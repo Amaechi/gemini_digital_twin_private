@@ -1,10 +1,12 @@
 """Shared primitive types and the generic tool-result envelope.
 
 Conventions (CLAUDE.md rule 5): SI internally; every numeric field name carries a unit suffix
-(``_m3h``, ``_m3s``, ``_bar``, ``_pa``, ``_degc``, ``_k``, ``_w``, ``_mw``, ``_mwh``, ``_frac`` …).
-Provenance tags follow spec §0: [P] organisers · [D] derived · [L] literature · [W] web · [A] assumption.
+(``_m3h``, ``_m3s``, ``_bar``, ``_pa``, ``_degc``, ``_k``, ``_w``, ``_mw``, ``_mwh``, ``_frac``).
+Provenance tags follow spec §0: [P] organisers, [D] derived, [L] literature, [W] web,
+[A] assumption.
 
-Later WPs may EXTEND these schemas (add fields/classes) but never rename or remove (WORK_PACKAGES.md).
+Later WPs may EXTEND these schemas (add fields/classes) but never rename or remove them
+(WORK_PACKAGES.md).
 """
 
 from __future__ import annotations
@@ -25,8 +27,11 @@ ConceptId = Literal["C0", "C1", "C2", "C3", "C4", "C5", "C6", "C7", "C8"]
 
 
 class StrictModel(BaseModel):
-    """Base model: rejects unknown fields (catches YAML typos and hallucinated LLM keys) and
-    NaN/inf (JSON would serialise them as null and break dump → validate round-trips)."""
+    """Base model that rejects unknown fields and NaN/inf.
+
+    Unknown fields: catches YAML typos and hallucinated LLM keys. NaN/inf: JSON would serialise
+    them as null and break dump → validate round-trips.
+    """
 
     model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
 
@@ -45,7 +50,9 @@ class GasHandling(StrEnum):
     """Associated-gas handling variant (DB-36 / DR-07). Venting CH4 is never an option."""
 
     DEGAS_USE = "degas_use"  # (a) degas and burn the gas in CHP/boiler, with calcite inhibitor
-    PRESSURISED_REINJECT = "pressurised_reinject"  # (b) keep loop pressurised, reinject dissolved gas
+    PRESSURISED_REINJECT = (
+        "pressurised_reinject"  # (b) keep loop pressurised, reinject dissolved gas
+    )
 
 
 T = TypeVar("T")

@@ -46,7 +46,7 @@ def test_tool_result_rejects_bad_payload_and_unknown_fields():
 
 
 def test_strict_model_forbids_extra_fields():
-    """StrictModel subclasses reject unknown fields."""
+    """Subclasses of StrictModel reject unknown fields."""
 
     class _M(StrictModel):
         a_k: float

@@ -139,11 +139,13 @@ assumptions:
     title: Cost data policy
     value:
       labelled_sources_only: true
-      placeholder_sensitivity_frac: 0.30
+      min_sensitivity_frac: 0.30
     unit: null
-    justification: Only labelled sources (spec §9.2); unsupported items are '[A] placeholder' entries.
-    source: GEOAGENT_DESIGN_SPEC §2.4 DB-35; config/cost_assumptions.yaml
-    sensitivity: "±30 % on placeholders."
+    justification: >-
+      Only labelled sources (spec §9.2). The former '[A] placeholder' items now carry the RC-10 "Sourced
+      values"; sensitivity is ±30 % or the item's stated range, whichever is wider (ECO-04).
+    source: GEOAGENT_DESIGN_SPEC §2.4 DB-35, §9.2 ECO-04; RC-10; config/cost_assumptions.yaml
+    sensitivity: "±30 % or the stated range, whichever is wider."
     tag: A
     status: default
     added_by: WP-00
@@ -214,11 +216,13 @@ assumptions:
     unit: null
     justification: >-
       The cost basis (currency, discount rate, energy prices) is an open question for the organisers
-      (spec §17 Q5). RC-10's main capex sources are in USD (NREL well costs) or convertible to USD with
-      the card's own rate (1 AUD = 0.63 USD), so USD avoids introducing an exchange rate that is not on
-      a reference card. Dollar-years differ between sources; see config/cost_assumptions.yaml notes.
-    source: RC-10; GEOAGENT_DESIGN_SPEC §17 Q5 (open)
-    sensitivity: "Revisit when the organisers answer §17 Q5."
+      (spec §17 Q5). RC-10 reports every sourced value in USD as well as natively. Values are stored
+      natively (EUR, USD, AUD with price year) and converted in code with eur_to_usd = 1.13 (ECB 2025
+      annual average), aud_to_usd = 0.63, the DEA 2020→2025 EUR factor 1.168 and CEPCI where marked.
+      The price-year mismatch between sources (2002/2011/2020/2023/2025 EUR and USD; NREL dollar-year
+      not stated) is accepted as ± a few % (RC-10).
+    source: RC-10 (incl. Sourced values); GEOAGENT_DESIGN_SPEC §17 Q5 (open)
+    sensitivity: "eur_to_usd 1.08–1.13; revisit when the organisers answer §17 Q5."
     tag: A
     status: default
     added_by: WP-00

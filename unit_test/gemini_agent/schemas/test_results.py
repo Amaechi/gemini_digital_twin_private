@@ -95,7 +95,7 @@ def test_annual_result_rejects_duplicate_or_unsorted_days_and_mismatched_kpis():
 
 
 def test_kpi_set_defaults_to_not_computed():
-    """KPIs are None/empty until a tool fills them; percentiles hold P10/P50/P90."""
+    """All KPIs are None/empty until a tool fills them; percentiles hold P10/P50/P90."""
     kpis = KPISet(
         candidate_id="C2", percentiles={"lcoh_per_mwh": {"p10": 40.0, "p50": 48.0, "p90": 60.0}}
     )
@@ -117,7 +117,7 @@ def test_nan_and_inf_are_rejected():
 
 
 def test_annual_result_rejects_date_not_matching_day_index():
-    """date must equal 1 Jan of `year` + day_index."""
+    """The date must equal 1 Jan of `year` + day_index."""
     with pytest.raises(ValidationError, match="does not match"):
         AnnualResult(
             candidate_id="X",

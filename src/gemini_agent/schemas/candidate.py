@@ -49,7 +49,9 @@ class Candidate(StrictModel):
         ge=0, description="Number of doublets; 0 if and only if concept is C0 (spec §3.4)."
     )
     depth_m: float | None = Field(
-        default=None, gt=0, description="Reservoir mid-depth TVD (DB-01, DB-07); None if no doublets."
+        default=None,
+        gt=0,
+        description="Reservoir mid-depth TVD (DB-01, DB-07); None if no doublets.",
     )
     design_flow_m3h: float | None = Field(
         default=None, gt=0, description="Design production flow per active doublet (DB-11)."
@@ -70,7 +72,8 @@ class Candidate(StrictModel):
         for key, value in sizes.items():
             if not key.endswith(EQUIPMENT_SIZE_SUFFIXES):
                 raise ValueError(
-                    f"equipment size key '{key}' must end with a unit suffix {EQUIPMENT_SIZE_SUFFIXES}"
+                    f"equipment size key '{key}' must end with a unit suffix "
+                    f"{EQUIPMENT_SIZE_SUFFIXES}"
                 )
             if value < 0:
                 raise ValueError(f"equipment size '{key}' must be >= 0, got {value}")

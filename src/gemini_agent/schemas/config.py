@@ -244,15 +244,35 @@ CostValue = float | dict[int, float] | dict[str, float] | None
 
 
 class CostItem(StrictModel):
-    """One cost assumption (RC-10, ECO-04): value, unit, range, source, tag."""
+    """One cost assumption (RC-10, ECO-04): value, unit, range, source, tag.
+
+    Values are stored in their **native** currency, unit and price year exactly as RC-10 states
+    them; USD figures are derived in code (economics tool, WP-08) from ``eur_to_usd``,
+    ``dea_eur2020_to_eur2025`` and ``cepci_index`` (when ``escalation_index == "cepci"``).
+    """
 
     value: CostValue = Field(
         union_mode="left_to_right",
-        description="Scalar, depth table {depth_m: value} or named parameters; null = unset placeholder.",
+        description=(
+            "Scalar, depth table {depth_m: value} or named parameters; " "null = unset placeholder."
+        ),
     )
-    unit: str
+    unit: str = Field(description="Unit of `value` in its native currency, e.g. 'M EUR/MW_th'.")
     range: tuple[float, float] | str | None = Field(
-        description="(low, high) for sensitivity, or text; None only for unset placeholders."
+        description="(low, high) in the unit of `value`, or text; None only for unset placeholders."
+    )
+    usd_range: tuple[float, float] | None = Field(
+        default=None, description="Sensitivity range in USD as stated on RC-10 (already converted)."
+    )
+    currency: Literal["EUR", "USD", "AUD"] | None = Field(
+        default=None, description="Currency of `value`; None for dimensionless items."
+    )
+    price_year: int | None = Field(
+        default=None, ge=1900, le=2100, description="Price year of `value` (e.g. 2025 for EUR2025)."
+    )
+    escalation_index: Literal["cepci"] | None = Field(
+        default=None,
+        description="Escalate to current prices with this index (RC-10 'escalation A').",
     )
     source: str
     tag: SourceTag
@@ -267,8 +287,10 @@ class CostItem(StrictModel):
             raise ValueError("value may be null only for a placeholder item")
         if self.range is None and self.value is not None and not isinstance(self.value, dict):
             raise ValueError("a scalar cost item needs a range")
-        if isinstance(self.range, tuple) and self.range[0] > self.range[1]:
-            raise ValueError("range low must be <= high")
+        for name in ("range", "usd_range"):
+            bounds = getattr(self, name)
+            if isinstance(bounds, tuple) and bounds[0] > bounds[1]:
+                raise ValueError(f"{name} low must be <= high")
         return self
 
 
@@ -278,11 +300,15 @@ class CostAssumptions(StrictModel):
     schema_version: int = 1
     source: str
     reporting_currency: str
-    placeholder_sensitivity_frac: float = Field(gt=0, lt=1, description="DB-35: ±30 %.")
+    min_sensitivity_frac: float = Field(
+        gt=0,
+        lt=1,
+        description="DB-35 / ECO-04: sensitivity is ±30 % or the item's range, whichever is wider.",
+    )
     items: dict[str, CostItem]
 
     def unset_placeholders(self) -> list[str]:
-        """Names of placeholder items that still have no value."""
+        """Names of placeholder items that still have no value (must be empty at submission)."""
         return sorted(name for name, item in self.items.items() if item.value is None)
 
 
@@ -327,11 +353,13 @@ class LLMConfig(StrictModel):
     @model_validator(mode="after")
     def _check_profile(self) -> LLMConfig:
         if self.active_profile not in self.profiles:
-            raise ValueError(f"active_profile '{self.active_profile}' not in {sorted(self.profiles)}")
+            raise ValueError(
+                f"active_profile '{self.active_profile}' not in {sorted(self.profiles)}"
+            )
         return self
 
     def active(self) -> ModelProfile:
-        """The selected hardware profile."""
+        """Return the selected hardware profile."""
         return self.profiles[self.active_profile]
 
 
@@ -361,22 +389,34 @@ ConfigName = Literal[
 def load_config(
     name: Literal["design_basis"], config_dir: Path | str | None = None
 ) -> DesignBasis: ...
+
+
 @overload
 def load_config(name: Literal["limits"], config_dir: Path | str | None = None) -> HardLimits: ...
+
+
 @overload
 def load_config(
     name: Literal["assumptions"], config_dir: Path | str | None = None
 ) -> AssumptionsRegister: ...
+
+
 @overload
 def load_config(
     name: Literal["climate_nl"], config_dir: Path | str | None = None
 ) -> ClimateConfig: ...
+
+
 @overload
 def load_config(
     name: Literal["cost_assumptions"], config_dir: Path | str | None = None
 ) -> CostAssumptions: ...
+
+
 @overload
 def load_config(name: Literal["llm"], config_dir: Path | str | None = None) -> LLMConfig: ...
+
+
 @overload
 def load_config(name: str, config_dir: Path | str | None = None) -> BaseModel: ...
 

@@ -40,6 +40,7 @@ def _stull_wet_bulb_degc(t_degc, rh_pct):
 
 @pytest.fixture(scope="module")
 def configs():
+    """All config files, loaded once per module."""
     return load_all_configs(REPO_ROOT / "config")
 
 
@@ -120,15 +121,32 @@ def test_assumptions_register_seeded_with_db30_to_db40(configs):
     reg = configs["assumptions"]
     assert isinstance(reg, AssumptionsRegister)
     ids = {a.id for a in reg.assumptions}
-    expected = {"DB-30", "DB-31", "DB-32", "DB-33", "DB-34a", "DB-34b", "DB-34c", "DB-34d",
-                "DB-34-RH", "DB-35", "DB-36", "DB-37", "DB-38", "DB-40"}
+    expected = {
+        "DB-30",
+        "DB-31",
+        "DB-32",
+        "DB-33",
+        "DB-34a",
+        "DB-34b",
+        "DB-34c",
+        "DB-34d",
+        "DB-34-RH",
+        "DB-35",
+        "DB-36",
+        "DB-37",
+        "DB-38",
+        "DB-40",
+    }
     assert expected <= ids
     assert reg.get("DB-31").value == 55.0
     assert reg.get("DB-32").value == 26.0
     assert reg.get("DB-33").value == 4100.0
     assert reg.get("DB-37").value == 0.3
-    assert reg.get("DB-38").value == {"skin": 0.0, "wellbore_radius_m": 0.108,
-                                      "drainage_radius_m": 1000.0}
+    assert reg.get("DB-38").value == {
+        "skin": 0.0,
+        "wellbore_radius_m": 0.108,
+        "drainage_radius_m": 1000.0,
+    }
     assert reg.get("DB-36").value["venting_allowed"] is False
     for item in reg.assumptions:
         assert item.justification and item.source and item.added_by
@@ -138,8 +156,15 @@ def test_assumptions_register_seeded_with_db30_to_db40(configs):
 
 def test_assumptions_register_rejects_duplicates():
     """Duplicate ids are a validation error."""
-    entry = {"id": "DB-31", "title": "t", "value": 1, "justification": "j", "source": "s",
-             "sensitivity": None, "added_by": "WP-00"}
+    entry = {
+        "id": "DB-31",
+        "title": "t",
+        "value": 1,
+        "justification": "j",
+        "source": "s",
+        "sensitivity": None,
+        "added_by": "WP-00",
+    }
     with pytest.raises(ValidationError, match="duplicate"):
         AssumptionsRegister(assumptions=[entry, entry])
 
@@ -150,14 +175,28 @@ def test_climate_wet_bulb_column_reproduces_stull(configs):
     assert isinstance(clim, ClimateConfig)
     assert _stull_wet_bulb_degc(20.0, 50.0) == pytest.approx(13.7, abs=0.1)
     m = clim.monthly
-    for t_db, rh, t_wb in zip(m.dry_bulb_degc, m.relative_humidity_pct, m.wet_bulb_degc,
-                              strict=True):
+    for t_db, rh, t_wb in zip(
+        m.dry_bulb_degc, m.relative_humidity_pct, m.wet_bulb_degc, strict=True
+    ):
         assert _stull_wet_bulb_degc(t_db, rh) == pytest.approx(t_wb, abs=0.1)
     assert sum(m.dry_bulb_degc) / 12 == pytest.approx(clim.annual_mean_degc, abs=0.05)
     assert m.relative_humidity_pct == configs["assumptions"].get("DB-34-RH").value
     assert (clim.design_point.dry_bulb_degc, clim.design_point.wet_bulb_degc) == (25.0, 18.4)
     assert (clim.warm_case.dry_bulb_degc, clim.warm_case.wet_bulb_degc) == (30.0, 21.0)
     assert clim.interpolation.anchor_day_of_month == 15 and clim.interpolation.wrap_year
+
+
+SOURCED_ITEMS = (
+    "hthp_capex_usd_per_kw_th",
+    "chp_capex_usd_per_kw_e",
+    "cooling_tower_capex_usd_per_kw_th",
+    "electric_boiler_capex_usd_per_kw_th",
+    "free_cooling_hex_capex_usd_per_kw_th",
+    "electricity_price_usd_per_mwh",
+    "gas_price_usd_per_mwh",
+    "co2_price_usd_per_t",
+)
+"""The eight former ECO-04 '[A] placeholder' items, now from RC-10 'Sourced values'."""
 
 
 def test_cost_assumptions_rc10_values(configs):
@@ -169,27 +208,117 @@ def test_cost_assumptions_rc10_values(configs):
     assert wells[2500] == 3.45 and wells[3000] == 6.0 and wells[5000] == 13.6
     assert items["well_cost_small_diameter_musd"].value[2500] == 2.9
     assert items["discount_rate_frac"].value == 0.08
-    hex_cost_aud = (items["plate_hex_base_aud"].value
-                    + items["plate_hex_per_kgs_k_aud"].value * 25.0 * 10.0)
+    hex_cost_aud = (
+        items["plate_hex_base_aud"].value + items["plate_hex_per_kgs_k_aud"].value * 25.0 * 10.0
+    )
     assert hex_cost_aud == 14000.0  # RC-10 validation: HEX cost(25 kg/s, 10 K) = 14,000 AUD
     assert items["aud_to_usd"].value == 0.63
-    assert cost.placeholder_sensitivity_frac == 0.30
+    assert cost.min_sensitivity_frac == 0.30
     for name, item in items.items():
-        assert item.unit and item.source, name
-        if item.value is None:
-            assert item.placeholder and item.tag == "A", name
-    assert {"hthp_capex_usd_per_kw_th", "electricity_price_usd_per_mwh",
-            "co2_price_usd_per_t"} <= set(cost.unset_placeholders())
+        assert item.unit and item.source and item.range is not None, name
+
+
+def test_no_cost_item_is_unset(configs):
+    """RC-10 validation / WP-13 check: no null value; unset_placeholders() is empty."""
+    cost = configs["cost_assumptions"]
+    assert cost.unset_placeholders() == []
+    assert all(item.value is not None and not item.placeholder for item in cost.items.values())
+
+
+def test_sourced_items_carry_native_currency_year_and_source(configs):
+    """Each former placeholder: native currency + price year, USD range, RC-10 source, tag L."""
+    items = configs["cost_assumptions"].items
+    for name in SOURCED_ITEMS:
+        item = items[name]
+        assert item.currency in {"EUR", "USD"}, name
+        assert item.price_year is not None, name
+        assert item.usd_range is not None, name
+        assert item.source.startswith("RC-10 Sourced values"), name
+        assert item.tag == "L", name
+    escalated = {name for name in SOURCED_ITEMS if items[name].escalation_index == "cepci"}
+    assert escalated == {
+        "cooling_tower_capex_usd_per_kw_th",
+        "free_cooling_hex_capex_usd_per_kw_th",
+    }
+
+
+def test_rc10_sourced_value_conversions(configs):
+    """RC-10 'Sourced-value conversions' reproduced from the YAML native values (data check)."""
+    items = configs["cost_assumptions"].items
+
+    def val(name):
+        return items[name].value
+
+    fx = val("eur_to_usd")
+    cepci = val("cepci_index")
+    assert fx == 1.13
+    # HTHP: 1.20 M EUR/MW x 1.13 = 1,356 $/kW_th (±1)
+    assert val("hthp_capex_usd_per_kw_th") * 1000.0 * fx == pytest.approx(1356.0, abs=1.0)
+    # CHP: 1.010 x 1.168 x 1.13 = 1.333 M$/MW_e (±0.002)
+    chp_musd_per_mw = val("chp_capex_usd_per_kw_e") * val("dea_eur2020_to_eur2025") * fx
+    assert chp_musd_per_mw == pytest.approx(1.333, abs=0.002)
+    # Gas: 15.8011 EUR/GJ x 3.6 = 56.88 EUR/MWh_GCV, x 1.111 = 63.19 EUR/MWh_LHV,
+    # x 1.13 = 71.4 $/MWh
+    gas_gcv = val("gas_price_usd_per_mwh") * 3.6
+    assert gas_gcv == pytest.approx(56.88, abs=0.01)
+    assert gas_gcv * val("gas_gcv_to_lhv") == pytest.approx(63.19, abs=0.01)
+    assert gas_gcv * val("gas_gcv_to_lhv") * fx == pytest.approx(71.4, abs=0.1)
+    assert 35.17 / 31.65 == pytest.approx(val("gas_gcv_to_lhv"), abs=0.001)
+    # CO2: 79.42 EUR/t x 1.13 = 89.74 $/t
+    assert val("co2_price_usd_per_t") * fx == pytest.approx(89.74, abs=0.01)
+    # Electricity: 118.2 EUR/MWh x 1.13 = 133.6 $/MWh; e-boiler 0.070 M EUR/MW = 79 $/kW_th
+    assert val("electricity_price_usd_per_mwh") * fx == pytest.approx(133.6, abs=0.05)
+    assert val("electric_boiler_capex_usd_per_kw_th") * 1000.0 * fx == pytest.approx(79.0, abs=0.5)
+    # Cooling tower: 64 $2011/kW x 797.9/585.7 = 87.2 $/kW (±0.1)
+    tower = val("cooling_tower_capex_usd_per_kw_th") * cepci[2023] / cepci[2011]
+    assert tower == pytest.approx(87.2, abs=0.1)
+    # Free-cooling HEX: 147 $2002/kW x 797.9/395.6 = 296 $/kW (±1)
+    fc_hex = val("free_cooling_hex_capex_usd_per_kw_th") * cepci[2023] / cepci[2002]
+    assert fc_hex == pytest.approx(296.0, abs=1.0)
+    # Hawaii Eq. 9 at 8,310 ton = 4,322,600 $ (±100), within 1 % of the vendor total 4,299,000 $
+    fn = val("free_cooling_hex_cost_function_usd")
+    eq9_usd = fn["per_ton"] * 8310.0 + fn["fixed"]
+    assert eq9_usd == pytest.approx(4_322_600.0, abs=100.0)
+    assert eq9_usd == pytest.approx(4_299_000.0, rel=0.01)
+    # CEPCI 1986 -> 2023 = 2.51, consistent with the [A] escalation factor 2.5
+    assert cepci[2023] / cepci[1986] == pytest.approx(
+        val("cepci_escalation_1986_to_2026"), abs=0.01
+    )
+
+
+def test_sourced_native_ranges_match_rc10_usd_ranges(configs):
+    """Where both are given, native range x conversion = RC-10 USD range (±1 % of the bound)."""
+    items = configs["cost_assumptions"].items
+    fx = items["eur_to_usd"].value
+    to_usd_per_kw = {
+        "hthp_capex_usd_per_kw_th": 1000.0 * fx,
+        "chp_capex_usd_per_kw_e": 1000.0 * fx * items["dea_eur2020_to_eur2025"].value,
+        "electric_boiler_capex_usd_per_kw_th": 1000.0 * fx,
+        "co2_price_usd_per_t": fx,
+    }
+    for name, factor in to_usd_per_kw.items():
+        low, high = items[name].range
+        usd_low, usd_high = items[name].usd_range
+        assert low * factor == pytest.approx(usd_low, rel=0.01), name
+        assert high * factor == pytest.approx(usd_high, rel=0.01), name
 
 
 def test_cost_item_rules():
-    """Null values only for placeholders; scalars need a range; low <= high."""
+    """Null values only for placeholders; scalars need a range; low <= high (both ranges)."""
     with pytest.raises(ValidationError, match="placeholder"):
         CostItem(value=None, unit="USD", range=None, source="s", tag="L")
     with pytest.raises(ValidationError, match="range"):
         CostItem(value=1.0, unit="USD", range=None, source="s", tag="L")
     with pytest.raises(ValidationError, match="low"):
         CostItem(value=1.0, unit="USD", range=(2.0, 1.0), source="s", tag="L")
+    with pytest.raises(ValidationError, match="usd_range"):
+        CostItem(value=1.0, unit="EUR", range="text", usd_range=(2.0, 1.0), source="s", tag="L")
+    with pytest.raises(ValidationError):
+        CostItem(value=1.0, unit="GBP", range="text", currency="GBP", source="s", tag="L")
+    placeholder = CostItem(
+        value=None, unit="USD", range=None, source="s", tag="A", placeholder=True
+    )
+    assert placeholder.value is None
 
 
 def test_llm_config(configs):

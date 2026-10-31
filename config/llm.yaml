@@ -2,8 +2,9 @@
 # engine: policy = deterministic PolicyEngine (cloud sessions, tests, CI — never calls an LLM)
 #         llm    = Pydantic AI agents on a local Ollama model (user's laptop only; CLOUD_SETUP.md §7)
 # The CLI flag --engine overrides `engine`.
-# Model tags below are the expected Ollama names for the spec §4.3 models; L-1 must confirm each with
-# `ollama show <tag>` (it must list `tools`) and update this file.
+# Orchestrator/coder tags were verified on ollama.com on 31 Oct 2026 (CLOUD_SETUP.md §7: all exist, with the
+# "tools" + "thinking" badges, 256K context). The `alternatives` are not verified. L-1 still confirms each tag
+# locally with `ollama show <tag>` (it must list `tools`).
 schema_version: 1
 engine: policy
 active_profile: 16gb

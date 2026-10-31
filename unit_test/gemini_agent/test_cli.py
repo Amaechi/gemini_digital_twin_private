@@ -16,7 +16,12 @@ def test_module_help_runs_as_subprocess():
     env = {**os.environ, "PYTHONPATH": str(REPO_ROOT / "src")}
     proc = subprocess.run(
         [sys.executable, "-m", "gemini_agent.cli", "--help"],
-        capture_output=True, text=True, env=env, cwd=REPO_ROOT, timeout=60, check=False,
+        capture_output=True,
+        text=True,
+        env=env,
+        cwd=REPO_ROOT,
+        timeout=60,
+        check=False,
     )
     assert proc.returncode == 0, proc.stderr
     assert "geoagent" in proc.stdout

@@ -8,7 +8,8 @@ from gemini_agent.schemas.config import REPO_ROOT
 
 WORKFLOW = REPO_ROOT / ".github" / "workflows" / "hackathon_tests.yaml"
 TEST_COMMAND = (
-    "python -m pytest -q unit_test/gemini_model unit_test/gemini_simulator unit_test/gemini_agent -x"
+    "python -m pytest -q unit_test/gemini_model unit_test/gemini_simulator "
+    "unit_test/gemini_agent -x"
 )
 
 
@@ -59,6 +60,13 @@ def test_gitignore_and_pytest_settings():
 def test_notice_credits():
     """NOTICE credits GEMINI/TNO, Plant Debugger (with commit), Warrant and Plant-as-Code."""
     notice = (REPO_ROOT / "NOTICE").read_text(encoding="utf-8")
-    for needle in ("GEMINI", "TNO", "PlantDebugger", "d69507aa48aec773a5cf72761e5ff60c491eefc1",
-                   "Apache", "Warrant", "Plant-as-Code"):
+    for needle in (
+        "GEMINI",
+        "TNO",
+        "PlantDebugger",
+        "d69507aa48aec773a5cf72761e5ff60c491eefc1",
+        "Apache",
+        "Warrant",
+        "Plant-as-Code",
+    ):
         assert needle in notice, needle
