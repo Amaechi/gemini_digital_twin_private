@@ -28,13 +28,13 @@ Optional GitHub settings: protect `main` (require PR + passing `hackathon_tests`
 ## 3. Connect GitHub and create the cloud environment
 1. claude.ai/code → connect GitHub → install the **Claude GitHub App** on `gemini_digital_twin_private` (private repos need the app; it also enables PR auto-fix).
 2. Create an environment named `geoagent`:
-   - **Network access:** Trusted (default) — PyPI is allowed. No Ollama/Hugging Face access is needed in the cloud.
+   - **Network access:** in the UI choose **Limited** and tick **Allow package managers** (the docs call this level "Trusted") — PyPI is allowed. Add `github.com` and `*.githubusercontent.com` under Allowed domains so the `uv python install` fallback can download if needed. No Ollama/Hugging Face access is needed in the cloud.
    - **Environment variables:**
      ```
      BASH_DEFAULT_TIMEOUT_MS=300000
      BASH_MAX_TIMEOUT_MS=600000
      ```
-   - **Setup script** (runs as root on Ubuntu 24.04 before Claude starts; cached ~7 days):
+   - **Setup script** — paste ONLY the bash block below (not this Markdown file). Runs as root on Ubuntu 24.04 before Claude starts; cached ~7 days:
      ```bash
      #!/bin/bash
      set -euo pipefail
@@ -50,7 +50,7 @@ Optional GitHub settings: protect `main` (require PR + passing `hackathon_tests`
        "pydantic>=2.7,<3" pydantic-ai==2.64.0 pyyaml pytest pytest-cov ruff
      /opt/geo-venv/bin/python -c "import numpy, scipy, pydantic_ai; print('geo-venv ok')"
      ```
-     Notes (docs checked 31 Oct 2026): `uv`, `pip`, `poetry`, `pytest` and `ruff` are pre-installed in the cloud image, so no installer download is needed; `uv python install` fetches from GitHub, which the Trusted allowlist already covers. The environment variables above are **not** visible inside the setup script (they are set after it runs) — the script does not need them. The repository is cloned before the script runs, so after WP-00 lands you may replace the package list with `uv pip install --python /opt/geo-venv/bin/python -r requirements-hackathon.txt` — test once; if the path is not found, keep the explicit list.
+     Notes (docs checked 31 Oct 2026): `uv`, `pip`, `poetry`, `pytest` and `ruff` are pre-installed in the cloud image, so no installer download is needed; `uv python install` fetches from GitHub (add the two GitHub domains above). The environment variables above are **not** visible inside the setup script (they are set after it runs) — the script does not need them. The repository is cloned before the script runs, so after WP-00 lands you may replace the package list with `uv pip install --python /opt/geo-venv/bin/python -r requirements-hackathon.txt` — test once; if the path is not found, keep the explicit list.
 3. Hardware is ≈ 4 vCPU / 16 GB RAM / 30 GB disk, **no GPU** ⇒ real LLM runs happen on your laptop (§7). Cloud sessions use the deterministic policy engine and Pydantic AI `TestModel`/`FunctionModel`.
 
 ## 4. Running work packages

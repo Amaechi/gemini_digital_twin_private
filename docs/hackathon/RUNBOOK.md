@@ -14,10 +14,10 @@ What needs a human (everything else the sessions do themselves):
 Why: a private repo is invisible to cloud sessions without it; it also enables automatic CI fixes on pull requests.
 
 **A2. Define the machine the sessions run on.** claude.ai/code → Environments → New environment:
-- Name `geoagent`; Network access **Trusted** (default);
+- Name `geoagent`; Network access **Limited** with **Allow package managers** ticked, plus allowed domains `github.com` and `*.githubusercontent.com`;
 - Environment variables `BASH_DEFAULT_TIMEOUT_MS=300000`, `BASH_MAX_TIMEOUT_MS=600000`;
-- Setup script: paste the script from `CLOUD_SETUP.md` §3.
-Why: every session boots a fresh Ubuntu machine; this makes each one identical and ready. Trusted = the machine reaches PyPI and GitHub and nothing else.
+- Setup script: paste only the bash block from `CLOUD_SETUP.md` §3 (not the whole file).
+Why: every session boots a fresh Ubuntu machine; this makes each one identical and ready. Limited + package managers = the machine reaches PyPI and GitHub and nothing else.
 
 **A3. Protect `main`.** GitHub → repo → Settings → Branches → Add rule for `main` → tick **Require a pull request before merging** (leave status checks for B3). Settings → General → tick **Allow auto-merge**.
 Why: no session can ever write directly to `main`; all work arrives as a pull request you approve with one click. Auto-merge lets GitHub merge a PR the moment its tests pass.
