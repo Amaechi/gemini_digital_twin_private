@@ -43,7 +43,7 @@ An agentic AI application that uses the GEMINI geothermal digital twin to select
 
 ## Session workflow (every session)
 1. Read `docs/hackathon/PROGRESS.md`, then your WP section in `WORK_PACKAGES.md`, then only the listed spec sections and cards.
-2. Work on branch `wp-XX-<slug>` (the session's branch is fine). Touch only files your WP owns; if you must touch another WP's file, keep the change minimal and note it in PROGRESS.md.
+2. Work on branch `wp-XX-<slug>` (the session's branch is fine). **Never commit to or push `main`** — all changes land via PR. Touch only files your WP owns; if you must touch another WP's file, keep the change minimal and note it in PROGRESS.md.
 3. Write tests with the code. Reproduce the card's validation tests. All tests green before finishing.
 4. Run the `wp-reviewer` subagent on your diff; for physics/model WPs also run `physics-checker`. Fix findings.
 5. Update `PROGRESS.md` (status, what changed, decisions, assumptions added, follow-ups, exact test command + result). Commit with clear messages. Open a PR titled `WP-XX: <title>`.
