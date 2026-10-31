@@ -1,0 +1,222 @@
+# Assumptions register (CLAUDE.md golden rule 2). Every [A] value or interpretation a tool uses MUST be here.
+# Seeded by WP-00 from GEOAGENT_DESIGN_SPEC §2.3 (DB-34) and §2.4 (DB-30…DB-40). Note: the spec defines no DB-39.
+# Later WPs append entries (never rename/remove); set added_by to the WP id and note them in PROGRESS.md.
+# Fields: id, title, value, unit, justification, source, sensitivity, tag (P/D/L/W/A), status, added_by.
+# Schema: gemini_agent.schemas.config.AssumptionsRegister.
+schema_version: 1
+assumptions:
+  - id: DB-30
+    title: Meaning of "330 daily steps" (doublet availability)
+    value:
+      interpretation: A
+      doublet_available_days_per_yr: 330
+      planned_outage_days_per_doublet: 35
+      outages_may_overlap: false
+      outage_schedule: chosen by the optimiser
+      demand_met_days_per_yr: 365
+    unit: null
+    justification: >-
+      Availability interpretation: each doublet is available 330 of 365 days (35-day planned outage,
+      never overlapping); heating and cooling demand must be met on all 365 days. 330/365 = 90.4 %
+      matches the standard 90 % availability planning assumption; it is the conservative reading
+      (forces backup capacity) and a design that passes it also passes the "simulate only 330 days" reading.
+    source: GEOAGENT_DESIGN_SPEC §2.4 DB-30; ESMAP p.31 [L]
+    sensitivity: "Interpretation B: simulate 330 days with no outage; report both."
+    tag: A
+    status: default
+    added_by: WP-00
+
+  - id: DB-31
+    title: District-heating return temperature
+    value: 55.0
+    unit: degC
+    justification: >-
+      100/55 °C network. Between measured Danish returns of 40–43 °C (Danfoss/Thisted p.4–5) and
+      conventional geothermal practice of ΔT >= 17–22 K (Guidebook p.231, 234); 55 °C lets the plate
+      HEX cool brine ≈ 86 → 58 °C before the heat-pump evaporator takes it to >= 46 °C. The agent MAY
+      treat the return temperature as a design lever.
+    source: GEOAGENT_DESIGN_SPEC §2.4 DB-31; Danfoss/Thisted p.4–5 [L]; Guidebook p.231, 234 [L]
+    sensitivity: [45.0, 65.0, 75.0]
+    tag: A
+    status: default
+    added_by: WP-00
+
+  - id: DB-32
+    title: Cooling-network return temperature
+    value: 26.0
+    unit: degC
+    justification: 20/26 °C; direct-cooling grids run ΔT 5–6 K.
+    source: GEOAGENT_DESIGN_SPEC §2.4 DB-32; Shallow DHC review p.8 [L]
+    sensitivity: [24.0, 28.0]
+    tag: A
+    status: default
+    added_by: WP-00
+
+  - id: DB-33
+    title: Brine specific heat capacity
+    value: 4100.0
+    unit: J/(kg K)
+    justification: Saline brine is below fresh water 4.19 kJ/(kg K) (the Guidebook uses fresh-water values).
+    source: GEOAGENT_DESIGN_SPEC §2.4 DB-33
+    sensitivity: [4000.0, 4190.0]
+    tag: A
+    status: default
+    added_by: WP-00
+
+  - id: DB-34a
+    title: Daily ambient temperature series for 2027
+    value:
+      method: piecewise_linear
+      anchor_day_of_month: 15
+      wrap_year: true
+      data: config/climate_nl.yaml
+    unit: null
+    justification: >-
+      Smooth seasonal profile from KNMI De Bilt 1991–2020 monthly normals placed at mid-month.
+    source: GEOAGENT_DESIGN_SPEC §2.3 DB-34a; RC-07; KNMI normals [W]
+    sensitivity: "Warm-climate case (DB-34b)."
+    tag: A
+    status: default
+    added_by: WP-00
+
+  - id: DB-34-RH
+    title: Monthly relative humidity (for wet-bulb)
+    value: [87, 84, 80, 75, 74, 76, 77, 78, 82, 85, 88, 88]
+    unit: "%"
+    justification: >-
+      No KNMI RH normals obtained; assumed values used with the Stull (2011) formula to derive monthly
+      wet-bulb. Replace with KNMI normals if obtained.
+    source: GEOAGENT_DESIGN_SPEC §2.3; RC-07 [A]
+    sensitivity: "Warm-climate design point 30 °C DB / 21 °C WB (DB-34b)."
+    tag: A
+    status: default
+    added_by: WP-00
+
+  - id: DB-34b
+    title: Summer design point for chiller and heat-rejection sizing
+    value:
+      dry_bulb_degc: 25.0
+      wet_bulb_degc: 18.4
+      warm_case_dry_bulb_degc: 30.0
+      warm_case_wet_bulb_degc: 21.0
+    unit: degC
+    justification: >-
+      1 % cooling dry-bulb with mean coincident wet-bulb, Amsterdam WMO 062400 (1973–1996). The warm
+      case is an assumption because the record pre-dates recent warming.
+    source: GEOAGENT_DESIGN_SPEC §2.3 DB-34b; RC-07; NOAA Engineering Weather Data [W]; warm case [A]
+    sensitivity: "Warm-climate case 30 °C DB / 21 °C WB."
+    tag: W
+    status: default
+    added_by: WP-00
+
+  - id: DB-34c
+    title: Annual mean air and shallow-ground temperature
+    value:
+      annual_mean_air_degc: 10.5
+      shallow_ground_degc: 12.5
+    unit: degC
+    justification: Shallow ground ≈ air mean + 2 °C; consistent with DB-04 (surface 12 °C).
+    source: GEOAGENT_DESIGN_SPEC §2.3 DB-34c; Shallow DHC review p.3 [L]
+    sensitivity: null
+    tag: L
+    status: default
+    added_by: WP-00
+
+  - id: DB-34d
+    title: Exergy dead state
+    value: daily_dry_bulb
+    unit: null
+    justification: Dead state T0 = daily ambient dry-bulb; stated in every exergy KPI.
+    source: GEOAGENT_DESIGN_SPEC §2.3 DB-34d; DiPippo Ch10 p.7 [L]
+    sensitivity: null
+    tag: L
+    status: default
+    added_by: WP-00
+
+  - id: DB-35
+    title: Cost data policy
+    value:
+      labelled_sources_only: true
+      placeholder_sensitivity_frac: 0.30
+    unit: null
+    justification: Only labelled sources (spec §9.2); unsupported items are '[A] placeholder' entries.
+    source: GEOAGENT_DESIGN_SPEC §2.4 DB-35; config/cost_assumptions.yaml
+    sensitivity: "±30 % on placeholders."
+    tag: A
+    status: default
+    added_by: WP-00
+
+  - id: DB-36
+    title: Associated-gas handling
+    value:
+      decision_variable: true
+      options: [degas_use, pressurised_reinject]
+      venting_allowed: false
+    unit: null
+    justification: >-
+      Decision variable, not an assumption (DR-07): (a) degas and use the gas in CHP/boiler with
+      calcite inhibitor, or (b) keep the loop pressurised and reinject dissolved gas. Venting CH4 is
+      never allowed. Degassing CO2 raises calcite scaling risk; Pleasant Bayou precedent for burning
+      separated methane.
+    source: GEOAGENT_DESIGN_SPEC §2.4 DB-36; DiPippo §4.4, §9.6.3 [L]; WEC p.15 [L]; Guidebook p.160 [L]
+    sensitivity: "Both variants simulated."
+    tag: A
+    status: default
+    added_by: WP-00
+
+  - id: DB-37
+    title: Grid electricity CO2 intensity
+    value: 0.3
+    unit: kg/kWh
+    justification: Value used in the GEMINI example.
+    source: GEOAGENT_DESIGN_SPEC §2.4 DB-37; GEMINI example
+    sensitivity: [0.2, 0.4]
+    tag: A
+    status: default
+    added_by: WP-00
+
+  - id: DB-38
+    title: Skin, wellbore radius, drainage radius
+    value:
+      skin: 0.0
+      wellbore_radius_m: 0.108
+      drainage_radius_m: 1000.0
+    unit: null
+    justification: Skin 0; rw = 0.108 m (8½-inch hole); re = 1,000 m.
+    source: GEOAGENT_DESIGN_SPEC §2.4 DB-38
+    sensitivity:
+      skin: [-1.0, 5.0]
+    tag: A
+    status: default
+    added_by: WP-00
+
+  - id: DB-40
+    title: Meaning of the 70 % pump efficiency
+    value:
+      pump_hydraulic_efficiency_frac: 0.70
+      motor_efficiency_frac: 0.93
+      vfd_efficiency_frac: 0.97
+    unit: null
+    justification: >-
+      70 % is the pump hydraulic (shaft) efficiency; motor and VFD losses are added separately
+      (motor 93 %, VFD 97 % [A]). Guidebook examples use 60–65 % wire-to-water.
+    source: GEOAGENT_DESIGN_SPEC §2.4 DB-40; Guidebook p.256–263 [L]
+    sensitivity: "Wire-to-water 70 %."
+    tag: A
+    status: default
+    added_by: WP-00
+
+  - id: ECO-CUR
+    title: Reporting currency for costs
+    value: USD
+    unit: null
+    justification: >-
+      The cost basis (currency, discount rate, energy prices) is an open question for the organisers
+      (spec §17 Q5). RC-10's main capex sources are in USD (NREL well costs) or convertible to USD with
+      the card's own rate (1 AUD = 0.63 USD), so USD avoids introducing an exchange rate that is not on
+      a reference card. Dollar-years differ between sources; see config/cost_assumptions.yaml notes.
+    source: RC-10; GEOAGENT_DESIGN_SPEC §17 Q5 (open)
+    sensitivity: "Revisit when the organisers answer §17 Q5."
+    tag: A
+    status: default
+    added_by: WP-00

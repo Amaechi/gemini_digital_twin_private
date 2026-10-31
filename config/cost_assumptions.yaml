@@ -1,0 +1,240 @@
+# Cost assumptions (RC-10 Economics; GEOAGENT_DESIGN_SPEC §9.2 ECO-01…ECO-04, DB-35).
+# Every item: value, unit, range, source, tag (P/D/L/W/A); `placeholder: true` marks ECO-04 "[A] placeholder" items.
+# Placeholder items with `value: null` have NO labelled source yet (RC-10 gives no number; spec §17 Q5 open).
+# WP-08 owns updates to this file (sources); tools must refuse or flag a calculation that needs an unset item.
+# Chiller cost functions (absorption vs electric, 1986 $) come from RC-05 and are added by WP-08.
+# `range` is (low, high) for sensitivity, or text when RC-10 states none.
+# Schema: gemini_agent.schemas.config.CostAssumptions.
+schema_version: 1
+source: "RC-10 Economics; GEOAGENT_DESIGN_SPEC §9.2"
+reporting_currency: USD            # assumption ECO-CUR (config/assumptions.yaml)
+placeholder_sensitivity_frac: 0.30 # DB-35: ±30 % on placeholders
+
+items:
+  # ------------------------------------------------------------------ finance
+  discount_rate_frac:
+    value: 0.08
+    unit: 1/yr
+    range: [0.08, 0.112]
+    source: "RC-10 defaults: r = 8 % (Gippsland; Guidebook) [L]; high = ESMAP Annex 3 WACC 11.2 % [L]"
+    tag: L
+  wacc_frac:
+    value: 0.112
+    unit: 1/yr
+    range: [0.109, 0.1122]
+    source: "RC-10: ESMAP Annex 3 spreadsheet p.144 WACC 11.22 % (quoted base 11.2 %); simple formula with D = 70 % gives 10.9 % [L]"
+    tag: L
+    note: "Finance view only (ECO-06): WACC = i_d (1 - tax) D + R_e E; i_d 6 %, tax 20 %, R_e 25 %, E 30 %."
+  analysis_period_yr:
+    value: 30.0
+    unit: yr
+    range: [20.0, 30.0]
+    source: "RC-10; spec ECO-01: life 30 yr and a 20-yr case (Guidebook advises <= 20 yr) [L]"
+    tag: L
+  inflation_general_frac:
+    value: 0.025
+    unit: 1/yr
+    range: [0.0175, 0.0325]
+    source: "RC-10 default (no citation on the card)"
+    tag: A
+    note: "Range = ±30 % (DB-35 rule for [A] values)."
+  energy_escalation_frac:
+    value: 0.05
+    unit: 1/yr
+    range: [0.03, 0.07]
+    source: "RC-10: energy escalation 3–7 %"
+    tag: A
+    note: "Value = midpoint of the RC-10 range (our choice)."
+
+  # ------------------------------------------------------------------ wells (ECO-02)
+  well_cost_large_diameter_musd:
+    value: {1000: 2.1, 1500: 2.5, 2000: 2.9, 2500: 3.45, 3000: 6.0, 3500: 6.75, 4000: 7.5, 4500: 8.3, 5000: 13.6}
+    unit: "M$ per well vs TVD depth (m)"
+    range: "±0.15 M$ per node (chart reading)"
+    source: "NREL 2025 cost curves, Fig. 5 markers, '2025 Revised Baseline' (RC-10) [L]"
+    tag: L
+    note: >-
+      12¼-inch vertical open hole. Interpolate linearly between nodes; casing-program steps between
+      2.5–3 km and 4.5–5 km — never smooth across them. 10 % contingency already included. Dollar-year not
+      stated (implicitly Lowry 2017 basis).
+  well_cost_small_diameter_musd:
+    value: {1500: 1.6, 2000: 1.9, 2500: 2.9, 3000: 4.1, 4500: 5.7, 5000: 10.8}
+    unit: "M$ per well vs TVD depth (m)"
+    range: "±0.15 M$ per node (chart reading)"
+    source: "NREL 2025 cost curves, Fig. 5 markers (RC-10) [L]"
+    tag: L
+    note: "8½-inch vertical; same step depths as the large-diameter table."
+  well_cost_smooth_fit:
+    value: {a_musd: 1.45, b_per_m: 0.000366, max_depth_m: 2500.0}
+    unit: "C = a_musd * exp(b_per_m * z_m), M$ per well"
+    range: "within ±5 % of the NREL markers at 1–2.5 km"
+    source: "RC-10: fit by us to the NREL 2025 Fig. 5 markers [D]"
+    tag: D
+    note: "Only for sensitivity sweeps <= 2.5 km; invalid above 2.5 km."
+  well_deviated_multiplier:
+    value: 1.125
+    unit: "-"
+    range: [1.10, 1.15]
+    source: "NREL 2025 cost curves (RC-10): horizontal/deviated multiplier 1.10–1.15 [L]"
+    tag: L
+    note: "Value = midpoint (our choice). Vertical wells use 1.0."
+  well_contingency_frac:
+    value: 0.10
+    unit: "-"
+    range: [0.10, 0.10]
+    source: "NREL 2025 cost curves (RC-10) [L]"
+    tag: L
+    note: "Already included in the NREL well-cost tables — do not add again."
+  well_cost_cross_check_musd:
+    value: {per_well_low: 2.0, per_well_high: 6.0, four_wells_2p5_3km_low: 10.0, four_wells_2p5_3km_high: 25.0}
+    unit: "M$"
+    range: "sanity band, not a cost input"
+    source: "ESMAP p.69 (RC-10) [L]"
+    tag: L
+
+  # ------------------------------------------------------------------ heat exchangers and pipes (ECO-03)
+  plate_hex_base_aud:
+    value: 2000.0
+    unit: AUD
+    range: "none stated on RC-10"
+    source: "Gippsland: HEX cost = 2000 + 48 · m_dot[kg/s] · dT[K] AUD (RC-10) [L]"
+    tag: L
+  plate_hex_per_kgs_k_aud:
+    value: 48.0
+    unit: "AUD per (kg/s · K)"
+    range: "none stated on RC-10"
+    source: "Gippsland (RC-10) [L]"
+    tag: L
+  plate_hex_titanium_multiplier:
+    value: 1.5
+    unit: "-"
+    range: "none stated on RC-10"
+    source: "Guidebook p.220: titanium plates +50 % (RC-10) [L]"
+    tag: L
+  aud_to_usd:
+    value: 0.63
+    unit: USD/AUD
+    range: "none stated on RC-10"
+    source: "RC-10 (Gippsland cost line): 1 AUD = 0.63 USD"
+    tag: L
+    note: "Date of the rate not stated on the card."
+  pipe_preinsulated_aud_per_m:
+    value: 500.0
+    unit: AUD/m
+    range: "none stated on RC-10"
+    source: "Gippsland (RC-10) [L]"
+    tag: L
+  pipe_hdpe_uninsulated_aud_per_m:
+    value: 100.0
+    unit: AUD/m
+    range: "none stated on RC-10"
+    source: "Gippsland (RC-10) [L]"
+    tag: L
+
+  # ------------------------------------------------------------------ old cost functions + escalation
+  heat_pump_1987_usd_per_kw:
+    value: 91.0
+    unit: "USD(1987)/kW"
+    range: "none stated on RC-10"
+    source: "Guidebook Table 13.3: ≈ $91/kW, 2.9 MW centrifugal (RC-10) [L]"
+    tag: L
+    note: "Outdated for high-temperature heat pumps — do not use for HTHP sizing costs."
+  cepci_escalation_1986_to_2026:
+    value: 2.5
+    unit: "-"
+    range: [1.75, 3.25]
+    source: "RC-10; spec ECO-04: CEPCI ratio ≈ 2.5 [A]"
+    tag: A
+    note: "Range = ±30 % (DB-35 rule for [A] values)."
+
+  # ------------------------------------------------------------------ [A] placeholders (ECO-04) — values to be sourced (WP-08)
+  hthp_capex_usd_per_kw_th:
+    value: null
+    unit: USD/kW_th
+    range: null
+    source: "none yet — RC-10 lists HTHP as an [A] placeholder"
+    tag: A
+    placeholder: true
+  chp_capex_usd_per_kw_e:
+    value: null
+    unit: USD/kW_e
+    range: null
+    source: "none yet — RC-10 lists CHP as an [A] placeholder"
+    tag: A
+    placeholder: true
+  cooling_tower_capex_usd_per_kw_th:
+    value: null
+    unit: USD/kW_th rejected
+    range: null
+    source: "none yet — RC-10 lists the cooling tower as an [A] placeholder"
+    tag: A
+    placeholder: true
+  electric_boiler_capex_usd_per_kw_th:
+    value: null
+    unit: USD/kW_th
+    range: null
+    source: "none yet — RC-10 lists the electric boiler as an [A] placeholder"
+    tag: A
+    placeholder: true
+  free_cooling_hex_capex_usd_per_kw_th:
+    value: null
+    unit: USD/kW_th
+    range: null
+    source: "none yet — RC-10 lists the free-cooling HEX as an [A] placeholder"
+    tag: A
+    placeholder: true
+  electricity_price_usd_per_mwh:
+    value: null
+    unit: USD/MWh_e
+    range: null
+    source: "none yet — RC-10: energy prices are [A] in YAML; spec §17 Q5 open"
+    tag: A
+    placeholder: true
+  gas_price_usd_per_mwh:
+    value: null
+    unit: USD/MWh (LHV)
+    range: null
+    source: "none yet — RC-10: energy prices are [A] in YAML; spec §17 Q5 open"
+    tag: A
+    placeholder: true
+  co2_price_usd_per_t:
+    value: null
+    unit: USD/t CO2
+    range: null
+    source: "none yet — RC-10: CO2 price is [A] in YAML"
+    tag: A
+    placeholder: true
+
+  # ------------------------------------------------------------------ opex and replacement
+  om_frac_of_capex_per_yr:
+    value: 0.015
+    unit: 1/yr
+    range: [0.01, 0.02]
+    source: "RC-10; spec ECO-01: O&M 1–2 % of capex/yr (Gippsland) [L]"
+    tag: L
+    note: "Value = midpoint (our choice)."
+  om_breakdown_guidebook_frac_per_yr:
+    value: {maintenance: 0.01, insurance: 0.0035, property_tax: 0.0015}
+    unit: "fraction of capex per yr"
+    range: "none stated on RC-10"
+    source: "Guidebook Table 18.7 (RC-10) [L]"
+    tag: L
+  plant_maintenance_frac_per_yr:
+    value: 0.02
+    unit: 1/yr
+    range: [0.015, 0.025]
+    source: "ESMAP p.74: plant maintenance 1.5–2.5 % (RC-10) [L]"
+    tag: L
+    note: "Value = midpoint (our choice)."
+  pump_replacement_interval_yr:
+    value: 7.0
+    unit: yr
+    range: [5.0, 10.0]
+    source: "RC-10: Gippsland 7 yr; Guidebook every 5–10 yr [L]"
+    tag: L
+  heat_pump_replacement_interval_yr:
+    value: 15.0
+    unit: yr
+    range: "none stated on RC-10"
+    source: "RC-10; spec ECO-01: heat pump replaced at 15 yr [L]"
+    tag: L

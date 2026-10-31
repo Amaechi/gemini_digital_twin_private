@@ -1,0 +1,33 @@
+# Netherlands climate (RC-07; GEOAGENT_DESIGN_SPEC §2.3 DB-34). Schema: gemini_agent.schemas.config.ClimateConfig.
+# T_db: KNMI De Bilt normals 1991–2020 [W]. RH: assumption [A] (DB-34-RH). T_wb: Stull (2011) from T_db and RH [D]
+# (validated in unit_test/gemini_agent/schemas/test_config.py to ±0.1 °C).
+schema_version: 1
+source: "RC-07; GEOAGENT_DESIGN_SPEC §2.3 DB-34 (KNMI normals [W], RH [A], Stull wet-bulb [D])"
+station: De Bilt (KNMI)
+normals_period: 1991-2020
+
+monthly:          # Jan   Feb   Mar   Apr   May   Jun   Jul   Aug   Sep   Oct   Nov   Dec
+  dry_bulb_degc:        [3.6,  3.9,  6.5,  9.9, 13.4, 16.1, 18.2, 17.8, 14.7, 10.9,  7.0,  4.2]
+  relative_humidity_pct: [87,   84,   80,   75,   74,   76,   77,   78,   82,   85,   88,   88]
+  wet_bulb_degc:        [2.4,  2.4,  4.6,  7.3, 10.6, 13.3, 15.4, 15.2, 12.7,  9.3,  5.8,  3.0]
+
+wet_bulb_method: "Stull (2011), valid RH 5–99 %, T −20…50 °C (RC-07)"
+
+interpolation:    # DB-34a: piecewise-linear between mid-month values, wrap Dec → Jan
+  method: piecewise_linear
+  anchor_day_of_month: 15
+  wrap_year: true
+
+design_point:     # DB-34b: summer design point for chiller / heat-rejection sizing [W]
+  dry_bulb_degc: 25.0
+  wet_bulb_degc: 18.4
+  basis: "1 % cooling DB, mean coincident WB; Amsterdam WMO 062400, 1973–1996 (NOAA Engineering Weather Data) [W]"
+
+warm_case:        # DB-34b sensitivity [A]
+  dry_bulb_degc: 30.0
+  wet_bulb_degc: 21.0
+  basis: "Warm-climate sensitivity [A]: the NOAA record pre-dates recent warming"
+
+annual_mean_degc: 10.5        # DB-34c (mean of monthly T_db = 10.52)
+shallow_ground_degc: 12.5     # DB-34c air mean + 2 °C [L Shallow DHC review p.3]
+exergy_dead_state: daily_dry_bulb   # DB-34d

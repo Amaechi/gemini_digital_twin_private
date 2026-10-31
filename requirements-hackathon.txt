@@ -1,0 +1,14 @@
+# GeoAgent (SPE GeoHackathon 2026) — pinned runtime + dev dependencies.
+# Python 3.12 (3.11 OK). Install: uv pip install -r requirements-hackathon.txt
+# Do NOT add GEMINI's full Poetry stack (Flask, Celery, Chroma, ...). Do not upgrade during the week (spec §4.2, NFR-01).
+numpy==2.2.6
+scipy==1.13.1
+pandas==2.3.3
+matplotlib==3.10.7
+pydantic==2.14.2
+pydantic-ai==2.64.0
+pyyaml==6.0.3
+# dev / CI
+pytest==9.2.0
+pytest-cov==7.1.0
+ruff==0.17.3

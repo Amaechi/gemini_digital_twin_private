@@ -1,0 +1,55 @@
+# Design basis DB-01…DB-19 — fixed inputs provided by the organisers [P].
+# Source: docs/hackathon/GEOAGENT_DESIGN_SPEC.md §2.1. Schema: gemini_agent.schemas.config.DesignBasis.
+# Never re-type these values in code: load this file. Derived quantities (DB-20…29) are computed by tools.
+# Assumptions/defaults (DB-30…40) live in config/assumptions.yaml; hard limits in config/limits.yaml.
+schema_version: 1
+source: "GEOAGENT_DESIGN_SPEC §2.1 (organiser problem statement) [P]"
+year: 2027
+
+reservoir:
+  mid_depth_m: 2500.0                     # DB-01 reservoir mid-depth, TVD
+  gross_thickness_m: 100.0                # DB-02 gross thickness h
+  geothermal_gradient_k_per_km: 30.0      # DB-03 30 °C/km
+  surface_temperature_degc: 12.0          # DB-04
+  pressure_barg: 250.0                    # DB-05 reservoir pressure 250 bar(g)
+  permeability_md: 200.0                  # DB-06
+  other_depths_allowed: true              # DB-07
+  other_depths_pressure_model: hydrostatic  # DB-07 hydrostatic pressure + gradient temperature
+
+brine:
+  density_kg_m3: 1030.0                   # DB-08
+  viscosity_pa_s: 0.00040                 # DB-08 0.40 mPa·s
+  gas_liquid_ratio_nm3_per_m3: 0.8        # DB-09
+  gas_ch4_mol_frac: 0.80                  # DB-09 80 mol % CH4
+  gas_co2_mol_frac: 0.20                  # DB-09 20 mol % CO2
+
+doublets:
+  count_min: 1                            # DB-10
+  count_max: 3                            # DB-10
+  flow_min_active_m3h: 50.0               # DB-11 min while active
+  flow_max_m3h: 300.0                     # DB-11 max per doublet
+  brine_cooling_max_k: 40.0               # DB-12 producer → injector
+  pump_hydraulic_efficiency_frac: 0.70    # DB-13 (meaning: DB-40)
+  injection_equals_production: true       # DB-14 equal volumes
+  same_reservoir: true                    # DB-14 same reservoir
+  operation_days_per_yr: 330              # DB-15 (interpretation: DB-30)
+
+heating:
+  supply_temperature_degc: 100.0          # DB-16
+  demand_csv: data/demand/GEMINI_Heating_Demand_Daily_2027.csv   # DB-18
+  csv_date_column: date
+  csv_value_column: heating_demand_MWth   # day-average MW
+  peak_mw: 30.0                           # DB-18 peak on 28 Jan
+  peak_date: 2027-01-28
+  annual_gwh: 111.67                      # DB-18
+  nonzero_days: 365
+
+cooling:
+  supply_temperature_degc: 20.0           # DB-17
+  demand_csv: data/demand/GEMINI_Cooling_Demand_Daily_2027.csv   # DB-19
+  csv_date_column: date
+  csv_value_column: cooling_demand_MWcool # day-average MW
+  peak_mw: 10.0                           # DB-19 peak on 19 Jul
+  peak_date: 2027-07-19
+  annual_gwh: 23.74                       # DB-19
+  nonzero_days: 219                       # DB-19
