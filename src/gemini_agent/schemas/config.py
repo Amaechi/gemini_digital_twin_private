@@ -254,7 +254,7 @@ class CostItem(StrictModel):
     value: CostValue = Field(
         union_mode="left_to_right",
         description=(
-            "Scalar, depth table {depth_m: value} or named parameters; " "null = unset placeholder."
+            "Scalar, depth table {depth_m: value} or named parameters; null = unset placeholder."
         ),
     )
     unit: str = Field(description="Unit of `value` in its native currency, e.g. 'M EUR/MW_th'.")
@@ -262,7 +262,11 @@ class CostItem(StrictModel):
         description="(low, high) in the unit of `value`, or text; None only for unset placeholders."
     )
     usd_range: tuple[float, float] | None = Field(
-        default=None, description="Sensitivity range in USD as stated on RC-10 (already converted)."
+        default=None,
+        description=(
+            "Sensitivity range in USD as stated on RC-10, already converted (and, for "
+            "escalation_index=cepci items, already escalated to 2023 USD); do not convert again."
+        ),
     )
     currency: Literal["EUR", "USD", "AUD"] | None = Field(
         default=None, description="Currency of `value`; None for dimensionless items."
@@ -291,6 +295,8 @@ class CostItem(StrictModel):
             bounds = getattr(self, name)
             if isinstance(bounds, tuple) and bounds[0] > bounds[1]:
                 raise ValueError(f"{name} low must be <= high")
+        if self.escalation_index is not None and self.price_year is None:
+            raise ValueError("an escalated item needs a price_year")
         return self
 
 
@@ -306,6 +312,23 @@ class CostAssumptions(StrictModel):
         description="DB-35 / ECO-04: sensitivity is ±30 % or the item's range, whichever is wider.",
     )
     items: dict[str, CostItem]
+
+    @model_validator(mode="after")
+    def _check_cepci_years(self) -> CostAssumptions:
+        escalated = {
+            name: item.price_year
+            for name, item in self.items.items()
+            if item.escalation_index == "cepci"
+        }
+        if not escalated:
+            return self
+        index = self.items.get("cepci_index")
+        if index is None or not isinstance(index.value, dict):
+            raise ValueError("items with escalation_index 'cepci' need a 'cepci_index' table")
+        missing = {name: year for name, year in escalated.items() if year not in index.value}
+        if missing:
+            raise ValueError(f"cepci_index has no entry for the price year of {missing}")
+        return self
 
     def unset_placeholders(self) -> list[str]:
         """Names of placeholder items that still have no value (must be empty at submission)."""

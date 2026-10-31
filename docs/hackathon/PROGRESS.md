@@ -5,7 +5,7 @@ Keep this file short and current. It is the hand-off between sessions (chat hist
 ## Status board
 | WP | Title | Status | Branch / PR | Last test command → result | Notes |
 |---|---|---|---|---|---|
-| WP-00 | Bootstrap, env, CI, skeleton | in review | `claude/peaceful-tesla-xdrfyy` / [PR #1](https://github.com/Amaechi/gemini_digital_twin_private/pull/1) | full suite → 142 passed (91 GEMINI + 51 agent); ruff, black, isort, flake8 clean | doublet example Q = 129.02 m³/h |
+| WP-00 | Bootstrap, env, CI, skeleton | in review | `claude/peaceful-tesla-xdrfyy` / [PR #1](https://github.com/Amaechi/gemini_digital_twin_private/pull/1) | full suite → 143 passed (91 GEMINI + 52 agent); ruff, black, isort, flake8 clean | doublet example Q = 129.02 m³/h |
 | WP-01 | GEMINI core fixes, registry | todo | | | |
 | WP-02 | Cooling models | todo | | | |
 | WP-03 | Heat pump, e-boiler, storage | todo | | | |
@@ -43,7 +43,7 @@ Status values: todo · in progress · in review · merged · blocked (say why).
 See spec §17. Answers: —
 
 ## Hand-off notes (latest session writes here, replace previous)
-**WP-00 done (in review).** Test command: `PYTHONPATH=src python -m pytest -q unit_test/gemini_model unit_test/gemini_simulator unit_test/gemini_agent -x` → **142 passed** (baseline before WP-00: 91 GEMINI). `ruff check src/gemini_agent unit_test/gemini_agent` → clean. black 25.11.0 / isort 7.0.0 / flake8 7.3.0 (`--max-line-length=100`) on the new files → clean. Branch rebased on `main` @ 0db8087. `PYTHONPATH=src python simulator_examples/run_doublet_plant_example.py` → primary flow **129.02 m³/h**, power_plant 5.825 MW. `requirements-hackathon.txt` installs into a fresh Python 3.12.13 venv, and the suite passes there.
+**WP-00 done (in review).** Test command: `PYTHONPATH=src python -m pytest -q unit_test/gemini_model unit_test/gemini_simulator unit_test/gemini_agent -x` → **143 passed** (baseline before WP-00: 91 GEMINI). `ruff check src/gemini_agent unit_test/gemini_agent` → clean. black 25.11.0 / isort 7.0.0 / flake8 7.3.0 (`--max-line-length=100`) on the new files → clean. Branch rebased on `main` @ 0db8087. `PYTHONPATH=src python simulator_examples/run_doublet_plant_example.py` → primary flow **129.02 m³/h**, power_plant 5.825 MW. `requirements-hackathon.txt` installs into a fresh Python 3.12.13 venv, and the suite passes there.
 
 What exists now:
 - `config/`: `design_basis.yaml` (DB-01…19, checked against the CSVs in a test), `limits.yaml` (kept in step with design_basis by a test), `assumptions.yaml`, `climate_nl.yaml` (RC-07; the Stull T_wb column is checked to ±0.1), `cost_assumptions.yaml` (RC-10, including all eight sourced values; no null items), `llm.yaml` (tags verified on ollama.com).
@@ -56,7 +56,7 @@ What exists now:
 - CI: `.github/workflows/hackathon_tests.yaml` runs ruff, the test suite and a CLI smoke test.
 
 Follow-ups:
-- **WP-08 (no blocker):** RC-10 now has a "Sourced values" table for all eight former placeholders, and `config/cost_assumptions.yaml` already holds them in native units. WP-08 converts them in code (`eur_to_usd`, `dea_eur2020_to_eur2025`, `cepci_index` where `escalation_index: cepci`) and applies max(±30 %, stated range) in sensitivity. Also add the RC-05 chiller cost functions. Add the ECO-05 CO₂ factors and state the grid-gas choice (56.6 vs 51.53 kg/GJ) in the assumptions register; associated gas is 68.6 kg/GJ. Optionally add the RC-10 sanity benchmarks (ECO-07).
+- **WP-08 (no blocker):** RC-10 now has a "Sourced values" table for all eight former placeholders, and `config/cost_assumptions.yaml` already holds them in native units. WP-08 converts them in code (`eur_to_usd`, `dea_eur2020_to_eur2025`, `cepci_index` where `escalation_index: cepci`) and applies max(±30 %, stated range) in sensitivity. **Never read `.value` of the eight sourced items directly**: the key names say USD (fixed by RC-10), but `.value` is native (e.g. `hthp_capex_usd_per_kw_th.value` = 1.20 M EUR/MW_th). Go through one `usd_value(name)`-style accessor, and don't convert `usd_range` again (it is already in USD, escalated). Also add the RC-05 chiller cost functions. Add the ECO-05 CO₂ factors and state the grid-gas choice (56.6 vs 51.53 kg/GJ) in the assumptions register; associated gas is 68.6 kg/GJ. Optionally add the RC-10 sanity benchmarks (ECO-07).
 - **WP-13:** fail submission checks if `CostAssumptions.unset_placeholders()` is ever non-empty (it is empty now).
 - **WP-03 / WP-08:** GEMINI `chp.py` uses an electrical fraction of 1/3, but the DEA gas engine on RC-10 gives ≈ 0.50 of useful output as electricity. The WP that uses CHP must state the choice in the assumptions register. Heat-pump COP for our ≈ 15–25 K lift comes from the RC Lorenz/Carnot method, not the DEA table, which starts at 40 K.
 - **L-1:** the tags were verified on ollama.com; still confirm locally with `ollama show <tag>`, whose output must list `tools`.

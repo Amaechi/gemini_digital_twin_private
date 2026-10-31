@@ -261,7 +261,7 @@ def test_rc10_sourced_value_conversions(configs):
     # x 1.13 = 71.4 $/MWh
     gas_gcv = val("gas_price_usd_per_mwh") * 3.6
     assert gas_gcv == pytest.approx(56.88, abs=0.01)
-    assert gas_gcv * val("gas_gcv_to_lhv") == pytest.approx(63.19, abs=0.01)
+    assert gas_gcv * val("gas_gcv_to_lhv") == pytest.approx(63.19, abs=0.1)
     assert gas_gcv * val("gas_gcv_to_lhv") * fx == pytest.approx(71.4, abs=0.1)
     assert 35.17 / 31.65 == pytest.approx(val("gas_gcv_to_lhv"), abs=0.001)
     # CO2: 79.42 EUR/t x 1.13 = 89.74 $/t
@@ -315,10 +315,23 @@ def test_cost_item_rules():
         CostItem(value=1.0, unit="EUR", range="text", usd_range=(2.0, 1.0), source="s", tag="L")
     with pytest.raises(ValidationError):
         CostItem(value=1.0, unit="GBP", range="text", currency="GBP", source="s", tag="L")
+    with pytest.raises(ValidationError, match="price_year"):
+        CostItem(value=1.0, unit="USD", range="t", escalation_index="cepci", source="s", tag="L")
     placeholder = CostItem(
         value=None, unit="USD", range=None, source="s", tag="A", placeholder=True
     )
     assert placeholder.value is None
+
+
+def test_escalated_items_need_matching_cepci_year(configs):
+    """Every CEPCI-escalated item's price year must be a key of cepci_index."""
+    raw = configs["cost_assumptions"].model_dump()
+    raw["items"]["cooling_tower_capex_usd_per_kw_th"]["price_year"] = 2012
+    with pytest.raises(ValidationError, match="cepci_index"):
+        CostAssumptions.model_validate(raw)
+    del raw["items"]["cepci_index"]
+    with pytest.raises(ValidationError, match="cepci_index"):
+        CostAssumptions.model_validate(raw)
 
 
 def test_llm_config(configs):

@@ -181,7 +181,9 @@ items:
     range: "none stated on RC-10"
     source: "Guidebook Table 13.3: ≈ $91/kW, 2.9 MW centrifugal (RC-10) [L]"
     tag: L
-    note: "Outdated for high-temperature heat pumps — use hthp_capex_usd_per_kw_th for HTHP costs."
+    note: >-
+      Outdated for high-temperature heat pumps — use hthp_capex_usd_per_kw_th for HTHP costs. Escalate with
+      cepci_escalation_1986_to_2026 (2.5 [A]); cepci_index has no 1987 entry.
   cepci_escalation_1986_to_2026:
     value: 2.5
     unit: "-"
@@ -215,8 +217,9 @@ items:
     source: "RC-10 Sourced values: DEA Electricity & DH catalogue v0019 Aug 2026, ch. 06 'Gas engines', datasheet '06 Gas engines, natural gas, 1–10 MW_e'"
     tag: L
     note: >-
-      × dea_eur2020_to_eur2025 = 1.18 M EUR2025/MW_e; × eur_to_usd = 1,333 $/kW_e. Fixed O&M 9,889 EUR2020/MW_e/yr
-      at 4,000 h/yr, variable O&M 5.42 EUR2020/MWh_e, life 25 yr; eta_e 0.48 nameplate (0.47 annual), back-pressure
+      × dea_eur2020_to_eur2025 = 1.18 M EUR2025/MW_e; × eur_to_usd = 1,333 $/kW_e. DEA 2030 column for O&M and
+      efficiency: fixed O&M 9,889 EUR2020/MW_e/yr at 4,000 h/yr, variable O&M 5.42 EUR2020/MWh_e, life 25 yr;
+      eta_e 0.48 nameplate (0.47 annual), back-pressure
       coefficient C_b 0.99 at DH 50/100 °C (≈ 1.01 MW_th per MW_e). GEMINI chp.py uses electrical fraction 1/3 vs
       ≈ 0.50 here — the WP that uses it must state the choice in the assumptions register.
   electric_boiler_capex_usd_per_kw_th:
@@ -309,7 +312,8 @@ items:
       Statutory EUA reference ('termijnkoers': Dec-26 forward averaged 1 Sep–31 Oct 2025) used for the 2026 Dutch
       carbon levies. range = EUA 52-week range 63.07–93.80 EUR/t (Dec-26 futures 89.19 on 30 Oct 2026); 2025
       auction average 73.43. ETS1 covers combustion > 20 MW thermal input; smaller gas boilers fall under ETS2 from
-      2028. × eur_to_usd = 89.74 $/t.
+      2028. × eur_to_usd = 89.74 $/t. price_year 2025 is our reading (averaging period Sep–Oct 2025); RC-10
+      states no price year.
 
   # ------------------------------------------------------------------ opex and replacement
   om_frac_of_capex_per_yr:

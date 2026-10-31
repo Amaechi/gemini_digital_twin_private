@@ -3,7 +3,8 @@
 #         llm    = Pydantic AI agents on a local Ollama model (user's laptop only; CLOUD_SETUP.md §7)
 # The CLI flag --engine overrides `engine`.
 # Orchestrator/coder tags were verified on ollama.com on 31 Oct 2026 (CLOUD_SETUP.md §7: all exist, with the
-# "tools" + "thinking" badges, 256K context). The `alternatives` are not verified. L-1 still confirms each tag
+# "tools" + "thinking" badges, 256K context). Not verified: gpt-oss:20b, gemma4:26b-a4b, qwen3.8:27b,
+# gemma4:31b. L-1 still confirms each tag
 # locally with `ollama show <tag>` (it must list `tools`).
 schema_version: 1
 engine: policy
