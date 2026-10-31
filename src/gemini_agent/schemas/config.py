@@ -9,7 +9,7 @@ design_basis.yaml      ``DesignBasis``         spec §2.1 DB-01…DB-19 [P]
 limits.yaml            ``HardLimits``          CLAUDE.md golden rule 4 (subset of DB-10…17)
 assumptions.yaml       ``AssumptionsRegister`` spec §2.3–2.4 DB-30…DB-40 [A]
 climate_nl.yaml        ``ClimateConfig``       RC-07, spec §2.3 DB-34
-cost_assumptions.yaml  ``CostAssumptions``     RC-10, spec §9.2 ECO-01…05
+cost_assumptions.yaml  ``CostAssumptions``     RC-10, spec §9.2 ECO-01…04
 llm.yaml               ``LLMConfig``           spec §4.2–4.3
 =====================  ======================  ==========================================
 
@@ -22,7 +22,7 @@ from __future__ import annotations
 import datetime as dt
 import os
 from pathlib import Path
-from typing import Literal
+from typing import Literal, overload
 
 import yaml
 from pydantic import BaseModel, Field, JsonValue, model_validator
@@ -246,7 +246,10 @@ CostValue = float | dict[int, float] | dict[str, float] | None
 class CostItem(StrictModel):
     """One cost assumption (RC-10, ECO-04): value, unit, range, source, tag."""
 
-    value: CostValue
+    value: CostValue = Field(
+        union_mode="left_to_right",
+        description="Scalar, depth table {depth_m: value} or named parameters; null = unset placeholder.",
+    )
     unit: str
     range: tuple[float, float] | str | None = Field(
         description="(low, high) for sensitivity, or text; None only for unset placeholders."
@@ -347,6 +350,35 @@ def default_config_dir() -> Path:
     """``$GEOAGENT_CONFIG_DIR`` if set, else ``<repo>/config``."""
     override = os.environ.get(CONFIG_DIR_ENV)
     return Path(override) if override else REPO_ROOT / "config"
+
+
+ConfigName = Literal[
+    "design_basis", "limits", "assumptions", "climate_nl", "cost_assumptions", "llm"
+]
+
+
+@overload
+def load_config(
+    name: Literal["design_basis"], config_dir: Path | str | None = None
+) -> DesignBasis: ...
+@overload
+def load_config(name: Literal["limits"], config_dir: Path | str | None = None) -> HardLimits: ...
+@overload
+def load_config(
+    name: Literal["assumptions"], config_dir: Path | str | None = None
+) -> AssumptionsRegister: ...
+@overload
+def load_config(
+    name: Literal["climate_nl"], config_dir: Path | str | None = None
+) -> ClimateConfig: ...
+@overload
+def load_config(
+    name: Literal["cost_assumptions"], config_dir: Path | str | None = None
+) -> CostAssumptions: ...
+@overload
+def load_config(name: Literal["llm"], config_dir: Path | str | None = None) -> LLMConfig: ...
+@overload
+def load_config(name: str, config_dir: Path | str | None = None) -> BaseModel: ...
 
 
 def load_config(name: str, config_dir: Path | str | None = None) -> BaseModel:

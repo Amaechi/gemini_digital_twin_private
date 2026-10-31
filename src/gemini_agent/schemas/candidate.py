@@ -45,7 +45,9 @@ class Candidate(StrictModel):
         default=None, description="Parent candidate for derived concepts (C6, C7, C8)."
     )
     description: str = ""
-    doublets: int = Field(ge=0, description="Number of doublets; 0 only for the C0 counterfactual.")
+    doublets: int = Field(
+        ge=0, description="Number of doublets; 0 if and only if concept is C0 (spec §3.4)."
+    )
     depth_m: float | None = Field(
         default=None, gt=0, description="Reservoir mid-depth TVD (DB-01, DB-07); None if no doublets."
     )
@@ -81,6 +83,11 @@ class Candidate(StrictModel):
             "design_flow_m3h": self.design_flow_m3h,
             "gas_handling": self.gas_handling,
         }
+        if (self.concept == "C0") != (self.doublets == 0):
+            raise ValueError(
+                f"concept {self.concept} with {self.doublets} doublet(s): C0 (no geothermal) must "
+                "have 0 doublets and every other concept at least 1 (spec §3.4)"
+            )
         if self.doublets == 0:
             given = [name for name, value in well_fields.items() if value is not None]
             if given:

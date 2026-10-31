@@ -95,8 +95,35 @@ def test_annual_result_rejects_duplicate_or_unsorted_days_and_mismatched_kpis():
 
 
 def test_kpi_set_defaults_to_not_computed():
-    """KPIs are None/empty until a tool fills them; robustness pairs are (P10, P90)."""
-    kpis = KPISet(candidate_id="C2", p10_p90={"lcoh_per_mwh": (40.0, 60.0)})
+    """KPIs are None/empty until a tool fills them; percentiles hold P10/P50/P90."""
+    kpis = KPISet(
+        candidate_id="C2", percentiles={"lcoh_per_mwh": {"p10": 40.0, "p50": 48.0, "p90": 60.0}}
+    )
     assert kpis.lcoh_per_mwh is None
-    assert kpis.p10_p90["lcoh_per_mwh"] == (40.0, 60.0)
+    assert kpis.percentiles["lcoh_per_mwh"]["p50"] == 48.0
     assert KPISet.model_validate_json(kpis.model_dump_json()) == kpis
+
+
+def test_nan_and_inf_are_rejected():
+    """NaN/inf would serialise to JSON null and break round-trips, so they are rejected."""
+    with pytest.raises(ValidationError):
+        _day(0, ambient_dry_bulb_degc=float("nan"))
+    with pytest.raises(ValidationError):
+        _day(0, margins={"brine_cooling_max_k": float("nan")})
+    with pytest.raises(ValidationError):
+        _day(0, doublet_flow_m3h=[float("inf"), 250.0])
+    with pytest.raises(ValidationError):
+        KPISet(candidate_id="C2", lcoh_per_mwh=float("inf"))
+
+
+def test_annual_result_rejects_date_not_matching_day_index():
+    """date must equal 1 Jan of `year` + day_index."""
+    with pytest.raises(ValidationError, match="does not match"):
+        AnnualResult(
+            candidate_id="X",
+            year=2027,
+            interpretation="A",
+            days=[_day(0, date=dt.date(2027, 3, 1))],
+        )
+    with pytest.raises(ValidationError, match="does not match"):
+        AnnualResult(candidate_id="X", year=2026, interpretation="A", days=[_day(0)])

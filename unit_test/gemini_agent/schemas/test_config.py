@@ -50,6 +50,21 @@ def test_every_yaml_loads_into_its_schema(configs):
         assert isinstance(model, CONFIG_MODELS[name])
 
 
+def test_every_config_round_trips_through_json(configs):
+    """Configs survive dump → validate (run manifests, memory store, tool boundaries)."""
+    for name, model in configs.items():
+        again = type(model).model_validate_json(model.model_dump_json())
+        assert again == model, name
+    wells = configs["cost_assumptions"].items["well_cost_large_diameter_musd"]
+    assert CostItem.model_validate_json(wells.model_dump_json()).value[2500] == 3.45
+
+
+def test_typed_loader_returns_schema_instances():
+    """load_config returns the schema type for each known file name."""
+    assert isinstance(load_config("design_basis"), DesignBasis)
+    assert isinstance(load_config("cost_assumptions"), CostAssumptions)
+
+
 def test_design_basis_values(configs):
     """DB-01…DB-19 as in spec §2.1."""
     db = configs["design_basis"]

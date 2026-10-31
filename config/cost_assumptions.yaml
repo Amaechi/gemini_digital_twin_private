@@ -16,7 +16,8 @@ items:
     value: 0.08
     unit: 1/yr
     range: [0.08, 0.112]
-    source: "RC-10 defaults: r = 8 % (Gippsland; Guidebook) [L]; high = ESMAP Annex 3 WACC 11.2 % [L]"
+    source: "RC-10 defaults: r = 8 % (Gippsland; Guidebook) [L]"
+    note: "High end of the range = ESMAP Annex 3 WACC 11.2 % (our choice of sensitivity bound)."
     tag: L
   wacc_frac:
     value: 0.112

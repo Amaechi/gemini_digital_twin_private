@@ -45,6 +45,19 @@ def test_c0_counterfactual_has_no_well_fields():
         Candidate(**{**cand.model_dump(), "depth_m": 2500.0})
 
 
+@pytest.mark.parametrize(("concept", "doublets"), [("C0", 2), ("C3", 0)])
+def test_c0_if_and_only_if_no_doublets(concept, doublets):
+    """C0 has no doublets; every other concept has at least one (spec §3.4)."""
+    with pytest.raises(ValidationError, match="C0"):
+        Candidate(
+            id="x",
+            concept=concept,
+            doublets=doublets,
+            heating_return_degc=55.0,
+            cooling_return_degc=26.0,
+        )
+
+
 def test_doublet_candidate_requires_well_fields():
     """With doublets > 0, depth, design flow and gas handling are required."""
     with pytest.raises(ValidationError, match="gas_handling"):

@@ -25,9 +25,10 @@ ConceptId = Literal["C0", "C1", "C2", "C3", "C4", "C5", "C6", "C7", "C8"]
 
 
 class StrictModel(BaseModel):
-    """Base model that rejects unknown fields (catches YAML typos and hallucinated LLM keys)."""
+    """Base model: rejects unknown fields (catches YAML typos and hallucinated LLM keys) and
+    NaN/inf (JSON would serialise them as null and break dump → validate round-trips)."""
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
 
 
 class SourceTag(StrEnum):

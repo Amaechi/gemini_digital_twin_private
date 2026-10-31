@@ -105,8 +105,9 @@ class DayResult(StrictModel):
 class KPISet(StrictModel):
     """KPIs reported for every candidate (spec §3.4 ENG-01a). ``None`` = not computed yet.
 
-    Money fields are scale-suffixed (``_million``, ``_per_mwh``) in ``currency``, which is set
-    by the economics tool from ``config/cost_assumptions.yaml``.
+    Money fields are scale-suffixed (``_million``, ``_per_mwh``) and expressed in ``currency``
+    (set by the economics tool from ``config/cost_assumptions.yaml``). The currency is not in the
+    field names on purpose: the cost basis is an open organiser question (spec §17 Q5).
     """
 
     candidate_id: str
@@ -126,21 +127,24 @@ class KPISet(StrictModel):
     electricity_generated_mwh: float | None = None
     gas_fuel_mwh: float | None = Field(default=None, description="Fuel burned, LHV basis.")
     co2_t_per_yr: float | None = None
-    co2_reduction_vs_c0_pct: float | None = None
+    co2_reduction_vs_c0_frac: float | None = Field(
+        default=None, description="(CO2_C0 - CO2) / CO2_C0; 0.6 = 60 % lower than C0."
+    )
     # Economics (RC-10)
-    currency: str | None = None
-    capex_million: float | None = None
-    opex_million_per_yr: float | None = None
-    lcoh_per_mwh: float | None = None
-    lcoc_per_mwh: float | None = None
+    currency: str | None = Field(default=None, description="e.g. 'USD' (assumption ECO-CUR).")
+    capex_million: float | None = Field(default=None, description="Million `currency`.")
+    opex_million_per_yr: float | None = Field(default=None, description="Million `currency`/yr.")
+    lcoh_per_mwh: float | None = Field(default=None, description="`currency` per MWh heat.")
+    lcoc_per_mwh: float | None = Field(default=None, description="`currency` per MWh cooling.")
     # Exergy (RC-11, DB-34d) — the dead state must be stated with the KPI
     exergy_efficiency_frac: float | None = None
     exergy_dead_state: str | None = None
     # Robustness
     min_constraint_margins: dict[str, float] = Field(default_factory=dict)
     thermal_breakthrough_yr: float | None = Field(default=None, description="t_b (RC-02).")
-    p10_p90: dict[str, tuple[float, float]] = Field(
-        default_factory=dict, description="KPI name -> (P10, P90) from the uncertainty run."
+    percentiles: dict[str, dict[str, float]] = Field(
+        default_factory=dict,
+        description="KPI name -> {'p10': .., 'p50': .., 'p90': ..} from the uncertainty run.",
     )
 
 
@@ -160,6 +164,10 @@ class AnnualResult(StrictModel):
         indices = [day.day_index for day in self.days]
         if indices != sorted(set(indices)):
             raise ValueError("days must have unique, increasing day_index")
+        jan_1 = dt.date(self.year, 1, 1)
+        for day in self.days:
+            if day.date != jan_1 + dt.timedelta(days=day.day_index):
+                raise ValueError(f"day_index {day.day_index} does not match date {day.date}")
         if self.kpis is not None and self.kpis.candidate_id != self.candidate_id:
             raise ValueError("kpis.candidate_id does not match candidate_id")
         return self
