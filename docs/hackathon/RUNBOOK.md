@@ -19,7 +19,7 @@ Why: a private repo is invisible to cloud sessions without it; it also enables a
 - Setup script: paste only the bash block from `CLOUD_SETUP.md` §3 (not the whole file).
 Why: every session boots a fresh Ubuntu machine; this makes each one identical and ready. Limited + package managers = the machine reaches PyPI and GitHub and nothing else.
 
-**A3. Protect `main`.** GitHub → repo → Settings → Branches → Add rule for `main` → tick **Require a pull request before merging** (leave status checks for B3). Settings → General → tick **Allow auto-merge**.
+**A3. Protect `main`.** GitHub → repo → Settings → Branches → **Add classic branch protection rule** → pattern `main` → tick **Require a pull request before merging** and **untick** its sub-option *Require approvals* (you cannot approve your own PR) → leave *Require status checks* unticked until B3 → tick **Do not allow bypassing the above settings** → Create. Then Settings → General → Pull Requests → tick **Allow auto-merge** and **Automatically delete head branches**.
 Why: no session can ever write directly to `main`; all work arrives as a pull request you approve with one click. Auto-merge lets GitHub merge a PR the moment its tests pass.
 
 ## Part B — First session: WP-00 (alone)
@@ -47,7 +47,7 @@ Optional extra scrutiny (WP-01, 02, 05, 07, 10): before merging, start one more 
 
 ## Part D — Your laptop (after Batch 7)
 
-Follow `CLOUD_SETUP.md` §7 exactly: pull, install Ollama and the model tags, run the three commands (model pick L-1, final run L-2, evaluation transcripts), commit `runs/final/`, push. Cloud machines have no GPU, so this is the only part that needs your hardware.
+Follow `CLOUD_SETUP.md` §7 exactly: pull, install Ollama and the model tags, run the three commands (model pick L-1, final run L-2, evaluation transcripts), commit `runs/final/` on a branch `local-llm-run`, push it and merge its PR (direct pushes to `main` are blocked by A3). Cloud machines have no GPU, so this is the only part that needs your hardware.
 
 ## Part E — Finish
 

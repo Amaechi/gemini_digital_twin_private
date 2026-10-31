@@ -23,7 +23,7 @@ git push origin main
 ```
 Kit contents: `CLAUDE.md` (auto-loaded by every session), `.claude/agents/{wp-reviewer,physics-checker}.md` (review subagents), `docs/hackathon/{GEOAGENT_DESIGN_SPEC.md, WORK_PACKAGES.md, PROGRESS.md, CLOUD_SETUP.md}`, `data/demand/*.csv`, `data/knowledge/reference_cards/RC-01…12`, `third_party/plantdebugger/` (Apache-2.0 reference files + LICENSE + README).
 
-Optional GitHub settings: protect `main` (require PR + passing `hackathon_tests` check) so sessions cannot push to it directly. Add team members as collaborators.
+GitHub settings (see RUNBOOK.md A3): classic branch protection on `main` — require PR, no required approvals, no bypass; add the `hackathon_tests` required check after WP-00 is merged; allow auto-merge. Add team members as collaborators.
 
 ## 3. Connect GitHub and create the cloud environment
 1. claude.ai/code → connect GitHub → install the **Claude GitHub App** on `gemini_digital_twin_private` (private repos need the app; it also enables PR auto-fix).
@@ -92,7 +92,8 @@ ollama serve &
 PYTHONPATH=src python scripts/run_eval.py --engine llm --model <tag> --scenarios S11   # L-1 pick model
 PYTHONPATH=src python -m gemini_agent.cli run --engine llm --model <tag> --out runs/final   # L-2
 PYTHONPATH=src python scripts/run_eval.py --engine llm --model <tag> --out runs/final/eval   # S1–S11 transcripts
-git add runs/final && git commit -m "Final LLM run and evaluation transcripts" && git push
+git checkout -b local-llm-run && git add runs/final && git commit -m "Final LLM run and evaluation transcripts" && git push -u origin local-llm-run
+# then open a PR on GitHub and merge it (main only accepts PRs)
 ```
 Record the model, hardware and token totals in PROGRESS.md. Then run WP-15 in the cloud.
 Optional commercial comparison: same commands with a provider model configured in `config/llm.yaml` (API key in your shell, never committed).
