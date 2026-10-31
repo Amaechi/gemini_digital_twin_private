@@ -5,7 +5,7 @@ Keep this file short and current. It is the hand-off between sessions (chat hist
 ## Status board
 | WP | Title | Status | Branch / PR | Last test command → result | Notes |
 |---|---|---|---|---|---|
-| WP-00 | Bootstrap, env, CI, skeleton | in review | `claude/peaceful-tesla-xdrfyy` / PR "WP-00: Bootstrap, environment, CI, skeleton" | full suite → 138 passed (91 GEMINI + 47 agent); ruff clean | doublet example Q = 129.02 m³/h |
+| WP-00 | Bootstrap, env, CI, skeleton | in review | `claude/peaceful-tesla-xdrfyy` / [PR #1](https://github.com/Amaechi/gemini_digital_twin_private/pull/1) | full suite → 138 passed (91 GEMINI + 47 agent); ruff clean | doublet example Q = 129.02 m³/h |
 | WP-01 | GEMINI core fixes, registry | todo | | | |
 | WP-02 | Cooling models | todo | | | |
 | WP-03 | Heat pump, e-boiler, storage | todo | | | |
