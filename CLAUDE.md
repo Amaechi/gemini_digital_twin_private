@@ -31,7 +31,7 @@ An agentic AI application that uses the GEMINI geothermal digital twin to select
 - Python venv prepared by the cloud setup script at `/opt/geo-venv` (Python 3.12). Activate: `source /opt/geo-venv/bin/activate`. If missing locally: `uv venv -p 3.12 .venv && uv pip install -r requirements-hackathon.txt`.
 - Run tests (quiet, always): `PYTHONPATH=src python -m pytest -q unit_test/gemini_model unit_test/gemini_simulator unit_test/gemini_agent -x`
 - Single test file: `PYTHONPATH=src python -m pytest -q <path> -x`
-- Lint new code: `ruff check src/gemini_agent unit_test/gemini_agent` (and new model folders).
+- Lint new code: `ruff check src/gemini_agent unit_test/gemini_agent` (and new model folders). GEMINI's upstream `Lint` workflow also runs **black + isort + flake8** on every push — run `black <new files> && isort <new files>` before committing so that check stays green.
 - GEMINI example: `PYTHONPATH=src python simulator_examples/run_doublet_plant_example.py`
 - CLI (once built): `PYTHONPATH=src python -m gemini_agent.cli run --engine policy`
 - Do NOT install GEMINI's full Poetry stack (Flask, Celery, Chroma…). Only numpy/scipy/pandas + our deps.

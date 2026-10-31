@@ -84,9 +84,11 @@ After WP-13/14 are merged:
 ```bash
 cd gemini_digital_twin_private && git pull
 uv venv -p 3.12 .venv && source .venv/bin/activate && uv pip install -r requirements-hackathon.txt
-# install Ollama (ollama.com), then pull candidate models (check exact tags on ollama.com/library):
-#   16 GB: qwen3.5:9b  + gemma4:12b
-#   36 GB: qwen3.6:35b (orchestrator) + qwen3.6:27b (coder)
+# install Ollama (ollama.com), then pull the models in config/llm.yaml. Tags verified on ollama.com 31 Oct 2026
+# (all exist; families carry the "tools" + "thinking" badges; 256K context):
+#   16 GB: qwen3.5:9b (6.6 GB) + gemma4:12b (8.0 GB)
+#   36 GB: qwen3.6:35b-a3b (23 GB, orchestrator) + qwen3.6:27b (18–19 GB, coder) — one loaded at a time
+# Still confirm locally: `ollama show <tag>` lists "tools" (L-1).
 export OLLAMA_CONTEXT_LENGTH=65536
 ollama serve &
 PYTHONPATH=src python scripts/run_eval.py --engine llm --model <tag> --scenarios S11   # L-1 pick model
