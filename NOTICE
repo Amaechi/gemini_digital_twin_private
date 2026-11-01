@@ -1,0 +1,65 @@
+GeoAgent — agentic geothermal district heating & cooling design (SPE GeoHackathon 2026)
+Copyright 2026 the GeoAgent team.
+Licensed under the Apache License, Version 2.0 (see LICENSE), to match GEMINI.
+
+This repository is a fork of the GEMINI Geothermal Digital Twin and contains, or is derived
+from, the third-party works listed below.
+
+-------------------------------------------------------------------------------
+1. GEMINI Geothermal Digital Twin (gemini-geothermal-suite-open)
+-------------------------------------------------------------------------------
+   Upstream:  https://github.com/GEMINI-Digital-Twin/gemini-geothermal-suite-open
+              (forked from the `development` branch @ d86e8bb)
+   Authors:   TNO, Gaia Energy, HVC, Well Engineering Partners (WEP), Helin
+              (sponsored by NWN innovatie "Datagedreven optimalisatie aardwarmtesystemen")
+   Licence:   Apache License 2.0 (LICENSE)
+   Use:       src/gemini_model/, src/gemini_simulator/ and the other GEMINI packages are used as
+              the simulation engine. Per Apache-2.0 §4(b), every GEMINI file we modify carries a
+              notice near the top:
+              "# Modified by <team> for SPE GeoHackathon 2026, <date>: <what changed>."
+
+-------------------------------------------------------------------------------
+2. Plant Debugger (marcosanyo/PlantDebugger)
+-------------------------------------------------------------------------------
+   Upstream:  https://github.com/marcosanyo/PlantDebugger
+   Commit:    d69507aa48aec773a5cf72761e5ff60c491eefc1 (2026-08-30)
+   Copyright: Copyright 2026 Plant Debugger contributors
+   Licence:   Apache License 2.0 (third_party/plantdebugger/LICENSE)
+   Use:       Unmodified reference copies in third_party/plantdebugger/ (never imported).
+              Code adapted into src/gemini_agent/ starts with the header
+              "# Adapted from marcosanyo/PlantDebugger (Apache-2.0), Copyright 2026 Plant Debugger
+              contributors, file <original path> @ d69507a. Modified by <team>, <date>: <what changed>."
+              Planned adaptations (spec §11.1; this list is updated as files are adapted):
+                agent/decision_engine.py            -> src/gemini_agent/agents/engine.py
+                agent/schemas.py                    -> src/gemini_agent/schemas/decision.py
+                agent/prompt.py (style)             -> src/gemini_agent/prompts/
+                runner/incident_runner.py           -> src/gemini_agent/runner/design_runner.py
+                safety/action_guard.py              -> src/gemini_agent/verify/design_guard.py
+                tools/verify.py                     -> src/gemini_agent/verify/design_verifier.py
+                tools/runbook.py                    -> src/gemini_agent/tools/knowledge.py
+                persistence/base.py, sqlite_store.py -> src/gemini_agent/memory/event_store.py
+                field_ops/site_knowledge.py, models.py (JSON parts)
+                                                    -> src/gemini_agent/memory/project_knowledge.py
+                logging_utils.py                    -> src/gemini_agent/logging/
+                scripts/run_eval.py, validate_submission.py -> scripts/
+              Ideas only (not copied): agent/adk_agent.py, field_ops/adk_orchestration.py
+              (repair turn, plan validation, pause/resume).
+
+-------------------------------------------------------------------------------
+3. Ideas and methods (cited; no code copied)
+-------------------------------------------------------------------------------
+   Warrant (agentic engineering write-ups): "do not let a model do arithmetic" — deterministic
+     tools compute every number; the model only chooses.
+   Plant-as-Code paper ("Engineering process plants as code", arXiv 2610.40239): verification
+     layers and Design-Ops; "agents propose, deterministic tools compute and check, only the
+     verifier can accept a design, the human approves".
+   Engineering equations and values: the reference cards in data/knowledge/reference_cards/
+     paraphrase and cite the source books and papers (see docs/hackathon/GEOAGENT_DESIGN_SPEC.md §19).
+     The books and papers themselves are not redistributed.
+
+-------------------------------------------------------------------------------
+4. Python dependencies
+-------------------------------------------------------------------------------
+   Installed from PyPI (requirements-hackathon.txt), not redistributed: numpy, scipy, pandas,
+   matplotlib (BSD/PSF-style), pydantic and pydantic-ai (MIT), PyYAML (MIT), pytest, pytest-cov,
+   ruff (MIT).

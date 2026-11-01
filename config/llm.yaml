@@ -1,0 +1,36 @@
+# LLM engine settings (GEOAGENT_DESIGN_SPEC §4.2–4.3). Schema: gemini_agent.schemas.config.LLMConfig.
+# engine: policy = deterministic PolicyEngine (cloud sessions, tests, CI — never calls an LLM)
+#         llm    = Pydantic AI agents on a local Ollama model (user's laptop only; CLOUD_SETUP.md §7)
+# The CLI flag --engine overrides `engine`.
+# Orchestrator/coder tags were verified on ollama.com on 31 Oct 2026 (CLOUD_SETUP.md §7: all exist, with the
+# "tools" + "thinking" badges, 256K context). Not verified: gpt-oss:20b, gemma4:26b-a4b, qwen3.8:27b,
+# gemma4:31b. L-1 still confirms each tag
+# locally with `ollama show <tag>` (it must list `tools`).
+schema_version: 1
+engine: policy
+active_profile: 16gb
+
+ollama:
+  base_url: http://localhost:11434/v1   # OpenAI-compatible endpoint
+  num_ctx: 65536                        # >= 32K required, 64K preferred (Ollama defaults to 4K under 24 GB VRAM)
+  keep_alive: 60m                       # keep the model loaded between calls
+
+profiles:
+  16gb:
+    description: "RTX 4060 Ti 16 GB / 4080 or 16 GB Mac — one model at a time (keep_alive swapping)"
+    orchestrator: qwen3.5:9b            # Qwen3.5-9B q4_K_M, 6.6 GB
+    coder: gemma4:12b                   # Gemma 4 12B q4_K_M/QAT, 7–8 GB (or qwen3.5:9b for everything)
+    alternatives: [qwen3.5:9b, gpt-oss:20b]   # gpt-oss-20b fits a 16 GB GPU with short context, not a 16 GB Mac
+  36gb:
+    description: "Mac M3/M4 Pro/Max 36 GB (nearest Windows: RTX 4090 24 GB / RTX 5090 32 GB)"
+    orchestrator: qwen3.6:35b-a3b       # Qwen3.6-35B-A3B MoE, 23 GB
+    coder: qwen3.6:27b                  # Qwen3.6-27B, 18–19 GB (cannot co-reside with the 35B on 36 GB)
+    alternatives: [gemma4:26b-a4b, qwen3.5:9b, qwen3.8:27b, gemma4:31b]   # 24 GB card: Gemma 4 26B-A4B QAT; router+coder: 9B + 27B; Qwen3.8-27B alt coder
+
+temperatures:
+  extraction: 0.0     # formatting / extraction
+  formatting: 0.0
+  planning: 0.6       # model-recommended ≈ 0.6 for planning with thinking
+
+max_output_retries: 2 # structured-output retries before falling back to the PolicyEngine (WP-10)
+seed: 42

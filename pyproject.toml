@@ -86,7 +86,10 @@ profile = "black"
 line_length = 100
 
 [tool.pytest.ini_options]
+# Modified by the GeoAgent team for SPE GeoHackathon 2026, 2026-10-31: do not collect tests from
+# vendored reference code (third_party/) or run outputs (runs/); pytest defaults kept in the list.
 pythonpath = "src"
+norecursedirs = [".*", "build", "dist", "*.egg", "venv", "node_modules", "third_party", "runs"]
 
 [build-system]
 requires = ["poetry-core"]

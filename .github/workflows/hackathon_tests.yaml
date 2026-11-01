@@ -1,0 +1,48 @@
+# GeoAgent (SPE GeoHackathon 2026) CI: GEMINI model/simulator tests + gemini_agent tests and lint.
+# Separate from GEMINI's own workflows (python_test.yaml, python_lint.yaml, docs.yaml), which are unchanged.
+name: Hackathon tests
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hackathon-tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements-hackathon.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements-hackathon.txt
+
+      - name: Lint (ruff)
+        run: ruff check src/gemini_agent unit_test/gemini_agent
+
+      - name: Test (pytest)
+        env:
+          PYTHONPATH: src
+        run: python -m pytest -q unit_test/gemini_model unit_test/gemini_simulator unit_test/gemini_agent -x
+
+      - name: CLI smoke test
+        env:
+          PYTHONPATH: src
+        run: |
+          python -m gemini_agent.cli --help
+          python -m gemini_agent.cli validate-config
