@@ -257,6 +257,7 @@ class EspPoint(StrictModel):
     intake_pressure_barg: float
     release_pressure_barg: float | None = Field(
         default=None,
+        ge=-P_ATM_BAR,
         description=(
             "Computed bubble point p_b here, bar(g): bare bubble point; the verifier applies the "
             "margin (VER-ESP-MARGIN). None → evidence-level p_b or the VER-ESP-PB setpoint."
@@ -304,6 +305,7 @@ class VerificationEvidence(StrictModel):
     scaling: ScalingEvidence | None = None
     co2_release_pressure_barg: float | None = Field(
         default=None,
+        ge=-P_ATM_BAR,
         description=(
             "Computed bubble point p_b, bar(g) (WP-05): bare bubble point; the verifier applies "
             "the margin (VER-ESP-MARGIN). None → the VER-ESP-PB setpoint (margin included)."
@@ -557,7 +559,8 @@ class DesignVerifier:
     """Deterministic 4-layer verifier (spec §10.1).
 
     Thresholds: ``config/limits.yaml`` (hard limits), the module constants (cards/spec, cited)
-    and the assumptions register (``VER-ESP-PB``, ``VER-HP-ETA``, ``VER-HP-LIFT``, ``DB-33``).
+    and the assumptions register (``VER-ESP-PB``, ``VER-ESP-MARGIN``, ``VER-HP-ETA``,
+    ``VER-HP-LIFT``, ``DB-33``).
     """
 
     def __init__(
@@ -575,9 +578,13 @@ class DesignVerifier:
         self.release_default_note = (
             f"{ESP_RELEASE_PRESSURE_ID} {_fmt(release_value)} {release.unit}"
         )
-        self.release_margin = float(register.get(ESP_MARGIN_ID).value)  # type: ignore[arg-type]
-        if self.release_margin < 1.0:
-            raise ValueError(f"{ESP_MARGIN_ID} must be >= 1, got {self.release_margin}")
+        margin = register.get(ESP_MARGIN_ID)
+        self.release_margin = float(margin.value)  # type: ignore[arg-type]
+        if margin.unit != "-" or self.release_margin < 1.0:
+            raise ValueError(
+                f"{ESP_MARGIN_ID} must be a dimensionless factor >= 1, got "
+                f"{self.release_margin} {margin.unit!r}"
+            )
         self.hp_carnot_fraction_default = float(register.get(HP_CARNOT_FRACTION_ID).value)
         self.hp_max_lift_default_k = float(register.get(HP_MAX_LIFT_ID).value)
         self.brine_cp_j_per_kg_k = float(register.get(BRINE_CP_ID).value)
@@ -627,7 +634,10 @@ class DesignVerifier:
             p_b_barg = ev.co2_release_pressure_barg
         if p_b_barg is not None:
             _note(ids, ESP_MARGIN_ID)
-            basis = f"{_fmt(self.release_margin)} × p_b {_fmt(p_b_barg)} bar(g), in bar(a)"
+            basis = (
+                f"{_fmt(self.release_margin)} × p_b(a), p_b {_fmt(p_b_barg)} bar(g) = "
+                f"{_fmt(p_b_barg + P_ATM_BAR)} bar(a), {ESP_MARGIN_ID}"
+            )
             return self.required_pressure_barg(p_b_barg), basis
         _note(ids, ESP_RELEASE_PRESSURE_ID)
         return self.release_pressure_default_barg, self.release_default_note
@@ -1379,7 +1389,9 @@ class DesignVerifier:
         assumption_ids: list[str],
     ) -> None:
         names = {
-            "PH-18": "ESP intake ≥ 1.2 · bubble point (RC-01 item 9 setpoint)",
+            "PH-18": (
+                f"ESP intake ≥ {_fmt(self.release_margin)} · bubble point (RC-01 item 9 setpoint)"
+            ),
             "PH-19": f"NPSH_A ≥ NPSH_R + {_fmt(NPSH_MARGIN_M)} m",
         }
         required = bool(ev.esps) or ev.candidate.doublets > 0 or "esp" in types.values()
@@ -1597,7 +1609,7 @@ class DesignVerifier:
         self, out: _Checks, ev: VerificationEvidence, assumption_ids: list[str]
     ) -> None:
         """PD-10 (RC-12): without degassing, brine stays above the CO₂-release pressure."""
-        name = "pressurised brine loop above the CO₂-release pressure"
+        name = "pressurised brine loop ≥ CO₂-release setpoint (RC-01 item 9)"
         source = f"RC-12; RC-01 item 9; {ESP_MARGIN_ID} / {ESP_RELEASE_PRESSURE_ID}"
         candidate = ev.candidate
         if candidate.doublets == 0 or candidate.gas_handling != GasHandling.PRESSURISED_REINJECT:
@@ -1615,7 +1627,7 @@ class DesignVerifier:
             assert p.min_brine_pressure_barg is not None
             detail = (
                 f"{p.name}: min brine pressure {_fmt(p.min_brine_pressure_barg)} bar(g) vs ≥ "
-                f"{_fmt(release)} bar(g) CO₂ release ({basis})"
+                f"{_fmt(release)} bar(g) CO₂-release setpoint ({basis})"
             )
             rating = HEX_RATING[p.construction][1]
             if rating < release:

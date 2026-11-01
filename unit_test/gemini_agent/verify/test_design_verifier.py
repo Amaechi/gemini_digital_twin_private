@@ -473,9 +473,36 @@ def test_bare_bubble_point_gets_the_register_margin(level, intake_barg, status):
     check = report.check("PH-18")
     assert check.status == status, check
     assert check.margin == pytest.approx(intake_barg - SETPOINT_BARG, abs=1e-6)
-    assert "1.2 × p_b 45.1 bar(g)" in check.detail and not check.warnings
+    assert "1.2 × p_b(a), p_b 45.1 bar(g) = 46.11 bar(a)" in check.detail
+    assert not check.warnings and check.name.startswith("ESP intake ≥ 1.2 ·")
     assert ESP_MARGIN_ID in report.assumption_ids
     assert ESP_RELEASE_PRESSURE_ID not in report.assumption_ids
+
+
+def test_esp_level_bubble_point_takes_precedence():
+    """A per-ESP p_b overrides the evidence-level one (30 → 37.2 bar(g) setpoint, not 54.3)."""
+    esp = EspPoint(
+        name="ESP-1",
+        intake_pressure_barg=40.0,
+        release_pressure_barg=30.0,
+        npsh_available_m=60,
+        npsh_required_m=20,
+    )
+    report = _verify(_with(esps=[esp], co2_release_pressure_barg=P_B_BARG))
+    check = report.check("PH-18")
+    assert check.status == CheckStatus.PASS
+    assert check.margin == pytest.approx(40.0 - (1.2 * (30.0 + 1.01325) - 1.01325))
+
+
+def test_impossible_bubble_point_is_refused():
+    """A bubble point below 0 bar(a) is refused at the evidence boundary."""
+    from pydantic import ValidationError
+
+    with pytest.raises(ValidationError):
+        EspPoint(name="ESP-1", intake_pressure_barg=10.0, release_pressure_barg=-5.0)
+    with pytest.raises(ValidationError):
+        _with(co2_release_pressure_barg=-1.1)
+    assert _with(co2_release_pressure_barg=-1.0).co2_release_pressure_barg == -1.0  # 0.013 bar(a)
 
 
 def test_margin_comes_from_the_register():
@@ -502,6 +529,15 @@ def test_margin_comes_from_the_register():
     assert VERIFIER.required_pressure_barg(P_B_BARG) == pytest.approx(SETPOINT_BARG)
     with pytest.raises(ValueError, match="VER-ESP-MARGIN"):
         verifier(0.9)
+    report = verifier(1.3).verify(ef.good_evidence())  # the check name follows the register
+    assert report.check("PH-18").name.startswith("ESP intake ≥ 1.3 ·")
+    wrong_unit = entry.model_copy(update={"unit": "%"})
+    with pytest.raises(ValueError, match="dimensionless"):
+        DesignVerifier(
+            VERIFIER.limits,
+            VERIFIER.design_basis,
+            register.model_copy(update={"assumptions": [*others, wrong_unit]}),
+        )
 
 
 def test_register_pressure_units_are_converted():
