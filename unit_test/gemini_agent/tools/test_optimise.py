@@ -434,6 +434,22 @@ def test_same_seed_same_result_serial_and_parallel(tiny_run, year):
     assert other_seed.seed == 7
 
 
+def test_failed_final_rerun_reports_no_optimum(year, monkeypatch):
+    """If the optimum fails its re-run with the right-sized nameplates: best = None, a warning."""
+    real = Evaluator.evaluate
+
+    def evaluate(self, candidate, outages=None, *, stage=""):
+        e = real(self, candidate, outages, stage=stage)
+        return e.model_copy(update={"unmet_heating_mwh": 1.0}) if stage == "final" else e
+
+    monkeypatch.setattr(Evaluator, "evaluate", evaluate)
+    request = tiny_request(doublet_options=[2], maxiter=0, optimise_outages=False)
+    result, history = optimise(request.model_copy(update={"dispatch_search": False}), year=year)
+    assert result.best is None and result.storage_scan == []
+    assert any("no optimum reported" in w for w in result.warnings)
+    assert history[-1].stage == "final" and not history[-1].meets_demand
+
+
 def test_tool_result_summary_and_files(tmp_path, year):
     """ToolResult: ≤ 300-char summary with the optimum; JSON + CSV written to runs/<id>/."""
     result = optimise_design(

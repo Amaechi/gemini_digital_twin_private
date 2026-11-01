@@ -16,7 +16,7 @@ Keep it ≤ 20 KB; it is the hand-off between sessions. Old detail: merged PRs a
 | WP-08 | Economics, CO₂, exergy, scaling | merged (66acde7) | [#12](https://github.com/Amaechi/gemini_digital_twin_private/pull/12) | TL-14/22/23; C0 LCOH 137 $/MWh ≈ ACM cap |
 | WP-09 | Verifier, memory, logging | merged (901e110) | [#9](https://github.com/Amaechi/gemini_digital_twin_private/pull/9) | 41-check DesignVerifier |
 | WP-10 | Agents, runner, CLI | merged (2285460; review a9083b7) | [#4](https://github.com/Amaechi/gemini_digital_twin_private/pull/4), [#6](https://github.com/Amaechi/gemini_digital_twin_private/pull/6) | policy P0–P10 on stubs |
-| WP-11 | Optimisation & uncertainty | in review | [#18](https://github.com/Amaechi/gemini_digital_twin_private/pull/18) | TL-13/15; opt 407 s, MC 951 s |
+| WP-11 | Optimisation & uncertainty | in review | [#18](https://github.com/Amaechi/gemini_digital_twin_private/pull/18) | TL-13/15 |
 | WP-12 | Model gap & Model Builder | merged (b81cfa9) | [#15](https://github.com/Amaechi/gemini_digital_twin_private/pull/15) | TL-17/18; S7 demo |
 | WP-13 | Eval suite & submission checks | merged (a622551) | [#16](https://github.com/Amaechi/gemini_digital_twin_private/pull/16) | S1–S11; SUB-01…24 |
 | WP-14 | Integration run & figures | todo | | Batch 7 |
@@ -25,7 +25,7 @@ Keep it ≤ 20 KB; it is the hand-off between sessions. Old detail: merged PRs a
 | WP-15 | Final review & packaging | todo | | |
 
 Status: todo · in progress · in review · merged · blocked (say why).
-Latest full suite (WP-11 branch, 2026-11-01): `PYTHONPATH=src python -m pytest -q unit_test/gemini_model unit_test/gemini_simulator unit_test/gemini_agent -x` → **1246 passed**.
+Latest full suite (WP-11 branch, 2026-11-01): `PYTHONPATH=src python -m pytest -q unit_test/gemini_model unit_test/gemini_simulator unit_test/gemini_agent -x` → **1247 passed**.
 Next: Batch 7 (WP-14).
 
 ## Decisions log (newest first)
@@ -35,7 +35,7 @@ One line per decision, grouped by WP; dated 11-01 (WP-00: 10-31). Why: the `conf
 - TL-13: screen doublets × depth → per `top_k` combo seeded DE (`deferred` ⇒ serial = pool): sizes (flow, HTHP, absorption) then outages (sorted-gap, x0 = SIM-OUTAGE, plant reused + memoised).
 - boiler/e-chiller cap-only ⇒ right-sized (largest daily output; chiller also the DB-19 peak at DB-34b ambient), priced, optimum re-run with them (`best` = None if that fails); free-cooling tower beyond the chiller plant's priced (`cooling_tower_mw`).
 - rule 4: guard before and after TL-09; year margins DB-11/12/14 < 0 rejected; DB-16/17 < 0 = unmet demand (penalised), rejected only without unmet; barrier 1e6 + reason; objective LCOH + LCOC (30 yr) + OPT-OBJ.
-- after search: SIM-OUTAGE default, DSP-* at `dispatch_levers` (report only), Pareto ≤ 3, C6 scan unpriced.
+- then: SIM-OUTAGE default, DSP-* bounds (report), Pareto ≤ 3, C6 scan unpriced.
 - TL-15: fixed design; `Scenario` = config copy + GEMINI overrides + year scale/shift (warm on cooling days) + `DoubletDesign` + CostBook factors; world cases keep base capex, DB-31/CHP-EL-FRAC re-derive; tornado = LCOH+LCOC swing; `robust_backup_mw` = P90 need.
 - [A]: VER-HP-ETA via `max_carnot_fraction` + `HP_DATASHEET_LABEL`; ±6 K = gradient ± 6/depth; II 0.65–1.0; not varied: SUB-RHOC/WELL/ESP/NPSH/PWH, HP-ETA-L.
 - touches: `DoubletDesign.injectivity_factor` (0.8 ⇒ +6.1 bar) + test; chp.py `electrical_fraction` (default 1/3) + test; TL-09 writes it only if CHP-EL-FRAC ≠ 1/3, no longer raises (test edited); CHP-EL-FRAC/SUB-RHOC text.
@@ -125,7 +125,7 @@ One line per decision, grouped by WP; dated 11-01 (WP-00: 10-31). Why: the `conf
 **WP-07** (old items done)
 - WP-14: bind TL-12 (`.data.annual.kpis`, `service_by_key` → WP-08, `verification_evidence(sim, c, **extra)`); KPIs cached by `config_hash` (put only).
 - WP-11 levers done. Open: DSP-FLOW alternatives (spread at min flow / max geothermal) not implemented ⇒ unpriced; DSP-HP-MIN `min_part_load_frac` 0 is cheaper on the C2 optimum (TL-13 `dispatch_variants`; register unchanged: decide).
-- Speed: ≥ 3 km (T_wh ≥ 100 °C) fast year 7–25 s (nested HEX-share/HTHP bisections) vs 2 s at 2.5 km.
+- Speed: a fast year takes 7–25 s at ≥ 3 km (nested HEX/HTHP bisections) vs 2 s at 2.5 km.
 - WP-09/14: C6 `storage` fails PH-20 (charge < 0) and PH-22 (no input key). WP-12: ATES outlet T; HP share bisection.
 - Treat as API: `simulate_day._flag_text/_heat_pump_margins/_heat_pump_screening`, `Mixer._MIN_TOTAL_FLOW`
 
@@ -173,4 +173,4 @@ One line per decision, grouped by WP; dated 11-01 (WP-00: 10-31). Why: the `conf
 See spec §17. Answers: —
 
 ## Hand-off notes (latest session writes here, replace previous)
-2026-11-01, WP-11: TL-13/15 real (WP-14 binds). `PYTHONPATH=src python scripts/run_optimisation.py --run-id wp11-c2 --workers 4` (4 vCPU): optimisation **407 s** (162 evals; target < 15 min), uncertainty **951 s** (200 MC + 34 OAT + 8 cases). C2 optimum 2×3200 m, 300 m³/h, HTHP 0.5 (inert), boiler 0.05, e-chiller 8.2 MW, outages d154/d239: LCOH 30.2 + LCOC 24.7 = 54.9 USD/MWh, CO₂ 3790 t/yr. MC P10/P50/P90 LCOH 25.8/33.3/44.6, LCOC 19.5/25.3/32.4; P(demand met) 56 % → 90 % with boiler 2.05 MW (+0.7 USD/MWh LCOH). Outputs in `runs/wp11-c2/` (git-ignored).
+2026-11-01, WP-11: TL-13/15 real (WP-14 binds). `PYTHONPATH=src python scripts/run_optimisation.py --run-id wp11-c2 --workers 4` (4 vCPU): optimisation **407 s** (162 evals; target < 15 min), uncertainty **951 s** (200 MC + 34 OAT + 8 cases). C2 optimum 2×3200 m, 300 m³/h, HTHP 0.5 (inert), boiler 0.05, e-chiller 8.2 MW, outages d154/d239: LCOH 30.2 + LCOC 24.7 = 54.9 USD/MWh, CO₂ 3790 t/yr. MC P10/P50/P90 LCOH 25.8/33.3/44.6, LCOC 19.5/25.3/32.4; P(demand met) 56 % → 90 % with boiler 2.05 MW (+0.7 USD/MWh LCOH). Outputs (19dde76; unchanged since) in `runs/wp11-c2/`.

@@ -160,7 +160,9 @@ class OptimiserSettings(StrictModel):
     recombination: float
     tol: float
     init: str
-    polish: bool
+    polish: Literal[False] = Field(
+        description="scipy's polish calls the objective outside the recording map: unsupported."
+    )
     updating: Literal["deferred"] = Field(
         description="Deferred updating: the population is evaluated as a batch (serial = pool)."
     )
@@ -193,7 +195,7 @@ def load_optimiser_settings(config_dir: Path | str | None = None) -> OptimiserSe
         recombination=float(de["recombination"]),
         tol=float(de["tol"]),
         init=str(de["init"]),
-        polish=bool(de["polish"]),
+        polish=de["polish"],
         updating=de["updating"],
         top_k=int(de["top_k"]),
     )
@@ -571,7 +573,8 @@ class DesignEvaluation(StrictModel):
         )
 
 
-def _code(breach: str) -> str:
+def breach_code(breach: str) -> str:
+    """DB id of a ``limit_breaches`` entry (``"key = value (DB-xx)"``)."""
     return breach.rsplit("(", 1)[-1].rstrip(")")
 
 
@@ -906,7 +909,8 @@ class Evaluator:
             b
             for b in breaches
             if not (
-                _code(b) in SHORTFALL_CODES and getattr(annual, SHORTFALL_CODES[_code(b)]) > 0.0
+                breach_code(b) in SHORTFALL_CODES
+                and getattr(annual, SHORTFALL_CODES[breach_code(b)]) > 0.0
             )
         ]
         if violations and self.reject_limit_breaches:
@@ -917,7 +921,7 @@ class Evaluator:
                 "hard limit breached in operation (WP-07 margins): " + "; ".join(violations),
                 start,
                 stage=stage,
-                violations=sorted({_code(b) for b in violations}),
+                violations=sorted({breach_code(b) for b in violations}),
             )
         boiler = [d.heat_by_source_mw.get("peak_boiler", 0.0) for d in annual.days]
         evaluation = DesignEvaluation(
@@ -1772,8 +1776,9 @@ def optimise(
                     lever=lever, value=value, evaluation=e, delta_objective_per_mwh=delta
                 )
             )
-        storage_scan = _storage_scan(request, named, best, evaluator, register, warnings)
-        history += storage_scan
+        if best is not None:
+            storage_scan = _storage_scan(request, named, best, evaluator, register, warnings)
+            history += storage_scan
     rejected = [e for e in history if e.status != "ok"]
     result = OptimisationResult(
         concept=request.concept,
@@ -1918,9 +1923,11 @@ __all__ = [
     "StorageSize",
     "Variable",
     "absorption_capacity_fraction",
+    "breach_code",
     "capex_request",
     "design_key",
     "evaluate_scenarios",
+    "limit_breaches",
     "load_optimiser_settings",
     "make_design_candidate",
     "optimise",

@@ -58,9 +58,11 @@ from gemini_agent.tools.economics import (
     real_energy_escalation,
 )
 from gemini_agent.tools.optimise import (
+    SHORTFALL_CODES,
     DesignEvaluation,
     Evaluator,
     Scenario,
+    breach_code,
     capex_request,
     evaluate_scenarios,
 )
@@ -649,6 +651,8 @@ def analyse(
     base = base_run.evaluation
     if base.status != "ok" or base_run.simulation is None or base_run.economics is None:
         raise ValueError(f"base design cannot be evaluated: {base.reason}")
+    if base.limit_breaches:
+        warnings.append(f"base design breaches in operation: {'; '.join(base.limit_breaches)}")
     assert base_run.plant is not None
     base_capex = capex_request(base_run.plant, base_run.simulation.annual)
     equipment = base_run.plant.meta.equipment_mw
@@ -847,8 +851,16 @@ def analyse(
             need = float(np.percentile([smp.kpis[kpi] for smp in ran], quantile))
             robust_mw[key] = max(installed[key], math.ceil(need / step - 1e-9) * step)
             robust_mw[key] = round(robust_mw[key], 6)
+        # Larger backups fix capacity shortfalls (incl. their DB-16/17 supply margins), not a
+        # DB-11/12/14 breach: such a sample does not meet demand at any backup size.
+        unfixable = {
+            i
+            for i, e in enumerate(results)
+            if any(breach_code(b) not in SHORTFALL_CODES for b in e.limit_breaches)
+        }
         robust_probability = sum(
-            all(smp.kpis[kpi] <= robust_mw[key] + 1e-9 for key, (kpi, _) in BACKUP_KPIS.items())
+            smp.index not in unfixable
+            and all(smp.kpis[kpi] <= robust_mw[key] + 1e-9 for key, (kpi, _) in BACKUP_KPIS.items())
             for smp in ran
         ) / len(samples)
         if robust_mw != installed:
