@@ -90,8 +90,11 @@
 
 <span class="sd">This module turns an optional ``"pvt"`` block in a component's project-JSON</span>
 <span class="sd">parameters into a configured ``PVTConstantSTP``. The same block is the single</span>
-<span class="sd">source of truth for the primary-loop liquid density and heat capacity that</span>
-<span class="sd">the heat exchanger, boiler/CHP and :mod:`gemini_simulator.kpi` use.</span>
+<span class="sd">source of truth for the primary-loop liquid density and heat capacity:</span>
+<span class="sd">:mod:`gemini_simulator.kpi` reads it from the producer well, and</span>
+<span class="sd">:func:`heat_exchanger_fluid_parameters` gives the matching parameters to set on</span>
+<span class="sd">the heat exchanger, boiler or CHP (the project builder must copy them there;</span>
+<span class="sd">``kpi.fluid_consistency_issues`` reports a mismatch).</span>
 
 <span class="sd">A ``"pvt"`` block may use the native ``PVTConstantSTP`` keys (``RHOL``,</span>
 <span class="sd">``VISL``, ``CPL`` ...) or the unit-suffixed aliases in</span>
@@ -148,7 +151,8 @@
 <span class="sd">    Raises</span>
 <span class="sd">    ------</span>
 <span class="sd">    TypeError</span>
-<span class="sd">        If the block is not a dict, or a value is not a real number.</span>
+<span class="sd">        If the block is not a dict, a key is not a string, or a value is not</span>
+<span class="sd">        a real number.</span>
 <span class="sd">    ValueError</span>
 <span class="sd">        If a key is unknown, an alias and its native key disagree, a value is</span>
 <span class="sd">        not finite, a density/viscosity/heat capacity/conductivity is not</span>
@@ -162,6 +166,8 @@
     <span class="n">native_keys</span> <span class="o">=</span> <span class="n">_native_keys</span><span class="p">()</span>
     <span class="n">normalised</span> <span class="o">=</span> <span class="p">{}</span>
     <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">pvt_parameters</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"'pvt' keys must be strings, got </span><span class="si">{</span><span class="n">key</span><span class="si">!r}</span><span class="s2">."</span><span class="p">)</span>
         <span class="k">if</span> <span class="n">key</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">"_"</span><span class="p">):</span>
             <span class="k">continue</span>  <span class="c1"># comment/description key, same convention as project JSON</span>
         <span class="n">native</span> <span class="o">=</span> <span class="n">PVT_PARAMETER_ALIASES</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="n">key</span><span class="p">)</span>

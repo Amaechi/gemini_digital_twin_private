@@ -176,9 +176,13 @@ outputs: <code class="docutils literal notranslate"><span class="pre">gas_densit
 <code class="docutils literal notranslate"><span class="pre">fuel_power_w</span></code> (W, LHV basis = gas mass flow x LHV),
 <code class="docutils literal notranslate"><span class="pre">ch4_mass_flow_kg_s</span></code>, <code class="docutils literal notranslate"><span class="pre">inherent_co2_kg_s</span></code> (CO2 contained in the
 gas, kg/s) and <code class="docutils literal notranslate"><span class="pre">co2_if_burned_kg_s</span></code> (inherent plus combustion
-CO2, kg/s). These are 0 without a composition. <code class="docutils literal notranslate"><span class="pre">emission</span></code> stays
-0: the separator does not emit; the CO2 is counted where the gas is
-burned (or vented).</p>
+CO2, kg/s). The species flows are the composition’s mass fractions
+times <code class="docutils literal notranslate"><span class="pre">gas_mass_flow_rate</span></code>, so they always add up to it (also
+with an explicit <code class="docutils literal notranslate"><span class="pre">gas_density</span></code>). Without a composition the
+species/CO2 outputs are 0, and <code class="docutils literal notranslate"><span class="pre">fuel_power_w</span></code> is 0 unless
+<code class="docutils literal notranslate"><span class="pre">fuel_lhv_j_kg</span></code> is given. <code class="docutils literal notranslate"><span class="pre">emission</span></code> stays 0: the separator
+does not emit; the CO2 is counted where the gas is burned (or
+vented).</p>
 </dd></dl>
 
 <dl class="py method">

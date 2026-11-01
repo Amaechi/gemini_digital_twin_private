@@ -180,9 +180,11 @@ design-basis brine:</p>
 </pre></div>
 </div>
 <p>Over 2.5 km the brine column is about 7.4 bar heavier than water. The same
-block feeds <code class="docutils literal notranslate"><span class="pre">gemini_simulator.kpi</span></code> (primary-loop density and heat capacity)
-and, through <code class="docutils literal notranslate"><span class="pre">heat_exchanger_fluid_parameters</span></code>, the <code class="docutils literal notranslate"><span class="pre">fluid_density</span></code> and
-<code class="docutils literal notranslate"><span class="pre">specific_heat</span></code> parameters of the heat exchanger, boiler and CHP. See
+block sets the primary-loop density and heat capacity in
+<code class="docutils literal notranslate"><span class="pre">gemini_simulator.kpi</span></code>. Use <code class="docutils literal notranslate"><span class="pre">heat_exchanger_fluid_parameters</span></code> to set the
+matching <code class="docutils literal notranslate"><span class="pre">fluid_density</span></code> and <code class="docutils literal notranslate"><span class="pre">specific_heat</span></code> parameters of the heat
+exchanger, boiler and CHP; they are not copied automatically, and
+<code class="docutils literal notranslate"><span class="pre">kpi.fluid_consistency_issues</span></code> reports a mismatch. See
 <code class="docutils literal notranslate"><span class="pre">src/gemini_model/fluid/REFERENCE.md</span></code>.</p>
 </section>
 </section>

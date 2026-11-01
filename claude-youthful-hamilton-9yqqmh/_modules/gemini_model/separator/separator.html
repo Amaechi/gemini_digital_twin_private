@@ -232,9 +232,13 @@
 <span class="sd">        ``fuel_power_w`` (W, LHV basis = gas mass flow x LHV),</span>
 <span class="sd">        ``ch4_mass_flow_kg_s``, ``inherent_co2_kg_s`` (CO2 contained in the</span>
 <span class="sd">        gas, kg/s) and ``co2_if_burned_kg_s`` (inherent plus combustion</span>
-<span class="sd">        CO2, kg/s). These are 0 without a composition. ``emission`` stays</span>
-<span class="sd">        0: the separator does not emit; the CO2 is counted where the gas is</span>
-<span class="sd">        burned (or vented).</span>
+<span class="sd">        CO2, kg/s). The species flows are the composition's mass fractions</span>
+<span class="sd">        times ``gas_mass_flow_rate``, so they always add up to it (also</span>
+<span class="sd">        with an explicit ``gas_density``). Without a composition the</span>
+<span class="sd">        species/CO2 outputs are 0, and ``fuel_power_w`` is 0 unless</span>
+<span class="sd">        ``fuel_lhv_j_kg`` is given. ``emission`` stays 0: the separator</span>
+<span class="sd">        does not emit; the CO2 is counted where the gas is burned (or</span>
+<span class="sd">        vented).</span>
 <span class="sd">        """</span>
         <span class="n">pressure</span> <span class="o">=</span> <span class="n">u</span><span class="p">[</span><span class="s2">"pressure"</span><span class="p">]</span>
         <span class="n">temperature</span> <span class="o">=</span> <span class="n">u</span><span class="p">[</span><span class="s2">"temperature"</span><span class="p">]</span>
@@ -269,9 +273,14 @@
         <span class="n">gas_mass_flow_rate</span> <span class="o">=</span> <span class="n">gas_flow_rate</span> <span class="o">*</span> <span class="n">gas_density</span>
         <span class="n">fuel_power_w</span> <span class="o">=</span> <span class="n">gas_mass_flow_rate</span> <span class="o">*</span> <span class="n">fuel_lhv_j_kg</span>
         <span class="k">if</span> <span class="n">gas</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-            <span class="n">ch4_mass_flow_kg_s</span> <span class="o">=</span> <span class="n">gas_flow_rate</span> <span class="o">*</span> <span class="n">gas</span><span class="p">[</span><span class="s2">"ch4_kg_per_nm3"</span><span class="p">]</span>
-            <span class="n">inherent_co2_kg_s</span> <span class="o">=</span> <span class="n">gas_flow_rate</span> <span class="o">*</span> <span class="n">gas</span><span class="p">[</span><span class="s2">"co2_kg_per_nm3"</span><span class="p">]</span>
-            <span class="n">co2_if_burned_kg_s</span> <span class="o">=</span> <span class="n">gas_flow_rate</span> <span class="o">*</span> <span class="n">gas</span><span class="p">[</span><span class="s2">"co2_if_burned_kg_per_nm3"</span><span class="p">]</span>
+            <span class="c1"># Mass fractions from the composition; scaled to the (possibly explicit) density.</span>
+            <span class="n">ch4_mass_flow_kg_s</span> <span class="o">=</span> <span class="n">gas_mass_flow_rate</span> <span class="o">*</span> <span class="n">gas</span><span class="p">[</span><span class="s2">"ch4_kg_per_nm3"</span><span class="p">]</span> <span class="o">/</span> <span class="n">gas</span><span class="p">[</span><span class="s2">"density_kg_nm3"</span><span class="p">]</span>
+            <span class="n">inherent_co2_kg_s</span> <span class="o">=</span> <span class="n">gas_mass_flow_rate</span> <span class="o">*</span> <span class="n">gas</span><span class="p">[</span><span class="s2">"co2_kg_per_nm3"</span><span class="p">]</span> <span class="o">/</span> <span class="n">gas</span><span class="p">[</span><span class="s2">"density_kg_nm3"</span><span class="p">]</span>
+            <span class="c1"># Burning 1 kmol CH4 gives 1 kmol CO2.</span>
+            <span class="n">co2_if_burned_kg_s</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="n">inherent_co2_kg_s</span>
+                <span class="o">+</span> <span class="n">ch4_mass_flow_kg_s</span> <span class="o">*</span> <span class="n">MOLAR_MASS_CO2_KG_PER_KMOL</span> <span class="o">/</span> <span class="n">MOLAR_MASS_CH4_KG_PER_KMOL</span>
+            <span class="p">)</span>
         <span class="k">else</span><span class="p">:</span>
             <span class="n">ch4_mass_flow_kg_s</span> <span class="o">=</span> <span class="n">inherent_co2_kg_s</span> <span class="o">=</span> <span class="n">co2_if_burned_kg_s</span> <span class="o">=</span> <span class="mf">0.0</span>
 
