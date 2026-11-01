@@ -99,6 +99,7 @@ GENERATOR_ASSUMPTION_IDS: tuple[str, ...] = (
     "DB-40",
     "VER-HP-LIFT",
     "CHP-EL-FRAC",
+    "ECO-CO2-GAS",
 )
 
 ComponentRole = Literal[
@@ -796,6 +797,13 @@ class GeneratorBasis(StrictModel):
     associated_gas_density_kg_nm3: float
 
 
+def _number(register: AssumptionsRegister, assumption_id: str) -> float:
+    value = register.get(assumption_id).value
+    if not isinstance(value, int | float) or isinstance(value, bool):
+        raise ConfigError(f"{assumption_id} must hold a number, got {value!r}")
+    return float(value)
+
+
 def _entry(register: AssumptionsRegister, assumption_id: str) -> dict[str, Any]:
     value = register.get(assumption_id).value
     if not isinstance(value, dict):
@@ -866,7 +874,8 @@ def load_generator_basis(config_dir: Path | str | None = None) -> GeneratorBasis
         chp_electrical_fraction=electrical_fraction,
         boiler_efficiency_frac=float(boiler_cfg["efficiency_frac"]),
         grid_gas_lhv_j_kg=grid_lhv,
-        grid_gas_emission_kg_per_gj=float(grid_cfg["emission_kg_per_gj"]),
+        # One CO₂ factor for grid gas: WP-08's ECO-CO2-GAS (ECO-05).
+        grid_gas_emission_kg_per_gj=_number(register, "ECO-CO2-GAS"),
         associated_gas_lhv_j_kg=assoc_lhv,
         associated_gas_emission_kg_per_gj=assoc_factor,
         associated_gas_density_kg_nm3=assoc_density,

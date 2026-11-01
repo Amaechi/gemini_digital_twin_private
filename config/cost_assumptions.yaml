@@ -5,7 +5,9 @@
 # `range` is (low, high) in the unit of `value`, or text; `usd_range` is the RC-10 sensitivity range already in USD.
 # Sensitivity = ±30 % (min_sensitivity_frac) or the stated range, whichever is wider (DB-35, ECO-04).
 # No item may be null: CostAssumptions.unset_placeholders() must be empty (RC-10 validation, WP-13 check).
-# Chiller cost functions (absorption vs electric, 1986 $) come from RC-05 and are added by WP-08.
+# Chiller cost functions (absorption vs electric, 1986 $, RC-05, `VERIFY`) were added by WP-08 (escalated by CEPCI).
+# Read every item ONLY through gemini_agent.tools.economics.CostBook.usd(name) / usd_value(name): item names say
+# what the accessor returns (USD), `.value` is native (e.g. hthp_capex_usd_per_kw_th.value = 1.20 M EUR/MW_th).
 # Schema: gemini_agent.schemas.config.CostAssumptions.
 schema_version: 1
 source: "RC-10 Economics (incl. 'Sourced values', primary documents read 31 Oct 2026); GEOAGENT_DESIGN_SPEC §9.2"
@@ -348,3 +350,100 @@ items:
     range: "none stated on RC-10"
     source: "RC-10; spec ECO-01: heat pump replaced at 15 yr [L]"
     tag: L
+
+  # ------------------------------------------------------------------ WP-08 additions (TL-14)
+  electric_boiler_small_capex_usd_per_kw_th:
+    value: 0.1546
+    unit: M EUR/MW_th
+    currency: EUR
+    price_year: 2025
+    range: [0.070, 0.1546]
+    usd_range: [79.0, 175.0]
+    source: "RC-10 Sourced values: DEA Electricity & DH catalogue v0019 Aug 2026, ch. 41 'Electric boilers', datasheet '41 Electric boiler, small'"
+    tag: L
+    note: >-
+      Units <= 10 MW_th (5 MW typical); electric_boiler_capex_usd_per_kw_th (0.070) is the > 10 MW unit. Same O&M,
+      efficiency and life as the large unit. × eur_to_usd = 175 $/kW_th.
+  gas_boiler_capex_usd_per_kw_th:
+    value: 270.0
+    unit: USD/kW_th
+    currency: USD
+    price_year: 2014
+    escalation_index: cepci
+    range: "none stated on RC-08 (±30 %, DB-35)"
+    source: "RC-08 Emission factors table: gas boiler benchmark US$270/kW_th, 80 % efficiency, 90 % availability (NREL desalination report) [L]"
+    tag: L
+    note: >-
+      price_year 2014 is our reading [A]: RC-08 states none, RC-10 dates the NREL desalination report's figures
+      as 2014 $. × CEPCI 2014→2023 (797.9/576.1, escalation [A]) = 374 $/kW_th. Used for grid-gas and peak
+      boilers (C0, C1 top-up, C2–C7 peak).
+  absorption_chiller_plant_cost_function_usd:
+    value: {machine_fixed: 83000.0, machine_per_ton: 252.0, plant_fixed: 41000.0, plant_per_ton: 170.0}
+    unit: "USD per plant = machine_fixed + machine_per_ton (Q_t − 100)/F + plant_fixed + plant_per_ton (Q_t − 100); Q_t duty in refrigeration tons, F capacity fraction"
+    currency: USD
+    price_year: 1986
+    escalation_index: cepci
+    range: "VERIFY: decoded from the Guidebook; valid 100–1000 ton"
+    source: "RC-05 Cost: Guidebook Ch14 p.269 (1986 Means $, decoded, VERIFY) [L]; spec ECO-04"
+    tag: L
+    note: >-
+      Machine + cooling tower/pumps/piping (the plant terms), so do not add separate cooling-tower capex for the
+      chiller's heat rejection. × CEPCI 1986→2023 = 797.9/318.4 = 2.51 (spec ECO-04 '×≈2.5'). Sanity bands
+      (RC-10 benchmarks): single-stage LiBr 1,800–2,300 $/ton installed (DOE 2017).
+  electric_chiller_plant_cost_function_usd:
+    value: {fixed: 107000.0, per_ton: 267.0}
+    unit: "USD per plant = fixed + per_ton (Q_t − 100); Q_t duty in refrigeration tons"
+    currency: USD
+    price_year: 1986
+    escalation_index: cepci
+    range: "VERIFY: decoded from the Guidebook; valid 100–1000 ton"
+    source: "RC-05 Cost: Guidebook Ch14 p.269 (1986 Means $, decoded, VERIFY) [L]; spec ECO-04"
+    tag: L
+    note: >-
+      Electric centrifugal plant; assumed to include its own heat rejection like the absorption plant (the
+      Guidebook compares complete plants; VERIFY) [A]. × CEPCI 1986→2023 = 2.51. Sanity band (RC-10 benchmarks): water-cooled
+      centrifugal 740–760 $2022/ton installed (US EIA 2023, chiller only).
+  absorption_titanium_tubes_multiplier:
+    value: 1.125
+    unit: "-"
+    range: [1.10, 1.15]
+    source: "RC-05 Materials: titanium generator tubes +10–15 % machine cost (Guidebook p.266–267) [L]"
+    tag: L
+    note: >-
+      Value = midpoint (our choice). Applied to the absorption machine terms only when the generator is driven
+      directly by brine (no isolation HEX + clean loop).
+  dry_cooler_cost_multiplier:
+    value: 3.0
+    unit: "× wet cooling-tower cost per kW rejected"
+    range: "none stated on RC-07 (±30 %, DB-35)"
+    source: "RC-07: dry cooler cost ≈ 3×, area ≈ 3×, fan power ≈ 3× a wet tower (DiPippo Ch23 Miravalles comparison) [L]"
+    tag: L
+    note: "Applied to cooling_tower_capex_usd_per_kw_th."
+
+  # ------------------------------------------------------------------ benchmarks (sanity only, never cost inputs)
+  heat_price_cap_acm_usd_per_mwh_th:
+    value: 121.9
+    unit: EUR/MWh_th
+    currency: EUR
+    price_year: 2026
+    range: "benchmark, not a cost input"
+    source: "RC-10 Benchmarks: ACM 'ACM stelt maximale warmtetarieven 2026 vast', 5 Dec 2025: 40.97 EUR/GJ incl. VAT = 33.86 EUR/GJ excl. VAT = 121.9 EUR/MWh_th [L]"
+    tag: L
+    note: "NL consumer heat price cap 2026 (maximum variable tariff); × eur_to_usd ≈ 138 $/MWh_th. A competitive LCOH sits below it."
+  benchmark_gippsland_grac_lcoh_usd_per_mwh_th:
+    value: 19.16
+    unit: AUD/GJ_th
+    currency: AUD
+    range: "benchmark, not a cost input"
+    source: "RC-10 Benchmarks: Gippsland GRAC LCOH 19.16 AUD/GJ (gas 31; SGIL 16.81) [L]"
+    tag: L
+    note: "Price year not stated on RC-10. × 3.6 × aud_to_usd ≈ 43.5 $/MWh_th."
+  benchmark_wvu_lcoh_usd_per_mwh_th:
+    value: 41.5
+    unit: USD/MWh_th
+    currency: USD
+    price_year: 2012
+    range: [40.0, 43.0]
+    source: "RC-10 Benchmarks; spec ECO-07: WVU heating + absorption cooling ≈ $40–43/MWh_th, full retrofit, 2012 $ [L]"
+    tag: L
+    note: "Value = midpoint. Not escalated (cepci_index has no 2012 entry); $18–22 for the hot-water case."
