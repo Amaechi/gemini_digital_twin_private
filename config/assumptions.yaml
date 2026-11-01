@@ -272,6 +272,167 @@ assumptions:
     status: default
     added_by: WP-04
 
+  - id: SUB-WELL
+    title: Well completion used for doublet hydraulics (TL-05, TL-06)
+    value:
+      trajectory: vertical
+      inner_diameter_m: 0.216
+      roughness_m: 0.0000457
+    unit: null
+    justification: >-
+      Producer and injector are vertical to the reservoir mid-depth. One flow-path inner diameter is used
+      for the whole well: the 8½-inch hole of DB-38 (2 × r_w = 0.216 m). This is conservative for friction,
+      because the pump chamber is ≥ 13⅜-inch casing (RC-01 item 11). Wall roughness is that of steel pipe,
+      0.0457 mm (RC-01 eq 5); it is always passed explicitly as roughness_m, never GEMINI's 0.01 m default
+      (WP-01 follow-up). Wellbore heat loss uses GEMINI DPDT's hard-coded U = 10 W/(m² K) against the
+      undisturbed geothermal gradient (RC-01 eq 1 and envelope note); this steady value is
+      conservative (start-up) at part load, e.g. ≈ 10 K loss at 50 m³/h.
+    source: RC-01 items 1, 5, 11; GEOAGENT_DESIGN_SPEC §2.4 DB-38
+    sensitivity: >-
+      A larger flow diameter (13⅜-inch casing above the pump) lowers friction; scaling or corrosion raises
+      roughness. Producer friction is ≈ 4.5 bar at 300 m³/h with the base values.
+    tag: A
+    status: default
+    added_by: WP-05
+
+  - id: SUB-PWH
+    title: Producer wellhead pressure (TL-05 operating point)
+    value: 3.0
+    unit: bar(g)
+    justification: >-
+      GEMINI's own doublet example (simulator_examples/projects/doublet_plant.json) produces against a
+      3.0 bar wellhead pressure, and the C2/C3 reference process degasses at the surface (spec §3.5). With
+      this value TL-05 reproduces the RC-01 envelope (ESP Δp 30–40 bar, ≈ 0.4 MW shaft at 300 m³/h). A
+      pressurised loop without degassing (C7, DB-36) must keep the wellhead above the bubble point
+      (SUB-PBUB, ≈ 45 bar(g) at 87 °C; RC-01 item 9, RC-12) and passes its own value to TL-05; that exceeds
+      the plate-HEX ratings on RC-03. Pressures are gauge throughout.
+    source: GEMINI doublet_plant.json boundary input; GEOAGENT_DESIGN_SPEC §3.5; RC-01 envelope; RC-12
+    sensitivity: [3.0, 50.0]
+    tag: A
+    status: default
+    added_by: WP-05
+
+  - id: SUB-PBUB
+    title: Brine bubble-point pressure (Henry's law) and ESP-intake setpoint (VER-ESP-PB)
+    value:
+      method: henry_law
+      basis: sea_water
+      second_bound: pure_water
+      intake_margin_factor: 1.2
+      bubble_pressure_bara: 46.1
+      bubble_pressure_pure_water_bara: 52.2
+      at_temperature_degc: 87.0
+      intake_setpoint_bara: 55.3
+    unit: null
+    justification: >-
+      The design basis gives no bubble point, so it is computed with Henry's law exactly as RC-01 item 9
+      specifies: p_b = Σ c_i / H_i(T), c_i = GLR · y_i / 0.022414 mol/m³ (DB-09: 0.8 Nm³/m³, 80 % CH₄,
+      20 % CO₂), H_i(T) = H_i° · exp[B_i (1/T − 1/298.15)] with the card's sea-water constants (CH₄ 1.2e-5
+      mol m⁻³ Pa⁻¹, B 1100 K; CO₂ 2.8e-4, B 2600 K) as the basis for our 1030 kg/m³ brine and the
+      pure-water constants (CH₄ 1.4e-5, 1600 K; CO₂ 3.4e-4, 2300 K) as the second bound. Ideal gas, no
+      fugacity or water-vapour correction (card). TL-05 evaluates it at the reservoir temperature of each
+      design (CH₄ p_b rises with T over 25–100 °C, so this is the conservative end); the values above are
+      the record at DB-01 (87 °C): p_b 46.1 bar(a) sea water (CH₄ 44.9 + CO₂ 1.1 bar), 52.2 bar(a) pure
+      water. The ESP intake must stay at or above 1.2 · p_b (margin for the van 't Hoff extrapolation
+      298 → 360 K and salinity above sea water [A]) = 55.3 bar(a) = 54.3 bar(g); the card rounds this up
+      to 60 bar(a) only as a default when p_b is not computed. The bare p_b (bar(g), not multiplied) is
+      passed to the verifier as the release pressure (EspPoint.release_pressure_barg); the DesignVerifier
+      applies the same factor itself from VER-ESP-MARGIN, so the two entries must state the same margin
+      (a test checks it). Replaces the former 20 bar(g) default, which the card now calls not
+      conservative.
+    source: >-
+      RC-01 item 9 (Henry's-law constants: Sander, Compilation of Henry's law constants v5.0.0, Atmos.
+      Chem. Phys. 23, 10901–12440, 2023; Burkholder et al. 2019, JPL Publication 19-5) [L]; margin 1.2 [A]
+    sensitivity: >-
+      Pure-water bound 52.2 bar(a) (setpoint 62.6 bar(a)); margin 1.1–1.3. The ESP setting depth moves
+      ≈ 10 m per bar of setpoint; a measured bubble point replaces the estimate.
+    tag: L
+    status: default
+    added_by: WP-05
+
+  - id: SUB-NPSH
+    title: ESP net positive suction head check
+    value:
+      npsh_margin_m: 15.0
+      vapour_pressure_bound_bara: 1.01325
+      vapour_pressure_bound_valid_to_degc: 100.0
+      atmospheric_pressure_bara: 1.01325
+    unit: null
+    justification: >-
+      NPSHA = (P_intake + P_atm − P_vap) / (ρ g), in m of brine (Guidebook p.173, RC-01 item 8). The
+      pump's NPSHR is not given (missing input), so the check is NPSHA ≥ 15 m, the heuristic margin of
+      RC-01 item 8 (DiPippo Problem 4.5); add NPSHR when a pump is selected. The vapour pressure is bounded
+      by water at its normal boiling point (1.01325 bar(a) at 100 °C), which is conservative for brine at
+      or below 100 °C (dissolved salt lowers it). Above 100 °C NPSHA is not evaluated (warning). The
+      bubble-point setpoint SUB-PBUB (1.2 · p_b) is far more restrictive at the intake.
+    source: RC-01 item 8 [L Guidebook p.173; DiPippo Problem 4.5]; [A]
+    sensitivity: "NPSHR of the selected pump (typically a few metres) adds to the 15 m margin."
+    tag: A
+    status: default
+    added_by: WP-05
+
+  - id: SUB-ESP
+    title: ESP model and sizing rules (TL-05, TL-06)
+    value:
+      stage_head_coeff: [83.08389282, -0.000460444, -1.19e-07, 1.69e-11, -6.36e-16, 6.69e-21]
+      stage_power_coeff: [10.02089977, -0.000160233, 6.52e-08, -2.13e-12, 1.71e-17, 1.38e-23]
+      frequency_min_hz: 30.0
+      frequency_max_hz: 70.0
+      frequency_nominal_hz: 60.0
+      setting_depth_step_m: 10.0
+      flow_scale_rule: best_efficiency_point_at_max_flow
+      stages_rule: max_flow_at_nominal_frequency
+      setting_depth_rule: shallowest_with_intake_at_bubble_pressure_at_max_flow
+    unit: null
+    justification: >-
+      Stage curves are GEMINI's ESP polynomials (TNO 2022 R11363; pump HC27000 in GEMINI's tests and the
+      doublet example; head in ft and brake power in hp per stage against bbl/d at 60 Hz). Their best-
+      efficiency point is ≈ 183 m³/h (72 %) and the head is negative above ≈ 280 m³/h, so DB-11's
+      300 m³/h needs a larger pump of the same family: the curve is flow-scaled (Q × k, head per stage × 1,
+      power × k, efficiency unchanged; like k impellers in parallel) so that its best-efficiency point is at
+      the maximum design flow. The number of stages is the smallest that gives the required ESP Δp at the
+      maximum flow at the nominal 60 Hz (60–70 Hz is kept for decline). The setting depth is the shallowest
+      depth, in 10 m steps, where the intake stays at or above the SUB-PBUB setpoint (1.2 · p_b) at the
+      maximum flow. Frequency window
+      30–70 Hz (RC-01 item 7); below 30 Hz the flow is held at 30 Hz with a wellhead choke. GEMINI scales
+      head by (f/60)² and power by (f/60)³ at the same flow (no flow affinity), so its curve power is
+      optimistic at reduced frequency; plant power uses the DB-13/DB-40 rule QΔp/0.70 and the curve power
+      is reported for comparison only.
+    source: RC-01 items 7, 11; GEMINI gemini_model/pump/esp.py and simulator_examples/projects/doublet_plant.json
+    sensitivity: "Stage count ± 1 and flow scale ± 10 % (change the frequency, not the rule-based power)."
+    tag: A
+    status: default
+    added_by: WP-05
+
+  - id: SUB-PSUC
+    title: Injection-pump suction pressure
+    value: 0.0
+    unit: bar(g)
+    justification: >-
+      The surface-loop pressure that reaches the injection pump is not known until WP-06 builds the plant.
+      Conservatively the injection pump supplies the whole injector wellhead pressure: no credit is taken
+      for the producer wellhead pressure (SUB-PWH), which the separator, filters and heat exchangers
+      consume. This reproduces the RC-01 envelope (≈ 0.3 MW shaft per doublet at 300 m³/h).
+    source: "[A]; RC-01 envelope"
+    sensitivity: [0.0, 3.0]
+    tag: A
+    status: default
+    added_by: WP-05
+
+  - id: SUB-SPACING
+    title: Producer–injector spacing at reservoir depth
+    value: 1200.0
+    unit: m
+    justification: >-
+      RC-02 default D ≥ 1200 m (target breakthrough time ≥ 30 yr; ENG-06). Paris/Dogger doublets use
+      1–1.3 km, Landau ≈ 1.2 km (RC-02). TL-07 also reports the minimum spacing for t_b ≥ the analysis
+      period.
+    source: RC-02 Defaults; GEOAGENT_DESIGN_SPEC §3.6 ENG-06
+    sensitivity: [1000.0, 1500.0]
+    tag: A
+    status: default
+    added_by: WP-05
+
   - id: VER-ESP-PB
     title: ESP-intake / CO₂-release pressure setpoint (bubble point from Henry's law)
     value: 60.0

@@ -98,9 +98,14 @@ class DepthArgs(StrictModel):
 
 
 class FlowArgs(StrictModel):
-    """Flow argument (TL-05)."""
+    """Flow argument (TL-05); bounded to the DB-11 hard limit (``config/limits.yaml``)."""
 
-    flow_m3h: float | None = Field(default=None, gt=0, description="None: design-basis maximum.")
+    flow_m3h: float | None = Field(
+        default=None,
+        ge=50.0,
+        le=300.0,
+        description="50–300 m³/h per active doublet (DB-11); None: design-basis maximum.",
+    )
 
 
 class CandidateArgs(StrictModel):

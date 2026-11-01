@@ -18,6 +18,9 @@ reservoir/ESP configuration directly, with no extra conversion code.
 # Modified by the GeoAgent team for SPE GeoHackathon 2026, 2026-11-01 (WP-01 review): the ESP's
 # water head/power curves are scaled by the "pvt" block's specific gravity (RHOL / 1000), so the
 # pump sees the same fluid as the well column; without a block SG = 1 and nothing changes.
+# Modified by the GeoAgent team for SPE GeoHackathon 2026, 2026-11-01 (WP-05): optional
+# "friction_opposes_flow" key in the injector config (RC-01 eq 12 friction sign, see
+# nodal_solver); absent or false keeps GEMINI's original injector friction sign.
 
 import numpy as np
 
@@ -398,11 +401,15 @@ def solve_injector_wellhead_pressure_bar(
               "welltrajectory": [{"angle": deg, "depth": m, "diameter": m}, ...],
               "roughness_m": float,                  # optional, defaults to 0.01
               "pvt": {...},                          # optional, GM-01
+              "friction_opposes_flow": bool,         # optional, defaults to False
             }
 
         (Same ``"trajectory_table"``-vs-``"welltrajectory"`` choice and
         optional ``"pvt"`` block as :func:`solve_primary_flow_m3h` -- see
-        its docstring.)
+        its docstring.) ``"friction_opposes_flow": true`` makes friction a
+        loss for the downward injection flow (RC-01 eq 12, ``P_wh =
+        P_bh,req - rho g H + dP_fric``); the default keeps GEMINI's original
+        sign (see :func:`gemini_simulator.nodal_solver.solve_injection_wellhead_pressure`).
     flow_m3h: float
         The (known) injection flow rate, in m3/h.
     wellhead_temperature_c: float
@@ -427,6 +434,11 @@ def solve_injector_wellhead_pressure_bar(
             "injectivity_index": injector_well_config["productivity_index_m3h_per_bar"] / 3.6e8,
         }
     )
+    friction_opposes_flow = injector_well_config.get("friction_opposes_flow", False)
+    if not isinstance(friction_opposes_flow, bool):
+        raise ValueError(
+            f"friction_opposes_flow must be true or false, got {friction_opposes_flow!r}"
+        )
     dpdt = _build_dpdt(
         _resolve_trajectory_segments(injector_well_config),
         roughness=injector_well_config.get("roughness_m", 0.01),
@@ -440,5 +452,6 @@ def solve_injector_wellhead_pressure_bar(
         flow_rate=flow_m3h / 3600.0,
         wellhead_temperature=wellhead_temperature_c + CELSIUS_TO_KELVIN,
         pressure_bracket=pressure_bracket_pa,
+        friction_opposes_flow=friction_opposes_flow,
     )
     return wellhead_pressure_pa / 1e5
