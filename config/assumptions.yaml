@@ -273,20 +273,23 @@ assumptions:
     added_by: WP-04
 
   - id: VER-ESP-PB
-    title: Bubble / CO₂-release pressure for the ESP-intake check (brine chemistry not given)
-    value: 20.0
-    unit: bar(g)
+    title: ESP-intake / CO₂-release pressure setpoint (bubble point from Henry's law)
+    value: 60.0
+    unit: bar(a)
     justification: >-
-      The brine bubble-point (CO₂-release) pressure is not provided, so the DesignVerifier uses the
-      reference card's default 20 bar(g) for the ESP-intake check (PH-18) and, for a pressurised loop
-      without degassing (DB-36 option b), as the minimum brine pressure at every brine HEX (PD-10,
-      RC-12), and flags the missing input. A tool that computes the release pressure passes it
-      explicitly (EspPoint.release_pressure_barg / VerificationEvidence.co2_release_pressure_barg) and
-      the default is not used. Caution: with GLR 0.8 Nm³/m³ of mostly CH₄ (DB-09) the true bubble
-      point is likely much higher (an unverified Henry's-law estimate gives ≈ 35–50 bar(a)), so this
-      default is probably non-conservative; a pressurised loop then exceeds gasketed plate-HEX ratings.
-    source: RC-01 item 9 [A] (DiPippo eq 4.16–4.20 flash-horizon method; Ch8 p.4)
-    sensitivity: "Release pressure 10 / 30 / 50 bar(g): ESP setting depth and the pressurised-loop HEX rating move accordingly."
+      The design basis gives no bubble point, so RC-01 item 9 computes it with Henry's law
+      (p_b = Σ c_i / H_i(T), sea-water constants, 87 °C, GLR 0.8 Nm³/m³, 80 % CH₄ / 20 % CO₂):
+      p_b ≈ 46 bar(a) on the sea-water basis (52 bar(a) pure water); the card's setpoint is 1.2 · p_b
+      ≈ 55 bar(a), rounded up to 60 bar(a). This register default is that computed setpoint. The
+      DesignVerifier uses it, converted to gauge (60 − 1.01325 = 58.99 bar(g)), as the minimum ESP
+      intake pressure (PH-18) and, for a pressurised loop without degassing (DB-36 option b), as the
+      minimum brine pressure at every brine HEX (PD-10, RC-12); with it a gasketed (≈ 20 bar) or welded
+      (300 psig) plate HEX cannot hold the loop above release (RC-03). When WP-05's tool computes p_b
+      for the actual depth, temperature and gas, it passes the explicit value
+      (EspPoint.release_pressure_barg / VerificationEvidence.co2_release_pressure_barg) and this
+      default is not used.
+    source: RC-01 item 9 (Henry's law, Sander 2023 constants), margin 1.2 [A]
+    sensitivity: "p_b 46 (sea water) / 52 (pure water) bar(a); margin 1.0–1.3 ⇒ setpoint ≈ 46–68 bar(a): the ESP setting depth moves accordingly."
     tag: A
     status: default
     added_by: WP-09

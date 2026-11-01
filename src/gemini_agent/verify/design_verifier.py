@@ -89,7 +89,10 @@ p.270)."""
 NPSH_MARGIN_M = 15.0
 """NPSH_A ≥ NPSH_R + 15 m (RC-01 item 8; DiPippo Problem 4.5 heuristic)."""
 ESP_RELEASE_PRESSURE_ID = "VER-ESP-PB"
-"""Register entry: default bubble/CO₂-release pressure (RC-01 item 9 [A], 20 bar(g))."""
+"""Register entry: ESP-intake / CO₂-release setpoint 1.2 · p_b = 60 bar(a) (RC-01 item 9, Henry's
+law); used when no computed bubble point is passed as evidence."""
+P_ATM_BAR = 1.01325
+"""Standard atmosphere (bar) to convert the register's bar(a) to the evidence's bar(g)."""
 HP_CARNOT_FRACTION_ID = "VER-HP-ETA"
 """Register entry: COP ≤ 0.6 × Carnot without a datasheet (RC-04 [A])."""
 HP_MAX_LIFT_ID = "VER-HP-LIFT"
@@ -250,7 +253,8 @@ class EspPoint(StrictModel):
     name: str
     intake_pressure_barg: float
     release_pressure_barg: float | None = Field(
-        default=None, description="Bubble/CO₂-release pressure here; None → evidence/register."
+        default=None,
+        description="Computed bubble/CO₂-release pressure here, bar(g); None → evidence/register.",
     )
     npsh_available_m: float | None = None
     npsh_required_m: float | None = Field(default=None, ge=0)
@@ -293,7 +297,8 @@ class VerificationEvidence(StrictModel):
     subsurface: SubsurfaceEvidence | None = None
     scaling: ScalingEvidence | None = None
     co2_release_pressure_barg: float | None = Field(
-        default=None, description="Computed bubble/CO₂-release pressure; None → VER-ESP-PB."
+        default=None,
+        description="Computed bubble/CO₂-release pressure p_b, bar(g) (WP-05); None → VER-ESP-PB.",
     )
     brine_contact_materials: dict[str, str] = Field(
         default_factory=dict, description="Component → material of brine-wetted parts."
@@ -426,7 +431,7 @@ class _Checks:
                 limit=_round(limit),
                 margin=_round(margin),
                 unit=unit,
-                detail=detail[:240],
+                detail=detail[:400],
                 warnings=list(warnings),
                 source=source,
             )
@@ -518,6 +523,15 @@ def _active_doublets(day: DayResult) -> Iterable[tuple[int, float]]:
             yield index, flow
 
 
+def _to_barg(value: float, unit: str | None) -> float:
+    """Convert a register pressure in ``bar(a)`` or ``bar(g)`` to bar(g); other units raise."""
+    if unit == "bar(a)":
+        return value - P_ATM_BAR
+    if unit == "bar(g)":
+        return value
+    raise ValueError(f"{ESP_RELEASE_PRESSURE_ID}: unit must be bar(a) or bar(g), got {unit!r}")
+
+
 def _lmtd(dt_a: float, dt_b: float) -> float:
     if abs(dt_a - dt_b) <= 1e-9 * max(dt_a, dt_b):
         return dt_a
@@ -546,7 +560,12 @@ class DesignVerifier:
         """Bind the hard limits, the design basis and the assumptions register."""
         self.limits = limits
         self.design_basis = design_basis
-        self.release_pressure_default_barg = float(register.get(ESP_RELEASE_PRESSURE_ID).value)
+        release = register.get(ESP_RELEASE_PRESSURE_ID)
+        release_value = float(release.value)  # type: ignore[arg-type]
+        self.release_pressure_default_barg = _to_barg(release_value, release.unit)
+        self.release_default_note = (
+            f"{ESP_RELEASE_PRESSURE_ID} {_fmt(release_value)} {release.unit}"
+        )
         self.hp_carnot_fraction_default = float(register.get(HP_CARNOT_FRACTION_ID).value)
         self.hp_max_lift_default_k = float(register.get(HP_MAX_LIFT_ID).value)
         self.brine_cp_j_per_kg_k = float(register.get(BRINE_CP_ID).value)
@@ -1351,8 +1370,8 @@ class DesignVerifier:
                 release = self._release_pressure(ev, assumption_ids)
                 if ev.co2_release_pressure_barg is None:
                     warnings.append(
-                        f"{p.name}: release pressure not given; default {_fmt(release)} bar(g) "
-                        f"({ESP_RELEASE_PRESSURE_ID})"
+                        f"{p.name}: no computed bubble point; default setpoint "
+                        f"{self.release_default_note} = {_fmt(release)} bar(g)"
                     )
             intake.add(
                 p.intake_pressure_barg - release,
@@ -1566,15 +1585,26 @@ class DesignVerifier:
             out.missing("PD-10", name, what, source)
             return
         release = self._release_pressure(ev, assumption_ids)
+        basis = (
+            "computed p_b"
+            if ev.co2_release_pressure_barg is not None
+            else (self.release_default_note)
+        )
         worst = _Bound()
         for p in brine_hex:
             assert p.min_brine_pressure_barg is not None
-            worst.add(
-                p.min_brine_pressure_barg - release,
-                p.min_brine_pressure_barg,
-                f"{p.name}: brine {_fmt(p.min_brine_pressure_barg)} bar(g) vs release ≥ "
-                f"{_fmt(release)} bar(g)",
+            detail = (
+                f"{p.name}: min brine pressure {_fmt(p.min_brine_pressure_barg)} bar(g) vs ≥ "
+                f"{_fmt(release)} bar(g) CO₂ release ({basis})"
             )
+            rating = HEX_RATING[p.construction][1]
+            if rating < release:
+                detail += (
+                    f"; {p.construction} plate HEX rated {_fmt(rating)} bar(g) cannot hold the "
+                    "loop above release: degas (inhibitor) or use a shell-and-tube unit "
+                    "(RC-01 item 9, RC-03)"
+                )
+            worst.add(p.min_brine_pressure_barg - release, p.min_brine_pressure_barg, detail)
         out.bound("PD-10", name, worst, limit=release, unit="bar", source=source)
 
     # ------------------------------------------------------------------ layer 5: exergy

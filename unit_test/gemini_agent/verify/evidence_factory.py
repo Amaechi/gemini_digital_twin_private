@@ -47,14 +47,14 @@ def project() -> dict[str, Any]:
 
 
 def candidate(candidate_id: str = CANDIDATE_ID, **overrides: Any) -> Candidate:
-    """Two-doublet candidate at the design-basis depth, pressurised loop (no degassing)."""
+    """Two-doublet candidate at the design-basis depth, degassed loop (RC-01 item 9 base route)."""
     data: dict[str, Any] = {
         "id": candidate_id,
         "concept": "C2",
         "doublets": 2,
         "depth_m": 2500.0,
         "design_flow_m3h": 300.0,
-        "gas_handling": "pressurised_reinject",
+        "gas_handling": "degas_use",
         "heating_return_degc": 55.0,
         "cooling_return_degc": 26.0,
         "equipment_sizes": {"hthp_heating_mw": 6.0, "absorption_cooling_mw": 3.0},
@@ -197,7 +197,7 @@ def good_evidence(candidate_id: str = CANDIDATE_ID, **overrides: Any) -> Verific
         ],
         "esps": [
             EspPoint(
-                name="ESP-1", intake_pressure_barg=25.0, npsh_available_m=60.0, npsh_required_m=20.0
+                name="ESP-1", intake_pressure_barg=61.0, npsh_available_m=60.0, npsh_required_m=20.0
             )
         ],
         "subsurface": SubsurfaceEvidence(
@@ -206,13 +206,12 @@ def good_evidence(candidate_id: str = CANDIDATE_ID, **overrides: Any) -> Verific
         "scaling": ScalingEvidence(
             status="insufficient data",
             mitigations=[
-                Mitigation.PRESSURISED_LOOP,
+                Mitigation.CALCITE_INHIBITOR,
                 Mitigation.TITANIUM_PLATES,
                 Mitigation.OXYGEN_EXCLUSION,
                 Mitigation.NO_COPPER,
             ],
         ),
-        "co2_release_pressure_barg": 15.0,
         "brine_contact_materials": {"production_casing": "carbon steel Sch 80"},
     }
     data.update(overrides)

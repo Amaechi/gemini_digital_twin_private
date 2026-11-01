@@ -89,6 +89,24 @@ def _duplicate_component_text() -> dict[str, Any]:
     return {"project": text[:first] + duplicate + text[first:]}
 
 
+def _pressurised(**changes: Any) -> dict[str, Any]:
+    """Pressurised no-degassing variant (DB-36 option b) with its RC-12 mitigations."""
+    scaling = ScalingEvidence(
+        status="insufficient data",
+        mitigations=[
+            Mitigation.PRESSURISED_LOOP,
+            Mitigation.TITANIUM_PLATES,
+            Mitigation.OXYGEN_EXCLUSION,
+            Mitigation.NO_COPPER,
+        ],
+    )
+    return {
+        "candidate": ef.candidate(gas_handling=GasHandling.PRESSURISED_REINJECT),
+        "scaling": scaling,
+        **changes,
+    }
+
+
 def _unmet_day() -> dict[str, Any]:
     heat = _day0("heat_by_source_mw")
     heat["boiler"] -= 2.0
@@ -116,7 +134,13 @@ def test_good_design_is_accepted_with_margins_and_short_summary():
     assert report.check("PH-13").margin == pytest.approx(376.15 / 60.0 - 3.5)  # Carnot
     assert report.check("PH-22").value == pytest.approx(0.0, abs=1e-9)  # brine balance closes
     assert report.check("PD-09").limit == pytest.approx(87.0)  # DB-20: 12 + 0.03 × 2500
-    assert set(report.assumption_ids) == {"DB-33", HP_CARNOT_FRACTION_ID, HP_MAX_LIFT_ID}
+    assert set(report.assumption_ids) == {
+        "DB-33",
+        ESP_RELEASE_PRESSURE_ID,  # no computed p_b: register setpoint 60 bar(a)
+        HP_CARNOT_FRACTION_ID,
+        HP_MAX_LIFT_ID,
+    }
+    assert report.check("PH-18").margin == pytest.approx(61.0 - (60.0 - 1.01325))
     assert all(value >= 0 for value in report.margins.values())
     assert report.check("EX-01").status == CheckStatus.INFO
     VerificationReport.model_validate(report.model_dump(mode="json"))  # strict round trip
@@ -220,7 +244,7 @@ FAILING_CASES: list[tuple[str, Callable[[], dict[str, Any]]]] = [
     ("PH-15", lambda: _first("absorption", cooling_mw=3.5)),
     ("PH-16", lambda: _first("absorption", pumping_power_mw=0.4)),
     ("PH-17", lambda: _first("pumps", shaft_power_w=100_000.0)),
-    ("PH-18", lambda: _first("esps", intake_pressure_barg=14.0)),
+    ("PH-18", lambda: _first("esps", intake_pressure_barg=58.0)),  # < 60 bar(a) = 58.99 bar(g)
     ("PH-19", lambda: _first("esps", npsh_available_m=30.0)),
     ("PH-20", lambda: _days(electricity_by_consumer_mw={"esp": -0.4})),
     ("PH-21", lambda: _days(margins={"hex_approach_k": -0.5})),
@@ -283,8 +307,11 @@ FAILING_CASES: list[tuple[str, Callable[[], dict[str, Any]]]] = [
             production_temperature_degc=[90.0, 86.0], injection_temperature_degc=[52.0, 46.0]
         ),
     ),
-    ("PD-10", lambda: {"co2_release_pressure_barg": None}),  # default 20 bar(g) > 16 bar(g)
-    ("PD-10", lambda: _hex(min_brine_pressure_barg=14.0)),
+    ("PD-10", lambda: _pressurised()),  # default 60 bar(a) > gasketed HEX at 16 bar(g)
+    (
+        "PD-10",
+        lambda: _pressurised(co2_release_pressure_barg=15.0, **_hex(min_brine_pressure_barg=14.0)),
+    ),
 ]
 
 
@@ -310,6 +337,10 @@ def test_every_pass_fail_check_has_a_failing_case():
     evaluated = {
         c.check_id for c in _verify(ef.good_evidence()).checks if c.status == CheckStatus.PASS
     }
+    # PD-10 applies only to the pressurised loop; an explicit (WP-05) p_b lets it pass there
+    pressurised = _verify(_with(**_pressurised(co2_release_pressure_barg=15.0)))
+    evaluated |= {c.check_id for c in pressurised.checks if c.status == CheckStatus.PASS}
+    assert pressurised.verdict == DesignVerdict.ACCEPTED
     assert evaluated == {check_id for check_id, _ in FAILING_CASES}
 
 
@@ -377,18 +408,59 @@ def test_hex_without_pressure_is_not_evaluated():
     assert report.verdict == DesignVerdict.UNVERIFIED
 
 
-def test_release_pressure_defaults_to_register():
-    """RC-01 item 9: without a bubble-point pressure the [A] default 20 bar(g) is used."""
-    esp = EspPoint(name="ESP-1", intake_pressure_barg=19.0, npsh_available_m=60, npsh_required_m=20)
-    report = _verify(_with(esps=[esp], co2_release_pressure_barg=None))
+def test_release_pressure_defaults_to_register_setpoint():
+    """RC-01 item 9: without a computed p_b the setpoint 60 bar(a) (1.2 · p_b) applies, in gauge."""
+    assert VERIFIER.release_pressure_default_barg == pytest.approx(60.0 - 1.01325)
+    esp = EspPoint(name="ESP-1", intake_pressure_barg=58.0, npsh_available_m=60, npsh_required_m=20)
+    report = _verify(_with(esps=[esp]))
     check = report.check("PH-18")
-    assert check.status == CheckStatus.FAIL and check.margin == pytest.approx(-1.0)
-    assert ESP_RELEASE_PRESSURE_ID in report.assumption_ids and check.warnings
-    assert report.check("PD-10").status == CheckStatus.FAIL  # brine HEX at 16 < 20 bar(g)
-    explicit = esp.model_copy(update={"release_pressure_barg": 18.0})
+    assert check.status == CheckStatus.FAIL and check.margin == pytest.approx(58.0 - 58.98675)
+    assert ESP_RELEASE_PRESSURE_ID in report.assumption_ids
+    assert any("60 bar(a)" in warning for warning in check.warnings)
+    explicit = esp.model_copy(update={"release_pressure_barg": 45.0})  # WP-05's computed p_b
     report = _verify(_with(esps=[explicit]))
     assert report.check("PH-18").status == CheckStatus.PASS
     assert ESP_RELEASE_PRESSURE_ID not in report.assumption_ids
+
+
+def test_register_pressure_units_are_converted():
+    """The register default may be bar(a) or bar(g); any other unit is refused."""
+    from gemini_agent.schemas.config import load_config
+
+    register = load_config("assumptions")
+    entry = register.get(ESP_RELEASE_PRESSURE_ID)
+    assert (entry.value, entry.unit) == (60.0, "bar(a)")
+    gauge = entry.model_copy(update={"value": 59.0, "unit": "bar(g)"})
+    others = [a for a in register.assumptions if a.id != ESP_RELEASE_PRESSURE_ID]
+    verifier = DesignVerifier(
+        VERIFIER.limits,
+        VERIFIER.design_basis,
+        register.model_copy(update={"assumptions": [*others, gauge]}),
+    )
+    assert verifier.release_pressure_default_barg == 59.0
+    bad = entry.model_copy(update={"unit": "MPa"})
+    with pytest.raises(ValueError, match="bar\\(a\\) or bar\\(g\\)"):
+        DesignVerifier(
+            VERIFIER.limits,
+            VERIFIER.design_basis,
+            register.model_copy(update={"assumptions": [*others, bad]}),
+        )
+
+
+def test_pressurised_loop_behind_gasketed_plate_hex_fails_with_reason():
+    """PD-10 uses the same 60 bar(a) setpoint: a gasketed plate HEX at 20 bar cannot hold it."""
+    report = _verify(
+        _with(**_pressurised(**_hex(design_pressure_barg=20.0, min_brine_pressure_barg=20.0)))
+    )
+    check = report.check("PD-10")
+    assert check.status == CheckStatus.FAIL
+    assert check.limit == pytest.approx(58.98675) and check.margin == pytest.approx(20 - 58.98675)
+    for phrase in ("gasketed plate HEX rated 20 bar(g)", "VER-ESP-PB 60 bar(a)", "degas"):
+        assert phrase in check.detail, check.detail
+    assert report.check("PH-09").status == CheckStatus.PASS  # the HEX itself is within rating
+    assert ESP_RELEASE_PRESSURE_ID in report.assumption_ids
+    explicit = _verify(_with(**_pressurised(co2_release_pressure_barg=15.0)))
+    assert explicit.check("PD-10").status == CheckStatus.PASS  # explicit evidence overrides
 
 
 def test_heat_pump_datasheet_overrides_rc04_defaults():
