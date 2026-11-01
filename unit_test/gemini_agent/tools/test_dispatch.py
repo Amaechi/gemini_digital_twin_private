@@ -29,7 +29,9 @@ from unit_test.gemini_agent.tools.plant_factory import basis, make_candidate
 
 HAND_C2 = {"hthp_heating_mw": 14.0, "peak_boiler_mw": 6.0, "electric_chiller_mw": 10.0}
 """WP-07 acceptance: hand-sized C2 (2 doublets, HTHP 14 MW, boiler 6 MW, chillers 10 MW)."""
-HP_MIN, ABS_MIN = 0.10, 0.10
+_REGISTER = load_config("assumptions")
+HP_MIN = float(_REGISTER.get("DSP-HP-MIN").value["min_part_load_frac"])  # type: ignore[index]
+ABS_MIN = float(_REGISTER.get("DSP-ABS-MIN").value)  # type: ignore[arg-type]
 PEAK, APRIL, JULY, OCTOBER = (dt.date(2027, m, d) for m, d in ((1, 15), (4, 15), (7, 15), (10, 1)))
 
 
@@ -421,6 +423,10 @@ def test_storage_discharge_displaces_boiler(plants):
     assert out.plan.storage_net_mw == 2.0
     with pytest.raises(ValueError, match="exceeds the boiler heat"):
         apply_storage_discharge(fast, boiler + 1.0)
+    no_boiler = _dispatch(plants["C2"], PEAK)  # boiler off: a sub-tolerance discharge is safe
+    assert no_boiler.day.heat_by_source_mw["peak_boiler"] == 0.0
+    tiny = apply_storage_discharge(no_boiler, 1e-7)
+    assert tiny.day.heat_by_source_mw["peak_boiler"] == 0.0
     with pytest.raises(ValueError, match="storage_charge_mw"):
         _dispatch(plants["C2"], PEAK, storage_charge_mw=-1.0)
 

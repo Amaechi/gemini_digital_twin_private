@@ -418,14 +418,15 @@ def annual_kpis(
     *,
     co2_t_per_yr: float | None,
     breakthrough_yr: float | None = None,
+    storage_mw: float = 0.0,
 ) -> KPISet:
     """Return the simulation KPIs (spec §3.4 ENG-01a) from the daily results (economics: WP-08).
 
     Installed capacity = nameplates where the candidate or TL-09 gives one (plate HEX design duty
-    per doublet, ``hthp_heating_mw``, peak boiler, chillers), else the largest daily output of
-    that source (CHP, free cooling, HTHP without a nameplate). Capacity factor per doublet =
-    Σ daily flow / (days × design flow). ``min_constraint_margins`` = the smallest daily value of
-    every margin key (≥ 0 satisfied).
+    per doublet, ``hthp_heating_mw``, peak boiler, chillers, C6 ``storage_mw``), else the
+    largest daily output of that source (CHP, free cooling, HTHP without a nameplate). Capacity
+    factor per doublet = Σ daily flow / (days × design flow). ``min_constraint_margins`` = the
+    smallest daily value of every margin key (≥ 0 satisfied).
     """
     days = annual.days
     heat: Counter[str] = Counter()
@@ -445,7 +446,7 @@ def annual_kpis(
         for key, value in day.margins.items():
             margins[key] = min(margins.get(key, value), value)
     meta = plant.meta
-    installed_heat = plant.boiler_capacity_w / 1e6 + peak.get("chp", 0.0)
+    installed_heat = plant.boiler_capacity_w / 1e6 + peak.get("chp", 0.0) + storage_mw
     if meta.hex_design is not None:
         installed_heat += meta.hex_design.duty_mw * plant.n_doublets
     if plant.has_hp:
@@ -620,9 +621,15 @@ def run_annual(
                 fast_days[i] = apply_storage_discharge(fast_days[i], net)
         warnings.append(
             "C6 storage: HT-ATES outlet temperature not modelled (discharge assumed at the supply "
-            "temperature; a booster may be needed); the verifier's PH-22 sees 'storage' heat "
-            "without brine/fuel input (DSP-STORAGE)"
+            "temperature; a booster may be needed); the verifier fails PH-20 on the negative "
+            "'storage' heat of charge days and PH-22 on the discharge (no brine/fuel input) "
+            "until WP-09/WP-14 teach it about storage (DSP-STORAGE)"
         )
+        if storage.charged_total_mwh <= 0.0 and storage.discharged_total_mwh <= 0.0:
+            warnings.append(
+                "C6 storage idle: no boiler heat to displace or no spare geothermal capacity "
+                "(DSP-STORAGE discharges only against boiler heat)"
+            )
     plans = [fast_days[i].plan for i in indices]
     fast_results = [fast_days[i].day for i in indices]
     for i in indices:
@@ -682,6 +689,7 @@ def run_annual(
         plant,
         co2_t_per_yr=co2.data.total_t,
         breakthrough_yr=min((c.breakthrough_time_yr for c in end_of_life), default=None),
+        storage_mw=storage.spec.power_mw if storage is not None else 0.0,
     )
     annual = annual.model_copy(update={"kpis": kpis})
     head = []
@@ -766,7 +774,14 @@ def _run_full(
             continue
         result = sim.day.model_copy(update={"doublet_available": list(plan.available)})
         if plan.storage_net_mw > 0:
-            result = discharge_into_day(result, min(plan.storage_net_mw, _boiler(result)))
+            applied = min(plan.storage_net_mw, _boiler(result))
+            if applied < plan.storage_net_mw - 1e-6:
+                warnings.append(
+                    f"{plan.date}: full-mode boiler heat {_boiler(result):.3f} MW below the "
+                    f"planned storage discharge {plan.storage_net_mw:.3f} MW: discharge cut to "
+                    "the boiler heat (ledger keeps the fast-mode value)"
+                )
+            result = discharge_into_day(result, applied)
         elif plan.storage_net_mw < 0:
             demand = year.days[index].heating_demand_mw
             heat = {**result.heat_by_source_mw, "storage": plan.storage_net_mw}
@@ -832,6 +847,9 @@ def verification_evidence(
             "brine_contact_materials": ev.brine_contact_materials,
             "co2_release_pressure_barg": ev.co2_release_pressure_barg,
         }
+    owned = sorted(set(extra) & {"candidate", "annual", "fast_annual", "kpis", "stub_evidence"})
+    if owned:
+        raise ValueError(f"evidence keys {owned} come from the TL-12 result, not from extra")
     data |= extra
     return VerificationEvidence(**data)
 
@@ -881,6 +899,8 @@ def _day_row(day: DayResult, plan: DayPlan | None) -> dict[str, Any]:
         row["absorption_drive_m3h"] = plan.absorption_drive_m3h
         row["storage_net_mw"] = plan.storage_net_mw
         row["dispatch_notes"] = " | ".join(plan.notes)
+    for key, value in day.margins.items():
+        row[f"margin_{key}"] = value
     row["flags"] = " | ".join(day.flags)
     return row
 

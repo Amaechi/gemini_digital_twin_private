@@ -33,9 +33,12 @@ Three parts, all deterministic:
   unmet demand (recorded, never hidden).
 
 C6 seasonal storage (DSP-STORAGE) is a ledger on WP-03's ``ThermalStorage``: charged with spare
-geothermal capacity on days without boiler heat, discharged to displace boiler heat; the plant
-then serves ``demand − net storage heat`` and ``heat_by_source_mw['storage']`` holds the net heat
-(negative while charging), as ``ThermalStorage.net_heat_to_plant_w`` prescribes.
+geothermal capacity on days without boiler heat (the plant serves ``demand + charge``) and
+discharged ahead of the peak boiler (:func:`apply_storage_discharge`: boiler heat, fuel and CO₂
+fall one for one). ``heat_by_source_mw['storage']`` holds the net heat (negative while
+charging), as ``ThermalStorage.net_heat_to_plant_w`` prescribes; the WP-09 verifier fails PH-20
+on that negative value and PH-22 on the discharge (no brine/fuel/electricity key) until it
+learns about storage (WP-09/WP-14).
 
 Units: flows m³/h at the doublet boundary, m³/s inside GEMINI; powers W inside, MW (day
 average) in ``DayResult``; temperatures °C.
@@ -906,7 +909,9 @@ class DayPlan(StrictModel):
     absorption_drive_m3h: float = 0.0
     hex_flow_frac: float | None = None
     hp_flow_frac: float | None = None
-    plant_heating_mw: float = Field(description="Heating load the plant serves (demand − storage).")
+    plant_heating_mw: float = Field(
+        description="Heating load the plant serves: demand, + the storage charge on charge days."
+    )
     storage_net_mw: float = Field(
         default=0.0,
         description="Net storage heat to the network (> 0 discharge ahead of the boiler, < 0 "
@@ -1355,7 +1360,7 @@ def discharge_into_day(day: DayResult, discharge_mw: float) -> DayResult:
         return day
     if discharge_mw > boiler + HEAT_TOL_MW:
         raise ValueError(f"discharge {discharge_mw:.3f} MW exceeds the boiler heat {boiler:.3f}")
-    share = max(boiler - discharge_mw, 0.0) / boiler
+    share = max(boiler - discharge_mw, 0.0) / boiler if boiler > 0 else 0.0
     heat = {**day.heat_by_source_mw, "peak_boiler": boiler * share, "storage": discharge_mw}
     fuel = dict(day.gas_fuel_by_consumer_mw)
     co2 = dict(day.co2_by_source_kg)

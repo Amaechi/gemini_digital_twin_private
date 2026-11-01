@@ -8,7 +8,7 @@ import pandas as pd
 import pytest
 
 import gemini_agent.tools.simulate_annual as sa
-from gemini_agent.memory.design_cache import DesignCache
+from gemini_agent.memory.design_cache import DesignCache, config_hash
 from gemini_agent.runner.design_runner import _db30_interpretation_b
 from gemini_agent.schemas.config import load_config
 from gemini_agent.schemas.results import AnnualResult
@@ -25,6 +25,7 @@ from gemini_agent.tools.economics import (
 from gemini_agent.tools.exergy import exergy_kpi
 from gemini_agent.tools.simulate_annual import (
     SimulateAnnualRequest,
+    cache_config,
     cache_namespace,
     compare_days,
     run_annual,
@@ -160,6 +161,8 @@ def test_outputs_written(fast_year, runs_root):
         "doublet_1_flow_m3h",
         "doublet_1_brine_cooling_k",
         "associated_gas_produced_nm3",
+        "margin_doublet_1_brine_cooling_margin_k",
+        "margin_heating_supply_margin_k",
         "ambient_wet_bulb_degc",
     ):
         assert column in frame.columns
@@ -372,6 +375,39 @@ def test_request_and_plant_guards(c2, map_cache):
         run_annual(SimulateAnnualRequest(candidate=c2, day_indices=[1]), plant=plant)
 
 
+def test_idle_storage_warns(map_cache):
+    """A store that never charges or discharges in the reported pass says so (DSP-STORAGE)."""
+    c6 = make_candidate(
+        "C6",
+        2,
+        parent_id="C3-2d",
+        equipment_sizes={"storage_capacity_mwh": 10.0, "storage_power_mw": 20.0},
+    )
+    sim = run_annual(
+        SimulateAnnualRequest(candidate=c6, day_indices=[14, 190]), map_cache_dir=map_cache
+    )
+    assert sim.storage is not None
+    assert sim.storage.charged_total_mwh == 0.0 and sim.storage.discharged_total_mwh == 0.0
+    assert any("storage idle" in w for w in sim.warnings)
+
+
+def test_cache_key_follows_config(c2, map_cache, config_copy, edit_yaml):
+    """SIM-07: editing a register value the dispatch reads changes the config hash."""
+    request = SimulateAnnualRequest(candidate=c2, day_indices=[14], write_outputs=False)
+    calendar = run_annual(request, map_cache_dir=map_cache).calendar
+    namespace = cache_namespace("fast")
+    before = config_hash(cache_config(request, calendar, config_copy), namespace=namespace)
+
+    def lower_min(data: dict) -> None:
+        for entry in data["assumptions"]:
+            if entry["id"] == "DSP-ABS-MIN":
+                entry["value"] = 0.05
+
+    edit_yaml(config_copy / "assumptions.yaml", lower_min)
+    after = config_hash(cache_config(request, calendar, config_copy), namespace=namespace)
+    assert after != before
+
+
 def test_c0_boiler_only(map_cache):
     """C0: no doublets, peak boiler + electric chiller; no brine keys."""
     c0 = make_candidate("C0", 0)
@@ -450,5 +486,7 @@ def test_end_to_end_economics_and_verifier(c2, full_sample):
     report = DesignVerifier.from_config().verify(evidence)
     for check_id in ("PD-01", "PD-02", "PD-06", "PH-22"):
         assert report.check(check_id).status == CheckStatus.PASS, report.check(check_id)
+    with pytest.raises(ValueError, match="come from the TL-12 result"):
+        verification_evidence(sim, c2, kpis=None)
     with pytest.raises(ValueError, match="given for"):
         verification_evidence(sim, make_candidate("C3", 2))
