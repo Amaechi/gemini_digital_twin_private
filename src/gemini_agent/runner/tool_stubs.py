@@ -1,4 +1,7 @@
-"""Labelled tool stubs that let the workflow run P0–P10 before WP-04…WP-09, WP-11, WP-12 land.
+"""Labelled tool stubs that let the workflow run P0–P10 before WP-04…WP-09, WP-11 land.
+
+WP-12's TL-17/TL-18 tools (``model_gap_analysis`` … ``register_model``) are bound for real
+(``tools/model_builder_tools.model_builder_specs``, ``stub=False``).
 
 Rules for every stub:
 - returns the shared schemas (``ToolResult``, ``Candidate``, ``KPISet``) so the runner and the
@@ -18,7 +21,6 @@ from pydantic import Field, JsonValue
 from gemini_agent.runner import ranking
 from gemini_agent.runner.toolbox import (
     CandidateArgs,
-    CardArgs,
     DepthArgs,
     FlowArgs,
     KnowledgeArgs,
@@ -35,6 +37,7 @@ from gemini_agent.schemas.config import DesignBasis, load_config
 from gemini_agent.schemas.decision import DesignVerdict
 from gemini_agent.schemas.results import KPISet
 from gemini_agent.tools.knowledge import knowledge_search
+from gemini_agent.tools.model_builder_tools import model_builder_specs
 
 GAP_IDS: tuple[str, ...] = ("DB-30", "DB-31", "DB-32")
 """Design-basis ambiguities the Requirements agent asks about or assumes (spec §2.4)."""
@@ -114,13 +117,6 @@ class VerificationOutput(StrictModel):
     verdict: DesignVerdict
     violations: list[str] = Field(default_factory=list)
     verifier: str
-
-
-class ModelGapOutput(StrictModel):
-    """``model_gap_analysis`` output."""
-
-    missing_component_types: list[str]
-    note: str
 
 
 class ResultsView(StrictModel):
@@ -334,15 +330,6 @@ def verify_design(args: CandidateArgs, context: ToolContext) -> ToolResult[Verif
     )
 
 
-def model_gap_analysis(args: NoArgs, context: ToolContext) -> ToolResult[ModelGapOutput]:
-    """TL-17 stub: no gap analysis yet (WP-12)."""
-    return ToolResult[ModelGapOutput](
-        data=ModelGapOutput(missing_component_types=[], note="not analysed (WP-12)"),
-        summary="STUB model_gap_analysis: registry not analysed yet (WP-12); no gaps reported.",
-        warnings=[stub_warning("WP-12")],
-    )
-
-
 def read_results(args: CandidateArgs, context: ToolContext) -> ToolResult[ResultsView]:
     """Read-only view of the selected candidate's KPIs (reviewer, P9)."""
     candidate_id = None if args.candidate_id == "all" else args.candidate_id
@@ -477,17 +464,7 @@ def stub_specs() -> list[ToolSpec]:
             verify_design,
             owner="WP-09",
         ),
-        ToolSpec(
-            "model_gap_analysis",
-            "Compare required component types with the GEMINI registry.",
-            NoArgs,
-            model_gap_analysis,
-            owner="WP-12",
-        ),
-        _generic("read_reference_card", "WP-12", "Read one reference card.", CardArgs),
-        _generic("write_model_file", "WP-12", "Write a new GEMINI model file (sandboxed)."),
-        _generic("run_pytest", "WP-12", "Run the new model's tests."),
-        _generic("register_model", "WP-12", "Register a tested model in the GEMINI registry."),
+        *model_builder_specs(),
         ToolSpec(
             "read_results",
             "Read the selected candidate's KPIs (read-only).",
