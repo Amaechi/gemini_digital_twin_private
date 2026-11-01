@@ -22,7 +22,7 @@
     <script src="_static/js/theme.js"></script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
-    <link rel="next" title="6. Source code documentation" href="index_sourcecode.html" />
+    <link rel="next" title="5.8. Cooling" href="model_cooling.html" />
     <link rel="prev" title="5.6. Erosion: Erosional Velocity/Rate" href="model_erosion.html" /> 
 </head>
 
@@ -143,6 +143,7 @@
 </li>
 </ul>
 </li>
+<li class="toctree-l2"><a class="reference internal" href="model_cooling.html">5.8. Cooling</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="index_sourcecode.html">6. Source code documentation</a></li>
@@ -378,6 +379,10 @@ parallel- or counter-flow configuration.</p>
 <tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">fluid_density</span></code>, <code class="docutils literal notranslate"><span class="pre">specific_heat</span></code></p></td>
 <td><p><em>(optional)</em> fluid properties <span class="math notranslate nohighlight">\(\rho\)</span>, <span class="math notranslate nohighlight">\(c_p\)</span>, default to
 water at STP</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">secondary_fluid_density</span></code>, <code class="docutils literal notranslate"><span class="pre">secondary_specific_heat</span></code></p></td>
+<td><p><em>(optional)</em> secondary-side <span class="math notranslate nohighlight">\(\rho\)</span>, <span class="math notranslate nohighlight">\(c_p\)</span> (e.g. district water when
+the primary side is brine); default to the primary-side values</p></td>
 </tr>
 </tbody>
 </table>
@@ -1176,7 +1181,7 @@ computed by this model.</p>
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
         <a href="model_erosion.html" class="btn btn-neutral float-left" title="5.6. Erosion: Erosional Velocity/Rate" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
-        <a href="index_sourcecode.html" class="btn btn-neutral float-right" title="6. Source code documentation" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="model_cooling.html" class="btn btn-neutral float-right" title="5.8. Cooling" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 
   <hr/>

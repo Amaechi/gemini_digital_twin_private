@@ -87,6 +87,11 @@
 <span class="sd">parallel- or counter-flow plate heat exchanger.</span>
 <span class="sd">"""</span>
 
+<span class="c1"># Modified by the GeoAgent team for SPE GeoHackathon 2026, 2026-11-01: optional</span>
+<span class="c1"># secondary-side "secondary_fluid_density"/"secondary_specific_heat" parameters (default: the</span>
+<span class="c1"># primary values, i.e. unchanged behaviour), so brine (primary) and district water</span>
+<span class="c1"># (secondary) can have their own rho/c_p (WP-02 decision on the WP-01 follow-up).</span>
+
 <span class="kn">import</span><span class="w"> </span><span class="nn">math</span>
 
 <span class="kn">from</span><span class="w"> </span><span class="nn">gemini_model.model_abstract</span><span class="w"> </span><span class="kn">import</span> <span class="n">StaticModel</span>
@@ -185,12 +190,15 @@
 <span class="w">        </span><span class="sd">"""Compute heat duty and outlet temperatures with the NTU-effectiveness method."""</span>
         <span class="n">rho</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"fluid_density"</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">DEFAULT_FLUID_DENSITY</span><span class="p">)</span>
         <span class="n">cw</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"specific_heat"</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">DEFAULT_SPECIFIC_HEAT</span><span class="p">)</span>
+        <span class="c1"># Secondary side defaults to the primary properties (original GEMINI behaviour).</span>
+        <span class="n">rho_secondary</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"secondary_fluid_density"</span><span class="p">,</span> <span class="n">rho</span><span class="p">)</span>
+        <span class="n">cw_secondary</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"secondary_specific_heat"</span><span class="p">,</span> <span class="n">cw</span><span class="p">)</span>
 
         <span class="n">mass_flow_primary</span> <span class="o">=</span> <span class="n">rho</span> <span class="o">*</span> <span class="n">primary_flow_rate</span>  <span class="c1"># kg/s</span>
-        <span class="n">mass_flow_secondary</span> <span class="o">=</span> <span class="n">rho</span> <span class="o">*</span> <span class="n">secondary_flow_rate</span>  <span class="c1"># kg/s</span>
+        <span class="n">mass_flow_secondary</span> <span class="o">=</span> <span class="n">rho_secondary</span> <span class="o">*</span> <span class="n">secondary_flow_rate</span>  <span class="c1"># kg/s</span>
 
         <span class="n">capacity_primary</span> <span class="o">=</span> <span class="n">mass_flow_primary</span> <span class="o">*</span> <span class="n">cw</span>  <span class="c1"># W/K</span>
-        <span class="n">capacity_secondary</span> <span class="o">=</span> <span class="n">mass_flow_secondary</span> <span class="o">*</span> <span class="n">cw</span>  <span class="c1"># W/K</span>
+        <span class="n">capacity_secondary</span> <span class="o">=</span> <span class="n">mass_flow_secondary</span> <span class="o">*</span> <span class="n">cw_secondary</span>  <span class="c1"># W/K</span>
         <span class="n">capacity_min</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="n">capacity_primary</span><span class="p">,</span> <span class="n">capacity_secondary</span><span class="p">)</span>
         <span class="n">capacity_max</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="n">capacity_primary</span><span class="p">,</span> <span class="n">capacity_secondary</span><span class="p">)</span>
 
