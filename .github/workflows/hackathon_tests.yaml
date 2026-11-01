@@ -46,3 +46,4 @@ jobs:
         run: |
           python -m gemini_agent.cli --help
           python -m gemini_agent.cli validate-config
+          python -m gemini_agent.cli run --engine policy --run-id ci-smoke --runs-dir "$RUNNER_TEMP/runs"
