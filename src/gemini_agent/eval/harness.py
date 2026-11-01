@@ -25,7 +25,6 @@ import copy
 import json
 import re
 import shutil
-import sys
 import time
 from collections.abc import Iterator, Sequence
 from contextlib import contextmanager
@@ -213,20 +212,14 @@ def build_engine(
     )
 
 
-class NaiveContextRunner(DesignRunner):
-    """MEM-06 'naive' token profile: every context carries the full event history.
-
-    The optimised default keeps the last ``HISTORY_EVENTS`` compacted events (spec §10.2); this
-    profile switches that compaction off so S10 can measure its token saving.
-    """
-
-    def _history(self, state: Any, role: Any = None) -> list[dict[str, Any]]:
-        saved = design_runner.HISTORY_EVENTS
-        design_runner.HISTORY_EVENTS = sys.maxsize
-        try:
-            return super()._history(state, role)
-        finally:
-            design_runner.HISTORY_EVENTS = saved
+NAIVE_PROFILE = {"history_events": None, "compact_history": False}
+"""MEM-06 'naive' token profile for S10: the full, uncompacted event history in every context.
+The optimised default keeps the last ``HISTORY_EVENTS`` compacted events (spec §10.2)."""
+NAIVE_PROFILE_NOTE = (
+    "naive = full event history with full payloads in every context; optimised = the last "
+    f"{design_runner.HISTORY_EVENTS} compacted events (MEM-06 compact context); no other "
+    "setting differs."
+)
 
 
 # --------------------------------------------------------------------------- setup
@@ -320,8 +313,13 @@ def _run_once(
         toolbox=toolbox,
         model_tag=model_tag,
     )
-    runner_cls = NaiveContextRunner if naive else DesignRunner
-    runner = runner_cls(decision_engine, runs_root=eval_dir, toolbox=toolbox, config_dir=config_dir)
+    runner = DesignRunner(
+        decision_engine,
+        runs_root=eval_dir,
+        toolbox=toolbox,
+        config_dir=config_dir,
+        **(NAIVE_PROFILE if naive else {}),
+    )
     try:
         started = time.monotonic()
         result = runner.start(
@@ -340,6 +338,7 @@ def _run_once(
             phases_started=[event.phase for event in events if event.type == "PHASE_START"],
             llm_calls=metrics.llm_calls,
             llm_valid_calls=metrics.llm_valid_calls,
+            config_dir=config_dir,
         )
     finally:
         runner.close()
@@ -469,7 +468,7 @@ def run_suite(
             eval_dir=eval_dir,
             config_dir=config_dir,
             llm_config=llm_config,
-            model_tag=model if engine == "llm" else "",
+            model_tag=model_tag if engine == "llm" else "",
         )
         for scenario in selected
     ]
@@ -564,6 +563,8 @@ def _token_table(run: EvalRun) -> list[str]:
     comparison = run.token_comparison or {}
     lines = [
         f"## {run.scenario} naive vs optimised tokens (MEM-06)",
+        "",
+        NAIVE_PROFILE_NOTE,
         "",
         "| Phase | Naive tokens | Optimised tokens | Saved |",
         "|---|---:|---:|---:|",

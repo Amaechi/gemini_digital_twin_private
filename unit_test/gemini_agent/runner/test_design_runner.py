@@ -257,6 +257,18 @@ def test_reviewer_sees_tool_evidence_only(tmp_path):
     assert "DECISION" in {item["type"] for item in runner._history(state)}
 
 
+def test_history_switches_for_the_naive_token_profile(tmp_path):
+    """MEM-06 (WP-13 S10): defaults keep the last compacted events; naive keeps everything."""
+    runner = _runner(tmp_path)
+    runner.start("", run_id="h1", input_mode="assume")
+    state = runner.load_state("h1")
+    optimised = runner._history(state)
+    naive = _runner(tmp_path, history_events=None, compact_history=False)._history(state)
+    assert len(optimised) == 12 < len(naive)
+    decisions = [item for item in naive if item["type"] == "DECISION"]
+    assert decisions and "steps" in decisions[0] and "phase" in decisions[0]
+
+
 def test_only_a_real_verifier_can_accept(tmp_path):
     """AG-11: ACCEPTED comes from a real verifier on real evidence; otherwise it is downgraded."""
     import dataclasses

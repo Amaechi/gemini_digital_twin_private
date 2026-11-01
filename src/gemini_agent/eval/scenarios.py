@@ -10,17 +10,17 @@ stubbed silently: a pending item is reported as pending until it is promoted to 
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal
 
 import yaml
 from pydantic import Field, JsonValue, model_validator
 
-from gemini_agent.runner.design_runner import RunResult
+from gemini_agent.runner.design_runner import MAX_VERIFICATION_LOOPS, RunResult
 from gemini_agent.runner.state import InputMode, RunState
 from gemini_agent.schemas.common import StrictModel
-from gemini_agent.schemas.config import REPO_ROOT
+from gemini_agent.schemas.config import REPO_ROOT, load_config
 from gemini_agent.schemas.decision import DR_TITLES
 
 SCENARIOS_FILE = REPO_ROOT / "evals" / "scenarios.yaml"
@@ -33,9 +33,11 @@ CheckType = Literal[
     "phase",
     "verdict",
     "phases_started",
+    "phases_in_order",
+    "loops_within_limit",
     "summary_contains",
     "conflict_contains",
-    "max_doublets",
+    "within_limits",
     "selected_candidate",
     "decision_records",
     "pending_question",
@@ -57,9 +59,9 @@ _REQUIRED: dict[str, tuple[str, ...]] = {
     "phase": ("equals",),
     "verdict": ("equals",),
     "phases_started": ("words",),
+    "phases_in_order": ("words",),
     "summary_contains": ("contains",),
     "conflict_contains": ("contains",),
-    "max_doublets": ("value",),
     "question_mentions": ("words",),
     "assumption_or_question": ("id",),
     "tool_called": ("tool",),
@@ -189,7 +191,7 @@ class Observation:
     llm_calls: int = 0
     llm_valid_calls: int = 0
     token_comparison: dict[str, Any] | None = None
-    extra: dict[str, Any] = field(default_factory=dict)
+    config_dir: Path | None = None
 
     def tool_output(self, tool: str) -> dict[str, Any] | None:
         """Full JSON output of the latest successful call of ``tool`` (None if never called)."""
@@ -280,11 +282,41 @@ def _conflict_contains(check: Check, obs: Observation) -> tuple[bool, str]:
     return bool(hits), f"{len(obs.state.conflicts)} conflict(s); matching: {hits[:1] or 'none'}"
 
 
-def _max_doublets(check: Check, obs: Observation) -> tuple[bool, str]:
-    counts = [candidate.doublets for candidate in obs.state.candidates]
-    if not counts:
-        return False, "no candidates generated"
-    return max(counts) <= float(check.value or 0), f"max {max(counts)} doublets per candidate"
+def _phases_in_order(check: Check, obs: Observation) -> tuple[bool, str]:
+    """Check each listed phase starts, first starts in the listed order (loop-backs allowed)."""
+    firsts = list(dict.fromkeys(phase for phase in obs.phases_started if phase in check.words))
+    return firsts == check.words, f"first starts {firsts}; {len(obs.phases_started)} starts"
+
+
+def _loops_within_limit(check: Check, obs: Observation) -> tuple[bool, str]:
+    """Check verifier loop-backs stay within the runner limit (spec §5.2 P7: ≤ 3)."""
+    loops = obs.state.loop_count
+    ok = loops <= MAX_VERIFICATION_LOOPS
+    return ok, f"{loops} loop-back(s) (limit {MAX_VERIFICATION_LOOPS})"
+
+
+def _within_limits(check: Check, obs: Observation) -> tuple[bool, str]:
+    """Check every geothermal candidate respects DB-10 doublets and DB-11 flow (limits.yaml)."""
+    limits = load_config("limits", obs.config_dir)
+    candidates = [c for c in obs.state.candidates if c.doublets > 0]
+    if not candidates:
+        return False, "no geothermal candidates generated"
+    bad = [
+        c.id
+        for c in candidates
+        if not limits.doublet_count_min <= c.doublets <= limits.doublet_count_max
+        or (
+            c.design_flow_m3h is not None
+            and not limits.flow_min_active_m3h <= c.design_flow_m3h <= limits.flow_max_m3h
+        )
+    ]
+    flows = [c.design_flow_m3h for c in candidates if c.design_flow_m3h is not None]
+    detail = (
+        f"{len(candidates)} candidates; doublets ≤ {max(c.doublets for c in candidates)}, "
+        f"flows {'≤ ' + format(max(flows), 'g') + ' m3/h' if flows else 'not sized yet'}; "
+        f"outside limits: {bad or 'none'}"
+    )
+    return not bad, detail
 
 
 def _selected_candidate(check: Check, obs: Observation) -> tuple[bool, str]:
@@ -402,7 +434,9 @@ _EVALUATORS = {
     "phases_started": _phases_started,
     "summary_contains": _summary_contains,
     "conflict_contains": _conflict_contains,
-    "max_doublets": _max_doublets,
+    "phases_in_order": _phases_in_order,
+    "loops_within_limit": _loops_within_limit,
+    "within_limits": _within_limits,
     "selected_candidate": _selected_candidate,
     "decision_records": _decision_records,
     "pending_question": _pending_question,

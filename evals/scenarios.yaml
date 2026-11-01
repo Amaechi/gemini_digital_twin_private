@@ -17,7 +17,8 @@ scenarios:
     checks:
       - {type: status, equals: completed, expect: "runs P0–P10 to completion"}
       - {type: phase, equals: P10, expect: "ends in P10 (report and approval)"}
-      - {type: phases_started, words: [P0, P1, P2, P3, P4, P5, P6, P7, P8, P9, P10], expect: "every phase runs once (no loop-back)"}
+      - {type: phases_in_order, words: [P0, P1, P2, P3, P4, P5, P6, P7, P8, P9, P10], expect: "every phase P0–P10 runs, in order (verifier loop-backs allowed)"}
+      - {type: loops_within_limit, expect: "verifier loop-backs stay within the limit (spec §5.2: ≤ 3)"}
       - {type: selected_candidate, expect: "a candidate is selected that was neither guard-failed nor REJECTED"}
       - {type: decision_records, expect: "DR-01…DR-10 are written"}
       - {type: files, files: [run_summary.json, events.jsonl, token_summary.json, report_draft.md], expect: "run artefacts are written"}
@@ -65,7 +66,7 @@ scenarios:
       - {type: conflict_contains, contains: "(DB-10)", expect: "flags the doublet-count limit DB-10"}
       - {type: conflict_contains, contains: "(DB-11)", expect: "flags the per-doublet flow limit DB-11"}
       - {type: status, equals: completed, expect: "continues within the limits"}
-      - {type: max_doublets, value: 3, expect: "every candidate has at most 3 doublets"}
+      - {type: within_limits, expect: "every candidate respects DB-10 doublets and DB-11 flow (limits.yaml)"}
       - {type: selected_candidate, expect: "proposes a compliant candidate"}
 
   - id: S5
@@ -135,7 +136,8 @@ scenarios:
     expected: "Detects inconsistency"
     prompt: "Design the geothermal heating and cooling system. The geothermal gradient is 30 °C/km but the reservoir is 150 °C at 2.5 km."
     checks:
-      - {type: conflict_contains, contains: "is inconsistent with a 30 K/km gradient (DB-03)", expect: "detects that 150 °C at 2.5 km contradicts the 30 °C/km gradient"}
+      - {type: conflict_contains, contains: "is inconsistent with the design basis", expect: "detects that 150 °C at 2.5 km contradicts the 30 °C/km gradient"}
+      - {type: conflict_contains, contains: "30 K/km gradient (DB-03)", expect: "names the gradient it checked against (DB-03)"}
       - {type: status, equals: completed, expect: "continues on the design basis"}
 
   - id: S10

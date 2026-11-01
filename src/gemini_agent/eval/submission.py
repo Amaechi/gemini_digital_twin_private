@@ -34,9 +34,13 @@ from gemini_agent.runner.state import RunState
 from gemini_agent.schemas.common import StrictModel
 from gemini_agent.schemas.config import REPO_ROOT, load_config
 from gemini_agent.schemas.decision import DR_TITLES, DesignVerdict
+from gemini_agent.verify.design_verifier import VERIFIER_NAME
 
 FINAL_RUNS_DIR = RUNS_ROOT / "final"
 EVAL_ROOT = RUNS_ROOT / "eval"
+"""Local eval outputs of scripts/run_eval.py (git-ignored)."""
+SUBMITTED_EVAL_ROOT = FINAL_RUNS_DIR / "eval"
+"""Evals that ship with the submission (``runs/final/`` is the only tracked run folder)."""
 RESULTS_FILE = "eval_results.json"
 MODEL_COMPARISON_FILE = "model_comparison.json"
 SCENARIO_IDS = tuple(f"S{number}" for number in range(1, 12))
@@ -317,8 +321,10 @@ def check_verifier_report(ctx: SubmissionContext) -> SubmissionCheck:
     record = next((r for r in state.tool_results if r.id == latest.tool_result_id), None)
     report = ctx.run.run_dir / record.path if record and record.path else None
     problems = []
-    if record is None or record.stub:
-        problems.append("verifier result is a stub or missing")
+    if latest.verifier != VERIFIER_NAME:
+        problems.append(f"verdict from '{latest.verifier}', not {VERIFIER_NAME} (golden rule 3)")
+    if record is None or record.stub or record.tool != "verify_design":
+        problems.append("verifier result is a stub, missing or not from verify_design")
     if report is None or not report.exists():
         problems.append("verifier report file missing")
     if latest.violations:
@@ -596,21 +602,25 @@ def check_gemini_notices(ctx: SubmissionContext) -> SubmissionCheck:
     changed = None
     if base is not None:
         changed = _git(
-            ctx.repo_root, "diff", "--name-only", "--diff-filter=M", base, "--", *GEMINI_PATHS
+            ctx.repo_root, "diff", "--name-only", "--diff-filter=MR", base, "--", *GEMINI_PATHS
         )
     if base is None or changed is None:
         detail = "git history unavailable (shallow clone?): check the notices by hand"
         return _check("SUB-21", item, CheckStatus.MANUAL, detail)
     files = [name for name in changed.splitlines() if name.endswith(".py")]
+    others = [name for name in changed.splitlines() if name and not name.endswith(".py")]
     missing = [
         name
         for name in files
         if GEMINI_NOTICE not in _head(ctx.repo_root / name, GEMINI_NOTICE_LINES)
     ]
     detail = (
-        f"{len(files)} GEMINI file(s) modified since {base[:7]}; no notice: {missing or 'none'}"
+        f"{len(files)} GEMINI .py file(s) modified since {base[:7]}; no notice: "
+        f"{missing or 'none'}; other modified files (check by hand): {others or 'none'}"
     )
-    return _passes("SUB-21", item, not missing, detail)
+    if missing:
+        return _check("SUB-21", item, CheckStatus.FAIL, detail)
+    return _check("SUB-21", item, CheckStatus.WARN if others else CheckStatus.PASS, detail)
 
 
 def check_readme(ctx: SubmissionContext) -> SubmissionCheck:
@@ -678,7 +688,7 @@ CHECKS: tuple[Callable[[SubmissionContext], SubmissionCheck], ...] = (
 def validate_submission(
     *,
     run_dir: Path | str = FINAL_RUNS_DIR,
-    eval_root: Path | str = EVAL_ROOT,
+    eval_root: Path | str = SUBMITTED_EVAL_ROOT,
     config_dir: Path | str | None = None,
     repo_root: Path | str = REPO_ROOT,
     run_tests: bool = False,

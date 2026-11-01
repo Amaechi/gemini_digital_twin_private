@@ -15,6 +15,9 @@ Examples::
 Outputs go to ``runs/eval/<model>/`` (``policy``, ``testmodel`` or the Ollama tag): one run
 directory per scenario (transcripts: ``events.jsonl``, ``llm_calls.jsonl``, ``token_summary.json``),
 ``eval_results.json`` and ``EVAL_REPORT.md``. ``--compare`` writes ``model_comparison.{json,md}``.
+``runs/eval/`` is git-ignored: for the submission use ``--eval-root runs/final/eval`` (tracked),
+which is where ``validate_submission.py`` looks. Without ``--model``, engine llm uses the active
+profile's orchestrator and coder models from config/llm.yaml (as ``cli run --engine llm``).
 Exit code 0 when no scenario failed or errored (pending and skipped scenarios do not fail).
 """
 
@@ -33,6 +36,8 @@ from gemini_agent.eval.harness import (
     EVAL_ROOT,
     REPORT_FILE,
     compare_evals,
+    eval_dir_name,
+    model_label,
     render_comparison,
     run_suite,
 )
@@ -83,9 +88,15 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 2
     suite = load_scenarios(args.scenarios_file)
     ids = [sid.strip() for sid in args.scenarios.split(",") if sid.strip()] or None
+    unknown = [sid for sid in ids or [] if sid not in {s.id for s in suite.scenarios}]
+    if unknown:
+        print(f"unknown scenario(s) {unknown} in {args.scenarios_file}", file=sys.stderr)
+        return 2
     if args.engine == "llm":
-        num_ctx = load_config("llm", args.config_dir).ollama.num_ctx
-        print(OLLAMA_HINT.format(num_ctx=num_ctx, eval_dir=args.eval_root), file=sys.stderr)
+        llm_config = load_config("llm", args.config_dir)
+        model_dir = args.eval_root / eval_dir_name(model_label("llm", args.model, llm_config))
+        hint = OLLAMA_HINT.format(num_ctx=llm_config.ollama.num_ctx, eval_dir=model_dir)
+        print(hint, file=sys.stderr)
     try:
         source = str(args.scenarios_file.resolve().relative_to(ROOT))
     except ValueError:

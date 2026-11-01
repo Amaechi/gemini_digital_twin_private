@@ -34,6 +34,7 @@ from gemini_agent.runner.state import RunState, ToolRecord, Verification
 from gemini_agent.schemas.config import REPO_ROOT
 from gemini_agent.schemas.decision import DesignVerdict, Phase
 from gemini_agent.schemas.results import KPISet
+from gemini_agent.verify.design_verifier import VERIFIER_NAME
 
 FOLLOW_UPS = ("SUB-03", "SUB-04", "SUB-05", "SUB-13")
 """PROGRESS 'Open follow-ups → WP-13': verdict, stub calls, stub evidence, cost placeholders."""
@@ -99,7 +100,7 @@ def _upgrade_to_passing(run_dir: Path) -> None:
         Verification(
             candidate_id=selected,
             verdict=DesignVerdict.ACCEPTED,
-            verifier="DesignVerifier",
+            verifier=VERIFIER_NAME,
             tool_result_id="TR-901",
             phase=Phase.P7,
         )
@@ -239,6 +240,17 @@ def test_verify_cost_items_are_flagged_not_failed(passing):
     assert report.ok and check.status == CheckStatus.WARN and "['b']" in check.detail
 
 
+def test_only_design_verifier_can_accept(passing):
+    """Golden rule 3: an ACCEPTED verdict from any other tool or verifier fails SUB-08."""
+    run_dir = Path(passing["run_dir"]) / "final"
+    store, state = _load(run_dir)
+    state.verifications[-1] = state.verifications[-1].model_copy(update={"verifier": "fake"})
+    _save(run_dir, store, state)
+    report = validate_submission(**passing)
+    assert report.failed_ids() == ["SUB-08"]
+    assert "not DesignVerifier" in next(c.detail for c in report.checks if c.id == "SUB-08")
+
+
 @pytest.mark.parametrize("case", ["verdict", "stub_call", "stub_evidence", "placeholder"])
 def test_each_follow_up_fails_on_its_own(passing, tmp_path, case):
     """Verdict ≠ ACCEPTED, a stub call, a stub-evidence DR or an unset placeholder each fail."""
@@ -312,7 +324,7 @@ def test_repository_checks_pass_on_this_repository():
         result = check(ctx)
         assert result.status == CheckStatus.PASS, result
     assert "scripts/run_eval.py" not in check_plant_debugger_notices(ctx).detail
-    assert check_gemini_notices(ctx).status in {CheckStatus.PASS, CheckStatus.MANUAL}
+    assert check_gemini_notices(ctx).status != CheckStatus.FAIL  # MANUAL in a shallow clone
 
 
 def test_incomplete_adapted_header_fails(passing):

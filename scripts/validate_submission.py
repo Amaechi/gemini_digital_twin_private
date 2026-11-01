@@ -28,8 +28,8 @@ if str(ROOT / "src") not in sys.path:
     sys.path.insert(0, str(ROOT / "src"))
 
 from gemini_agent.eval.submission import (
-    EVAL_ROOT,
     FINAL_RUNS_DIR,
+    SUBMITTED_EVAL_ROOT,
     render_markdown,
     validate_submission,
 )
@@ -39,7 +39,12 @@ def build_parser() -> argparse.ArgumentParser:
     """Argument parser."""
     parser = argparse.ArgumentParser(description="Validate the GeoAgent submission (spec §18)")
     parser.add_argument("--run-dir", type=Path, default=FINAL_RUNS_DIR, help="final run directory")
-    parser.add_argument("--eval-root", type=Path, default=EVAL_ROOT)
+    parser.add_argument(
+        "--eval-root",
+        type=Path,
+        default=SUBMITTED_EVAL_ROOT,
+        help="submitted evals (default runs/final/eval, tracked; run_eval.py --eval-root there)",
+    )
     parser.add_argument("--config-dir", type=Path, default=None)
     parser.add_argument("--repo-root", type=Path, default=ROOT)
     parser.add_argument("--pytest", action="store_true", help="also run the unit-test suite")

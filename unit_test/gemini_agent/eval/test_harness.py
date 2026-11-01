@@ -6,6 +6,7 @@ exercised with a FunctionModel in place of Ollama.
 
 import json
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 import yaml
@@ -24,7 +25,7 @@ from gemini_agent.eval.harness import (
     run_scenario,
     run_suite,
 )
-from gemini_agent.eval.scenarios import Scenario, load_scenarios
+from gemini_agent.eval.scenarios import Scenario, evaluate, load_scenarios
 from gemini_agent.runner import design_runner
 from gemini_agent.schemas.config import load_config
 from gemini_simulator.registry import COMPONENT_REGISTRY
@@ -123,7 +124,7 @@ def test_testmodel_s10_compares_naive_and_optimised_tokens(testmodel_results):
     assert total == s10.token_comparison["total"]
     assert 0 < total["optimised_tokens"] < total["naive_tokens"]
     report = (eval_dir / "EVAL_REPORT.md").read_text()
-    assert "S10 naive vs optimised tokens" in report
+    assert "S10 naive vs optimised tokens" in report and "naive = full event history" in report
     assert report.index("| P9 |") < report.index("| P10 |")
     assert design_runner.HISTORY_EVENTS == 12  # naive profile restored the default
 
@@ -151,6 +152,22 @@ def test_llm_engine_records_to_the_model_directory(tmp_path, monkeypatch):
     assert (eval_dir / "S1" / "token_summary.json").exists()
     s11 = _run(results, "S11").metrics
     assert s11.llm_calls > 0 and s11.tool_call_validity_frac == 1.0 and s11.fallbacks == 0
+
+
+def test_llm_engine_without_model_uses_the_configured_profile(tmp_path, monkeypatch):
+    """Without --model each role builds its configured model (orchestrator/coder), as the CLI."""
+    built = []
+
+    def fake_build(llm_config, kind="orchestrator", tag=""):
+        built.append((kind, tag))
+        return fake_model()
+
+    monkeypatch.setattr(engine_module, "build_ollama_model", fake_build)
+    results = run_suite(load_scenarios(), engine="llm", eval_root=tmp_path, scenario_ids=["S3"])
+    config = load_config("llm")
+    orchestrator = config.profiles[config.active_profile].orchestrator
+    assert results.model == orchestrator and (tmp_path / eval_dir_name(orchestrator)).is_dir()
+    assert built and all(tag == "" for _, tag in built)  # no tag forced onto the coder role
 
 
 def test_compare_evals_writes_the_model_comparison(policy_results, testmodel_results, tmp_path):
@@ -195,6 +212,24 @@ def test_broken_setup_is_an_error_not_a_crash(tmp_path):
     )
     run = run_scenario(scenario, engine="policy", eval_dir=tmp_path)
     assert run.outcome == Outcome.ERROR and "no_such_model" in run.note
+
+
+def test_phases_in_order_allows_verifier_loop_backs():
+    """S1: a REJECTED → P6 loop-back is valid; a skipped or reordered phase is not."""
+    words = [f"P{n}" for n in range(11)]
+    check = Scenario.model_validate(
+        {
+            "id": "S1",
+            "situation": "s",
+            "expected": "e",
+            "checks": [{"type": "phases_in_order", "words": words, "expect": "x"}],
+        }
+    ).checks[0]
+    looped = SimpleNamespace(phases_started=words + ["P6", "P7", "P8", "P9", "P10"])
+    assert evaluate(check, looped).passed
+    assert not evaluate(check, SimpleNamespace(phases_started=words[:-1])).passed
+    swapped = SimpleNamespace(phases_started=words[:3] + ["P4", "P3"] + words[5:])
+    assert not evaluate(check, swapped).passed
 
 
 def test_removed_components_restores_the_registry():

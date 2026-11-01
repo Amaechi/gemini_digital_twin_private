@@ -165,8 +165,14 @@ class DesignRunner:
         budgets: dict[Phase, PhaseBudget] | None = None,
         ask_fn: AskFn | None = None,
         max_verification_loops: int = MAX_VERIFICATION_LOOPS,
+        history_events: int | None = HISTORY_EVENTS,
+        compact_history: bool = True,
     ) -> None:
-        """Configure the runner; ``budgets`` override the phase table per phase."""
+        """Configure the runner; ``budgets`` override the phase table per phase.
+
+        ``history_events`` (None = all) and ``compact_history`` are the MEM-06 context switches;
+        the defaults are the optimised settings (WP-13 S10 runs the naive ones for comparison).
+        """
         self.engine = engine
         self.runs_root = Path(runs_root)
         self.toolbox = toolbox or default_toolbox()
@@ -174,6 +180,8 @@ class DesignRunner:
         self.budgets = budgets or {}
         self.ask_fn = ask_fn
         self.max_verification_loops = max_verification_loops
+        self.history_events = history_events
+        self.compact_history = compact_history
         self._policy = PolicyEngine()
         self._stores: dict[str, SQLiteEventStore] = {}
 
@@ -927,9 +935,15 @@ class DesignRunner:
             event
             for event in self.store(state.run_id).list_events(state.run_id)
             if event.type in types
-        ][-HISTORY_EVENTS:]
+        ]
+        if self.history_events is not None:
+            events = events[-self.history_events :]
         return [
-            {"type": e.type, "phase": e.phase, **_compact_payload(e.type, e.payload)}
+            {
+                "type": e.type,
+                "phase": e.phase,
+                **(_compact_payload(e.type, e.payload) if self.compact_history else e.payload),
+            }
             for e in events
         ]
 

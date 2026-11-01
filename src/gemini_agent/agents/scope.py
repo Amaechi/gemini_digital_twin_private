@@ -43,26 +43,43 @@ _DESIGN_WORDS = re.compile(
 )
 _DOUBLETS = re.compile(r"\b(\d+)\s*(?:x\s*)?doublets?\b", re.IGNORECASE)
 _FLOW = re.compile(r"\b(\d+(?:\.\d+)?)\s*m(?:3|³)\s*/\s*h\b", re.IGNORECASE)
+_NUMBER = r"\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d+(?:\.\d+)?"
+"""A number as written, optionally with thousands separators ('2,500')."""
 _DEG_C = r"(?:°\s?C|deg\s?C)"
+_NOT_GRADIENT = r"\b(?!\s*(?:/|per\b))"
 _TEMPERATURE = re.compile(
-    rf"(?<![\d.])(\d+(?:\.\d+)?)\s*{_DEG_C}\b(?!\s*(?:/|per\b))", re.IGNORECASE
+    rf"(?<![\d.,])([-−]?)({_NUMBER})\s*{_DEG_C}{_NOT_GRADIENT}", re.IGNORECASE
 )
-"""A temperature such as '120 °C' or '20 degC' (not a gradient such as '30 °C/km')."""
+"""A temperature such as '120 °C' or '-10 degC' (not a gradient such as '30 °C/km')."""
 _GRADIENT = re.compile(
-    rf"(?<![\d.])(\d+(?:\.\d+)?)\s*(?:{_DEG_C}|K)\s*(?:/|per\s+)\s*km\b", re.IGNORECASE
+    rf"(?<![\d.,])({_NUMBER})\s*(?:{_DEG_C}|K)\s*(?:/|per\s+)\s*km\b", re.IGNORECASE
 )
-_TEMP_AT_DEPTH = re.compile(
-    rf"(?<![\d.])(\d+(?:\.\d+)?)\s*{_DEG_C}\s*(?:at|@)\s*(?:a\s+depth\s+of\s+)?"
-    r"(\d+(?:\.\d+)?)\s*(km|m)\b",
+_DEPTH = rf"(?:at|@)\s*(?:a\s+depth\s+of\s+)?({_NUMBER})\s*(km|m)\b"
+_TEMP_AT_DEPTH = re.compile(rf"(?<![\d.,])({_NUMBER})\s*{_DEG_C}\s*{_DEPTH}", re.IGNORECASE)
+"""'150 °C at 2.5 km'."""
+_DEPTH_THEN_TEMP = re.compile(
+    rf"\b{_DEPTH}[^.;!?°]{{0,40}}?(?<![\d.,])({_NUMBER})\s*{_DEG_C}{_NOT_GRADIENT}",
+    re.IGNORECASE,
+)
+"""'(the reservoir) at 2.5 km is 150 °C' — counted only with a reservoir word in the sentence."""
+_RESERVOIR_WORD = re.compile(
+    r"\b(reservoirs?|formations?|aquifers?|rock|wells?|boreholes?|bottom[- ]?hole|downhole)\b",
     re.IGNORECASE,
 )
 _HEAT_WORD = re.compile(r"\bheat\w*", re.IGNORECASE)
 _COOL_WORD = re.compile(r"\b(?:cool\w*|chill\w*)", re.IGNORECASE)
 _NOT_SUPPLY = re.compile(
-    r"\b(return\w*|reservoirs?|formations?|aquifers?|brine|wellheads?|wells?|ambient|outdoor|air|"
-    r"wet[- ]bulb|dry[- ]bulb|surface|inject\w*|produc\w*|bottom\w*|source|sink|depth)\b",
+    r"\b(return\w*|reservoirs?|formations?|aquifers?|brine|wellheads?|wells?|ambient|outdoors?|"
+    r"outside|indoors?|inside|rooms?|air|weather|wet[- ]bulb|dry[- ]bulb|surface|inject\w*|"
+    r"produc\w*|bottom\w*|source|sink|depth|driv\w*|approach\w*|lift\w*|exchangers?|"
+    r"when\s+it(?:'s|\s+is))\b",
     re.IGNORECASE,
 )
+"""Words before a temperature that make it something other than a supply temperature."""
+_NOT_SUPPLY_AFTER = re.compile(
+    r"\W*(?:\w+\W+)?(indoors?|outdoors?|outside|inside|ambient|rooms?|air)\b", re.IGNORECASE
+)
+"""'21 °C indoors', '10 °C outside air': the next one or two words."""
 _SENTENCE_END = re.compile(r"[.;!?](?:\s|$)")
 
 REFUSAL_TEMPLATE = (
@@ -139,76 +156,102 @@ def constraint_conflicts(
     return conflicts
 
 
-def _differs(stated: str, expected: float) -> bool:
-    """Return True if ``expected`` does not round to the number as written (its precision)."""
-    decimals = len(stated.split(".", 1)[1]) if "." in stated else 0
-    return abs(float(stated) - expected) > 0.5 * 10.0**-decimals
+def _number(text: str) -> float:
+    return float(text.replace(",", ""))
+
+
+def _half_unit(text: str) -> float:
+    """Half a unit of the last digit as written: the precision of a stated number."""
+    digits = text.replace(",", "")
+    decimals = len(digits.split(".", 1)[1]) if "." in digits else 0
+    return 0.5 * 10.0**-decimals
+
+
+def _differs(stated: str, expected: float, tolerance: float = 0.0) -> bool:
+    """Return True if ``expected`` is outside the stated number's precision (plus ``tolerance``)."""
+    return abs(_number(stated) - expected) > _half_unit(stated) + tolerance
 
 
 def _supply_temperature_conflicts(prompt: str, limits: HardLimits) -> list[str]:
     """S5: a requested heating/cooling supply temperature that is not DB-16/DB-17.
 
     A temperature counts as a supply temperature when the words before it (same sentence, after
-    the previous temperature) name heating or cooling and not a return, reservoir, well or
-    ambient temperature; the last service word wins ('heating at 100 degC and cooling at 20 degC').
+    the previous temperature) name heating or cooling and nothing else (no return, reservoir,
+    ambient, indoor, driving or approach temperature), it is not followed by 'indoors'/'outside',
+    and it is not negative; the last service word wins ('heating at 100 degC and cooling at 20').
     """
-    depth_spans = [m.span() for m in _TEMP_AT_DEPTH.finditer(prompt)]
+    claimed = [m.start(1) for m in _TEMP_AT_DEPTH.finditer(prompt)]
+    claimed += [m.start(3) for m in _DEPTH_THEN_TEMP.finditer(prompt)]
     conflicts: list[str] = []
     previous_end = 0
     for match in _TEMPERATURE.finditer(prompt):
         window = prompt[previous_end : match.start()]
         previous_end = match.end()
-        if any(start <= match.start() < end for start, end in depth_spans):
+        if match.group(1) or match.start(2) in claimed:
             continue
         ends = list(_SENTENCE_END.finditer(window))
         if ends:
             window = window[ends[-1].end() :]
-        if _NOT_SUPPLY.search(window):
+        if _NOT_SUPPLY.search(window) or _NOT_SUPPLY_AFTER.match(prompt, match.end()):
             continue
         heat = [m.start() for m in _HEAT_WORD.finditer(window)]
         cool = [m.start() for m in _COOL_WORD.finditer(window)]
         if not heat and not cool:
             continue
-        stated = match.group(1)
+        stated = match.group(2)
         if max(heat, default=-1) > max(cool, default=-1):
             service, basis_degc, basis_id = "heating", limits.heating_supply_degc, "DB-16"
         else:
             service, basis_degc, basis_id = "cooling", limits.cooling_supply_degc, "DB-17"
         if _differs(stated, basis_degc):
             conflicts.append(
-                f"Requested {service} supply {float(stated):g} degC conflicts with the design "
+                f"Requested {service} supply {_number(stated):g} degC conflicts with the design "
                 f"basis {basis_degc:g} degC ({basis_id}); the design keeps {basis_degc:g} degC "
                 "until a change of basis is confirmed."
             )
     return conflicts
 
 
+def _sentence_at(prompt: str, index: int) -> str:
+    starts = [m.end() for m in _SENTENCE_END.finditer(prompt) if m.end() <= index]
+    ends = [m.start() for m in _SENTENCE_END.finditer(prompt) if m.start() >= index]
+    return prompt[max(starts, default=0) : min(ends, default=len(prompt))]
+
+
 def _reservoir_conflicts(prompt: str, basis: DesignBasis) -> list[str]:
     """S9: a stated gradient or reservoir temperature at a depth that disagrees with the basis.
 
-    The implied temperature is RC-01 eq 1 via ``temperature_at_depth_degc`` (DB-04 surface
-    temperature, the stated gradient if any, else DB-03).
+    The basis temperature at the stated depth is RC-01 eq 1 via ``temperature_at_depth_degc``
+    (DB-04 surface temperature, DB-03 gradient). A stated value is consistent when it agrees
+    within the precision it is written with (temperature, and depth × gradient).
     """
     reservoir = basis.reservoir
+    gradient = reservoir.geothermal_gradient_k_per_km
     conflicts: list[str] = []
-    gradients = list(_GRADIENT.finditer(prompt))
-    for match in gradients:
-        if _differs(match.group(1), reservoir.geothermal_gradient_k_per_km):
+    for match in _GRADIENT.finditer(prompt):
+        if _differs(match.group(1), gradient):
             conflicts.append(
-                f"Stated gradient {float(match.group(1)):g} K/km differs from the design basis "
-                f"{reservoir.geothermal_gradient_k_per_km:g} K/km (DB-03); the design uses DB-03."
+                f"Stated gradient {_number(match.group(1)):g} K/km differs from the design basis "
+                f"{gradient:g} K/km (DB-03); the design uses DB-03."
             )
-    gradient = (
-        float(gradients[-1].group(1)) if gradients else reservoir.geothermal_gradient_k_per_km
-    )
-    for match in _TEMP_AT_DEPTH.finditer(prompt):
-        depth_m = float(match.group(2)) * (1000.0 if match.group(3).lower() == "km" else 1.0)
+    claims = [(m.group(1), m.group(2), m.group(3)) for m in _TEMP_AT_DEPTH.finditer(prompt)]
+    used = {m.start(1) for m in _TEMP_AT_DEPTH.finditer(prompt)}
+    used |= {m.start(2) for m in _TEMP_AT_DEPTH.finditer(prompt)}
+    for match in _DEPTH_THEN_TEMP.finditer(prompt):
+        if match.start(1) in used or match.start(3) in used:
+            continue
+        if _RESERVOIR_WORD.search(_sentence_at(prompt, match.start())):
+            claims.append((match.group(3), match.group(1), match.group(2)))
+    for temperature, depth, unit in claims:
+        scale = 1000.0 if unit.lower() == "km" else 1.0
+        depth_m = _number(depth) * scale
         implied = temperature_at_depth_degc(depth_m, reservoir.surface_temperature_degc, gradient)
-        if _differs(match.group(1), implied):
+        depth_tolerance_k = gradient * _half_unit(depth) * scale / 1000.0
+        if _differs(temperature, implied, depth_tolerance_k):
             conflicts.append(
-                f"Stated {float(match.group(1)):g} degC at {depth_m:g} m is inconsistent with a "
-                f"{gradient:g} K/km gradient (DB-03) and {reservoir.surface_temperature_degc:g} "
-                f"degC surface temperature (DB-04), which give {implied:.1f} degC there (RC-01); "
-                "the design uses the design basis until the data are confirmed."
+                f"Stated {_number(temperature):g} degC at {depth_m:g} m is inconsistent with the "
+                f"design basis: {reservoir.surface_temperature_degc:g} degC surface temperature "
+                f"(DB-04) and {gradient:g} K/km gradient (DB-03) give {implied:.1f} degC there "
+                "(RC-01); the design uses the design basis until the data are confirmed."
             )
     return conflicts

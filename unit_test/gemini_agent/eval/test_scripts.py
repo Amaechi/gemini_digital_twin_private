@@ -65,6 +65,7 @@ def test_run_eval_policy_subset_and_compare(run_eval, tmp_path, capsys):
 def test_run_eval_usage_errors_and_failures(run_eval, tmp_path):
     """--model needs --engine llm; a failing scenario gives exit code 1."""
     assert run_eval.main(["--model", "qwen3.5:9b", "--eval-root", str(tmp_path)]) == 2
+    assert run_eval.main(["--scenarios", "S99", "--eval-root", str(tmp_path)]) == 2
     suite = {
         "source": "test",
         "scenarios": [
