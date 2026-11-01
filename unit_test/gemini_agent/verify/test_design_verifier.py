@@ -18,6 +18,7 @@ from gemini_agent.schemas.common import SUMMARY_MAX_CHARS, GasHandling
 from gemini_agent.schemas.decision import DesignVerdict, RunStatus
 from gemini_agent.schemas.results import KPISet
 from gemini_agent.verify.design_verifier import (
+    ESP_MARGIN_ID,
     ESP_RELEASE_PRESSURE_ID,
     HP_CARNOT_FRACTION_ID,
     HP_MAX_LIFT_ID,
@@ -245,6 +246,17 @@ FAILING_CASES: list[tuple[str, Callable[[], dict[str, Any]]]] = [
     ("PH-16", lambda: _first("absorption", pumping_power_mw=0.4)),
     ("PH-17", lambda: _first("pumps", shaft_power_w=100_000.0)),
     ("PH-18", lambda: _first("esps", intake_pressure_barg=58.0)),  # < 60 bar(a) = 58.99 bar(g)
+    (  # WP-05 bare p_b 45.1 bar(g): 50 bar(g) is above p_b but below 1.2·p_b = 54.32 bar(g)
+        "PH-18",
+        lambda: _first("esps", release_pressure_barg=45.1, intake_pressure_barg=50.0),
+    ),
+    (  # the same through the evidence-level p_b
+        "PH-18",
+        lambda: {
+            "co2_release_pressure_barg": 45.1,
+            **_first("esps", intake_pressure_barg=50.0),
+        },
+    ),
     ("PH-19", lambda: _first("esps", npsh_available_m=30.0)),
     ("PH-20", lambda: _days(electricity_by_consumer_mw={"esp": -0.4})),
     ("PH-21", lambda: _days(margins={"hex_approach_k": -0.5})),
@@ -310,7 +322,9 @@ FAILING_CASES: list[tuple[str, Callable[[], dict[str, Any]]]] = [
     ("PD-10", lambda: _pressurised()),  # default 60 bar(a) > gasketed HEX at 16 bar(g)
     (
         "PD-10",
-        lambda: _pressurised(co2_release_pressure_barg=15.0, **_hex(min_brine_pressure_barg=14.0)),
+        lambda: _pressurised(  # 16 bar(g): above p_b 15 but below 1.2·p_b = 18.20 bar(g)
+            co2_release_pressure_barg=15.0, **_hex(min_brine_pressure_barg=16.0)
+        ),
     ),
 ]
 
@@ -338,7 +352,7 @@ def test_every_pass_fail_check_has_a_failing_case():
         c.check_id for c in _verify(ef.good_evidence()).checks if c.status == CheckStatus.PASS
     }
     # PD-10 applies only to the pressurised loop; an explicit (WP-05) p_b lets it pass there
-    pressurised = _verify(_with(**_pressurised(co2_release_pressure_barg=15.0)))
+    pressurised = _verify(_with(**_pressurised(co2_release_pressure_barg=12.0)))  # 1.2·p_b 14.6
     evaluated |= {c.check_id for c in pressurised.checks if c.status == CheckStatus.PASS}
     assert pressurised.verdict == DesignVerdict.ACCEPTED
     assert evaluated == {check_id for check_id, _ in FAILING_CASES}
@@ -417,10 +431,77 @@ def test_release_pressure_defaults_to_register_setpoint():
     assert check.status == CheckStatus.FAIL and check.margin == pytest.approx(58.0 - 58.98675)
     assert ESP_RELEASE_PRESSURE_ID in report.assumption_ids
     assert any("60 bar(a)" in warning for warning in check.warnings)
-    explicit = esp.model_copy(update={"release_pressure_barg": 45.0})  # WP-05's computed p_b
+    assert ESP_MARGIN_ID not in report.assumption_ids  # default already includes the margin
+    explicit = esp.model_copy(update={"release_pressure_barg": 45.0})  # WP-05's bare p_b
     report = _verify(_with(esps=[explicit]))
-    assert report.check("PH-18").status == CheckStatus.PASS
+    assert report.check("PH-18").status == CheckStatus.PASS  # 58 ≥ 1.2 · 46.01 − 1.01 = 54.20
     assert ESP_RELEASE_PRESSURE_ID not in report.assumption_ids
+    assert ESP_MARGIN_ID in report.assumption_ids
+
+
+P_B_BARG = 45.1
+"""WP-05's bare bubble point (RC-01 item 9, sea water, 46.1 bar(a)) in bar(g)."""
+SETPOINT_BARG = 1.2 * (P_B_BARG + 1.01325) - 1.01325
+"""RC-01 item 9: p_intake ≥ 1.2 · p_b in bar(a) → 54.32 bar(g)."""
+
+
+@pytest.mark.parametrize("level", ["esp", "evidence"])
+@pytest.mark.parametrize(
+    ("intake_barg", "status"),
+    [
+        (SETPOINT_BARG, CheckStatus.PASS),  # exactly 1.2 · p_b
+        (SETPOINT_BARG + 0.5, CheckStatus.PASS),
+        (SETPOINT_BARG - 0.05, CheckStatus.FAIL),
+        (50.0, CheckStatus.FAIL),  # between p_b and 1.2 · p_b
+        (P_B_BARG + 0.1, CheckStatus.FAIL),  # just above the bare p_b
+    ],
+)
+def test_bare_bubble_point_gets_the_register_margin(level, intake_barg, status):
+    """PH-18: an explicit p_b (per ESP or evidence-level) is a bare bubble point.
+
+    The verifier applies VER-ESP-MARGIN: limit = 1.2 · (p_b + 1.01325) − 1.01325 bar(g).
+    """
+    assert SETPOINT_BARG == pytest.approx(54.32265)
+    esp = EspPoint(
+        name="ESP-1", intake_pressure_barg=intake_barg, npsh_available_m=60, npsh_required_m=20
+    )
+    if level == "esp":
+        esp = esp.model_copy(update={"release_pressure_barg": P_B_BARG})
+        report = _verify(_with(esps=[esp]))
+    else:
+        report = _verify(_with(esps=[esp], co2_release_pressure_barg=P_B_BARG))
+    check = report.check("PH-18")
+    assert check.status == status, check
+    assert check.margin == pytest.approx(intake_barg - SETPOINT_BARG, abs=1e-6)
+    assert "1.2 × p_b 45.1 bar(g)" in check.detail and not check.warnings
+    assert ESP_MARGIN_ID in report.assumption_ids
+    assert ESP_RELEASE_PRESSURE_ID not in report.assumption_ids
+
+
+def test_margin_comes_from_the_register():
+    """The factor is read from VER-ESP-MARGIN (not hard-coded); below 1 it is refused."""
+    from gemini_agent.schemas.config import load_config
+
+    register = load_config("assumptions")
+    entry = register.get(ESP_MARGIN_ID)
+    assert (entry.value, entry.unit, entry.tag.value) == (1.2, "-", "A")
+    others = [a for a in register.assumptions if a.id != ESP_MARGIN_ID]
+
+    def verifier(value: float) -> DesignVerifier:
+        changed = entry.model_copy(update={"value": value})
+        return DesignVerifier(
+            VERIFIER.limits,
+            VERIFIER.design_basis,
+            register.model_copy(update={"assumptions": [*others, changed]}),
+        )
+
+    assert verifier(1.0).required_pressure_barg(P_B_BARG) == pytest.approx(P_B_BARG)
+    assert verifier(1.3).required_pressure_barg(P_B_BARG) == pytest.approx(
+        1.3 * (P_B_BARG + 1.01325) - 1.01325
+    )
+    assert VERIFIER.required_pressure_barg(P_B_BARG) == pytest.approx(SETPOINT_BARG)
+    with pytest.raises(ValueError, match="VER-ESP-MARGIN"):
+        verifier(0.9)
 
 
 def test_register_pressure_units_are_converted():
@@ -459,8 +540,12 @@ def test_pressurised_loop_behind_gasketed_plate_hex_fails_with_reason():
         assert phrase in check.detail, check.detail
     assert report.check("PH-09").status == CheckStatus.PASS  # the HEX itself is within rating
     assert ESP_RELEASE_PRESSURE_ID in report.assumption_ids
-    explicit = _verify(_with(**_pressurised(co2_release_pressure_barg=15.0)))
-    assert explicit.check("PD-10").status == CheckStatus.PASS  # explicit evidence overrides
+    explicit = _verify(_with(**_pressurised(co2_release_pressure_barg=12.0)))
+    check = explicit.check("PD-10")  # explicit p_b overrides the default, with the margin
+    assert check.status == CheckStatus.PASS
+    assert check.limit == pytest.approx(1.2 * (12.0 + 1.01325) - 1.01325)
+    between = _verify(_with(**_pressurised(co2_release_pressure_barg=15.0)))
+    assert between.check("PD-10").status == CheckStatus.FAIL  # 16 < 1.2 · p_b = 18.20 bar(g)
 
 
 def test_heat_pump_datasheet_overrides_rc04_defaults():

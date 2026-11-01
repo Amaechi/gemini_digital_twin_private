@@ -91,8 +91,11 @@ NPSH_MARGIN_M = 15.0
 ESP_RELEASE_PRESSURE_ID = "VER-ESP-PB"
 """Register entry: ESP-intake / CO₂-release setpoint 1.2 · p_b = 60 bar(a) (RC-01 item 9, Henry's
 law); used when no computed bubble point is passed as evidence."""
+ESP_MARGIN_ID = "VER-ESP-MARGIN"
+"""Register entry: factor 1.2 [A] on a computed bubble point, p ≥ 1.2 · p_b in bar(a) (RC-01
+item 9). Applied by the verifier whenever a bare p_b is passed as evidence."""
 P_ATM_BAR = 1.01325
-"""Standard atmosphere (bar) to convert the register's bar(a) to the evidence's bar(g)."""
+"""Standard atmosphere (bar) to convert between bar(a) and the evidence's bar(g)."""
 HP_CARNOT_FRACTION_ID = "VER-HP-ETA"
 """Register entry: COP ≤ 0.6 × Carnot without a datasheet (RC-04 [A])."""
 HP_MAX_LIFT_ID = "VER-HP-LIFT"
@@ -254,7 +257,10 @@ class EspPoint(StrictModel):
     intake_pressure_barg: float
     release_pressure_barg: float | None = Field(
         default=None,
-        description="Computed bubble/CO₂-release pressure here, bar(g); None → evidence/register.",
+        description=(
+            "Computed bubble point p_b here, bar(g): bare bubble point; the verifier applies the "
+            "margin (VER-ESP-MARGIN). None → evidence-level p_b or the VER-ESP-PB setpoint."
+        ),
     )
     npsh_available_m: float | None = None
     npsh_required_m: float | None = Field(default=None, ge=0)
@@ -298,7 +304,10 @@ class VerificationEvidence(StrictModel):
     scaling: ScalingEvidence | None = None
     co2_release_pressure_barg: float | None = Field(
         default=None,
-        description="Computed bubble/CO₂-release pressure p_b, bar(g) (WP-05); None → VER-ESP-PB.",
+        description=(
+            "Computed bubble point p_b, bar(g) (WP-05): bare bubble point; the verifier applies "
+            "the margin (VER-ESP-MARGIN). None → the VER-ESP-PB setpoint (margin included)."
+        ),
     )
     brine_contact_materials: dict[str, str] = Field(
         default_factory=dict, description="Component → material of brine-wetted parts."
@@ -566,6 +575,9 @@ class DesignVerifier:
         self.release_default_note = (
             f"{ESP_RELEASE_PRESSURE_ID} {_fmt(release_value)} {release.unit}"
         )
+        self.release_margin = float(register.get(ESP_MARGIN_ID).value)  # type: ignore[arg-type]
+        if self.release_margin < 1.0:
+            raise ValueError(f"{ESP_MARGIN_ID} must be >= 1, got {self.release_margin}")
         self.hp_carnot_fraction_default = float(register.get(HP_CARNOT_FRACTION_ID).value)
         self.hp_max_lift_default_k = float(register.get(HP_MAX_LIFT_ID).value)
         self.brine_cp_j_per_kg_k = float(register.get(BRINE_CP_ID).value)
@@ -599,11 +611,26 @@ class DesignVerifier:
         ]
         return self._report(evidence.candidate.id, checks, evidence.stub_evidence, assumption_ids)
 
-    def _release_pressure(self, ev: VerificationEvidence, ids: list[str]) -> float:
-        if ev.co2_release_pressure_barg is not None:
-            return ev.co2_release_pressure_barg
+    def required_pressure_barg(self, p_b_barg: float) -> float:
+        """RC-01 item 9 setpoint for a bare bubble point: margin × p_b in bar(a), as bar(g)."""
+        return self.release_margin * (p_b_barg + P_ATM_BAR) - P_ATM_BAR
+
+    def _setpoint(
+        self, p_b_barg: float | None, ev: VerificationEvidence, ids: list[str]
+    ) -> tuple[float, str]:
+        """Return the required pressure (bar(g)) and its basis.
+
+        A bare p_b (argument, else ``ev.co2_release_pressure_barg``) gets the register margin;
+        without one the VER-ESP-PB setpoint applies (it already includes the margin).
+        """
+        if p_b_barg is None:
+            p_b_barg = ev.co2_release_pressure_barg
+        if p_b_barg is not None:
+            _note(ids, ESP_MARGIN_ID)
+            basis = f"{_fmt(self.release_margin)} × p_b {_fmt(p_b_barg)} bar(g), in bar(a)"
+            return self.required_pressure_barg(p_b_barg), basis
         _note(ids, ESP_RELEASE_PRESSURE_ID)
-        return self.release_pressure_default_barg
+        return self.release_pressure_default_barg, self.release_default_note
 
     # ------------------------------------------------------------------ layer 1: syntactic
     def _syntactic(
@@ -1352,7 +1379,7 @@ class DesignVerifier:
         assumption_ids: list[str],
     ) -> None:
         names = {
-            "PH-18": "ESP intake above bubble/CO₂-release pressure",
+            "PH-18": "ESP intake ≥ 1.2 · bubble point (RC-01 item 9 setpoint)",
             "PH-19": f"NPSH_A ≥ NPSH_R + {_fmt(NPSH_MARGIN_M)} m",
         }
         required = bool(ev.esps) or ev.candidate.doublets > 0 or "esp" in types.values()
@@ -1365,19 +1392,17 @@ class DesignVerifier:
             return
         intake, npsh, missing, warnings = _Bound(), _Bound(), [], []
         for p in ev.esps:
-            release = p.release_pressure_barg
-            if release is None:
-                release = self._release_pressure(ev, assumption_ids)
-                if ev.co2_release_pressure_barg is None:
-                    warnings.append(
-                        f"{p.name}: no computed bubble point; default setpoint "
-                        f"{self.release_default_note} = {_fmt(release)} bar(g)"
-                    )
+            limit, basis = self._setpoint(p.release_pressure_barg, ev, assumption_ids)
+            if p.release_pressure_barg is None and ev.co2_release_pressure_barg is None:
+                warnings.append(
+                    f"{p.name}: no computed bubble point; default setpoint {basis} = "
+                    f"{_fmt(limit)} bar(g)"
+                )
             intake.add(
-                p.intake_pressure_barg - release,
+                p.intake_pressure_barg - limit,
                 p.intake_pressure_barg,
-                f"{p.name}: intake {_fmt(p.intake_pressure_barg)} bar(g) vs release ≥ "
-                f"{_fmt(release)} bar(g)",
+                f"{p.name}: intake {_fmt(p.intake_pressure_barg)} bar(g) vs ≥ {_fmt(limit)} "
+                f"bar(g) ({basis})",
             )
             if p.npsh_available_m is None or p.npsh_required_m is None:
                 missing.append(p.name)
@@ -1394,7 +1419,7 @@ class DesignVerifier:
             intake,
             limit=None,
             unit="bar",
-            source=f"RC-01 item 9; {ESP_RELEASE_PRESSURE_ID}",
+            source=f"RC-01 item 9; {ESP_MARGIN_ID} / {ESP_RELEASE_PRESSURE_ID}",
             warnings=warnings,
         )
         if missing:
@@ -1573,7 +1598,7 @@ class DesignVerifier:
     ) -> None:
         """PD-10 (RC-12): without degassing, brine stays above the CO₂-release pressure."""
         name = "pressurised brine loop above the CO₂-release pressure"
-        source = f"RC-12; RC-01 item 9; {ESP_RELEASE_PRESSURE_ID}"
+        source = f"RC-12; RC-01 item 9; {ESP_MARGIN_ID} / {ESP_RELEASE_PRESSURE_ID}"
         candidate = ev.candidate
         if candidate.doublets == 0 or candidate.gas_handling != GasHandling.PRESSURISED_REINJECT:
             out.not_applicable("PD-10", name, "loop is degassed or has no brine", source)
@@ -1584,12 +1609,7 @@ class DesignVerifier:
             what = f"minimum brine pressure of {lacking or 'the brine HEX'}"
             out.missing("PD-10", name, what, source)
             return
-        release = self._release_pressure(ev, assumption_ids)
-        basis = (
-            "computed p_b"
-            if ev.co2_release_pressure_barg is not None
-            else (self.release_default_note)
-        )
+        release, basis = self._setpoint(None, ev, assumption_ids)
         worst = _Bound()
         for p in brine_hex:
             assert p.min_brine_pressure_barg is not None
