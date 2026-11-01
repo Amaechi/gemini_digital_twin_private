@@ -147,7 +147,9 @@ Q_G = s_G\,(\Delta\Delta t - \Delta\Delta t_{min,G})\]</div>
 points it reproduces Method A within 1.0 % (capacity) and 2.1 % (COP). Results at 20 °C chilled
 water are extrapolated and flagged in <code class="docutils literal notranslate"><span class="pre">validity_warnings</span></code>. Capacity never exceeds the nameplate.</p>
 <p>Energy balance: <span class="math notranslate nohighlight">\(Q_{reject} = Q_E + Q_G + P_{aux}\)</span> with <span class="math notranslate nohighlight">\(P_{aux}\)</span> = 0.077 kW/ton
-(≈ 2.2 % of <span class="math notranslate nohighlight">\(Q_E\)</span>, extra tower fan and pump). Each external circuit (drive, cooling water,
+(≈ 2.2 % of <span class="math notranslate nohighlight">\(Q_E\)</span>, extra tower fan and pump) while <code class="docutils literal notranslate"><span class="pre">include_heat_rejection_auxiliaries</span></code> is
+true (default); set it to false when a <code class="docutils literal notranslate"><span class="pre">heat_rejection</span></code> component is connected, which counts the
+fan and pumps itself (<span class="math notranslate nohighlight">\(P_{aux} = 0\)</span>). Each external circuit (drive, cooling water,
 chilled water) has its own density and heat capacity; with a given flow its outlet temperature
 follows from <span class="math notranslate nohighlight">\(\rho c_p V \Delta T = Q\)</span>, otherwise a fixed ΔT is used (generator 7.2 K,
 cooling-water range 5 K) and the required flow is reported. With a given drive flow, Method B
@@ -194,12 +196,14 @@ Method B lowers <span class="math notranslate nohighlight">\(\Delta\Delta t\)</s
 <div class="math notranslate nohighlight">
 \[COP = \eta\,\frac{T_{evap}}{T_{cond} - T_{evap}}, \qquad P_{el} = \frac{Q}{COP}, \qquad
 Q_{reject} = Q + P_{el}\]</div>
-<p>with <span class="math notranslate nohighlight">\(\eta = 0.40\)</span>, <span class="math notranslate nohighlight">\(T_{evap} = T_{supply} - 4\)</span> K, <span class="math notranslate nohighlight">\(T_{cond} = T_{wb} + 4.5 + 5 + 3\)</span>
+<p>with <span class="math notranslate nohighlight">\(T_{evap} = T_{supply} - 4\)</span> K, <span class="math notranslate nohighlight">\(T_{cond} = T_{wb} + 4.5 + 5 + 3\)</span>
 (cooling tower) or <span class="math notranslate nohighlight">\(T_{db} + 8\)</span> (dry cooler), COP between 3 and 8. Inputs: <code class="docutils literal notranslate"><span class="pre">cooling_load_w</span></code>
 or <code class="docutils literal notranslate"><span class="pre">chilled_water_flow_rate_m3s</span></code>; <code class="docutils literal notranslate"><span class="pre">ambient_wet_bulb_degc</span></code> or <code class="docutils literal notranslate"><span class="pre">ambient_dry_bulb_degc</span></code>; optional
-<code class="docutils literal notranslate"><span class="pre">cooling_water_temperature_in_degc</span></code> (then <span class="math notranslate nohighlight">\(T_{cond} = T_{cw,in} + 5 + 3\)</span>). Note: the card’s
-η was implied with water temperatures as cycle temperatures; with the approach chain the Guidebook
-point needs η ≈ 0.44, so η = 0.40 understates the COP by ≈ 9–11 % (sensitivity case).</p>
+<code class="docutils literal notranslate"><span class="pre">cooling_water_temperature_in_degc</span></code> (then <span class="math notranslate nohighlight">\(T_{cond} = T_{cw,in} + 5 + 3\)</span>). η is on this
+<strong>refrigerant basis</strong>: calibrated so that the Guidebook point (COP 4.39 at 7.2 °C chilled / 32.2 °C
+condenser leaving water) is reproduced, <span class="math notranslate nohighlight">\(\eta = 4.39 \times 32 / 276.35 = 0.508\)</span> (the
+Guidebook’s 0.39–0.40 is on the water basis; RC-06). With this η the COP cap of 8 binds at the
+Dutch design points. <span class="math notranslate nohighlight">\(P_{el}\)</span> is compressor power only.</p>
 </section>
 <section id="heat-rejection">
 <h2><span class="section-number">5.8.4. </span>Heat rejection<a class="headerlink" href="#heat-rejection" title="Link to this heading"></a></h2>

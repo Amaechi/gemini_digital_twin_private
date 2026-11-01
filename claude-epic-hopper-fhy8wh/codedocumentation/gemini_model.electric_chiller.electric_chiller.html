@@ -126,12 +126,14 @@
 <code class="docutils literal notranslate"><span class="pre">REFERENCE.md</span></code>); Geothermal Direct Use Engineering &amp; Design Guidebook (Geo-Heat Center
 1989) p.257-258, 262, 266; spec §3.3 and §7.2 GM-05.</p>
 <ul class="simple">
-<li><p><code class="docutils literal notranslate"><span class="pre">COP</span> <span class="pre">=</span> <span class="pre">η</span> <span class="pre">T_evap</span> <span class="pre">/</span> <span class="pre">(T_cond</span> <span class="pre">-</span> <span class="pre">T_evap)</span></code> (K), η ≈ 0.40 (implied 0.39-0.40 by the Guidebook
-COP 4.39 at 45/90 °F and 4.07 at 45/95 °F, p.257-258) [L]. Known bias (COOL-ELC): that η
-was implied with the <em>water</em> temperatures as cycle temperatures, while the chain below
-adds -4 K / +3 K approaches; through the chain the Guidebook point needs η ≈ 0.44, so
-η = 0.40 (card and spec GM-05) understates the COP by ≈ 9-11 % – it overstates electric
-power and so favours absorption in comparisons. Sensitivity case: η 0.44.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">COP</span> <span class="pre">=</span> <span class="pre">η</span> <span class="pre">T_evap</span> <span class="pre">/</span> <span class="pre">(T_cond</span> <span class="pre">-</span> <span class="pre">T_evap)</span></code> (K) on the <strong>refrigerant basis</strong> (T_evap and T_cond
+below include the -4 K / +3 K offsets). RC-06 “Temperature basis of η”: the Guidebook’s
+0.39-0.40 (COP 4.39 at 45 °F chilled / 90 °F condenser leaving water, p.257-258) is on the
+water basis; on the model’s basis the same point gives η = 4.39 × 32 / 276.35 = 0.508 [D].
+With <code class="docutils literal notranslate"><span class="pre">carnot_efficiency:</span> <span class="pre">None</span></code> (default) η is calibrated by
+<a class="reference internal" href="#gemini_model.electric_chiller.electric_chiller.calibrated_carnot_efficiency" title="gemini_model.electric_chiller.electric_chiller.calibrated_carnot_efficiency"><code class="xref py py-func docutils literal notranslate"><span class="pre">calibrated_carnot_efficiency()</span></code></a> from the model’s own approach parameters, so the
+Guidebook point is always reproduced (COOL-ELC); an explicit value overrides it (keep it
+on the refrigerant basis – do not mix bases).</p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">T_evap</span> <span class="pre">=</span> <span class="pre">T_chilled,supply</span> <span class="pre">-</span> <span class="pre">4</span> <span class="pre">K</span></code> [A] (20 °C supply -&gt; 16 °C).</p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">T_cond</span> <span class="pre">=</span> <span class="pre">T_cw,leaving</span> <span class="pre">+</span> <span class="pre">3</span> <span class="pre">K</span></code> with a cooling tower, <code class="docutils literal notranslate"><span class="pre">T_cw,leaving</span> <span class="pre">=</span> <span class="pre">T_wb</span> <span class="pre">+</span> <span class="pre">approach</span>
 <span class="pre">(4-5</span> <span class="pre">K,</span> <span class="pre">default</span> <span class="pre">4.5)</span> <span class="pre">+</span> <span class="pre">range</span> <span class="pre">(~5</span> <span class="pre">K)</span></code> [A]; or <code class="docutils literal notranslate"><span class="pre">T_cond</span> <span class="pre">=</span> <span class="pre">T_db</span> <span class="pre">+</span> <span class="pre">8</span> <span class="pre">K</span></code> with a dry cooler [A].
@@ -140,18 +142,25 @@ If <code class="docutils literal notranslate"><span class="pre">cooling_water_te
 <code class="docutils literal notranslate"><span class="pre">dry_cooler</span></code> option is RC-06’s air-cooled condensing (T_db + 8 K); a water-loop dry
 cooler (<code class="docutils literal notranslate"><span class="pre">heat_rejection</span></code> dry cooler, T_db + 5 K) feeding the condenser gives T_db + 13 K
 (COP 5.26 vs 6.80 at 25 °C) – a warning says which formula was used.</p></li>
-<li><p>COP capped at 8 and floored at 3 [A]; <code class="docutils literal notranslate"><span class="pre">P_el</span> <span class="pre">=</span> <span class="pre">Q_cool</span> <span class="pre">/</span> <span class="pre">COP</span></code>; <code class="docutils literal notranslate"><span class="pre">Q_reject</span> <span class="pre">=</span> <span class="pre">Q_cool</span> <span class="pre">+</span> <span class="pre">P_el</span></code>.</p></li>
+<li><p>COP capped at 8 and floored at 3 [A]; <code class="docutils literal notranslate"><span class="pre">P_el</span> <span class="pre">=</span> <span class="pre">Q_cool</span> <span class="pre">/</span> <span class="pre">COP</span></code> is compressor power only (tower
+fan and condenser-water pump belong to a <code class="docutils literal notranslate"><span class="pre">heat_rejection</span></code> component, RC-06);
+<code class="docutils literal notranslate"><span class="pre">Q_reject</span> <span class="pre">=</span> <span class="pre">Q_cool</span> <span class="pre">+</span> <span class="pre">P_el</span></code>. With η 0.508 the cap of 8 binds at the Dutch design points.</p></li>
 </ul>
 <p>Condenser sensitivity: the model gives <code class="docutils literal notranslate"><span class="pre">d</span> <span class="pre">ln</span> <span class="pre">COP</span> <span class="pre">/</span> <span class="pre">dT_cond</span> <span class="pre">=</span> <span class="pre">-1/(T_cond</span> <span class="pre">-</span> <span class="pre">T_evap)</span></code>
-(output <code class="docutils literal notranslate"><span class="pre">condenser_sensitivity_per_k</span></code>), -4.0 %/K at the Guidebook point (7.2/32.2 °C),
-steeper than the Guidebook data (≈ -2.6 %/K of condenser-water temperature, p.257-258):
-the model’s COP falls faster in hot weather (documented check in the unit tests).</p>
+(output <code class="docutils literal notranslate"><span class="pre">condenser_sensitivity_per_k</span></code>), -3.1 %/K at the Guidebook point (lift 32 K on the
+refrigerant basis), steeper than the Guidebook data (≈ -2.6 %/K of condenser-water
+temperature, p.257-258): the model’s COP falls faster in hot weather (documented check).</p>
 <p>Capacity is the nominal capacity (no temperature derating); unmet load is reported.
-At 20 °C chilled supply and Dutch summer conditions the model gives COP ≈ 6-8 (RC-06).</p>
+At 20 °C chilled supply and Dutch summer conditions RC-06 expects COP ≈ 6-8; with the
+calibrated η the model reaches the cap (8) there and drops below it only in hotter weather
+(e.g. 6.7 with a dry cooler at 30 °C dry-bulb).</p>
 <p class="rubric">Functions</p>
 <table class="autosummary longtable docutils align-default">
 <tbody>
-<tr class="row-odd"><td><p><a class="reference internal" href="#gemini_model.electric_chiller.electric_chiller.carnot_cop" title="gemini_model.electric_chiller.electric_chiller.carnot_cop"><code class="xref py py-obj docutils literal notranslate"><span class="pre">carnot_cop</span></code></a>(evaporator_temperature_degc, ...)</p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#gemini_model.electric_chiller.electric_chiller.calibrated_carnot_efficiency" title="gemini_model.electric_chiller.electric_chiller.calibrated_carnot_efficiency"><code class="xref py py-obj docutils literal notranslate"><span class="pre">calibrated_carnot_efficiency</span></code></a>([...])</p></td>
+<td><p>Return η on the model's refrigerant basis that reproduces a COP at water temperatures.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#gemini_model.electric_chiller.electric_chiller.carnot_cop" title="gemini_model.electric_chiller.electric_chiller.carnot_cop"><code class="xref py py-obj docutils literal notranslate"><span class="pre">carnot_cop</span></code></a>(evaporator_temperature_degc, ...)</p></td>
 <td><p>Return η T_evap / (T_cond - T_evap) (RC-06), uncapped; inf if T_cond &lt;= T_evap.</p></td>
 </tr>
 </tbody>
@@ -180,6 +189,12 @@ tower) or <code class="docutils literal notranslate"><span class="pre">ambient_d
 <code class="docutils literal notranslate"><span class="pre">cooling_water_temperature_in_degc</span></code> (condenser water from a heat-rejection unit),
 <code class="docutils literal notranslate"><span class="pre">chilled_water_temperature_in_degc</span></code> / <code class="docutils literal notranslate"><span class="pre">_out_degc</span></code> (return / supply set point),
 and direct overrides <code class="docutils literal notranslate"><span class="pre">evaporator_temperature_degc</span></code> / <code class="docutils literal notranslate"><span class="pre">condenser_temperature_degc</span></code>.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="gemini_model.electric_chiller.electric_chiller.ElectricChiller.carnot_efficiency">
+<span class="sig-name descname"><span class="pre">carnot_efficiency</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/gemini_model/electric_chiller/electric_chiller.html#ElectricChiller.carnot_efficiency"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#gemini_model.electric_chiller.electric_chiller.ElectricChiller.carnot_efficiency" title="Link to this definition"></a></dt>
+<dd><p>Return η in use: the parameter, or the RC-06 calibration on the model’s basis.</p>
 </dd></dl>
 
 <dl class="py method">
@@ -213,6 +228,15 @@ water-cooled formula is used because condenser water is given.</p>
 <dd><p>Not applicable: static model.</p>
 </dd></dl>
 
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="gemini_model.electric_chiller.electric_chiller.calibrated_carnot_efficiency">
+<span class="sig-prename descclassname"><span class="pre">gemini_model.electric_chiller.electric_chiller.</span></span><span class="sig-name descname"><span class="pre">calibrated_carnot_efficiency</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">evaporator_approach_k</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">4.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">condenser_approach_k</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">3.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cop</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">4.39</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">chilled_water_degc</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">7.2</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">condenser_water_out_degc</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">32.2</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/gemini_model/electric_chiller/electric_chiller.html#calibrated_carnot_efficiency"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#gemini_model.electric_chiller.electric_chiller.calibrated_carnot_efficiency" title="Link to this definition"></a></dt>
+<dd><p>Return η on the model’s refrigerant basis that reproduces a COP at water temperatures.</p>
+<p>T_evap = chilled water - evaporator approach, T_cond = condenser leaving water +
+condenser approach; <code class="docutils literal notranslate"><span class="pre">η</span> <span class="pre">=</span> <span class="pre">COP</span> <span class="pre">(T_cond</span> <span class="pre">-</span> <span class="pre">T_evap)</span> <span class="pre">/</span> <span class="pre">T_evap</span></code> (K). With the RC-06 defaults
+(COP 4.39 at 7.2 / 32.2 °C, approaches 4 K / 3 K) η = 4.39 × 32 / 276.35 = 0.508 [D].</p>
 </dd></dl>
 
 <dl class="py function">

@@ -90,9 +90,9 @@
 <span class="sd">- Heat to reject from a chiller ``Q_reject = Q_cool (1 + 1/COP)`` (Guidebook p.262):</span>
 <span class="sd">  2.43 Q_cool at COP 0.7, 1.33 Q_cool at COP 3 (:func:`chiller_heat_rejection_w`). The</span>
 <span class="sd">  chiller models already output ``heat_rejected_w``; wire that to ``heat_load_w``. For the</span>
-<span class="sd">  absorption chiller set its ``aux_power_fraction`` to 0 (or wire</span>
-<span class="sd">  ``absorber_condenser_heat_w``): its default 2.2 % aux is the extra tower fan and pump,</span>
-<span class="sd">  which this unit already counts (COOL-ABS-AUX).</span>
+<span class="sd">  absorption chiller set ``include_heat_rejection_auxiliaries: false``: its default 2.2 % aux</span>
+<span class="sd">  is the extra tower fan and pump, which this unit already counts (COOL-ABS-AUX). The</span>
+<span class="sd">  electric chiller's ``power_el`` is compressor power only (RC-06).</span>
 <span class="sd">- Cooling tower: leaving (cold) water ``T_out = T_wb + approach``, approach 4-5 K</span>
 <span class="sd">  (default 4.5) [A]; range ≈ 5 K [A]; fan + cooling-water pump ≈ 2 % of heat rejected [A]</span>
 <span class="sd">  (Guidebook 0.077 kW/ton incremental, p.269).</span>

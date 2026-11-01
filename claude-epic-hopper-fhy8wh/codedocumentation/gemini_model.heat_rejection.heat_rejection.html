@@ -130,9 +130,9 @@ Ch23 p.11-12; spec §7.2 GM-06.</p>
 <li><p>Heat to reject from a chiller <code class="docutils literal notranslate"><span class="pre">Q_reject</span> <span class="pre">=</span> <span class="pre">Q_cool</span> <span class="pre">(1</span> <span class="pre">+</span> <span class="pre">1/COP)</span></code> (Guidebook p.262):
 2.43 Q_cool at COP 0.7, 1.33 Q_cool at COP 3 (<a class="reference internal" href="#gemini_model.heat_rejection.heat_rejection.chiller_heat_rejection_w" title="gemini_model.heat_rejection.heat_rejection.chiller_heat_rejection_w"><code class="xref py py-func docutils literal notranslate"><span class="pre">chiller_heat_rejection_w()</span></code></a>). The
 chiller models already output <code class="docutils literal notranslate"><span class="pre">heat_rejected_w</span></code>; wire that to <code class="docutils literal notranslate"><span class="pre">heat_load_w</span></code>. For the
-absorption chiller set its <code class="docutils literal notranslate"><span class="pre">aux_power_fraction</span></code> to 0 (or wire
-<code class="docutils literal notranslate"><span class="pre">absorber_condenser_heat_w</span></code>): its default 2.2 % aux is the extra tower fan and pump,
-which this unit already counts (COOL-ABS-AUX).</p></li>
+absorption chiller set <code class="docutils literal notranslate"><span class="pre">include_heat_rejection_auxiliaries:</span> <span class="pre">false</span></code>: its default 2.2 % aux
+is the extra tower fan and pump, which this unit already counts (COOL-ABS-AUX). The
+electric chiller’s <code class="docutils literal notranslate"><span class="pre">power_el</span></code> is compressor power only (RC-06).</p></li>
 <li><p>Cooling tower: leaving (cold) water <code class="docutils literal notranslate"><span class="pre">T_out</span> <span class="pre">=</span> <span class="pre">T_wb</span> <span class="pre">+</span> <span class="pre">approach</span></code>, approach 4-5 K
 (default 4.5) [A]; range ≈ 5 K [A]; fan + cooling-water pump ≈ 2 % of heat rejected [A]
 (Guidebook 0.077 kW/ton incremental, p.269).</p></li>

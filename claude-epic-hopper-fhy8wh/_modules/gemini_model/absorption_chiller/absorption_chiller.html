@@ -125,9 +125,11 @@
 <span class="sd">Outputs: ``cooling_power_w`` Q_E, ``drive_heat_w`` Q_G = Q_E/COP, ``heat_rejected_w``</span>
 <span class="sd">= Q_E + Q_G + P_aux (exact), ``power_el`` = P_aux = ``aux_power_fraction`` Q_E</span>
 <span class="sd">(0.077 kW/ton ≈ 2.2 %: extra tower fan + cooling-water pump vs an electric chiller,</span>
-<span class="sd">Guidebook p.269 -- set it to 0 if a separate ``heat_rejection`` component already counts</span>
-<span class="sd">the tower fan and pumps), ``power_th`` = Q_E (useful cooling), ``emission`` 0, circuit</span>
-<span class="sd">outlet temperatures and flows, ``validity_warnings``.</span>
+<span class="sd">Guidebook p.269), ``power_th`` = Q_E (useful cooling), ``emission`` 0, circuit outlet</span>
+<span class="sd">temperatures and flows, ``validity_warnings``. ``include_heat_rejection_auxiliaries``</span>
+<span class="sd">(default True) switches P_aux on; set it to False when a ``heat_rejection`` component is</span>
+<span class="sd">connected, which counts the tower fan and pumps itself (RC-05/RC-06 no-double-counting rule;</span>
+<span class="sd">P_aux = 0 and Q_reject = Q_E + Q_G).</span>
 
 <span class="sd">Materials (RC-05, p.266-267): Cu / 90-10 CuNi generator tubes are incompatible with</span>
 <span class="sd">geothermal brine -&gt; titanium generator tubes (+10-15 % machine cost) or an isolation HEX</span>
@@ -197,6 +199,8 @@
             <span class="s2">"chilled_water_temperature_out_degc"</span><span class="p">:</span> <span class="mf">20.0</span><span class="p">,</span>  <span class="c1"># supply set point (spec)</span>
             <span class="s2">"chilled_water_temperature_in_degc"</span><span class="p">:</span> <span class="mf">26.0</span><span class="p">,</span>  <span class="c1"># return, DB-32 [A]</span>
             <span class="s2">"aux_power_fraction"</span><span class="p">:</span> <span class="mf">0.077</span> <span class="o">/</span> <span class="n">ghc1989</span><span class="o">.</span><span class="n">KW_PER_TON</span><span class="p">,</span>  <span class="c1"># 0.077 kW/ton, p.269</span>
+            <span class="c1"># False when a heat_rejection component is connected (it counts fan + pumps).</span>
+            <span class="s2">"include_heat_rejection_auxiliaries"</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span>
             <span class="s2">"ghc1989_conservative_clamp"</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span>
             <span class="s2">"drive_density_kg_m3"</span><span class="p">:</span> <span class="n">density</span><span class="p">,</span>
             <span class="s2">"drive_specific_heat_j_kgk"</span><span class="p">:</span> <span class="n">specific_heat</span><span class="p">,</span>
@@ -309,6 +313,11 @@
         <span class="n">q_nom</span> <span class="o">=</span> <span class="n">_positive</span><span class="p">(</span><span class="n">p</span><span class="p">[</span><span class="s2">"nominal_capacity_w"</span><span class="p">],</span> <span class="s2">"nominal_capacity_w"</span><span class="p">)</span>
         <span class="n">q_cap</span> <span class="o">=</span> <span class="n">_non_negative</span><span class="p">(</span><span class="n">p</span><span class="p">[</span><span class="s2">"max_capacity_fraction"</span><span class="p">],</span> <span class="s2">"max_capacity_fraction"</span><span class="p">)</span> <span class="o">*</span> <span class="n">q_nom</span>
         <span class="n">aux_fraction</span> <span class="o">=</span> <span class="n">_non_negative</span><span class="p">(</span><span class="n">p</span><span class="p">[</span><span class="s2">"aux_power_fraction"</span><span class="p">],</span> <span class="s2">"aux_power_fraction"</span><span class="p">)</span>
+        <span class="n">include_aux</span> <span class="o">=</span> <span class="n">p</span><span class="p">[</span><span class="s2">"include_heat_rejection_auxiliaries"</span><span class="p">]</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">include_aux</span><span class="p">,</span> <span class="nb">bool</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">"include_heat_rejection_auxiliaries must be True or False, got </span><span class="si">{</span><span class="n">include_aux</span><span class="si">!r}</span><span class="s2">"</span>
+            <span class="p">)</span>
         <span class="n">dt_generator</span> <span class="o">=</span> <span class="n">_positive</span><span class="p">(</span><span class="n">p</span><span class="p">[</span><span class="s2">"generator_delta_t_k"</span><span class="p">],</span> <span class="s2">"generator_delta_t_k"</span><span class="p">)</span>
         <span class="n">cw_range</span> <span class="o">=</span> <span class="n">_positive</span><span class="p">(</span><span class="n">p</span><span class="p">[</span><span class="s2">"cooling_water_range_k"</span><span class="p">],</span> <span class="s2">"cooling_water_range_k"</span><span class="p">)</span>
 
@@ -341,7 +350,7 @@
                 <span class="n">warnings</span><span class="p">,</span>
             <span class="p">)</span>
 
-        <span class="n">p_aux</span> <span class="o">=</span> <span class="n">aux_fraction</span> <span class="o">*</span> <span class="n">q_e</span>
+        <span class="n">p_aux</span> <span class="o">=</span> <span class="n">aux_fraction</span> <span class="o">*</span> <span class="n">q_e</span> <span class="k">if</span> <span class="n">include_aux</span> <span class="k">else</span> <span class="mf">0.0</span>
         <span class="n">q_ac</span> <span class="o">=</span> <span class="n">q_e</span> <span class="o">+</span> <span class="n">q_g</span>
         <span class="n">q_reject</span> <span class="o">=</span> <span class="n">q_ac</span> <span class="o">+</span> <span class="n">p_aux</span>
 

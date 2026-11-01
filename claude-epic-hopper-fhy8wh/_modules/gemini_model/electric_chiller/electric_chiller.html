@@ -86,12 +86,14 @@
 <span class="sd">``REFERENCE.md``); Geothermal Direct Use Engineering &amp; Design Guidebook (Geo-Heat Center</span>
 <span class="sd">1989) p.257-258, 262, 266; spec §3.3 and §7.2 GM-05.</span>
 
-<span class="sd">- ``COP = η T_evap / (T_cond - T_evap)`` (K), η ≈ 0.40 (implied 0.39-0.40 by the Guidebook</span>
-<span class="sd">  COP 4.39 at 45/90 °F and 4.07 at 45/95 °F, p.257-258) [L]. Known bias (COOL-ELC): that η</span>
-<span class="sd">  was implied with the *water* temperatures as cycle temperatures, while the chain below</span>
-<span class="sd">  adds -4 K / +3 K approaches; through the chain the Guidebook point needs η ≈ 0.44, so</span>
-<span class="sd">  η = 0.40 (card and spec GM-05) understates the COP by ≈ 9-11 % -- it overstates electric</span>
-<span class="sd">  power and so favours absorption in comparisons. Sensitivity case: η 0.44.</span>
+<span class="sd">- ``COP = η T_evap / (T_cond - T_evap)`` (K) on the **refrigerant basis** (T_evap and T_cond</span>
+<span class="sd">  below include the -4 K / +3 K offsets). RC-06 "Temperature basis of η": the Guidebook's</span>
+<span class="sd">  0.39-0.40 (COP 4.39 at 45 °F chilled / 90 °F condenser leaving water, p.257-258) is on the</span>
+<span class="sd">  water basis; on the model's basis the same point gives η = 4.39 × 32 / 276.35 = 0.508 [D].</span>
+<span class="sd">  With ``carnot_efficiency: None`` (default) η is calibrated by</span>
+<span class="sd">  :func:`calibrated_carnot_efficiency` from the model's own approach parameters, so the</span>
+<span class="sd">  Guidebook point is always reproduced (COOL-ELC); an explicit value overrides it (keep it</span>
+<span class="sd">  on the refrigerant basis -- do not mix bases).</span>
 <span class="sd">- ``T_evap = T_chilled,supply - 4 K`` [A] (20 °C supply -&gt; 16 °C).</span>
 <span class="sd">- ``T_cond = T_cw,leaving + 3 K`` with a cooling tower, ``T_cw,leaving = T_wb + approach</span>
 <span class="sd">  (4-5 K, default 4.5) + range (~5 K)`` [A]; or ``T_cond = T_db + 8 K`` with a dry cooler [A].</span>
@@ -100,15 +102,19 @@
 <span class="sd">  ``dry_cooler`` option is RC-06's air-cooled condensing (T_db + 8 K); a water-loop dry</span>
 <span class="sd">  cooler (``heat_rejection`` dry cooler, T_db + 5 K) feeding the condenser gives T_db + 13 K</span>
 <span class="sd">  (COP 5.26 vs 6.80 at 25 °C) -- a warning says which formula was used.</span>
-<span class="sd">- COP capped at 8 and floored at 3 [A]; ``P_el = Q_cool / COP``; ``Q_reject = Q_cool + P_el``.</span>
+<span class="sd">- COP capped at 8 and floored at 3 [A]; ``P_el = Q_cool / COP`` is compressor power only (tower</span>
+<span class="sd">  fan and condenser-water pump belong to a ``heat_rejection`` component, RC-06);</span>
+<span class="sd">  ``Q_reject = Q_cool + P_el``. With η 0.508 the cap of 8 binds at the Dutch design points.</span>
 
 <span class="sd">Condenser sensitivity: the model gives ``d ln COP / dT_cond = -1/(T_cond - T_evap)``</span>
-<span class="sd">(output ``condenser_sensitivity_per_k``), -4.0 %/K at the Guidebook point (7.2/32.2 °C),</span>
-<span class="sd">steeper than the Guidebook data (≈ -2.6 %/K of condenser-water temperature, p.257-258):</span>
-<span class="sd">the model's COP falls faster in hot weather (documented check in the unit tests).</span>
+<span class="sd">(output ``condenser_sensitivity_per_k``), -3.1 %/K at the Guidebook point (lift 32 K on the</span>
+<span class="sd">refrigerant basis), steeper than the Guidebook data (≈ -2.6 %/K of condenser-water</span>
+<span class="sd">temperature, p.257-258): the model's COP falls faster in hot weather (documented check).</span>
 
 <span class="sd">Capacity is the nominal capacity (no temperature derating); unmet load is reported.</span>
-<span class="sd">At 20 °C chilled supply and Dutch summer conditions the model gives COP ≈ 6-8 (RC-06).</span>
+<span class="sd">At 20 °C chilled supply and Dutch summer conditions RC-06 expects COP ≈ 6-8; with the</span>
+<span class="sd">calibrated η the model reaches the cap (8) there and drops below it only in hotter weather</span>
+<span class="sd">(e.g. 6.7 with a dry cooler at 30 °C dry-bulb).</span>
 <span class="sd">"""</span>
 
 <span class="kn">import</span><span class="w"> </span><span class="nn">math</span>
@@ -118,6 +124,11 @@
 
 <span class="n">KELVIN</span> <span class="o">=</span> <span class="mf">273.15</span>
 <span class="n">HEAT_REJECTION_OPTIONS</span> <span class="o">=</span> <span class="p">(</span><span class="s2">"cooling_tower"</span><span class="p">,</span> <span class="s2">"dry_cooler"</span><span class="p">)</span>
+<span class="c1"># RC-06 calibration point (Guidebook p.257-258): COP 4.39 at 45 °F chilled water and 90 °F</span>
+<span class="c1"># condenser leaving water (water temperatures; the card rounds them to 7.2 / 32.2 °C).</span>
+<span class="n">GUIDEBOOK_COP</span> <span class="o">=</span> <span class="mf">4.39</span>
+<span class="n">GUIDEBOOK_CHILLED_WATER_DEGC</span> <span class="o">=</span> <span class="mf">7.2</span>
+<span class="n">GUIDEBOOK_CONDENSER_WATER_OUT_DEGC</span> <span class="o">=</span> <span class="mf">32.2</span>
 
 
 <span class="k">def</span><span class="w"> </span><span class="nf">_finite</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">name</span><span class="p">):</span>
@@ -155,6 +166,29 @@
 
 
 
+<div class="viewcode-block" id="calibrated_carnot_efficiency">
+<a class="viewcode-back" href="../../../codedocumentation/gemini_model.electric_chiller.electric_chiller.html#gemini_model.electric_chiller.electric_chiller.calibrated_carnot_efficiency">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">calibrated_carnot_efficiency</span><span class="p">(</span>
+    <span class="n">evaporator_approach_k</span><span class="o">=</span><span class="mf">4.0</span><span class="p">,</span>
+    <span class="n">condenser_approach_k</span><span class="o">=</span><span class="mf">3.0</span><span class="p">,</span>
+    <span class="n">cop</span><span class="o">=</span><span class="n">GUIDEBOOK_COP</span><span class="p">,</span>
+    <span class="n">chilled_water_degc</span><span class="o">=</span><span class="n">GUIDEBOOK_CHILLED_WATER_DEGC</span><span class="p">,</span>
+    <span class="n">condenser_water_out_degc</span><span class="o">=</span><span class="n">GUIDEBOOK_CONDENSER_WATER_OUT_DEGC</span><span class="p">,</span>
+<span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Return η on the model's refrigerant basis that reproduces a COP at water temperatures.</span>
+
+<span class="sd">    T_evap = chilled water - evaporator approach, T_cond = condenser leaving water +</span>
+<span class="sd">    condenser approach; ``η = COP (T_cond - T_evap) / T_evap`` (K). With the RC-06 defaults</span>
+<span class="sd">    (COP 4.39 at 7.2 / 32.2 °C, approaches 4 K / 3 K) η = 4.39 × 32 / 276.35 = 0.508 [D].</span>
+<span class="sd">    """</span>
+    <span class="n">t_evap</span> <span class="o">=</span> <span class="n">chilled_water_degc</span> <span class="o">-</span> <span class="n">evaporator_approach_k</span>
+    <span class="n">t_cond</span> <span class="o">=</span> <span class="n">condenser_water_out_degc</span> <span class="o">+</span> <span class="n">condenser_approach_k</span>
+    <span class="k">if</span> <span class="n">t_cond</span> <span class="o">&lt;=</span> <span class="n">t_evap</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"calibration point needs T_cond &gt; T_evap"</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">cop</span> <span class="o">*</span> <span class="p">(</span><span class="n">t_cond</span> <span class="o">-</span> <span class="n">t_evap</span><span class="p">)</span> <span class="o">/</span> <span class="p">(</span><span class="n">t_evap</span> <span class="o">+</span> <span class="n">KELVIN</span><span class="p">)</span></div>
+
+
+
 <div class="viewcode-block" id="ElectricChiller">
 <a class="viewcode-back" href="../../../codedocumentation/gemini_model.electric_chiller.electric_chiller.html#gemini_model.electric_chiller.electric_chiller.ElectricChiller">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">ElectricChiller</span><span class="p">(</span><span class="n">StaticModel</span><span class="p">):</span>
@@ -165,7 +199,7 @@
         <span class="n">density</span><span class="p">,</span> <span class="n">specific_heat</span> <span class="o">=</span> <span class="n">liquid_properties</span><span class="p">()</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span> <span class="o">=</span> <span class="p">{</span>
             <span class="s2">"nominal_capacity_w"</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
-            <span class="s2">"carnot_efficiency"</span><span class="p">:</span> <span class="mf">0.40</span><span class="p">,</span>  <span class="c1"># [L] Guidebook p.257-258 (0.39-0.40)</span>
+            <span class="s2">"carnot_efficiency"</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>  <span class="c1"># None -&gt; calibrated, refrigerant basis (0.508) [D]</span>
             <span class="s2">"heat_rejection"</span><span class="p">:</span> <span class="s2">"cooling_tower"</span><span class="p">,</span>  <span class="c1"># or "dry_cooler"</span>
             <span class="s2">"evaporator_approach_k"</span><span class="p">:</span> <span class="mf">4.0</span><span class="p">,</span>  <span class="c1"># [A] T_evap = T_supply - 4 K</span>
             <span class="s2">"condenser_approach_k"</span><span class="p">:</span> <span class="mf">3.0</span><span class="p">,</span>  <span class="c1"># [A] T_cond = T_cw,leaving + 3 K</span>
@@ -205,6 +239,19 @@
 <a class="viewcode-back" href="../../../codedocumentation/gemini_model.electric_chiller.electric_chiller.html#gemini_model.electric_chiller.electric_chiller.ElectricChiller.update_state">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">update_state</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">u</span><span class="p">,</span> <span class="n">x</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">"""Not applicable: static model."""</span></div>
+
+
+<div class="viewcode-block" id="ElectricChiller.carnot_efficiency">
+<a class="viewcode-back" href="../../../codedocumentation/gemini_model.electric_chiller.electric_chiller.html#gemini_model.electric_chiller.electric_chiller.ElectricChiller.carnot_efficiency">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">carnot_efficiency</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">"""Return η in use: the parameter, or the RC-06 calibration on the model's basis."""</span>
+        <span class="n">p</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span>
+        <span class="k">if</span> <span class="n">p</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"carnot_efficiency"</span><span class="p">)</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">_positive</span><span class="p">(</span><span class="n">p</span><span class="p">[</span><span class="s2">"carnot_efficiency"</span><span class="p">],</span> <span class="s2">"carnot_efficiency"</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">calibrated_carnot_efficiency</span><span class="p">(</span>
+            <span class="n">_non_negative</span><span class="p">(</span><span class="n">p</span><span class="p">[</span><span class="s2">"evaporator_approach_k"</span><span class="p">],</span> <span class="s2">"evaporator_approach_k"</span><span class="p">),</span>
+            <span class="n">_non_negative</span><span class="p">(</span><span class="n">p</span><span class="p">[</span><span class="s2">"condenser_approach_k"</span><span class="p">],</span> <span class="s2">"condenser_approach_k"</span><span class="p">),</span>
+        <span class="p">)</span></div>
 
 
     <span class="k">def</span><span class="w"> </span><span class="nf">_rho_cp</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
@@ -265,7 +312,7 @@
 <span class="sd">        """</span>
         <span class="n">p</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span>
         <span class="n">q_nom</span> <span class="o">=</span> <span class="n">_positive</span><span class="p">(</span><span class="n">p</span><span class="p">[</span><span class="s2">"nominal_capacity_w"</span><span class="p">],</span> <span class="s2">"nominal_capacity_w"</span><span class="p">)</span>
-        <span class="n">eta</span> <span class="o">=</span> <span class="n">_positive</span><span class="p">(</span><span class="n">p</span><span class="p">[</span><span class="s2">"carnot_efficiency"</span><span class="p">],</span> <span class="s2">"carnot_efficiency"</span><span class="p">)</span>
+        <span class="n">eta</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">carnot_efficiency</span><span class="p">()</span>
         <span class="n">cop_max</span> <span class="o">=</span> <span class="n">_positive</span><span class="p">(</span><span class="n">p</span><span class="p">[</span><span class="s2">"cop_max"</span><span class="p">],</span> <span class="s2">"cop_max"</span><span class="p">)</span>
         <span class="n">cop_min</span> <span class="o">=</span> <span class="n">_positive</span><span class="p">(</span><span class="n">p</span><span class="p">[</span><span class="s2">"cop_min"</span><span class="p">],</span> <span class="s2">"cop_min"</span><span class="p">)</span>
         <span class="k">if</span> <span class="n">cop_min</span> <span class="o">&gt;</span> <span class="n">cop_max</span><span class="p">:</span>
@@ -325,6 +372,7 @@
             <span class="s2">"load_ratio"</span><span class="p">:</span> <span class="n">q_cool</span> <span class="o">/</span> <span class="n">q_nom</span><span class="p">,</span>
             <span class="s2">"cop"</span><span class="p">:</span> <span class="n">cop</span><span class="p">,</span>
             <span class="s2">"cop_uncapped"</span><span class="p">:</span> <span class="n">cop_carnot</span><span class="p">,</span>
+            <span class="s2">"carnot_efficiency"</span><span class="p">:</span> <span class="n">eta</span><span class="p">,</span>
             <span class="s2">"evaporator_temperature_degc"</span><span class="p">:</span> <span class="n">t_evap</span><span class="p">,</span>
             <span class="s2">"condenser_temperature_degc"</span><span class="p">:</span> <span class="n">t_cond</span><span class="p">,</span>
             <span class="s2">"condenser_sensitivity_per_k"</span><span class="p">:</span> <span class="n">sensitivity</span><span class="p">,</span>

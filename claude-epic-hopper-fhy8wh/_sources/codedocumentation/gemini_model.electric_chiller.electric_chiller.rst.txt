@@ -8,6 +8,7 @@ gemini\_model.electric\_chiller.electric\_chiller
 
    .. autosummary::
    
+      calibrated_carnot_efficiency
       carnot_cop
    
    .. rubric:: Classes

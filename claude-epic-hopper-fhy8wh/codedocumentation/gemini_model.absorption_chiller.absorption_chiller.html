@@ -164,9 +164,11 @@ generator tubes.</p>
 <p>Outputs: <code class="docutils literal notranslate"><span class="pre">cooling_power_w</span></code> Q_E, <code class="docutils literal notranslate"><span class="pre">drive_heat_w</span></code> Q_G = Q_E/COP, <code class="docutils literal notranslate"><span class="pre">heat_rejected_w</span></code>
 = Q_E + Q_G + P_aux (exact), <code class="docutils literal notranslate"><span class="pre">power_el</span></code> = P_aux = <code class="docutils literal notranslate"><span class="pre">aux_power_fraction</span></code> Q_E
 (0.077 kW/ton ≈ 2.2 %: extra tower fan + cooling-water pump vs an electric chiller,
-Guidebook p.269 – set it to 0 if a separate <code class="docutils literal notranslate"><span class="pre">heat_rejection</span></code> component already counts
-the tower fan and pumps), <code class="docutils literal notranslate"><span class="pre">power_th</span></code> = Q_E (useful cooling), <code class="docutils literal notranslate"><span class="pre">emission</span></code> 0, circuit
-outlet temperatures and flows, <code class="docutils literal notranslate"><span class="pre">validity_warnings</span></code>.</p>
+Guidebook p.269), <code class="docutils literal notranslate"><span class="pre">power_th</span></code> = Q_E (useful cooling), <code class="docutils literal notranslate"><span class="pre">emission</span></code> 0, circuit outlet
+temperatures and flows, <code class="docutils literal notranslate"><span class="pre">validity_warnings</span></code>. <code class="docutils literal notranslate"><span class="pre">include_heat_rejection_auxiliaries</span></code>
+(default True) switches P_aux on; set it to False when a <code class="docutils literal notranslate"><span class="pre">heat_rejection</span></code> component is
+connected, which counts the tower fan and pumps itself (RC-05/RC-06 no-double-counting rule;
+P_aux = 0 and Q_reject = Q_E + Q_G).</p>
 <p>Materials (RC-05, p.266-267): Cu / 90-10 CuNi generator tubes are incompatible with
 geothermal brine -&gt; titanium generator tubes (+10-15 % machine cost) or an isolation HEX
 with a clean loop (then the drive inlet is the clean-loop temperature).</p>
