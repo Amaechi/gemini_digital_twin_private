@@ -17,7 +17,7 @@ Keep it ≤ 20 KB; it is the hand-off between sessions. Old detail: merged PRs a
 | WP-09 | Verifier, memory, logging | merged (901e110) | [#9](https://github.com/Amaechi/gemini_digital_twin_private/pull/9) | 41-check DesignVerifier |
 | WP-10 | Agents, runner, CLI | merged (2285460; review a9083b7) | [#4](https://github.com/Amaechi/gemini_digital_twin_private/pull/4), [#6](https://github.com/Amaechi/gemini_digital_twin_private/pull/6) | policy run P0–P10 on stubs (UNVERIFIED) |
 | WP-11 | Optimisation & uncertainty | todo | | Batch 6 |
-| WP-12 | Model gap & Model Builder | in review | PR pending | TL-17/18 real; S7 FunctionModel demo; 1093 passed |
+| WP-12 | Model gap & Model Builder | in review | [#15](https://github.com/Amaechi/gemini_digital_twin_private/pull/15) | TL-17/18 real; S7 FunctionModel demo; 1093 passed |
 | WP-13 | Eval suite & submission checks | todo | | Batch 5 |
 | WP-14 | Integration run & figures | todo | | Batch 7 |
 | L-1 | Local: pick LLM via S11 eval | todo | | user, local Ollama |
