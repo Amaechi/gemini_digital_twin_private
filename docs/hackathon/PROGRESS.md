@@ -36,7 +36,7 @@ One line per decision, grouped by WP; dated 11-01 (WP-00: 10-31). Why: the `conf
 - merit order = topology HEX → CHP → HTHP → boiler; DSP-FLOW min equal flow w/o boiler, off < 50, ≤ design.
 - cooling free → absorption (DSP-ABS-MIN; drive ≥ COOL-ABS-DRV × 1.01, ΔT ≤ 40 K) → electric; DSP-HP-MIN off if ≤ +10 % brine.
 - DB-30: SIM-OUTAGE lowest-load; B drops lowest heat + cool window; availability = calendar; C7 suction = WHP.
-- C6: power required, discharge ahead of boiler; SIM-06 via TL-07; full year 0 invalid d, ≤ 0.36 %.
+- C6: power required, discharge before boiler; SIM-06 via TL-07; full year 0 invalid d, ≤ 0.36 %.
 
 **WP-06**
 - generated HPs = WP-03 closed form, Lorenz, η_L = HP-ETA-L (GEMINI NM default kept); no validity bypass / "HPs off" rebuild.
