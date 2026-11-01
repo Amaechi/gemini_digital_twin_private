@@ -10,4 +10,5 @@ gemini\_model.fluid
    :toctree:
    :recursive:
 
+   pvt_config
    pvt_water_stp

@@ -145,7 +145,16 @@ are runtime inputs so the compressor can be wired inline in a gas
 flow chain. <code class="docutils literal notranslate"><span class="pre">pressure_in</span></code>/<code class="docutils literal notranslate"><span class="pre">pressure_out</span></code>/<code class="docutils literal notranslate"><span class="pre">mass_flow</span></code> are
 echoed back unchanged as outputs (this model does not itself alter
 the flow or pressures, it only reports the power required to
-achieve them) so a downstream component can chain off them.</p>
+achieve them) so a downstream component can chain off them.
+<code class="docutils literal notranslate"><span class="pre">power_el</span></code> (W) equals <code class="docutils literal notranslate"><span class="pre">compressor_power</span></code> (electric drive assumed;
+the efficiencies are already applied, so <code class="docutils literal notranslate"><span class="pre">mechanical_efficiency</span></code>
+must include motor/VFD losses for a wire-to-gas figure);
+<code class="docutils literal notranslate"><span class="pre">power_th</span></code> and <code class="docutils literal notranslate"><span class="pre">emission</span></code> are 0.</p>
+<p>Known limitation (GEMINI formula, unchanged): the per-stage work is
+<code class="docutils literal notranslate"><span class="pre">m</span> <span class="pre">R</span> <span class="pre">T1/(k-1)</span> <span class="pre">(r^((k-1)/k)</span> <span class="pre">-</span> <span class="pre">1)</span></code>, without the factor <code class="docutils literal notranslate"><span class="pre">k</span></code> of the
+steady-flow isentropic work <code class="docutils literal notranslate"><span class="pre">m</span> <span class="pre">k/(k-1)</span> <span class="pre">R</span> <span class="pre">T1</span> <span class="pre">(r^((k-1)/k)</span> <span class="pre">-</span> <span class="pre">1)</span></code>, so
+the power is low by a factor <code class="docutils literal notranslate"><span class="pre">k</span></code> (about 1.3). Flagged for follow-up
+in docs/hackathon/PROGRESS.md.</p>
 </dd></dl>
 
 <dl class="py method">

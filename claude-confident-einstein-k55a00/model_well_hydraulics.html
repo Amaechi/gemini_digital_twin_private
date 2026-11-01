@@ -67,6 +67,7 @@
 <li class="toctree-l4"><a class="reference internal" href="#temperature-drop">5.2.5.3. Temperature Drop</a></li>
 </ul>
 </li>
+<li class="toctree-l3"><a class="reference internal" href="#fluid-pvt-and-two-phase-velocities">5.2.6. Fluid PVT and two-phase velocities</a></li>
 </ul>
 </li>
 <li class="toctree-l2"><a class="reference internal" href="model_fluid_pvt.html">5.3. Fluid: PVT Properties</a></li>
@@ -562,6 +563,19 @@ heat capacity:</p>
 </tbody>
 </table>
 </section>
+</section>
+<section id="fluid-pvt-and-two-phase-velocities">
+<h2><span class="section-number">5.2.6. </span>Fluid PVT and two-phase velocities<a class="headerlink" href="#fluid-pvt-and-two-phase-velocities" title="Link to this heading"></a></h2>
+<p>The fluid properties come from <code class="docutils literal notranslate"><span class="pre">DPDT.PVT</span></code>. Passing a <code class="docutils literal notranslate"><span class="pre">&quot;pvt&quot;</span></code> block in the
+parameters (<code class="docutils literal notranslate"><span class="pre">update_parameters({&quot;pvt&quot;:</span> <span class="pre">{...}})</span></code>, or from project JSON for
+<code class="docutils literal notranslate"><span class="pre">well</span></code>, <code class="docutils literal notranslate"><span class="pre">producer_well</span></code> and <code class="docutils literal notranslate"><span class="pre">injector_well</span></code>) replaces it with a
+configured <code class="docutils literal notranslate"><span class="pre">PVTConstantSTP</span></code> (see <a class="reference internal" href="model_fluid_pvt.html"><span class="doc">Fluid: PVT Properties</span></a>).</p>
+<p>For two-phase cells the superficial velocities passed to Beggs-Brill are</p>
+<div class="math notranslate nohighlight">
+\[u_{s,l} = \frac{\dot m_l}{\rho_l A} \qquad u_{s,g} = \frac{\dot m_g}{\rho_g A}\]</div>
+<p>with <span class="math notranslate nohighlight">\(\dot m_g = x \dot m\)</span> the gas mass flow. Earlier versions used the
+gas mass fraction <span class="math notranslate nohighlight">\(x\)</span> instead of <span class="math notranslate nohighlight">\(\dot m_g\)</span>; single-phase results
+(<span class="math notranslate nohighlight">\(x = 0\)</span>) are unaffected. See <code class="docutils literal notranslate"><span class="pre">src/gemini_model/well/REFERENCE.md</span></code>.</p>
 </section>
 </section>
 
