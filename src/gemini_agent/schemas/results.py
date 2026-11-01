@@ -146,9 +146,32 @@ class KPISet(StrictModel):
     opex_million_per_yr: float | None = Field(default=None, description="Million `currency`/yr.")
     lcoh_per_mwh: float | None = Field(default=None, description="`currency` per MWh heat.")
     lcoc_per_mwh: float | None = Field(default=None, description="`currency` per MWh cooling.")
+    # Added by WP-08 (extend, never rename): ECO-01 20-yr case and carrier detail
+    lcoh_20yr_per_mwh: float | None = Field(
+        default=None, description="LCOH over the 20-yr analysis period (ECO-01 reports both)."
+    )
+    lcoc_20yr_per_mwh: float | None = Field(
+        default=None, description="LCOC over the 20-yr analysis period."
+    )
+    electricity_purchased_mwh: float | None = Field(
+        default=None, ge=0, description="Daily max(0, consumed − generated) (ECO-ELEC-NET)."
+    )
+    grid_gas_fuel_mwh: float | None = Field(
+        default=None, ge=0, description="Purchased grid gas (LHV); gas_fuel_mwh − associated gas."
+    )
     # Exergy (RC-11, DB-34d) — the dead state must be stated with the KPI
-    exergy_efficiency_frac: float | None = None
+    exergy_efficiency_frac: float | None = Field(
+        default=None,
+        description=(
+            "Functional exergy efficiency: (E_heat + E_cold + W_generated) / (brine exergy + "
+            "electricity + fuel exergy) (RC-11; EXG-KPI)."
+        ),
+    )
     exergy_dead_state: str | None = None
+    exergy_utilisation_frac: float | None = Field(
+        default=None,
+        description="Spec §10.1 utilisation (W_net + E_heat + E_cold)/(m·e_res); None if no brine.",
+    )
     # Robustness
     min_constraint_margins: dict[str, float] = Field(default_factory=dict)
     thermal_breakthrough_yr: float | None = Field(default=None, description="t_b (RC-02).")
