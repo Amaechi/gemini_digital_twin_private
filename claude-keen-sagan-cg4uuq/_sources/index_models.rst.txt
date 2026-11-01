@@ -1,3 +1,6 @@
+.. Modified by the GeoAgent team for SPE GeoHackathon 2026, 2026-11-01: added the
+   model_cooling page (WP-02).
+
 .. _models-section:
 
 Models
@@ -24,3 +27,4 @@ For the auto-generated API reference (function/class signatures), see
     model_corrosion
     model_erosion
     model_surface_equipment
+    model_cooling
