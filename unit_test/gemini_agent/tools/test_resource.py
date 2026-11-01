@@ -58,6 +58,7 @@ def test_basis_follows_config_edits(config_copy, edit_yaml):
         ("DB-40", "pump_hydraulic_efficiency_frac", 0.65, "limits"),
         ("SUB-PBUB", "method", "default_20_barg", "henry_law"),
         ("SUB-PBUB", "basis", "brine", "basis"),
+        ("SUB-PBUB", "intake_margin_factor", 1.3, "VER-ESP-MARGIN"),
     ],
 )
 def test_basis_rejects_inconsistent_register(

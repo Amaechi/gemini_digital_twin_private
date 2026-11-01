@@ -11,8 +11,10 @@ import time
 
 import pytest
 from pydantic import ValidationError
+from scipy.optimize import brentq
 
 from gemini_agent.runner.toolbox import FlowArgs
+from gemini_agent.schemas.candidate import Candidate
 from gemini_agent.schemas.common import SUMMARY_MAX_CHARS
 from gemini_agent.schemas.config import REPO_ROOT, load_config
 from gemini_agent.tools import doublet as doublet_module
@@ -38,6 +40,14 @@ from gemini_agent.tools.doublet import (
     resolve_doublet,
 )
 from gemini_agent.tools.resource import load_subsurface_basis
+from gemini_agent.verify.design_verifier import (
+    ESP_MARGIN_ID,
+    ESP_RELEASE_PRESSURE_ID,
+    CheckStatus,
+    DesignVerifier,
+    EspPoint,
+    VerificationEvidence,
+)
 from gemini_model.well.correlation.darcyweisbach import DarcyWeisbach
 from gemini_simulator.well_flow import solve_injector_wellhead_pressure_bar
 
@@ -353,10 +363,93 @@ def test_esp_evidence_carries_bubble_point(full_flow):
 
 
 def test_esp_evidence_matches_verifier_esp_point(full_flow):
-    """Contract with WP-09: the evidence validates as ``EspPoint`` (runs once WP-09 is merged)."""
-    verifier = pytest.importorskip("gemini_agent.verify.design_verifier")
-    point = verifier.EspPoint(**full_flow.esp_evidence.model_dump())
+    """Contract with WP-09: the evidence is an ``EspPoint`` carrying the *bare* p_b in bar(g)."""
+    point = EspPoint(**full_flow.esp_evidence.model_dump())
+    assert set(EspEvidence.model_fields) == set(EspPoint.model_fields)
     assert point.release_pressure_barg == full_flow.release_pressure_barg
+    assert point.release_pressure_barg < full_flow.intake_setpoint_barg  # not pre-multiplied
+
+
+def test_margin_agrees_with_verifier_register():
+    """SUB-PBUB (TL-05 sizing) and VER-ESP-MARGIN (verifier PH-18) state the same 1.2."""
+    register = load_config("assumptions")
+    assert register.get("SUB-PBUB").value["intake_margin_factor"] == 1.2
+    assert register.get(ESP_MARGIN_ID).value == 1.2
+
+
+def _setting_depth_for_intake(basis, target_barg, flow_m3h=300.0):
+    """ESP setting depth (m) at which the intake at ``flow_m3h`` equals ``target_barg``."""
+
+    def residual(depth_m):
+        design = DoubletDesign(esp_setting_depth_m=depth_m)
+        point = operating_point(resolve_doublet(design, basis), flow_m3h)
+        return point.esp_intake_pressure_barg - target_barg
+
+    return brentq(residual, 300.0, 2400.0, xtol=1e-9)
+
+
+def _ph18(point):
+    candidate = Candidate.model_validate(
+        {
+            "id": "C2-wp05",
+            "concept": "C2",
+            "doublets": 1,
+            "depth_m": 2500.0,
+            "design_flow_m3h": point.flow_m3h,
+            "gas_handling": "degas_use",
+            "heating_return_degc": 55.0,
+            "cooling_return_degc": 26.0,
+        }
+    )
+    evidence = VerificationEvidence(
+        candidate=candidate, esps=[EspPoint(**point.esp_evidence.model_dump())]
+    )
+    return DesignVerifier.from_config().verify(evidence)
+
+
+def test_end_to_end_verifier_ph18_at_and_below_setpoint(basis, doublet):
+    """TL-05 → verifier PH-18 with the bare p_b: 1.2·p_b passes, between p_b and 1.2·p_b fails.
+
+    The verifier applies VER-ESP-MARGIN itself (limit = 1.2 · (p_b + 1.01325) − 1.01325 bar(g)),
+    which is exactly TL-05's setpoint, so both margins agree (the verifier rounds to 1e-6 bar).
+    """
+    bubble = doublet.bubble_point
+    p_b, setpoint = bubble.release_pressure_barg, bubble.intake_setpoint_barg
+    # Intake at the setpoint (1e-6 m deeper than the exact root, so the float margin is ≥ 0).
+    at_setpoint = operating_point(
+        resolve_doublet(
+            DoubletDesign(esp_setting_depth_m=_setting_depth_for_intake(basis, setpoint) + 1e-6),
+            basis,
+        ),
+        300.0,
+    )
+    assert at_setpoint.feasible
+    assert at_setpoint.esp_intake_pressure_barg == pytest.approx(setpoint, abs=1e-6)
+    assert at_setpoint.esp_evidence.release_pressure_barg == p_b  # bare p_b, not 1.2·p_b
+    report = _ph18(at_setpoint)
+    check = report.check("PH-18")
+    assert check.status == CheckStatus.PASS, check
+    assert check.margin == pytest.approx(at_setpoint.intake_margin_bar, abs=1e-6)  # rounded 1e-6
+    assert ESP_MARGIN_ID in report.assumption_ids
+    assert ESP_RELEASE_PRESSURE_ID not in report.assumption_ids  # register default not used
+
+    # Intake halfway between p_b and 1.2·p_b: TL-05 flags it and the verifier fails PH-18.
+    between = operating_point(
+        resolve_doublet(
+            DoubletDesign(
+                esp_setting_depth_m=_setting_depth_for_intake(basis, 0.5 * (p_b + setpoint))
+            ),
+            basis,
+        ),
+        300.0,
+    )
+    assert p_b < between.esp_intake_pressure_barg < setpoint
+    assert not between.feasible and any("1.2 × bubble point" in r for r in between.reasons)
+    check = _ph18(between).check("PH-18")
+    assert check.status == CheckStatus.FAIL, check
+    assert check.margin == pytest.approx(between.intake_margin_bar, abs=1e-6)
+    # The default sized design (840 m) passes as well.
+    assert _ph18(operating_point(doublet, 300.0)).check("PH-18").status == CheckStatus.PASS
 
 
 def test_pressurised_loop_has_no_tubing_release(basis, doublet):

@@ -47,6 +47,8 @@ ASSUMPTION_NPSH = "SUB-NPSH"
 ASSUMPTION_ESP = "SUB-ESP"
 ASSUMPTION_SUCTION = "SUB-PSUC"
 ASSUMPTION_SPACING = "SUB-SPACING"
+ASSUMPTION_VERIFIER_ESP_MARGIN = "VER-ESP-MARGIN"
+"""WP-09's margin on p_b; must equal SUB-PBUB's (TL-05 sizes, the verifier checks, same 1.2)."""
 
 BUBBLE_POINT_SOLVENTS = frozenset({"sea_water", "pure_water"})
 """Henry's-law constant sets on RC-01 item 9."""
@@ -167,6 +169,17 @@ def load_subsurface_basis(config_dir: Path | str | None = None) -> SubsurfaceBas
             raise ValueError(
                 f"{ASSUMPTION_BUBBLE_PRESSURE} {key} must be one of {sorted(BUBBLE_POINT_SOLVENTS)}"
             )
+    margin = float(bubble["intake_margin_factor"])
+    try:
+        verifier_margin = _number(register, ASSUMPTION_VERIFIER_ESP_MARGIN)
+    except KeyError:
+        verifier_margin = margin
+    if verifier_margin != margin:
+        raise ValueError(
+            f"{ASSUMPTION_BUBBLE_PRESSURE} margin {margin:g} differs from "
+            f"{ASSUMPTION_VERIFIER_ESP_MARGIN} {verifier_margin:g}: TL-05 and the verifier must "
+            "agree"
+        )
     if well.get("trajectory") != "vertical":
         raise ValueError(f"{ASSUMPTION_WELL}: only a vertical trajectory is supported")
     injectivity_rule = register.get(ASSUMPTION_INJECTIVITY).value
@@ -206,7 +219,7 @@ def load_subsurface_basis(config_dir: Path | str | None = None) -> SubsurfaceBas
         gas_co2_mol_frac=brine.gas_co2_mol_frac,
         bubble_point_basis=str(bubble["basis"]),
         bubble_point_second_bound=str(bubble["second_bound"]),
-        bubble_point_margin_factor=float(bubble["intake_margin_factor"]),
+        bubble_point_margin_factor=margin,
         npsh_margin_m=float(npsh["npsh_margin_m"]),
         vapour_pressure_bound_bara=float(npsh["vapour_pressure_bound_bara"]),
         vapour_pressure_bound_valid_to_degc=float(npsh["vapour_pressure_bound_valid_to_degc"]),

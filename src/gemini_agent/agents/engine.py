@@ -24,7 +24,7 @@ from typing import Any, Generic, Literal, TypeVar
 from pydantic import BaseModel
 
 from gemini_agent.agents.roles import ROLES
-from gemini_agent.logging.llm_logger import LLMCallRecord, LLMLogger
+from gemini_agent.logging.llm_logger import RETRY_PARTS, LLMCallRecord, LLMLogger
 from gemini_agent.prompts.system import choice_prompt, decision_prompt, system_prompt
 from gemini_agent.schemas.config import LLMConfig
 from gemini_agent.schemas.decision import (
@@ -240,41 +240,14 @@ def build_ollama_model(
     return OllamaModel(model_tag, provider=provider)
 
 
-def _messages_json(messages: list[Any]) -> list[Any]:
-    from pydantic_ai.messages import ModelMessagesTypeAdapter
-
-    try:
-        return list(ModelMessagesTypeAdapter.dump_python(messages, mode="json"))
-    except Exception:  # noqa: BLE001  # pragma: no cover - logging must never break a run
-        return [str(message) for message in messages]
-
-
-_RETRY_PARTS = frozenset({"RetryPromptPart", "RetryFeedbackPart"})
-"""Pydantic AI part classes that carry a validation error back to the model."""
-
-
 def _last_feedback(messages: list[Any]) -> str:
     """Text of the last validation error sent back to the model ('' if none)."""
     for message in reversed(messages):
         for part in reversed(getattr(message, "parts", [])):
-            if type(part).__name__ in _RETRY_PARTS:
+            if type(part).__name__ in RETRY_PARTS:
                 content = getattr(part, "content", "")
                 return (content if isinstance(content, str) else str(content))[:300]
     return ""
-
-
-def _retries_and_tool_calls(messages: list[Any]) -> tuple[int, list[dict[str, Any]]]:
-    from pydantic_ai.messages import ToolCallPart
-
-    retries = 0
-    calls: list[dict[str, Any]] = []
-    for message in messages:
-        for part in getattr(message, "parts", []):
-            if type(part).__name__ in _RETRY_PARTS:
-                retries += 1
-            elif isinstance(part, ToolCallPart):
-                calls.append({"tool": part.tool_name, "args": part.args_as_dict()})
-    return retries, calls
 
 
 @dataclass
@@ -422,40 +395,21 @@ class LLMEngine(DecisionEngine):
         usage: Any = None,
     ) -> tuple[int, int, int]:
         """Log one call; return (retries, input tokens, output tokens)."""
-        retries, calls = _retries_and_tool_calls(list(messages))
-        input_tokens = output_tokens = requests = 0
-        if usage is not None:
-            input_tokens = int(usage.input_tokens or 0)
-            output_tokens = int(usage.output_tokens or 0)
-            requests = int(usage.requests or 0)
-        else:
-            for message in messages:
-                msg_usage = getattr(message, "usage", None)
-                if msg_usage is not None:
-                    input_tokens += int(getattr(msg_usage, "input_tokens", 0) or 0)
-                    output_tokens += int(getattr(msg_usage, "output_tokens", 0) or 0)
-                    requests += 1
-        if self.logger is None:
-            return retries, input_tokens, output_tokens
-        self.logger.log(
-            LLMCallRecord(
-                run_id=self.run_id,
-                agent=role.value,
-                phase=phase.value,
-                model=model_name,
-                messages=_messages_json(list(messages)),
-                response=output.model_dump(mode="json") if isinstance(output, BaseModel) else None,
-                tool_calls=calls,
-                input_tokens=input_tokens,
-                output_tokens=output_tokens,
-                requests=requests,
-                latency_s=round(time.perf_counter() - start, 4),
-                retries=retries,
-                decision_source=source,
-                error=error,
-            )
+        record = LLMCallRecord.from_messages(
+            run_id=self.run_id,
+            agent=role.value,
+            phase=phase.value,
+            model=model_name,
+            messages=list(messages),
+            output=output if isinstance(output, BaseModel) else None,
+            usage=usage,
+            latency_s=time.perf_counter() - start,
+            decision_source=source,
+            error=error,
         )
-        return retries, input_tokens, output_tokens
+        if self.logger is not None:
+            self.logger.log(record)
+        return record.retries, record.input_tokens, record.output_tokens
 
     def decide(self, context: DecisionContext) -> EngineResult[Decision]:
         """Run the phase role's decision agent on the compact context."""
