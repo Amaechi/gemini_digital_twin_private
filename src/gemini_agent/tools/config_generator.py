@@ -73,9 +73,11 @@ GENERATOR_VERSION = 1
 
 JOULE_PER_GJ = 1.0e9
 CHP_FRACTION_ID = "CHP-EL-FRAC"
+"""Register id of the CHP electrical share (owned by WP-03; WP-08 reads the same entry)."""
 HP_EFFICIENCY_ID = "HP-ETA-L"
 """Register id of the heat-pump Lorenz efficiency η_L (owned by WP-03)."""
-"""Register id of the CHP electrical share (owned by WP-03; WP-08 reads the same entry)."""
+HP_APPROACH_ID = "HP-APPROACH"
+"""Register id of the heat-pump condenser/evaporator approaches (owned by WP-03; sets the cap)."""
 CHP_FRACTION_TOL = 5e-5
 """CHP-EL-FRAC is stored to 4 decimals (0.3333) while chp.py uses exactly 1/3."""
 CR_BALANCED_TOL = 1e-9
@@ -792,6 +794,8 @@ class GeneratorBasis(StrictModel):
     hp_solver: Literal["closed_form", "nelder_mead"] = Field(description="CFG-HP (WP-03 GM-03).")
     hp_mode: Literal["carnot", "lorenz"]
     hp_eta: float = Field(description="HP-ETA-L (Lorenz) — WP-03's register entry.")
+    hp_condenser_approach_k: float = Field(description="HP-APPROACH (WP-03).")
+    hp_evaporator_approach_k: float = Field(description="HP-APPROACH (WP-03).")
     hp_max_lift_k: float = Field(description="VER-HP-LIFT: sink outlet − source outlet.")
     chp_total_efficiency_frac: float
     chp_electrical_fraction: float = Field(description="CHP-EL-FRAC (WP-03) = chp.py 1/3.")
@@ -840,7 +844,7 @@ def load_generator_basis(config_dir: Path | str | None = None) -> GeneratorBasis
     boiler_cfg = _entry(register, "CFG-BOILER")
     grid_cfg = _entry(register, "CFG-GRID-GAS")
     # The CHP electrical share is WP-03's register entry; GEMINI chp.py hard-codes it.
-    electrical_fraction = float(register.get(CHP_FRACTION_ID).value)  # type: ignore[arg-type]
+    electrical_fraction = _number(register, CHP_FRACTION_ID)
     if not math.isclose(
         electrical_fraction, CHP.ELECTRICAL_POWER_FRACTION, abs_tol=CHP_FRACTION_TOL
     ):
@@ -876,6 +880,8 @@ def load_generator_basis(config_dir: Path | str | None = None) -> GeneratorBasis
         hp_solver=hp_cfg["solver"],
         hp_mode=hp_cfg["mode"],
         hp_eta=_number(register, HP_EFFICIENCY_ID),
+        hp_condenser_approach_k=float(_entry(register, HP_APPROACH_ID)["condenser_approach_k"]),
+        hp_evaporator_approach_k=float(_entry(register, HP_APPROACH_ID)["evaporator_approach_k"]),
         hp_max_lift_k=float(register.get("VER-HP-LIFT").value),  # type: ignore[arg-type]
         chp_total_efficiency_frac=float(chp_cfg["total_efficiency_frac"]),
         chp_electrical_fraction=electrical_fraction,
@@ -1533,6 +1539,8 @@ def _train(
             "solver": gb.hp_solver,
             "mode": gb.hp_mode,
             "eta_lorenz": gb.hp_eta,
+            "condenser_approach_k": gb.hp_condenser_approach_k,
+            "evaporator_approach_k": gb.hp_evaporator_approach_k,
             "Th_out_target": gb.heating_supply_degc,
             # DB-12 brine floor, and VER-HP-LIFT: sink outlet − source outlet ≤ 60 K.
             "Ts_in_minimum": max(

@@ -471,3 +471,16 @@ def test_gas_handling_drives_degassing_and_hp_lift_floor():
     _, c4 = generated("C4", 2, 3200.0, None)
     assert any("flashing is not checked" in flag for flag in c4.flags)
     assert "district_split_hex_bypass" in c4.roles
+
+
+def test_associated_gas_factor_agrees_between_code_paths():
+    """CFG-ASSOC-GAS (separator path, 68.56) = ECO-CO2-AG / DB-28 (design-basis path, WP-08)."""
+    from gemini_agent.tools.design_basis import gas_mix_properties
+
+    _, factor, density = gas_burner_values(0.8, 0.2)
+    mix = gas_mix_properties(0.8, 0.2)
+    assert mix.density_kg_per_nm3 == pytest.approx(density, rel=1e-9)
+    per_gj = mix.co2_when_burned_kg_per_nm3 / mix.lhv_mj_per_nm3 * 1e3
+    assert per_gj == pytest.approx(factor, rel=1e-9)
+    eco = load_config("assumptions").get("ECO-CO2-AG").value
+    assert eco["factor_kg_per_gj_lhv"] == pytest.approx(factor, abs=0.05)

@@ -87,6 +87,7 @@ HEAT_TOL_MW = 1e-6
 HP_OFF_FLOW_M3S = 1e-12
 """Sink flow below which a heat pump is treated as off (its Th_out has no weight)."""
 HP_CAPACITY_TOL_MW = 1e-6
+"""Heat-pump heat above the hthp_heating_mw nameplate by less than this is not controlled."""
 SHARE_BISECTION_STEPS = 12
 """Plate-HEX / heat-pump share resolution: 1/4096 of the district flow."""
 BOILER_CONTROL_PASSES = 2
@@ -236,7 +237,7 @@ def heat_pump_failures(solver: Solver, config: GeneratedConfig) -> list[str]:
     """Return why each ``HeatpumpBasic`` output is not physical (empty if all valid).
 
     Physical = finite, Th_in ≤ Th_out ≤ max(target, Th_in), floor ≤ Ts_out ≤ Ts_in, no negative
-    power, brine
+    power, and
     unchanged at zero sink flow. RC-04 envelope violations are flags, not failures.
     """
     problems = []
@@ -603,12 +604,7 @@ def _assemble(
             hp_flags.append(flag)
         if point is not None:
             hp_points.append(point)
-            if out.get("max_lift_k") is not None:
-                margins[f"{name}_lift_margin_k"] = float(out["max_lift_k"]) - float(out["lift_k"])
-            if out.get("cop_cap"):
-                margins[f"{name}_cop_cap_margin_frac"] = 1.0 - float(out["COP"]) / float(
-                    out["cop_cap"]
-                )
+        _heat_pump_margins(name, out, params=config.project["components"][name], margins=margins)
     gas_fuel: dict[str, float] = {}
     co2: dict[str, float] = {}
     generated = 0.0
@@ -770,6 +766,31 @@ def _heat_pump_screening(
     raw = out.get("heat_pump_point")
     point = HeatPumpPoint(name=name, **raw) if isinstance(raw, dict) else None
     return flag, point
+
+
+def _heat_pump_margins(
+    name: str, out: dict[str, Any], *, params: Any, margins: dict[str, float]
+) -> None:
+    """Margins of a running heat pump, so the verifier's PH-21 sees every limit (not only flags).
+
+    ``{name}_rc04_limits_margin_count`` is −1 for a point reported outside its limits (also when
+    it emits no ``heat_pump_point``, e.g. COP < 1); lift and datasheet sink temperature get their
+    own margins. The COP-cap margin is reported only when the model does not enforce the cap
+    itself (``apply_cop_cap`` False) — otherwise it is 0 by construction whenever the cap binds.
+    """
+    if not out.get("running", True):
+        return
+    margins[f"{name}_rc04_limits_margin_count"] = -1.0 if out.get("within_limits") is False else 0.0
+    if out.get("max_lift_k") is not None and out.get("lift_k") is not None:
+        margins[f"{name}_lift_margin_k"] = float(out["max_lift_k"]) - float(out["lift_k"])
+    sink_max = out.get("max_sink_temperature_degc")
+    if sink_max is not None and out.get("sink_temperature_out_degc") is not None:
+        margins[f"{name}_sink_temperature_margin_k"] = float(sink_max) - float(
+            out["sink_temperature_out_degc"]
+        )
+    enforced = (params.get("parameters") or {}).get("apply_cop_cap", True)
+    if not enforced and out.get("cop_cap"):
+        margins[f"{name}_cop_cap_margin_frac"] = 1.0 - float(out["COP"]) / float(out["cop_cap"])
 
 
 def _flag_text(flag: HeatPumpFlag) -> str:

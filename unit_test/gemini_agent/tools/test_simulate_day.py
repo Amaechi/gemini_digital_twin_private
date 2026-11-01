@@ -183,6 +183,7 @@ def test_closed_form_heat_pumps_run_a_c2_day_without_the_workaround():
     assert not any("bypass" in w for w in sim.warnings)
     for name in ("hthp_1", "hthp_2"):
         out = sim.outputs[name]
+        assert sim.day.margins[f"{name}_rc04_limits_margin_count"] == 0.0
         assert (out["solver"], out["running"], out["within_limits"]) == ("closed_form", True, True)
         assert 3.5 <= out["COP"] <= 4.5  # RC-04 typical HTHP band at the design lift
         assert out["Th_out"] == pytest.approx(100.0)
@@ -235,6 +236,9 @@ def test_out_of_limits_heat_pump_point_is_flagged_not_hidden():
     text = next(f for f in sim.day.flags if f.startswith("hthp_1"))
     assert "OUTSIDE RC-04 limits" in text
     assert sim.day.margins["hthp_1_lift_margin_k"] < 0
+    assert sim.day.margins["hthp_1_rc04_limits_margin_count"] == -1.0
+    assert sim.day.margins["hthp_2_rc04_limits_margin_count"] == 0.0
+    assert "hthp_1_cop_cap_margin_frac" not in sim.day.margins  # the model enforces the cap
     point = next(p for p in sim.heat_pumps if p.name == "hthp_1")
     assert point.max_lift_k == 30.0
     report = DesignVerifier.from_config().verify(verification_evidence(candidate, [sim]))
@@ -401,3 +405,24 @@ def test_candidate_return_temperatures_are_used():
     assert cold_sim.config.district_flow_m3s == pytest.approx(
         warm_sim.config.district_flow_m3s * 45.0 / 55.0
     )
+
+
+def test_heat_pump_uses_register_approaches_and_flags_sink_limit():
+    """HP-APPROACH reaches the model; a datasheet sink-temperature limit becomes a margin."""
+    gb, sub = bases()
+    peak, _ = days()
+    candidate = make_candidate("C2", 2)
+    config = generate_plant(candidate, peak.loads(), gb=gb, sub=sub)
+    params = config.project["components"]["hthp_1"]["parameters"]
+    assert (params["condenser_approach_k"], params["evaporator_approach_k"]) == (4.0, 4.0)
+    # Test fixture only: a sink limit below the 100 °C target the point must reach.
+    params.update(
+        {
+            "datasheet": "test fixture: hypothetical HTHP datasheet",
+            "max_sink_temperature_degc": 95.0,
+        }
+    )
+    sim = simulate_config_day(candidate, peak, config, gb=gb, sub=sub)
+    assert sim.day.margins["hthp_1_sink_temperature_margin_k"] == pytest.approx(-5.0)
+    assert sim.day.margins["hthp_1_rc04_limits_margin_count"] == -1.0
+    assert any(f.startswith("hthp_1") and "OUTSIDE" in f for f in sim.day.flags)
