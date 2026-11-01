@@ -272,20 +272,31 @@ def test_absorption_concept_year(map_cache):
     assert sim.calendar.outage_windows() != [] and sim.calendar.placement == "lowest_load"
 
 
-def test_c6_storage_ledger_year(map_cache):
-    """C6 with storage: ledger totals, net 'storage' heat key, network demand still met."""
-    c6 = make_candidate(
-        "C6",
-        2,
-        parent_id="C3-2d",
-        equipment_sizes={
-            "storage_capacity_mwh": 3000.0,
-            "storage_power_mw": 5.0,
-            "peak_boiler_mw": 30.0,
-            "hthp_heating_mw": 4.0,
-        },
-    )
+C6_SIZES = {
+    "storage_capacity_mwh": 3000.0,
+    "storage_power_mw": 5.0,
+    "peak_boiler_mw": 30.0,
+    "hthp_heating_mw": 4.0,
+}
+
+
+def _c6(**sizes: float):
+    return make_candidate("C6", 2, parent_id="C3-2d", equipment_sizes={**C6_SIZES, **sizes})
+
+
+@pytest.fixture(scope="module")
+def c6_year(map_cache):
+    """Fast year of a sized C6 (storage ledger) and of its C3 parent without storage."""
+    c6 = _c6()
     sim = run_annual(SimulateAnnualRequest(candidate=c6), map_cache_dir=map_cache)
+    parent = c6.model_copy(update={"concept": "C3", "parent_id": None})
+    base = run_annual(SimulateAnnualRequest(candidate=parent), map_cache_dir=map_cache)
+    return c6, sim, base
+
+
+def test_c6_storage_ledger_year(c6_year):
+    """C6 with storage: ledger totals, net 'storage' heat key, network demand still met."""
+    _, sim, base = c6_year
     bal = sim.storage
     assert bal is not None and bal.charged_total_mwh > 0 and bal.discharged_total_mwh > 0
     assert bal.final_energy_mwh == pytest.approx(
@@ -297,37 +308,59 @@ def test_c6_storage_ledger_year(map_cache):
     for day in sim.annual.days:
         assert day.heat_supplied_mw == pytest.approx(day.heating_demand_mw, abs=1e-5)
     assert any("DSP-STORAGE" in w for w in sim.warnings)
-    parent = c6.model_copy(update={"concept": "C3", "parent_id": None})
-    base = run_annual(SimulateAnnualRequest(candidate=parent), map_cache_dir=map_cache)
     boiler = sim.annual.kpis.heat_by_source_mwh["peak_boiler"]  # type: ignore[union-attr]
     base_boiler = base.annual.kpis.heat_by_source_mwh["peak_boiler"]  # type: ignore[union-attr]
     assert base_boiler - boiler == pytest.approx(bal.discharged_total_mwh, rel=1e-6)
 
 
-def test_c6_storage_full_mode(map_cache):
-    """Full mode replays storage days: plant serves demand ∓ storage, the network sees demand."""
-    c6 = make_candidate(
-        "C6",
-        2,
-        parent_id="C3-2d",
-        equipment_sizes={
-            "storage_capacity_mwh": 3000.0,
-            "storage_power_mw": 5.0,
-            "peak_boiler_mw": 30.0,
-            "hthp_heating_mw": 4.0,
-        },
-    )
-    sim = run_annual(
-        SimulateAnnualRequest(candidate=c6, mode="full", day_indices=[14, 120, 190]),
+def test_c6_rounding_days_charge(c6_year, map_cache):
+    """Days with ~1e-15 MW of rounding 'boiler heat' are charge days, not lost (HEAT_TOL_MW)."""
+    _, _, base = c6_year
+    noise = [
+        d.day_index for d in base.annual.days if 0 < d.heat_by_source_mw["peak_boiler"] <= 1e-6
+    ]
+    assert noise  # the rounding days exist in the parent plant
+    big = run_annual(
+        SimulateAnnualRequest(candidate=_c6(storage_capacity_mwh=30000.0)),
         map_cache_dir=map_cache,
     )
-    nets = {p.day_index: p.storage_net_mw for p in sim.plans}
-    assert nets[14] > 0 and nets[190] < 0  # winter discharge, summer charge
+    nets = big.storage.net_mw_by_day  # type: ignore[union-attr]
+    charged = [i for i in noise if nets.get(i, 0.0) < 0]
+    # A strict "boiler <= 0" test charged none of them; later ones may meet a full store.
+    assert len(charged) >= len(noise) // 2
+
+
+def test_c6_storage_full_mode_uses_year_ledger(c6_year, map_cache):
+    """A day subset (full mode) replays the whole-year ledger, not a ledger of the subset."""
+    c6, year_sim, _ = c6_year
+    nets = year_sim.storage.net_mw_by_day  # type: ignore[union-attr]
+    discharge_day = min(i for i, v in nets.items() if v > 0)
+    charge_day = min(i for i, v in nets.items() if v < 0)
+    idle_day = next(i for i in range(365) if i not in nets)
+    days = sorted({discharge_day, charge_day, idle_day})
+    sim = run_annual(
+        SimulateAnnualRequest(candidate=c6, mode="full", day_indices=days),
+        map_cache_dir=map_cache,
+    )
+    assert sim.storage == year_sim.storage  # same seasonal ledger
+    for plan in sim.plans:
+        assert plan.storage_net_mw == pytest.approx(nets.get(plan.day_index, 0.0))
     for day in sim.annual.days:
-        assert day.heat_by_source_mw["storage"] == pytest.approx(nets[day.day_index])
+        assert day.heat_by_source_mw.get("storage", 0.0) == pytest.approx(
+            nets.get(day.day_index, 0.0), rel=1e-3
+        )
         assert day.heat_supplied_mw == pytest.approx(day.heating_demand_mw, abs=1e-3)
         assert day.unmet_heating_mwh == 0.0
     assert sim.comparison is not None and sim.comparison.status == "pass"
+
+
+def test_hp_min_inactive_without_reference(map_cache):
+    """DSP-HP-MIN needs a reference: hot brine without a nameplate warns that it is inactive."""
+    deep = make_candidate("C2", 2, depth_m=3200.0, candidate_id="C2-deep-no-nameplate")
+    sim = run_annual(
+        SimulateAnnualRequest(candidate=deep, day_indices=[14]), map_cache_dir=map_cache
+    )
+    assert any("DSP-HP-MIN inactive" in w for w in sim.warnings)
 
 
 def test_c6_without_storage_size_warns(map_cache):

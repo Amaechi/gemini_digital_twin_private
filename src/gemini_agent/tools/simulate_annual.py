@@ -79,7 +79,11 @@ from gemini_agent.tools.economics import (
     co2_emissions,
 )
 from gemini_agent.tools.resource import SubsurfaceBasis
-from gemini_agent.tools.simulate_day import DayConditions, simulate_plant_day
+from gemini_agent.tools.simulate_day import (
+    HEAT_TOL_MW,
+    DayConditions,
+    simulate_plant_day,
+)
 from gemini_agent.tools.thermal import (
     ThermalBreakthroughRequest,
     thermal_breakthrough_report,
@@ -216,7 +220,10 @@ class EndOfLifeCheck(StrictModel):
     """SIM-06: TL-07 at one doublet's annual-mean operation (RC-02 eq 1–3)."""
 
     doublet: int = Field(ge=1)
-    mean_flow_m3h: float = Field(description="Σ daily flow / simulated days (outages count as 0).")
+    mean_flow_m3h: float = Field(
+        description="Σ daily flow / simulated days (outages count as 0). Under DB-30 B that is "
+        "330 days: about 10 % above Σ/365, i.e. a conservative (earlier) breakthrough."
+    )
     mean_production_degc: float = Field(description="Flow-weighted wellhead temperature.")
     mean_injection_degc: float = Field(description="Flow-weighted injection temperature.")
     breakthrough_time_yr: float
@@ -591,9 +598,11 @@ def run_annual(
             hp_extra_flow_frac=hp_extra,
         )
 
-    fast_days = {i: dispatch(i) for i in indices}
-    storage = None
     spec = storage_spec(candidate, register)
+    # The C6 ledger is seasonal: it always runs over the whole calendar, even for a day subset.
+    base_indices = calendar.simulated_day_indices if spec is not None else indices
+    fast_days = {i: dispatch(i) for i in base_indices}
+    storage = None
     if candidate.concept == "C6" and spec is None:
         warnings.append(
             "C6 without equipment_sizes storage_capacity_mwh and storage_power_mw: parent plant "
@@ -601,6 +610,7 @@ def run_annual(
         )
     if spec is not None:
         boiler = {i: f.day.heat_by_source_mw.get("peak_boiler", 0.0) for i, f in fast_days.items()}
+        # Tolerance, not 0: rounding leaves ~1e-15 MW of "boiler heat" on met days.
         charge = {
             i: spare_geothermal_mw(
                 plant,
@@ -609,12 +619,15 @@ def run_annual(
                 spec.power_mw,
                 drive_flow_m3s=fast_days[i].plan.absorption_drive_m3h / SECONDS_PER_HOUR,
             )
-            for i in indices
-            if boiler[i] <= 0.0 and fast_days[i].day.unmet_heating_mwh <= 0.0
+            for i in base_indices
+            if boiler[i] <= HEAT_TOL_MW and fast_days[i].day.unmet_heating_mwh <= 0.0
         }
-        discharge = {i: b for i, b in boiler.items() if b > 0.0}
-        storage = storage_ledger(spec, indices, charge, discharge)
+        discharge = {i: b for i, b in boiler.items() if b > HEAT_TOL_MW}
+        storage = storage_ledger(spec, base_indices, charge, discharge)
+        wanted = set(indices)
         for i, net in storage.net_mw_by_day.items():
+            if i not in wanted:
+                continue
             if net < 0:
                 fast_days[i] = dispatch(i, -net)
             else:
@@ -630,6 +643,11 @@ def run_annual(
                 "C6 storage idle: no boiler heat to displace or no spare geothermal capacity "
                 "(DSP-STORAGE discharges only against boiler heat)"
             )
+    if plant.has_hp and not plant.hp_reference_w:
+        warnings.append(
+            "DSP-HP-MIN inactive: no hthp_heating_mw and no HTHP heat at the design point "
+            "(reference 0), so HTHP trickles are not switched off; give a nameplate"
+        )
     plans = [fast_days[i].plan for i in indices]
     fast_results = [fast_days[i].day for i in indices]
     for i in indices:

@@ -1322,7 +1322,8 @@ assumptions:
       no large brine or CHP must-run increase is bought against the HEX → HTHP → CHP merit order; otherwise a
       daily average below the minimum is read as on/off cycling within the day and kept (noted). The WP-06
       July trickle at full flow (≈ 150 W, COP 9.8) is removed by DSP-FLOW's minimum flow; this rule removes
-      the remaining small trickles with hot brine (e.g. 3 kW at 105 °C wellhead).
+      the remaining small trickles with hot brine (e.g. 3 kW at 105 °C wellhead) when the reference is > 0; a
+      zero reference (no nameplate and no HTHP heat at the design point) disables the rule (TL-12 warns).
     source: engineering assumption [A]; WP-06 follow-up (PROGRESS)
     sensitivity: "min_part_load_frac 0–0.25; max_extra_flow_frac 0–0.25"
     tag: A
@@ -1337,7 +1338,12 @@ assumptions:
       COOL-ABS-PL: Method B COP falls to ≈ 0.47 at 10 % load and 0.21 at 2 % (85 °C drive); WP-02 asks dispatch
       to avoid very low absorption loads. Below 10 % of the absorption nameplate the residual after free
       cooling goes to the electric chiller. Above it the drive brine is the smallest given flow (≥ the
-      COOL-ABS-DRV minimum + 1 % TL-05 flow tolerance) at which GM-04 meets the residual.
+      COOL-ABS-DRV minimum + 1 % TL-05 flow tolerance, drive ΔT ≤ DB-12) at which GM-04 meets the residual
+      capped at its capacity at the maximum doublet flow — SIM-03 (1) puts absorption up to its GM-04
+      capacity before the electric chiller. Consequence (WP-07 physics check): a small, capacity-limited
+      machine chases its last few % with a large drive flow (C3 with 3 MW: one doublet at ≈ 290 m3/h in
+      late July for ≈ 0.2–0.8 MW more absorption cooling, + CHP gas), against DSP-FLOW's minimise-brine
+      reasoning; a cost/CO2-based absorption vs electric split is WP-11's.
     source: COOL-ABS-PL (WP-02) [A]
     sensitivity: [0.05, 0.25]
     tag: A
