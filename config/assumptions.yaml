@@ -1251,13 +1251,14 @@ assumptions:
   - id: SIM-DB30B
     title: Days simulated under DB-30 interpretation B
     value:
-      simulated_days: "year minus its lowest-load window of (365 − demand_met_days_per_yr) days"
+      simulated_days: "year minus its lowest heating + cooling demand window of (365 − demand_met_days_per_yr) days"
       outages: none
     unit: null
     justification: >-
       Interpretation B simulates 330 daily steps without outage but does not say which 35 days are dropped.
-      Dropping the lowest-load window (same load as SIM-OUTAGE) keeps every design-relevant day, so a design
-      that passes A also passes B (spec §2.4) and B is never judged on easier days than A.
+      Dropping the window of lowest total demand (heating + cooling, not the SIM-OUTAGE geothermal load, which
+      for non-absorption concepts is heating only and would drop the July cooling peak) keeps the DB-18 and
+      DB-19 design days, so B is not judged on easier days than A.
     source: GEOAGENT_DESIGN_SPEC §2.4 DB-30 [A interpretation]
     sensitivity: "Drop the last 35 days of the year instead (less conservative: removes December)."
     tag: A
@@ -1294,12 +1295,14 @@ assumptions:
       resolution_m3h: 0.06
     unit: null
     justification: >-
-      The district water passes plate HEX → CHP → HTHP → peak boiler, so the SIM-03 merit order (HEX → HTHP →
-      CHP/boiler) is the topology and the free decision is the brine flow. The smallest flow that keeps the
-      boiler off minimises pumping and the CHP must-run heat of the associated gas (DB-36: all degassed gas
-      is burned), i.e. favours the HTHP over CHP heat as the merit order asks. Equal sharing minimises pump
-      power because ESP power Q·Δp(Q) grows faster than Q (RC-01). When the maximum flow is not enough the
-      boiler fills, then unmet demand is recorded.
+      The district water passes plate HEX → CHP → HTHP → peak boiler, so the SIM-03 order in which sources
+      take the load is the topology and the free decision is the brine flow. The smallest flow that keeps the
+      boiler off minimises brine production: pumping, and the associated gas the CHP must burn (DB-36) with
+      its CO2. It is knowingly not the lowest operating cost: a larger flow gives more plate-HEX and less
+      HTHP heat, which can save electricity (WP-07 physics check: C7 15 Apr 108 → 135 m3/h, −6 % net
+      electricity; C2 also more CHP electricity but +3.8 t/d CO2). A cost/CO2-priced flow search is WP-11's.
+      Equal sharing minimises pump power because ESP power Q·Δp(Q) grows faster than Q (RC-01). When the
+      maximum flow is not enough the boiler fills, then unmet demand is recorded.
     source: GEOAGENT_DESIGN_SPEC §8 SIM-03; RC-01 [A interpretation]
     sensitivity: "Spread over all doublets at the minimum flow; or maximum geothermal flow (WP-11)."
     tag: A
@@ -1344,18 +1347,21 @@ assumptions:
   - id: DSP-STORAGE
     title: C6 seasonal HT-ATES dispatch ledger
     value:
-      sizes: "equipment_sizes storage_capacity_mwh; storage_power_mw (default capacity / 24 h)"
-      charge: spare geothermal capacity (all available doublets at the design flow, no boiler) on days without boiler heat
-      discharge: displaces peak-boiler heat
+      sizes: "equipment_sizes storage_capacity_mwh and storage_power_mw (both required, no default)"
+      charge: spare geothermal capacity (all available doublets at the design flow, the day's absorption drive, no boiler) on days without boiler heat; served by the plant as extra load
+      discharge: in series ahead of the peak boiler at full district flow, displacing boiler heat, fuel and CO2 one for one
       recovery: STO-REC-HT (on discharge)
       cycles: 2 (second pass starts from the first's end state)
       outlet_temperature: not modelled (discharge assumed at the supply temperature)
     unit: null
     justification: >-
       C6 has no GEMINI storage component (WP-06). WP-03's ThermalStorage keeps the ledger: the plant serves
-      demand + charge or demand − discharge, and DayResult heat_by_source_mw['storage'] holds the net heat
-      (negative while charging), as ThermalStorage.net_heat_to_plant_w prescribes. RC-09: seasonal ATES needs
-      an annual heat balance — charged/discharged totals are reported.
+      demand + charge on charge days; on discharge days the plant is unchanged and the storage preheats the
+      water ahead of the boiler, so HEX/HTHP heat is not lost to a smaller district flow (WP-07 physics
+      check). DayResult heat_by_source_mw['storage'] holds the net heat (negative while charging), as
+      ThermalStorage.net_heat_to_plant_w prescribes. No storage power default: capacity / 24 h gave 125 MW
+      for 3000 MWh, implausible for seasonal ATES. RC-09: seasonal ATES needs an annual heat balance —
+      charged/discharged totals are reported and an end ≠ start above 1 % of capacity is warned.
     source: RC-09 Thermal storage; WP-03 GM-09 [A interpretation]
     sensitivity: "Recovery 0.63 → 0.8; storage power ± 50 %."
     tag: A

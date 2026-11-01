@@ -15,6 +15,7 @@ from gemini_agent.tools.dispatch import (
     FastPlant,
     StorageSpec,
     _absorption_drive_m3s,
+    apply_storage_discharge,
     availability_calendar,
     db30_rule,
     dispatch_day,
@@ -48,6 +49,13 @@ def plants(map_cache):
         "C4": make_candidate("C4", 2, depth_m=3200.0),
         "C7": make_candidate("C7", 2, parent_id="C2-2d"),
         "C0": make_candidate("C0", 0, equipment_sizes={"peak_boiler_mw": 6.0}),
+        "C4-5MW": make_candidate(
+            "C4",
+            2,
+            depth_m=3200.0,
+            candidate_id="C4-5MW",
+            equipment_sizes={"absorption_chiller_mw": 5.0},
+        ),
         "C2-deep": make_candidate(
             "C2",
             2,
@@ -275,11 +283,33 @@ def test_absorption_drive_is_smallest_meeting_flow(plants):
     """COOL-ABS-DRV: drive ≥ minimum × 1.01; a larger residual needs more drive (bisection)."""
     plant = plants["C3"]
     day = day_conditions(load_config("design_basis").cooling.peak_date)
-    small = _absorption_drive_m3s(plant, day, 0.5e6) * 3600.0
-    large = _absorption_drive_m3s(plant, day, 8.0e6) * 3600.0
-    assert small == pytest.approx(138.49 * 1.01, rel=1e-3)  # minimum drive + TL-05 tolerance
-    assert small < large <= plant.flow_max_m3h
-    assert _absorption_drive_m3s(plant, day, 0.0) == 0.0
+    small, note = _absorption_drive_m3s(plant, day, 0.5e6)
+    large, _ = _absorption_drive_m3s(plant, day, 8.0e6)
+    assert note is None
+    assert small * 3600.0 == pytest.approx(138.49 * 1.01, rel=1e-3)  # minimum + TL-05 tolerance
+    assert small < large <= plant.flow_max_m3h / 3600.0
+    assert _absorption_drive_m3s(plant, day, 0.0) == (0.0, None)
+
+
+def test_absorption_drive_respects_db12(plants):
+    """A 5 MW absorber on 105 °C brine: the drive flow keeps the brine cooling ≤ 40 K (DB-12)."""
+    plant = plants["C4-5MW"]
+    for date in (JULY, load_config("design_basis").cooling.peak_date):
+        fast = _dispatch(plant, date)
+        assert fast.day.cool_by_source_mw["absorption_chiller"] > 0
+        for key, value in fast.day.margins.items():
+            if "cooling_margin_k" in key:
+                assert value >= -1e-6, (date, key, value)
+        assert "absorption_drive_cooling_margin_k" in fast.day.margins
+        assert not any("DB-12" in w for w in fast.warnings)
+        full = simulate_plant_day(
+            plant.candidate,
+            day_conditions(date),
+            fast.plan.plant_dispatch(),
+            gb=plant.gb,
+            sub=plant.sub,
+        )
+        assert full.valid, full.failures
 
 
 def test_absorption_minimum_load(plants):
@@ -375,15 +405,36 @@ def test_storage_ledger_balance():
     assert (bal.charge_days, bal.discharge_days) == (5, 5)
 
 
+def test_storage_discharge_displaces_boiler(plants):
+    """Discharge ahead of the boiler: HEX/HTHP unchanged, boiler heat, fuel and CO₂ fall 1:1."""
+    fast = _dispatch(plants["C2"], PEAK, available=[False, True])
+    boiler = fast.day.heat_by_source_mw["peak_boiler"]
+    out = apply_storage_discharge(fast, 2.0)
+    heat = out.day.heat_by_source_mw
+    assert heat["storage"] == 2.0 and heat["peak_boiler"] == pytest.approx(boiler - 2.0)
+    assert heat["hex_2"] == fast.day.heat_by_source_mw["hex_2"]
+    share = (boiler - 2.0) / boiler
+    for field in ("gas_fuel_by_consumer_mw", "co2_by_source_kg"):
+        before = getattr(fast.day, field)["peak_boiler"]
+        assert getattr(out.day, field)["peak_boiler"] == pytest.approx(before * share)
+    assert out.day.heat_supplied_mw == pytest.approx(fast.day.heat_supplied_mw)
+    assert out.plan.storage_net_mw == 2.0
+    with pytest.raises(ValueError, match="exceeds the boiler heat"):
+        apply_storage_discharge(fast, boiler + 1.0)
+    with pytest.raises(ValueError, match="storage_charge_mw"):
+        _dispatch(plants["C2"], PEAK, storage_charge_mw=-1.0)
+
+
 def test_storage_spec_only_for_sized_c6():
-    """C6 needs storage_capacity_mwh; power defaults to capacity/24 h; recovery STO-REC-HT."""
+    """C6 needs storage_capacity_mwh and storage_power_mw (no default); recovery STO-REC-HT."""
     register = load_config("assumptions")
-    sized = make_candidate(
-        "C6", 2, parent_id="C3-2d", equipment_sizes={"storage_capacity_mwh": 480}
-    )
-    spec = storage_spec(sized, register)
-    assert spec is not None and spec.power_mw == pytest.approx(20.0)
+    sizes = {"storage_capacity_mwh": 480.0, "storage_power_mw": 15.0}
+    spec = storage_spec(make_candidate("C6", 2, parent_id="C3-2d", equipment_sizes=sizes), register)
+    assert spec is not None and spec.power_mw == pytest.approx(15.0)
     assert spec.discharge_efficiency_frac == pytest.approx(0.63)
+    capacity_only = {"storage_capacity_mwh": 480.0}
+    c6 = make_candidate("C6", 2, parent_id="C3-2d", equipment_sizes=capacity_only)
+    assert storage_spec(c6, register) is None
     assert storage_spec(make_candidate("C6", 2, parent_id="C3-2d"), register) is None
     assert (
         storage_spec(make_candidate("C2", 2, equipment_sizes={"storage_capacity_mwh": 1}), register)

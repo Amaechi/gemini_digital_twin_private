@@ -26,6 +26,7 @@ and flow-weighted mean production and injection temperatures (the dispatched ΔT
 from __future__ import annotations
 
 import datetime as dt
+import hashlib
 import json
 import re
 import time
@@ -53,6 +54,7 @@ from gemini_agent.tools.config_generator import (
     GENERATOR_VERSION,
 )
 from gemini_agent.tools.demand import read_demand_csv
+from gemini_agent.tools.design_basis import SECONDS_PER_HOUR
 from gemini_agent.tools.dispatch import (
     DISPATCH_ASSUMPTION_IDS,
     AvailabilityCalendar,
@@ -60,8 +62,10 @@ from gemini_agent.tools.dispatch import (
     FastDay,
     FastPlant,
     StorageBalance,
+    apply_storage_discharge,
     availability_calendar,
     db30_rule,
+    discharge_into_day,
     dispatch_day,
     spare_geothermal_mw,
     storage_ledger,
@@ -500,10 +504,18 @@ def cache_config(
 ) -> dict:
     """Return what the annual result depends on (SIM-07 key payload).
 
-    Includes the register, design basis and limits it reads (DSP-*, STO-REC-HT, DB-*); a change
-    of the dispatch rules or the fast model in code needs a ``CACHE_VERSION`` bump.
+    Includes the register, design basis, limits and climate it reads (DSP-*, STO-REC-HT, DB-*)
+    and the SHA-256 of the demand CSVs; a change of the dispatch rules or the fast model in code
+    needs a ``CACHE_VERSION`` bump.
     """
+    basis = load_config("design_basis", config_dir)
+    demand = {
+        side.demand_csv: hashlib.sha256(side.csv_path(REPO_ROOT).read_bytes()).hexdigest()
+        for side in (basis.heating, basis.cooling)
+    }
     return {
+        "climate": load_config("climate_nl", config_dir).model_dump(mode="json"),
+        "demand_sha256": demand,
         "assumptions": load_config("assumptions", config_dir).model_dump(mode="json"),
         "design_basis": load_config("design_basis", config_dir).model_dump(mode="json"),
         "limits": load_config("limits", config_dir).model_dump(mode="json"),
@@ -555,6 +567,7 @@ def run_annual(
         _placement_load(plant, year),
         rule=rule,
         outage_start_indices=request.outage_start_indices,
+        exclusion_load_mw=[d.heating_demand_mw + d.cooling_demand_mw for d in year.days],
     )
     indices = calendar.simulated_day_indices
     if request.day_indices is not None:
@@ -566,12 +579,12 @@ def run_annual(
         indices = sorted(set(request.day_indices))
     warnings: list[str] = []
 
-    def dispatch(index: int, net: float = 0.0) -> FastDay:
+    def dispatch(index: int, charge: float = 0.0) -> FastDay:
         return dispatch_day(
             plant,
             year.days[index],
             calendar.available(index),
-            storage_net_mw=net,
+            storage_charge_mw=charge,
             hp_min_frac=hp_min,
             absorption_min_frac=abs_min,
             hp_extra_flow_frac=hp_extra,
@@ -582,20 +595,29 @@ def run_annual(
     spec = storage_spec(candidate, register)
     if candidate.concept == "C6" and spec is None:
         warnings.append(
-            "C6 without equipment_sizes storage_capacity_mwh: parent plant only, no storage "
-            "dispatched (DSP-STORAGE)"
+            "C6 without equipment_sizes storage_capacity_mwh and storage_power_mw: parent plant "
+            "only, no storage dispatched (DSP-STORAGE)"
         )
     if spec is not None:
         boiler = {i: f.day.heat_by_source_mw.get("peak_boiler", 0.0) for i, f in fast_days.items()}
         charge = {
-            i: spare_geothermal_mw(plant, year.days[i], calendar.available(i), spec.power_mw)
+            i: spare_geothermal_mw(
+                plant,
+                year.days[i],
+                calendar.available(i),
+                spec.power_mw,
+                drive_flow_m3s=fast_days[i].plan.absorption_drive_m3h / SECONDS_PER_HOUR,
+            )
             for i in indices
             if boiler[i] <= 0.0 and fast_days[i].day.unmet_heating_mwh <= 0.0
         }
         discharge = {i: b for i, b in boiler.items() if b > 0.0}
         storage = storage_ledger(spec, indices, charge, discharge)
         for i, net in storage.net_mw_by_day.items():
-            fast_days[i] = dispatch(i, net)
+            if net < 0:
+                fast_days[i] = dispatch(i, -net)
+            else:
+                fast_days[i] = apply_storage_discharge(fast_days[i], net)
         warnings.append(
             "C6 storage: HT-ATES outlet temperature not modelled (discharge assumed at the supply "
             "temperature; a booster may be needed); the verifier's PH-22 sees 'storage' heat "
@@ -722,7 +744,7 @@ def _run_full(
     for index, fast in sorted(fast_days.items()):
         plan = fast.plan
         day = year.days[index]
-        if plan.storage_net_mw:
+        if plan.storage_net_mw < 0:  # charging: the plant serves demand + charge
             day = day.model_copy(update={"heating_demand_mw": plan.plant_heating_mw})
         sim = simulate_plant_day(
             plant.candidate,
@@ -743,7 +765,9 @@ def _run_full(
             )
             continue
         result = sim.day.model_copy(update={"doublet_available": list(plan.available)})
-        if plan.storage_net_mw:
+        if plan.storage_net_mw > 0:
+            result = discharge_into_day(result, min(plan.storage_net_mw, _boiler(result)))
+        elif plan.storage_net_mw < 0:
             demand = year.days[index].heating_demand_mw
             heat = {**result.heat_by_source_mw, "storage": plan.storage_net_mw}
             gap = demand - sum(heat.values())
@@ -767,6 +791,10 @@ def _run_full(
         evidence.heat_pumps += sim.heat_pumps
         evidence.brine_contact_materials.update(sim.brine_contact_materials)
     return results, invalid, evidence, warnings
+
+
+def _boiler(day: DayResult) -> float:
+    return day.heat_by_source_mw.get("peak_boiler", 0.0)
 
 
 def verification_evidence(

@@ -216,7 +216,11 @@ def test_interpretation_b_from_answer(c2, map_cache):
     assert sim.annual.interpretation == "B" and len(sim.annual.days) == 330
     assert sim.calendar.rule.source == "answer"
     assert all(all(d.doublet_available) for d in sim.annual.days)
-    assert sim.calendar.excluded_start_index not in [d.day_index for d in sim.annual.days]
+    simulated = [d.day_index for d in sim.annual.days]
+    assert sim.calendar.excluded_start_index not in simulated
+    basis = load_config("design_basis")
+    for peak in (basis.heating.peak_date, basis.cooling.peak_date):  # design days kept
+        assert (peak - basis.heating.peak_date.replace(month=1, day=1)).days in simulated
 
 
 def test_given_outages_and_bad_days(c2, map_cache):
@@ -290,6 +294,11 @@ def test_c6_storage_ledger_year(map_cache):
     for day in sim.annual.days:
         assert day.heat_supplied_mw == pytest.approx(day.heating_demand_mw, abs=1e-5)
     assert any("DSP-STORAGE" in w for w in sim.warnings)
+    parent = c6.model_copy(update={"concept": "C3", "parent_id": None})
+    base = run_annual(SimulateAnnualRequest(candidate=parent), map_cache_dir=map_cache)
+    boiler = sim.annual.kpis.heat_by_source_mwh["peak_boiler"]  # type: ignore[union-attr]
+    base_boiler = base.annual.kpis.heat_by_source_mwh["peak_boiler"]  # type: ignore[union-attr]
+    assert base_boiler - boiler == pytest.approx(bal.discharged_total_mwh, rel=1e-6)
 
 
 def test_c6_storage_full_mode(map_cache):

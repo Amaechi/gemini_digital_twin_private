@@ -12,7 +12,7 @@ Keep it ≤ 20 KB; it is the hand-off between sessions. Old detail: merged PRs a
 | WP-04 | Design basis, demand, climate | merged (f7acb2a) | [#2](https://github.com/Amaechi/gemini_digital_twin_private/pull/2) | TL-01/02/02b |
 | WP-05 | Subsurface & doublet tools | merged (bc8baab) | [#8](https://github.com/Amaechi/gemini_digital_twin_private/pull/8) | TL-03…08; 7 SUB-* |
 | WP-06 | Config generator, guard, day sim | merged (9eb7beb) | [#13](https://github.com/Amaechi/gemini_digital_twin_private/pull/13) | TL-09/10/11; 9 CFG-*; `DayResult.flags` |
-| WP-07 | Annual simulation & dispatch | in review | PR (WP-07) | TL-12; hand C2 fast year 2 s, 0 unmet d |
+| WP-07 | Annual simulation & dispatch | in review | PR (WP-07) | TL-12; 1043 passed; hand C2 0 unmet d |
 | WP-08 | Economics, CO₂, exergy, scaling | merged (66acde7) | [#12](https://github.com/Amaechi/gemini_digital_twin_private/pull/12) | TL-14/22/23; C0 LCOH 137 $/MWh ≈ ACM cap |
 | WP-09 | Verifier, memory, logging | merged (901e110) | [#9](https://github.com/Amaechi/gemini_digital_twin_private/pull/9) | 41-check DesignVerifier |
 | WP-10 | Agents, runner, CLI | merged (2285460; review a9083b7) | [#4](https://github.com/Amaechi/gemini_digital_twin_private/pull/4), [#6](https://github.com/Amaechi/gemini_digital_twin_private/pull/6) | policy run P0–P10 on stubs (UNVERIFIED) |
@@ -31,12 +31,12 @@ Next: Batch 5 (WP-07, WP-12, WP-13).
 ## Decisions log (newest first)
 One line per decision, grouped by WP; dated 11-01 (WP-00: 10-31). Why: the `config/assumptions.yaml` entry or the module docstring.
 
-**WP-07** (tests: full-suite command above)
+**WP-07** (full-suite command above)
 - TL-12 fast = TL-06 map + design `PlantSpec` models direct (SIM-FAST); full = fast plan via `simulate_plant_day`.
 - merit order = topology HEX → CHP → HTHP → boiler; DSP-FLOW min equal flow w/o boiler, off < 50, ≤ design.
-- cooling free → absorption (DSP-ABS-MIN, drive ≥ COOL-ABS-DRV × 1.01) → electric; DSP-HP-MIN off if ≤ +10 % brine.
-- DB-30: SIM-OUTAGE lowest-load; B = 330 d (SIM-DB30B); `doublet_available` = calendar; C7 map suction = WHP.
-- C6 ledger, `storage` = net heat; SIM-06 via TL-07; CO₂ via `co2_emissions`; full year: 0 invalid d, ≤ 0.36 %.
+- cooling free → absorption (DSP-ABS-MIN; drive ≥ COOL-ABS-DRV × 1.01, ΔT ≤ 40 K) → electric; DSP-HP-MIN off if ≤ +10 % brine.
+- DB-30: SIM-OUTAGE lowest-load; B drops lowest heat + cool window; `doublet_available` = calendar; C7 suction = WHP.
+- C6: power required, discharge ahead of boiler (1:1); SIM-06 via TL-07; CO₂ via WP-08; full year 0 invalid d, ≤ 0.36 %.
 
 **WP-06**
 - generated HPs = WP-03 closed form, Lorenz, η_L = HP-ETA-L (GEMINI NM default kept); no validity bypass / "HPs off" rebuild.
@@ -152,9 +152,9 @@ One line per decision, grouped by WP; dated 11-01 (WP-00: 10-31). Why: the `conf
 ## Open follow-ups (grouped by the WP that must act)
 **WP-07** (old items done)
 - WP-14: bind TL-12 (`.data.annual.kpis`, `service_by_key` → WP-08, `verification_evidence(sim, c, **extra)`); KPIs cached by `config_hash` (put only).
-- WP-11: lever `outage_start_indices`; DSP-FLOW favours fewer doublets; vary DSP-*; C6 storage size/power.
-- WP-09/14: PH-22 fails C6 `storage` heat (no input key). WP-12: ATES outlet T; HP share bisection conservative.
-- Treat as API: `simulate_day._flag_text/_heat_pump_margins/_heat_pump_screening`, `Mixer._MIN_TOTAL_FLOW`.
+- WP-11: lever `outage_start_indices`; DSP-FLOW not cost-optimal (priced flow search); vary DSP-*; C6 sizes.
+- WP-09/14: PH-22 fails C6 `storage` heat (no input key). WP-12: ATES outlet T; HP share bisection.
+- Treat as API: `simulate_day._flag_text/_heat_pump_margins/_heat_pump_screening`, `Mixer._MIN_TOTAL_FLOW`
 
 **WP-11**
 - Sensitivities: SUB-* ranges; SUB-PBUB (52.2 bar(a); margin 1.1–1.3 with VER-ESP-MARGIN and VER-ESP-PB); SUB-PSUC; SUB-II (cold injection ≈ +6 bar on 26.5 bar WHP); TL-07 ±6 K; COOL-ELC η 0.44–0.513.

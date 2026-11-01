@@ -262,8 +262,13 @@ def availability_calendar(
     *,
     rule: Db30Rule,
     outage_start_indices: Sequence[int] | None = None,
+    exclusion_load_mw: Sequence[float] | None = None,
 ) -> AvailabilityCalendar:
-    """Build the DB-30 calendar (module doc); ``outage_start_indices`` is the optimiser's lever."""
+    """Build the DB-30 calendar (module doc); ``outage_start_indices`` is the optimiser's lever.
+
+    Interpretation B drops the lowest window of ``exclusion_load_mw`` (default: the placement
+    load; TL-12 passes heating + cooling demand so B keeps the cooling design days, SIM-DB30B).
+    """
     n_days = len(placement_load_mw)
     expected = (dt.date(year, 12, 31) - dt.date(year, 1, 1)).days + 1
     if n_days != expected:
@@ -281,7 +286,10 @@ def availability_calendar(
     elif outage_start_indices:
         raise ValueError("outage starts given but DB-30 has no planned outage here")
     excluded = max(0, n_days - rule.demand_met_days_per_yr) if rule.interpretation == "B" else 0
-    excluded_start = lowest_load_starts(placement_load_mw, excluded, 1)[0] if excluded else None
+    exclusion = placement_load_mw if exclusion_load_mw is None else exclusion_load_mw
+    if len(exclusion) != n_days:
+        raise ValueError(f"exclusion load has {len(exclusion)} days, expected {n_days}")
+    excluded_start = lowest_load_starts(exclusion, excluded, 1)[0] if excluded else None
     simulated = [
         d
         for d in range(n_days)
@@ -469,11 +477,11 @@ class FastPlant:
             if given is None or given < setpoint:
                 base = base.model_copy(update={"producer_wellhead_pressure_barg": setpoint})
             # Pressurised loop: no letdown (no separator, lossless filters and HEX in TL-09), so
-            # the brine reaches the injection pump at the producer WHP, not at SUB-PSUC.
-            if base.injection_pump_suction_barg is None:
-                base = base.model_copy(
-                    update={"injection_pump_suction_barg": base.producer_wellhead_pressure_barg}
-                )
+            # the brine reaches the injection pump at the producer WHP, not at SUB-PSUC — in
+            # GEMINI's pressure chain whatever suction the design names.
+            base = base.model_copy(
+                update={"injection_pump_suction_barg": base.producer_wellhead_pressure_barg}
+            )
         return base
 
     def _model(self, name: str, kind: str, params: dict[str, Any] | None) -> Any:
@@ -900,7 +908,9 @@ class DayPlan(StrictModel):
     hp_flow_frac: float | None = None
     plant_heating_mw: float = Field(description="Heating load the plant serves (demand − storage).")
     storage_net_mw: float = Field(
-        default=0.0, description="Net storage heat to the network (> 0 discharge, < 0 charge)."
+        default=0.0,
+        description="Net storage heat to the network (> 0 discharge ahead of the boiler, < 0 "
+        "charge served by the plant).",
     )
     notes: list[str] = Field(default_factory=list)
 
@@ -935,13 +945,18 @@ def _free_cooling_outputs(plant: FastPlant, day: DayConditions) -> dict[str, Any
     )
 
 
-def _absorption_drive_m3s(plant: FastPlant, day: DayConditions, residual_w: float) -> float:
+def _absorption_drive_m3s(
+    plant: FastPlant, day: DayConditions, residual_w: float
+) -> tuple[float, str | None]:
     """Smallest given drive flow (m³/s) at which the absorber meets ``residual_w`` (GM-04).
 
-    Bisection between the COOL-ABS-DRV minimum drive flow and the doublet's maximum flow, the
-    drive at the wellhead temperature of a doublet running at that drive flow (conservative: the
-    dispatched doublet flow is at least the drive flow). If even the maximum flow cannot meet the
-    residual, the maximum is returned and the electric chiller takes the rest.
+    A flow is acceptable when the absorber delivers the target cooling *and* cools the drive
+    brine by at most DB-12 (40 K; the drive outlet mixes into the doublet's injection stream).
+    Bisection between the COOL-ABS-DRV minimum drive flow (+ TL-05 flow tolerance) and the
+    doublet's maximum flow, the drive at the wellhead temperature of a doublet running at that
+    drive flow (the part-load drive heat depends on the load only, not on the drive temperature).
+    The target is the residual capped at the capacity at maximum flow. Returns ``(0, note)``
+    (absorption off, electric chiller) when no flow up to the maximum satisfies both.
     """
     absorber = plant._model("absorption_need", "absorption_chiller", plant.cooling_spec.absorption)
     base: dict[str, Any] = {
@@ -956,7 +971,7 @@ def _absorption_drive_m3s(plant: FastPlant, day: DayConditions, residual_w: floa
         fc = _free_cooling_outputs(plant, day)
         base["chilled_water_temperature_in_degc"] = fc["chilled_water_temperature_out_degc"]
 
-    def cooling_w(flow_m3h: float) -> dict[str, Any]:
+    def output(flow_m3h: float) -> dict[str, Any]:
         q = max(flow_m3h, plant.flow_min_m3h)
         u = {
             **base,
@@ -965,8 +980,10 @@ def _absorption_drive_m3s(plant: FastPlant, day: DayConditions, residual_w: floa
         }
         return _calc(absorber, u)
 
-    high_out = cooling_w(plant.flow_max_m3h)
+    high_out = output(plant.flow_max_m3h)
     target = min(residual_w, float(high_out["cooling_power_w"]))
+    if target <= 0:
+        return 0.0, None
     # Full mode drives the absorber with frac × GEMINI's flow, which TL-05 holds only within
     # FLOW_TOLERANCE_FRAC of the target: keep the drive that much above the COOL-ABS-DRV minimum.
     minimum = (
@@ -974,18 +991,33 @@ def _absorption_drive_m3s(plant: FastPlant, day: DayConditions, residual_w: floa
         * SECONDS_PER_HOUR
         * (1.0 + FLOW_TOLERANCE_FRAC)
     )
-    if target <= 0 or minimum >= plant.flow_max_m3h:
-        return plant.flow_max_m3h / SECONDS_PER_HOUR if target > 0 else 0.0
+    limit_k = plant.gb.brine_cooling_max_k
+
+    def ok(flow_m3h: float) -> bool:
+        out = output(flow_m3h)
+        cools = float(out["cooling_power_w"]) >= target - HEAT_TOL_MW * 1e6
+        return cools and float(out.get("drive_delta_t_k") or 0.0) <= limit_k
+
+    if minimum >= plant.flow_max_m3h:
+        return 0.0, (
+            f"absorption off: COOL-ABS-DRV minimum drive {minimum:.0f} m³/h ≥ maximum doublet "
+            f"flow {plant.flow_max_m3h:g} m³/h; electric chiller"
+        )
+    if not ok(plant.flow_max_m3h):
+        return 0.0, (
+            f"absorption off: at {plant.flow_max_m3h:g} m³/h the drive brine would be cooled "
+            f"> DB-12 {limit_k:g} K for {target / 1e6:.2f} MW; electric chiller"
+        )
     low, high = minimum, plant.flow_max_m3h
-    if float(cooling_w(low)["cooling_power_w"]) >= target - HEAT_TOL_MW * 1e6:
-        return low / SECONDS_PER_HOUR
+    if ok(low):
+        return low / SECONDS_PER_HOUR, None
     for _ in range(FLOW_BISECTION_STEPS):
         mid = 0.5 * (low + high)
-        if float(cooling_w(mid)["cooling_power_w"]) >= target - HEAT_TOL_MW * 1e6:
+        if ok(mid):
             high = mid
         else:
             low = mid
-    return high / SECONDS_PER_HOUR
+    return high / SECONDS_PER_HOUR, None
 
 
 def _equal_flows(available: Sequence[bool], k: int, q: float) -> list[float]:
@@ -1004,14 +1036,20 @@ def dispatch_day(
     day: DayConditions,
     available: Sequence[bool],
     *,
-    storage_net_mw: float = 0.0,
+    storage_charge_mw: float = 0.0,
     hp_min_frac: float,
     absorption_min_frac: float,
     hp_extra_flow_frac: float = 0.0,
 ) -> FastDay:
-    """Merit-order dispatch of one day on the fast model (module doc, SIM-03)."""
+    """Merit-order dispatch of one day on the fast model (module doc, SIM-03).
+
+    ``storage_charge_mw`` (C6) is served by the plant on top of the demand; a storage discharge
+    is applied afterwards with :func:`apply_storage_discharge`.
+    """
+    if storage_charge_mw < 0:
+        raise ValueError("storage_charge_mw must be >= 0 (discharge: apply_storage_discharge)")
     notes: list[str] = []
-    plant_heat = max(day.heating_demand_mw - storage_net_mw, 0.0)
+    plant_heat = day.heating_demand_mw + storage_charge_mw
     n_avail = sum(1 for ok in available if ok)
     # ---- cooling: free cooling first; absorption for the residual if worth it
     drive_m3s = 0.0
@@ -1021,7 +1059,9 @@ def dispatch_day(
             residual = float(_free_cooling_outputs(plant, day)["residual_cooling_w"])
         minimum_load = absorption_min_frac * plant.absorption_nameplate_w
         if residual > 0 and residual >= minimum_load:
-            drive_m3s = _absorption_drive_m3s(plant, day, residual)
+            drive_m3s, drive_note = _absorption_drive_m3s(plant, day, residual)
+            if drive_note:
+                notes.append(drive_note)
         elif residual > 0:
             notes.append(
                 f"absorption off: residual {residual / 1e6:.3f} MW < DSP-ABS-MIN "
@@ -1103,7 +1143,7 @@ def dispatch_day(
         hex_flow_frac=point.hex_share,
         hp_flow_frac=point.hp_share,
         plant_heating_mw=plant_heat,
-        storage_net_mw=storage_net_mw,
+        storage_net_mw=-storage_charge_mw,
         notes=notes,
     )
     result, warnings = fast_day_result(plant, day, point, plan)
@@ -1203,6 +1243,11 @@ def fast_day_result(
     electricity["electric_chiller"] = float(chiller["power_el"]) / 1e6
     cooling_supply = float(chiller["chilled_water_temperature_out_degc"])
     electricity["heat_rejection"] = float(out["heat_rejection"]["power_el"]) / 1e6
+    warnings += [
+        f"{day.date}: DB-12 {key} = {value:.2f} K < 0"
+        for key, value in margins.items()
+        if "cooling_margin_k" in key and value < -CONTROL_TOL_K
+    ]
     unmet_cooling = max(day.cooling_demand_mw - sum(cool.values()), 0.0)
     unmet_cooling = unmet_cooling if unmet_cooling > HEAT_TOL_MW else 0.0
     if day.cooling_demand_mw > 0:
@@ -1284,13 +1329,50 @@ class StorageBalance(StrictModel):
 
 
 def storage_spec(candidate: Candidate, register: AssumptionsRegister) -> StorageSpec | None:
-    """Storage of a C6 candidate from ``storage_capacity_mwh`` / ``storage_power_mw``."""
+    """Storage of a C6 candidate: both ``storage_capacity_mwh`` and ``storage_power_mw`` given."""
     capacity = candidate.equipment_sizes.get("storage_capacity_mwh")
-    if candidate.concept != "C6" or not capacity:
+    power = candidate.equipment_sizes.get("storage_power_mw")
+    if candidate.concept != "C6" or not capacity or not power:
         return None
-    power = candidate.equipment_sizes.get("storage_power_mw") or capacity / HOURS_PER_DAY
     recovery = float(register.get("STO-REC-HT").value)  # type: ignore[arg-type]
     return StorageSpec(capacity_mwh=capacity, power_mw=power, discharge_efficiency_frac=recovery)
+
+
+def apply_storage_discharge(fast: FastDay, discharge_mw: float) -> FastDay:
+    """Storage discharge ahead of the peak boiler at full district flow (DSP-STORAGE).
+
+    HEX, CHP and HTHP are unchanged; the boiler's heat, fuel and CO₂ fall by the discharge
+    (GEMINI's boiler is linear in fuel). ``heat_by_source_mw['storage']`` holds the discharge.
+    """
+    plan = fast.plan.model_copy(update={"storage_net_mw": discharge_mw})
+    return fast.model_copy(update={"plan": plan, "day": discharge_into_day(fast.day, discharge_mw)})
+
+
+def discharge_into_day(day: DayResult, discharge_mw: float) -> DayResult:
+    """Replace ``discharge_mw`` of peak-boiler heat by storage heat in a ``DayResult``."""
+    boiler = day.heat_by_source_mw.get("peak_boiler", 0.0)
+    if discharge_mw <= 0:
+        return day
+    if discharge_mw > boiler + HEAT_TOL_MW:
+        raise ValueError(f"discharge {discharge_mw:.3f} MW exceeds the boiler heat {boiler:.3f}")
+    share = max(boiler - discharge_mw, 0.0) / boiler
+    heat = {**day.heat_by_source_mw, "peak_boiler": boiler * share, "storage": discharge_mw}
+    fuel = dict(day.gas_fuel_by_consumer_mw)
+    co2 = dict(day.co2_by_source_kg)
+    fuel["peak_boiler"] = fuel.get("peak_boiler", 0.0) * share
+    co2["peak_boiler"] = co2.get("peak_boiler", 0.0) * share
+    margins = dict(day.margins)
+    if "peak_boiler_capacity_margin_mw" in margins:
+        margins["peak_boiler_capacity_margin_mw"] += boiler - heat["peak_boiler"]
+    return DayResult.model_validate(
+        {
+            **day.model_dump(),
+            "heat_by_source_mw": heat,
+            "gas_fuel_by_consumer_mw": fuel,
+            "co2_by_source_kg": co2,
+            "margins": margins,
+        }
+    )
 
 
 def storage_ledger(
@@ -1344,15 +1426,29 @@ def storage_ledger(
 
 
 def spare_geothermal_mw(
-    plant: FastPlant, day: DayConditions, available: Sequence[bool], limit_mw: float
+    plant: FastPlant,
+    day: DayConditions,
+    available: Sequence[bool],
+    limit_mw: float,
+    *,
+    drive_flow_m3s: float = 0.0,
 ) -> float:
-    """Extra plant load (≤ ``limit_mw``) the available doublets carry at maximum without boiler."""
+    """Extra plant load (≤ ``limit_mw``) the available doublets carry at maximum without boiler.
+
+    ``drive_flow_m3s`` is the day's absorption drive (its brine is not available to the HEX).
+    """
     flows = [plant.flow_max_m3h if ok else 0.0 for ok in available]
     if not any(flows) or limit_mw <= 0:
         return 0.0
 
     def carries(extra: float) -> bool:
-        return plant.carries(day, flows, day.heating_demand_mw + extra, hp_on=plant.has_hp)
+        return plant.carries(
+            day,
+            flows,
+            day.heating_demand_mw + extra,
+            hp_on=plant.has_hp,
+            drive_flow_m3s=drive_flow_m3s,
+        )
 
     if carries(limit_mw):
         return limit_mw
@@ -1380,8 +1476,10 @@ __all__ = [
     "FastPoint",
     "StorageBalance",
     "StorageSpec",
+    "apply_storage_discharge",
     "availability_calendar",
     "db30_rule",
+    "discharge_into_day",
     "dispatch_day",
     "fast_day_result",
     "lowest_load_starts",
