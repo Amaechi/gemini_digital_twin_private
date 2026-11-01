@@ -19,6 +19,11 @@ The flow rate that reconciles the two (``p_bh_well(Q) == p_bh_reservoir(Q)``)
 is the physically consistent solution.
 """
 
+# Modified by the GeoAgent team for SPE GeoHackathon 2026, 2026-11-01 (WP-05): optional
+# ``friction_opposes_flow`` for the injection solves (RC-01 eq 12: friction is a loss for the
+# downward injection flow). The default (False) keeps GEMINI's original sign, where friction
+# adds to the injector bottomhole pressure as if the flow went up.
+
 from scipy.optimize import brentq
 
 
@@ -137,21 +142,47 @@ def solve_production_flow_rate(
     return brentq(residual, flow_bracket[0], flow_bracket[1])
 
 
-def _well_bottomhole_pressure_injection(dpdt, flow_rate, wellhead_pressure, wellhead_temperature):
+def _well_bottomhole_pressure_injection(
+    dpdt, flow_rate, wellhead_pressure, wellhead_temperature, friction_opposes_flow=False
+):
     """Bottomhole pressure resulting from injecting ``flow_rate`` (Pa).
 
     Injection flows *down* the well from a fixed wellhead pressure; no
     ESP is involved on the injection side.
+
+    ``DPDT`` treats a positive ``flowrate`` as upward (production) flow,
+    whatever the walking ``direction``: walked down, it returns
+    ``P_wh + rho g H + dP_fric``. With ``friction_opposes_flow=False``
+    (default, GEMINI's original behaviour) the injection rate is passed
+    as is, so friction *raises* the bottomhole pressure. With ``True`` it
+    is passed as a negative (downward) rate: the Darcy-Weisbach term
+    ``f (L/D) rho |v| v / 2`` then opposes the downward flow, giving
+    ``P_bh = P_wh + rho g H - dP_fric`` (RC-01 eq 12, Pajak et al.), and
+    the heat-exchange term has the sign of a fluid moving down. The
+    corrected mode is single-phase only (Beggs-Brill is not set up for
+    downward two-phase flow); a ``ValueError`` is raised otherwise.
     """
+    if friction_opposes_flow and flow_rate != 0:
+        _require_single_phase(dpdt, wellhead_pressure, wellhead_temperature)
     u = {
         "pressure": wellhead_pressure,
         "temperature": wellhead_temperature,
         "temperature_ambient": wellhead_temperature,
-        "flowrate": flow_rate,
+        "flowrate": -flow_rate if friction_opposes_flow else flow_rate,
         "direction": "down",
     }
     dpdt.calculate_output(u, None)
     return dpdt.get_output()["pressure_output"]
+
+
+def _require_single_phase(dpdt, pressure, temperature):
+    """Raise ``ValueError`` if the well fluid has a gas mass fraction (two-phase)."""
+    gas_mass_fraction = dpdt.PVT.get_pvt(pressure, temperature)[2]
+    if gas_mass_fraction > 0:
+        raise ValueError(
+            "friction_opposes_flow supports single-phase injection only "
+            f"(gas mass fraction {gas_mass_fraction})."
+        )
 
 
 def solve_injection_flow_rate(
@@ -160,6 +191,7 @@ def solve_injection_flow_rate(
     wellhead_pressure,
     wellhead_temperature,
     flow_bracket=(1e-6, 0.2),
+    friction_opposes_flow=False,
 ):
     """Solve for the injection flow rate that balances well and reservoir.
 
@@ -173,6 +205,10 @@ def solve_injection_flow_rate(
         Fixed wellhead boundary conditions, in Pa and K.
     flow_bracket: tuple[float, float]
         ``(low, high)`` flow rate bracket (m3/s) to search for the root.
+    friction_opposes_flow: bool
+        ``False`` (default) keeps GEMINI's original friction sign; ``True``
+        makes friction a loss for the downward injection flow (RC-01 eq 12,
+        see :func:`_well_bottomhole_pressure_injection`).
 
     Returns
     -------
@@ -182,7 +218,7 @@ def solve_injection_flow_rate(
 
     def residual(flow_rate):
         p_well = _well_bottomhole_pressure_injection(
-            dpdt, flow_rate, wellhead_pressure, wellhead_temperature
+            dpdt, flow_rate, wellhead_pressure, wellhead_temperature, friction_opposes_flow
         )
         p_reservoir = _reservoir_bottomhole_pressure(ipr, flow_rate)
         return p_well - p_reservoir
@@ -196,6 +232,7 @@ def solve_injection_wellhead_pressure(
     flow_rate,
     wellhead_temperature,
     pressure_bracket=(1e3, 1e8),
+    friction_opposes_flow=False,
 ):
     """Solve for the wellhead (surface) pressure to inject a flow rate.
 
@@ -222,6 +259,11 @@ def solve_injection_wellhead_pressure(
     pressure_bracket: tuple[float, float]
         ``(low, high)`` wellhead pressure bracket (Pa) to search for the
         root. Must bracket a sign change; widen if ``brentq`` raises.
+    friction_opposes_flow: bool
+        ``False`` (default) keeps GEMINI's original friction sign, which
+        *lowers* the required wellhead pressure; ``True`` makes friction a
+        loss for the downward injection flow, ``P_wh = P_bh,req - rho g H +
+        dP_fric`` (RC-01 eq 12, see :func:`_well_bottomhole_pressure_injection`).
 
     Returns
     -------
@@ -240,7 +282,7 @@ def solve_injection_wellhead_pressure(
 
     def residual(wellhead_pressure):
         p_well = _well_bottomhole_pressure_injection(
-            dpdt, flow_rate, wellhead_pressure, wellhead_temperature
+            dpdt, flow_rate, wellhead_pressure, wellhead_temperature, friction_opposes_flow
         )
         return p_well - p_reservoir
 
