@@ -18,7 +18,7 @@ Keep it ≤ 20 KB; it is the hand-off between sessions. Old detail: merged PRs a
 | WP-10 | Agents, runner, CLI | merged (2285460; review a9083b7) | [#4](https://github.com/Amaechi/gemini_digital_twin_private/pull/4), [#6](https://github.com/Amaechi/gemini_digital_twin_private/pull/6) | policy run P0–P10 on stubs (UNVERIFIED) |
 | WP-11 | Optimisation & uncertainty | todo | | Batch 6 |
 | WP-12 | Model gap & Model Builder | todo | | Batch 5 |
-| WP-13 | Eval suite & submission checks | in review | | S1–S11 policy + TestModel; SUB-01…24 (stub run NOT READY, expected) |
+| WP-13 | Eval suite & submission checks | in review | [#16](https://github.com/Amaechi/gemini_digital_twin_private/pull/16) | S1–S11 policy + TestModel; SUB-01…24 (stub run NOT READY, expected) |
 | WP-14 | Integration run & figures | todo | | Batch 7 |
 | L-1 | Local: pick LLM via S11 eval | todo | | user, local Ollama |
 | L-2 | Local: final LLM run + eval transcripts | todo | | user, local Ollama |
