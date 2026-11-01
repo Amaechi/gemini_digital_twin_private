@@ -9,7 +9,7 @@ Keep this file short and current. It is the hand-off between sessions (chat hist
 | WP-01 | GEMINI core fixes, registry | todo | | | |
 | WP-02 | Cooling models | todo | | | |
 | WP-03 | Heat pump, e-boiler, storage | todo | | | |
-| WP-04 | Design basis, demand, climate | in review | `claude/peaceful-mayer-9onzgj` / PR (WP-04) | full suite → 208 passed (143 + 65 tool tests); ruff, black 25.11.0, isort 7.0.0, flake8 clean | TL-01/02/02b; 3 assumptions added |
+| WP-04 | Design basis, demand, climate | in review | `claude/peaceful-mayer-9onzgj` / [PR #2](https://github.com/Amaechi/gemini_digital_twin_private/pull/2) | full suite → 208 passed (143 + 65 tool tests); ruff, black 25.11.0, isort 7.0.0, flake8 clean | TL-01/02/02b; 3 assumptions added |
 | WP-05 | Subsurface & doublet tools | todo | | | |
 | WP-06 | Config generator, guard, day sim | todo | | | |
 | WP-07 | Annual simulation & dispatch | todo | | | |
