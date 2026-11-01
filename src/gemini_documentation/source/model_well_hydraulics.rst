@@ -1,3 +1,6 @@
+.. Modified by the GeoAgent team for SPE GeoHackathon 2026, 2026-11-01: "pvt" parameter
+   (GM-01) and superficial gas velocity fix (GM-11).
+
 Well: Pressure and Temperature Hydraulics
 ==========================================
 
@@ -402,3 +405,21 @@ heat capacity:
    * - :math:`\Delta T`
      - --
      - Cell temperature change (K)
+
+Fluid PVT and two-phase velocities
+---------------------------------------
+
+The fluid properties come from ``DPDT.PVT``. Passing a ``"pvt"`` block in the
+parameters (``update_parameters({"pvt": {...}})``, or from project JSON for
+``well``, ``producer_well`` and ``injector_well``) replaces it with a
+configured ``PVTConstantSTP`` (see :doc:`model_fluid_pvt`).
+
+For two-phase cells the superficial velocities passed to Beggs-Brill are
+
+.. math::
+
+    u_{s,l} = \frac{\dot m_l}{\rho_l A} \qquad u_{s,g} = \frac{\dot m_g}{\rho_g A}
+
+with :math:`\dot m_g = x \dot m` the gas mass flow. Earlier versions used the
+gas mass fraction :math:`x` instead of :math:`\dot m_g`; single-phase results
+(:math:`x = 0`) are unaffected. See ``src/gemini_model/well/REFERENCE.md``.

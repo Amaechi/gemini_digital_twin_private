@@ -17,6 +17,11 @@ instead of being solved by standalone Python calls outside the Solver's
 connection graph.
 """
 
+# Modified by the GeoAgent team for SPE GeoHackathon 2026, 2026-11-01: optional "pvt" parameter
+# (GM-01) is validated on update_parameters and passed to the well solve; default behaviour
+# (GEMINI water PVT) is unchanged.
+
+from gemini_model.fluid.pvt_config import normalise_pvt_parameters
 from gemini_model.model_abstract import StaticModel
 from gemini_simulator.well_flow import (
     producer_esp_power_w,
@@ -38,9 +43,11 @@ class ProducerWell(StaticModel):
     ``well_config`` argument (``reservoir_pressure_bar``,
     ``productivity_index_m3h_per_bar``, ``trajectory_table`` (preferred)
     or legacy ``welltrajectory``, optional
-    ``esp_depth_m``/``esp``/``esp_freq_hz``), plus optional
+    ``esp_depth_m``/``esp``/``esp_freq_hz``, ``pvt``), plus optional
     ``ambient_temperature_c`` (default 20.0) and ``flow_bracket_m3h``
-    (default ``(0.01, 700.0)``).
+    (default ``(0.01, 700.0)``). ``pvt`` sets the well fluid's PVT
+    properties (GM-01, see :mod:`gemini_model.fluid.pvt_config`); it is
+    checked when set, so a bad key fails at project build time.
 
     Inputs (``u``): ``wellhead_pressure`` (bar), ``wellhead_temperature``
     (C) -- the surface boundary condition the well is produced against.
@@ -69,6 +76,8 @@ class ProducerWell(StaticModel):
             Parameters dict as defined by the model (see class docstring).
         """
         for key, value in parameters.items():
+            if key == "pvt":
+                normalise_pvt_parameters(value)  # raises on a bad block
             self.parameters[key] = value
 
     def initialize_state(self, x):
@@ -125,7 +134,8 @@ class InjectorWell(StaticModel):
     :func:`gemini_simulator.well_flow.solve_injector_wellhead_pressure_bar`'s
     ``injector_well_config`` argument (``reservoir_pressure_bar``,
     ``productivity_index_m3h_per_bar``, ``trajectory_table`` (preferred)
-    or legacy ``welltrajectory``), plus optional
+    or legacy ``welltrajectory``, optional ``pvt`` as for
+    :class:`ProducerWell`), plus optional
     ``pressure_bracket_bar`` (default ``(0.001, 500.0)``) and an optional
     ``injector_pump`` sub-dict (``efficiency_factor``,
     ``electricity_emission_factor``) describing the surface pump that
@@ -162,6 +172,8 @@ class InjectorWell(StaticModel):
             Parameters dict as defined by the model (see class docstring).
         """
         for key, value in parameters.items():
+            if key == "pvt":
+                normalise_pvt_parameters(value)  # raises on a bad block
             self.parameters[key] = value
 
     def initialize_state(self, x):

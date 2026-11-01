@@ -8,13 +8,19 @@ components by a short, stable type string instead of an import path, and
 gives a single place to extend when new gemini_model components are added.
 """
 
+# Modified by the GeoAgent team for SPE GeoHackathon 2026, 2026-11-01: registered the existing
+# "heatpump" (HeatpumpBasic), "compressor" and "co2_corrosion" models (GM-02).
+
 from gemini_model.adder.adder import Adder
 from gemini_model.boiler.boiler import Boiler
 from gemini_model.booster_pump.booster_pump import BoosterPump
 from gemini_model.chp.chp import CHP
+from gemini_model.compressor.compressor import Compressor
+from gemini_model.corrosion.co2_corrosion import CO2Corrosion
 from gemini_model.filter.filter import Filter
 from gemini_model.fluid.pvt_water_stp import PVTConstantSTP
 from gemini_model.heat_exchanger.heat_exchanger import HeatExchanger
+from gemini_model.heatpump.heatpump_basic import HeatpumpBasic
 from gemini_model.injector_pump.injector_pump import InjectorPump
 from gemini_model.mixer.mixer import Mixer
 from gemini_model.pump.esp import ESP
@@ -42,11 +48,16 @@ COMPONENT_REGISTRY = {
     "esp": ESP,
     "producer_well": ProducerWell,
     "injector_well": InjectorWell,
+    # GM-02 (WP-01): existing GEMINI models, now usable from project JSON.
+    "heatpump": HeatpumpBasic,
+    "compressor": Compressor,
+    "co2_corrosion": CO2Corrosion,
 }
 
 # Component types that need extra, non-`parameters` setup after
-# instantiation (e.g. DPDT's `.PVT` attribute, which is not part of its
-# `update_parameters` dict but is required before `calculate_output` runs).
+# instantiation (e.g. DPDT's `.PVT` attribute, which is required before
+# `calculate_output` runs). A "pvt" block in the well's parameters replaces
+# this default PVT when the project loader applies the parameters (GM-01).
 _POST_INIT_HOOKS = {
     "well": lambda component: setattr(component, "PVT", PVTConstantSTP()),
 }

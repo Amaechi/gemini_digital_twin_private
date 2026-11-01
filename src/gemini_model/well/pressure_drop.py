@@ -4,8 +4,13 @@ Computes pressure drop due to friction and gravity along a multi-section well
 for single- and two-phase flow, and temperature change due to heat transfer.
 """
 
+# Modified by the GeoAgent team for SPE GeoHackathon 2026, 2026-11-01: optional "pvt" parameter
+# (GM-01, project-JSON-settable brine PVT); superficial gas velocity uses the gas mass flow
+# (GM-11). Default behaviour (water PVT, gas mass fraction 0) is unchanged.
+
 import numpy as np
 
+from gemini_model.fluid.pvt_config import build_pvt
 from gemini_model.model_abstract import StaticModel
 from gemini_model.well.correlation.beggsbrill import BeggsBrill
 from gemini_model.well.correlation.darcyweisbach import DarcyWeisbach
@@ -27,9 +32,14 @@ class DPDT(StaticModel):
         Parameters
         ----------
         parameters: dict
-            Parameters dict as defined by the model.
+            Parameters dict as defined by the model. An optional ``"pvt"``
+            dict (see :func:`gemini_model.fluid.pvt_config.normalise_pvt_parameters`)
+            replaces ``self.PVT`` with a ``PVTConstantSTP`` built from it, so the
+            fluid can be set from project JSON (GM-01).
         """
         for key, value in parameters.items():
+            if key == "pvt":
+                self.PVT = build_pvt(value)
             self.parameters[key] = value
 
     def initialize_state(self, x):
@@ -102,7 +112,7 @@ class DPDT(StaticModel):
                     model = 2  # using  beggsbrill model
 
                 us_l = ml / rho_l / Atube[k - 1]  # superficial liquid velocity [m/s]
-                us_g = gmf / rho_g / Atube[k - 1]  # superficial gas velocity [m/s]
+                us_g = mg / rho_g / Atube[k - 1]  # superficial gas velocity [m/s]
 
                 if model == 1:
 
