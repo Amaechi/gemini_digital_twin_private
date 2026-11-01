@@ -5,7 +5,7 @@ Keep it ≤ 20 KB; it is the hand-off between sessions. Old detail: merged PRs a
 ## Status board
 | WP | Title | Status | PR | Notes |
 |---|---|---|---|---|
-| WP-00 | Bootstrap, env, CI, skeleton | merged (529bc4b) | [#1](https://github.com/Amaechi/gemini_digital_twin_private/pull/1) | doublet example Q = 129.02 m³/h |
+| WP-00 | Bootstrap, env, CI, skeleton | merged (529bc4b) | [#1](https://github.com/Amaechi/gemini_digital_twin_private/pull/1) | doublet example 129.02 m³/h |
 | WP-01 | GEMINI core fixes, registry | merged (ac57442; review cac5889) | [#3](https://github.com/Amaechi/gemini_digital_twin_private/pull/3), [#5](https://github.com/Amaechi/gemini_digital_twin_private/pull/5) | pvt blocks, separator gas, registry |
 | WP-02 | Cooling models | merged (6eedd33) | [#7](https://github.com/Amaechi/gemini_digital_twin_private/pull/7) | 4 cooling models; HEX per-side ρ/c_p |
 | WP-03 | Heat pump, e-boiler, storage | merged (6fa9667) | [#11](https://github.com/Amaechi/gemini_digital_twin_private/pull/11) | closed-form HP (capped 3.71 @ design); e-boiler; storage |
@@ -15,31 +15,30 @@ Keep it ≤ 20 KB; it is the hand-off between sessions. Old detail: merged PRs a
 | WP-07 | Annual simulation & dispatch | merged (a68c2c9) | [#17](https://github.com/Amaechi/gemini_digital_twin_private/pull/17) | TL-12; 1211 passed (merged main) |
 | WP-08 | Economics, CO₂, exergy, scaling | merged (66acde7) | [#12](https://github.com/Amaechi/gemini_digital_twin_private/pull/12) | TL-14/22/23; C0 LCOH 137 $/MWh ≈ ACM cap |
 | WP-09 | Verifier, memory, logging | merged (901e110) | [#9](https://github.com/Amaechi/gemini_digital_twin_private/pull/9) | 41-check DesignVerifier |
-| WP-10 | Agents, runner, CLI | merged (2285460; review a9083b7) | [#4](https://github.com/Amaechi/gemini_digital_twin_private/pull/4), [#6](https://github.com/Amaechi/gemini_digital_twin_private/pull/6) | policy run P0–P10 on stubs (UNVERIFIED) |
-| WP-11 | Optimisation & uncertainty | in progress | | Batch 6 |
-| WP-12 | Model gap & Model Builder | merged (b81cfa9) | [#15](https://github.com/Amaechi/gemini_digital_twin_private/pull/15) | TL-17/18 real; S7 FunctionModel demo; 1093 passed |
-| WP-13 | Eval suite & submission checks | merged (a622551) | [#16](https://github.com/Amaechi/gemini_digital_twin_private/pull/16) | S1–S11 policy + TestModel; SUB-01…24 (stub run NOT READY, expected) |
+| WP-10 | Agents, runner, CLI | merged (2285460; review a9083b7) | [#4](https://github.com/Amaechi/gemini_digital_twin_private/pull/4), [#6](https://github.com/Amaechi/gemini_digital_twin_private/pull/6) | policy P0–P10 on stubs |
+| WP-11 | Optimisation & uncertainty | in review | (PR pending) | TL-13/15; C2 opt 407 s, MC 951 s (4 vCPU) |
+| WP-12 | Model gap & Model Builder | merged (b81cfa9) | [#15](https://github.com/Amaechi/gemini_digital_twin_private/pull/15) | TL-17/18; S7 demo |
+| WP-13 | Eval suite & submission checks | merged (a622551) | [#16](https://github.com/Amaechi/gemini_digital_twin_private/pull/16) | S1–S11; SUB-01…24 |
 | WP-14 | Integration run & figures | todo | | Batch 7 |
 | L-1 | Local: pick LLM via S11 eval | todo | | user, local Ollama |
 | L-2 | Local: final LLM run + eval transcripts | todo | | user, local Ollama |
 | WP-15 | Final review & packaging | todo | | |
 
-Status values: todo · in progress · in review · merged · blocked (say why).
-Latest full suite (`main` @ 9eb7beb, 2026-11-01): `PYTHONPATH=src python -m pytest -q unit_test/gemini_model unit_test/gemini_simulator unit_test/gemini_agent -x` → **993 passed**.
-Next: Batch 6 (WP-11).
+Status: todo · in progress · in review · merged · blocked (say why).
+Latest full suite (WP-11 branch, 2026-11-01): `PYTHONPATH=src python -m pytest -q unit_test/gemini_model unit_test/gemini_simulator unit_test/gemini_agent -x` → **1246 passed**.
+Next: Batch 7 (WP-14).
 
 ## Decisions log (newest first)
 One line per decision, grouped by WP; dated 11-01 (WP-00: 10-31). Why: the `config/assumptions.yaml` entry or the module docstring.
 
 **WP-11**
-- TL-13 `optimise.py`: screen OPT-SPACE (doublets × depth) at CFG-SIZING + DB-11 max → per `top_k` combo seeded DE (`updating="deferred"`, recording map ⇒ serial = pool): size stage (flow, HTHP, absorption; x0 = screened design) then outage stage (sorted-gap starts; x0 = SIM-OUTAGE; plant reused, `carries`/`run` memoised); rounded 1 m³/h / 0.05 MW.
-- boiler + e-chiller are cap-only ⇒ right-sized to the largest daily output (exact inner optimum), priced, then the named optimum is re-run with those nameplates (zero unmet confirmed).
-- rule 4: guard candidate checks before TL-09, project checks after; rejected/infeasible = barrier 1e6 + reason, never selected; best = status ok AND zero unmet; objective LCOH + LCOC (30 yr) + OPT-OBJ (1000 + 1/MWh unmet).
-- `capex_request(plant, annual)` (for WP-14 too): HEX/doublet at design ṁ/ΔT (Ti), HTHP nameplate else max(ref, peak), CHP peak, boiler/chillers nameplate, absorption F on brine, free cooling peak.
-- after search: SIM-OUTAGE default re-run; DSP-HP-MIN/ABS-MIN priced at register bounds (report only); Pareto ≤ 3 (cheapest, knee, cleanest); C6 scan unpriced.
-- TL-15 `uncertainty.py`: fixed design; `Scenario` = config copy + GEMINI overrides (`ScenarioPlant._model`) + year scale/shift + `DoubletDesign` + CostBook factors; world cases keep base capex, DB-31/CHP-EL-FRAC re-derive it; OAT, UQ-CASES, WP-08 tornado, LHS MC, Spearman; `KPISet.percentiles`, `min_constraint_margins` = worst of base + samples.
-- VER-HP-ETA via `max_carnot_fraction` + `HP_DATASHEET_LABEL`; ±6 K (RC-02) = gradient ± 6/depth; not varied: SUB-RHOC, SUB-WELL, SUB-ESP, SUB-PWH, HP-ETA-L.
-- touches: WP-05 `DoubletDesign.injectivity_factor` (0.8 ⇒ +6.1 bar @ 300 m³/h); chp.py `electrical_fraction` (default 1/3), TL-09 writes it only if CHP-EL-FRAC ≠ 1/3.
+- TL-13: screen doublets × depth → per `top_k` combo seeded DE (`deferred` ⇒ serial = pool): sizes (flow, HTHP, absorption) then outages (sorted-gap, x0 = SIM-OUTAGE, plant reused + memoised).
+- boiler/e-chiller cap-only ⇒ right-sized (largest daily output; chiller also the DB-19 peak at DB-34b ambient), priced, optimum re-run with them (`best` = None if that fails); free-cooling tower beyond the chiller plant's priced (`cooling_tower_mw`).
+- rule 4: guard before and after TL-09; year margins DB-11/12/14 < 0 rejected; DB-16/17 < 0 = unmet demand (penalised), rejected only without unmet; barrier 1e6 + reason; objective LCOH + LCOC (30 yr) + OPT-OBJ.
+- after search: SIM-OUTAGE default, DSP-* at `dispatch_levers` (report only), Pareto ≤ 3, C6 scan unpriced.
+- TL-15: fixed design; `Scenario` = config copy + GEMINI overrides + year scale/shift (warm on cooling days) + `DoubletDesign` + CostBook factors; world cases keep base capex, DB-31/CHP-EL-FRAC re-derive; tornado = LCOH+LCOC swing; `robust_backup_mw` = P90 need.
+- [A]: VER-HP-ETA via `max_carnot_fraction` + `HP_DATASHEET_LABEL`; ±6 K = gradient ± 6/depth; II 0.65–1.0; not varied: SUB-RHOC/WELL/ESP/NPSH/PWH, HP-ETA-L.
+- touches: `DoubletDesign.injectivity_factor` (0.8 ⇒ +6.1 bar) + test; chp.py `electrical_fraction` (default 1/3) + test; TL-09 writes it only if CHP-EL-FRAC ≠ 1/3, no longer raises (test edited); CHP-EL-FRAC/SUB-RHOC text.
 **WP-07**
 - TL-12 fast = TL-06 map + design `PlantSpec` models direct (SIM-FAST); full = fast plan via `simulate_plant_day`.
 - merit order = topology HEX → CHP → HTHP → boiler; DSP-FLOW min equal flow w/o boiler, off < 50, ≤ design.
@@ -125,15 +124,17 @@ One line per decision, grouped by WP; dated 11-01 (WP-00: 10-31). Why: the `conf
 ## Open follow-ups (grouped by the WP that must act)
 **WP-07** (old items done)
 - WP-14: bind TL-12 (`.data.annual.kpis`, `service_by_key` → WP-08, `verification_evidence(sim, c, **extra)`); KPIs cached by `config_hash` (put only).
-- WP-11 done (outages, DSP-HP-MIN/ABS-MIN, absorption/electric split, C6 scan). Open: DSP-FLOW alternative rules (spread at minimum flow / maximum geothermal flow) are not implemented, so not priced.
+- WP-11 levers done. Open: DSP-FLOW alternatives (spread at min flow / max geothermal) not implemented ⇒ unpriced; DSP-HP-MIN `min_part_load_frac` 0 is cheaper on the C2 optimum (TL-13 `dispatch_variants`; register unchanged: decide).
+- Speed: ≥ 3 km (T_wh ≥ 100 °C) fast year 7–25 s (nested HEX-share/HTHP bisections) vs 2 s at 2.5 km.
 - WP-09/14: C6 `storage` fails PH-20 (charge < 0) and PH-22 (no input key). WP-12: ATES outlet T; HP share bisection.
 - Treat as API: `simulate_day._flag_text/_heat_pump_margins/_heat_pump_screening`, `Mixer._MIN_TOTAL_FLOW`
 
 **WP-11**
-- Done: SUB-*/SUB-PBUB+VER-ESP-*/SUB-PSUC/SUB-II/TL-07 ±6 K/COOL-ELC/VER-HP-ETA/HP-APPROACH ranges (UQ-RANGES), tornado top 8, ECO-CO2-GAS 51.53, DB-31 45/65/75, CHP-EL-FRAC 0.50 (chp.py param), outages, DSP-*, split, C6 scan.
-- WP-14: bind `optimise_design(OptimiseRequest)` / `uncertainty(UncertaintyRequest)` (stub names); economics via `optimise.capex_request`; SUB-11 needs a tool named `*sensitivity*` (bind WP-08 `cost_sensitivity`); S6 from `UncertaintyReport.cases` (`DB-31=…`); DR-06 outages = `best.outage_start_indices`; TL-13 `rejected` → `ToolContext.guard_failed`.
-- WP-08/WP-15: no HT-ATES (C6) capex on RC-10 ⇒ C6 storage unpriced; WACC view (ECO-06) not implemented.
-- Treat as API: `FastPlant._model` (TL-15 `ScenarioPlant` hook).
+- Done: all former WP-11 items (UQ-RANGES, UQ-CASES incl. DB-31 45/65/75, ECO-CO2-GAS 51.53, CHP-EL-FRAC 0.50; tornado; levers).
+- WP-14: bind `optimise_design` / `uncertainty` (stub names); SUB-11 needs a `*sensitivity*` tool (WP-08 `cost_sensitivity`); S6 from `UncertaintyReport.cases` (`DB-31=…`); DR-06 = `best.outage_start_indices`; TL-13 `rejected` → `ToolContext.guard_failed`.
+- WP-08/15: no HT-ATES capex on RC-10 ⇒ C6 unpriced; WACC view (ECO-06) missing.
+- WP-14: 3.2 km optimum has T_wh ≈ 105 °C: ≈ 1 % flashes in the 0 bar(g) degasser, NPSH unchecked ⇒ separator p ≥ p_sat + margin or take 3000 m. Install TL-15 `robust_backup_mw` (DR). C2 at ≥ 3 km = C1 + inert HTHP ⇒ optimise C1/C3/C4 too.
+- Treat as API: `FastPlant._model`, `.carries`, `.run` (TL-13/15 `ScenarioPlant` hooks: overrides + memo).
 **WP-12**
 - Done: PROGRESS gaps → LIM-SUB-01…08, LIM-PLT-01…05, LIM-GEM-01, LIM-TOOL-01.
 - WP-14: report `limitations` from `TR-*_model_gap_analysis.json`; LLM P4 calls the tools directly (no `check_draft`) and `register_model` mutates the live registry; use `ModelBuilder.close_gaps` if a gap appears.
@@ -149,7 +150,7 @@ One line per decision, grouped by WP; dated 11-01 (WP-00: 10-31). Why: the `conf
 - Bind real tools under the same names with `stub=False`; keep the `runner/toolbox.py` reducer contract.
 - WP-04: pass `context.config_dir`; `climate` → `profile_climate`; adapter adds DB-30…32 (no `open_gaps`).
 - WP-05: `reservoir_conditions` (DepthArgs), `productivity_index` (NoArgs), `doublet_operating_point` (FlowArgs → `OperatingPointRequest`), `thermal_breakthrough`, `pressure_interference`; add TL-07/08 argument models (else TL-08 uses 2 doublets).
-- WP-06: `generate_gemini_config`, `design_guard` (`failed_ids` → `ToolContext.guard_failed`), `simulate_day`; map `GeneratedConfig` (`hex_design`, `equipment_mw`, brine ṁ/ΔT) to `CapexRequest` (MW; `plate_hexes` ṁ/ΔT; `absorption_capacity_fraction` from WP-02; `cooling_tower_mw` only outside RC-05 plants).
+- WP-06: `generate_gemini_config`, `design_guard` (`failed_ids` → `ToolContext.guard_failed`), `simulate_day`; `CapexRequest` via WP-11 `capex_request(FastPlant, annual)`.
 - WP-08: `economics(EconomicsRequest, annual)`, `co2_emissions(Co2Request, annual)`, `exergy_kpi(annual, climate=, base_kpis=)`, `cost_sensitivity`, `scaling_check(ScalingRequest)` (C7 `co2_release_pressure_barg` from TL-05), `pipe_heat_loss`; C0 CO₂ first (`c0_co2_t_per_yr`).
 - Register `verify_design_spec(collector)` before stubs go off (else P9 escalates); collector = `verification_evidence(candidate, days)` + `EspPoint(**point.esp_evidence.model_dump())`, `bubble_point.release_pressure_barg` (bare, gauge), `AbsorptionPoint`, subsurface, scaling, `stub_evidence`.
 - Verifier gaps: unchecked TL-05 `feasible`, `flow_error_frac ≤ 0.01`, `intake_margin_bar ≥ 0`, TL-08 `within_limit`, TL-07 `breakthrough_after_horizon` (ENG-06); unread cooling `validity_warnings`, `DayResult.flags` (margins carry them, PH-21); `HeatPumpPoint` lacks max sink T.
@@ -165,11 +166,11 @@ One line per decision, grouped by WP; dated 11-01 (WP-00: 10-31). Why: the `conf
 - Nits: negative `gas_water_ratio` accepted; DPDT stores params before a bad `pvt` raises; kpi `plant_thermal_power_w` default 1050 kg/m³, unsuffixed `fluid_density`/`specific_heat`; PH-17 checks pump triples, not daily power; dissolved-gas NPSH margin unquantified; DB-30 fact stores the coerced value; SY-01, SE-02 both build the project; `resume <unknown id>` creates `runs/<id>/`; `--run-id` unsanitised; `resource.py:235` reads `costs.items[...].value`; `heat_pump_1987_usd_per_kw` unescalated.
 
 **All WPs**
-- Lint with GEMINI's pins: black 25.11.0, isort 7.0.0, flake8 7.3.0 + flake8-docstrings 1.7.0 (`--max-line-length=100`). `/opt/geo-venv` has no isort and PATH black is 26.x: `uv pip install --python /opt/geo-venv/bin/python isort==7.0.0 black==25.11.0 flake8-pyproject==1.2.3`.
+- Lint with GEMINI's pins (black 25.11.0, isort 7.0.0, flake8 7.3.0 + flake8-docstrings 1.7.0, `--max-line-length=100`): `uv pip install --python /opt/geo-venv/bin/python isort==7.0.0 black==25.11.0 flake8==7.3.0 flake8-docstrings==1.7.0`. WP-15: 42 pre-existing flake8 findings (WP-04 climate/demand/design_basis + tests) fail `run_linter.sh`.
 - Many GEMINI files are CRLF: keep line endings (no `read_text`/`write_text` round trip).
 
 ## Open questions for organisers (Discord)
 See spec §17. Answers: —
 
 ## Hand-off notes (latest session writes here, replace previous)
-2026-11-01, after batch 4 (WP-03, WP-06, WP-08 merged): full suite on `main` @ 9eb7beb → **993 passed**. Real tools exist for TL-01…11, 14, 22, 23; the runner still uses stubs (WP-14 binds them). Next: batch 5 (WP-07, WP-12, WP-13).
+2026-11-01, WP-11: TL-13/15 real (WP-14 binds). `PYTHONPATH=src python scripts/run_optimisation.py --run-id wp11-c2 --workers 4` (4 vCPU): optimisation **407 s** (162 evals; target < 15 min), uncertainty **951 s** (200 MC + 34 OAT + 8 cases). C2 optimum 2×3200 m, 300 m³/h, HTHP 0.5 (inert), boiler 0.05, e-chiller 8.2 MW, outages d154/d239: LCOH 30.2 + LCOC 24.7 = 54.9 USD/MWh, CO₂ 3790 t/yr. MC P10/P50/P90 LCOH 25.8/33.3/44.6, LCOC 19.5/25.3/32.4; P(demand met) 56 % → 90 % with boiler 2.05 MW (+0.7 USD/MWh LCOH). Outputs in `runs/wp11-c2/` (git-ignored).

@@ -77,7 +77,7 @@ HP_DATASHEET_LABEL = (
     "WP-11 sensitivity case: register VER-HP-ETA range (RC-04 parameter table), not a datasheet"
 )
 """heatpump_basic needs a citation next to max_carnot_fraction; this names the register range."""
-ESCALATION_INPUT = "energy_escalation_nominal_frac"
+ESCALATION_INPUT = "energy_escalation_real_frac"
 PERCENTILE_KPIS: tuple[str, ...] = (
     "lcoh_per_mwh",
     "lcoc_per_mwh",
@@ -320,21 +320,21 @@ class SensitivityBar(StrictModel):
     base_value: float
     low_value: float
     high_value: float
-    objective_low: float | None = Field(description="Incl. the OPT-OBJ unmet penalty.")
-    objective_high: float | None
-    cost_low: float | None = Field(description="LCOH + LCOC at the low value (no penalty).")
-    cost_high: float | None
-    lcoh_low: float | None
-    lcoh_high: float | None
-    lcoc_low: float | None
-    lcoc_high: float | None
-    co2_low_t: float | None
-    co2_high_t: float | None
+    objective_low_per_mwh: float | None = Field(description="Incl. the OPT-OBJ unmet penalty.")
+    objective_high_per_mwh: float | None
+    cost_low_per_mwh: float | None = Field(description="LCOH + LCOC at the low value (no penalty).")
+    cost_high_per_mwh: float | None
+    lcoh_low_per_mwh: float | None
+    lcoh_high_per_mwh: float | None
+    lcoc_low_per_mwh: float | None
+    lcoc_high_per_mwh: float | None
+    co2_low_t_per_yr: float | None
+    co2_high_t_per_yr: float | None
     unmet_low_mwh: float | None
     unmet_high_mwh: float | None
     status_low: str
     status_high: str
-    swing: float = Field(
+    swing_per_mwh: float = Field(
         description="|cost_high − cost_low| (LCOH + LCOC, USD/MWh); 0 if unknown. Demand risk is "
         "in unmet_low/high_mwh (not mixed into the swing)."
     )
@@ -347,10 +347,14 @@ class SensitivityCase(StrictModel):
     assumption_id: str
     value: JsonValue
     evaluation: DesignEvaluation
-    delta_objective: float | None
-    delta_lcoh: float | None
-    delta_lcoc: float | None
-    delta_co2_t: float | None
+    delta_objective_per_mwh: float | None
+    delta_lcoh_per_mwh: float | None
+    delta_lcoc_per_mwh: float | None
+    delta_co2_t_per_yr: float | None
+    delta_cost_per_mwh: float | None = Field(
+        default=None, description="Δ(LCOH + LCOC) without the unmet penalty."
+    )
+    unmet_mwh: float | None = Field(default=None, description="Unmet heating + cooling, MWh/yr.")
 
 
 class MonteCarloSample(StrictModel):
@@ -465,7 +469,7 @@ def _cost(e: DesignEvaluation) -> float | None:
 
 def _objective(e: DesignEvaluation) -> float | None:
     """LCOH + LCOC + penalty of a design that ran; None if it could not run."""
-    return e.objective if e.status == "ok" else None
+    return e.objective_per_mwh if e.status == "ok" else None
 
 
 def sample_inputs(
@@ -626,6 +630,10 @@ def analyse(
         if unknown:
             raise ValueError(f"unknown UQ-RANGES inputs {unknown}")
         inputs = [i for i in inputs if i.name in request.inputs]
+    if mc["sampling"] != "latin_hypercube" or mc["driver_ranking"] != "spearman_rank_correlation":
+        raise ValueError(
+            "UQ-MC: only latin_hypercube sampling and Spearman ranking are implemented"
+        )
     year = year or year_conditions(cfg)
     warnings: list[str] = []
     base_eval = Evaluator.build(
@@ -635,6 +643,7 @@ def analyse(
         parent_concept=request.parent_concept,
         year=year,
         day_indices=request.day_indices,
+        reject_limit_breaches=False,
     )
     base_run = base_eval.run(candidate, outages, stage="uncertainty-base", keep=True)
     base = base_run.evaluation
@@ -670,6 +679,7 @@ def analyse(
         "year": year,
         "day_indices": request.day_indices,
         "stage": "uncertainty",
+        "reject_limit_breaches": False,
     }
 
     def scenario(
@@ -707,16 +717,16 @@ def analyse(
                     base_value=spec.base,
                     low_value=spec.low,
                     high_value=spec.high,
-                    objective_low=ol,
-                    objective_high=oh,
-                    cost_low=cl,
-                    cost_high=ch,
-                    lcoh_low=lo.lcoh_per_mwh,
-                    lcoh_high=hi.lcoh_per_mwh,
-                    lcoc_low=lo.lcoc_per_mwh,
-                    lcoc_high=hi.lcoc_per_mwh,
-                    co2_low_t=lo.co2_t_per_yr,
-                    co2_high_t=hi.co2_t_per_yr,
+                    objective_low_per_mwh=ol,
+                    objective_high_per_mwh=oh,
+                    cost_low_per_mwh=cl,
+                    cost_high_per_mwh=ch,
+                    lcoh_low_per_mwh=lo.lcoh_per_mwh,
+                    lcoh_high_per_mwh=hi.lcoh_per_mwh,
+                    lcoc_low_per_mwh=lo.lcoc_per_mwh,
+                    lcoc_high_per_mwh=hi.lcoc_per_mwh,
+                    co2_low_t_per_yr=lo.co2_t_per_yr,
+                    co2_high_t_per_yr=hi.co2_t_per_yr,
                     unmet_low_mwh=(
                         None
                         if lo.status != "ok"
@@ -729,10 +739,10 @@ def analyse(
                     ),
                     status_low=lo.status,
                     status_high=hi.status,
-                    swing=abs(ch - cl) if cl is not None and ch is not None else 0.0,
+                    swing_per_mwh=abs(ch - cl) if cl is not None and ch is not None else 0.0,
                 )
             )
-        bars.sort(key=lambda b: b.swing, reverse=True)
+        bars.sort(key=lambda b: b.swing_per_mwh, reverse=True)
         for b in bars:
             worst = max(b.unmet_low_mwh or 0.0, b.unmet_high_mwh or 0.0)
             if worst > 0:
@@ -763,10 +773,16 @@ def analyse(
                     assumption_id=assumption_id,
                     value=value,
                     evaluation=e,
-                    delta_objective=_delta(e.objective, base.objective) if ok else None,
-                    delta_lcoh=_delta(e.lcoh_per_mwh, base.lcoh_per_mwh) if ok else None,
-                    delta_lcoc=_delta(e.lcoc_per_mwh, base.lcoc_per_mwh) if ok else None,
-                    delta_co2_t=_delta(e.co2_t_per_yr, base.co2_t_per_yr) if ok else None,
+                    delta_objective_per_mwh=(
+                        _delta(e.objective_per_mwh, base.objective_per_mwh) if ok else None
+                    ),
+                    delta_lcoh_per_mwh=_delta(e.lcoh_per_mwh, base.lcoh_per_mwh) if ok else None,
+                    delta_lcoc_per_mwh=_delta(e.lcoc_per_mwh, base.lcoc_per_mwh) if ok else None,
+                    delta_co2_t_per_yr=_delta(e.co2_t_per_yr, base.co2_t_per_yr) if ok else None,
+                    delta_cost_per_mwh=_delta(_cost(e), _cost(base)) if ok else None,
+                    unmet_mwh=(
+                        (e.unmet_heating_mwh or 0.0) + (e.unmet_cooling_mwh or 0.0) if ok else None
+                    ),
                 )
             )
             if not ok:
@@ -809,6 +825,12 @@ def analyse(
     if failed:
         warnings.append(
             f"{failed}/{len(samples)} samples could not run (counted as demand not met)"
+        )
+    breached = [e for e in results if e.limit_breaches]
+    if breached:
+        warnings.append(
+            f"{len(breached)}/{len(samples)} samples breach a hard limit in operation (counted as "
+            f"demand not met; first: {breached[0].limit_breaches[0]})"
         )
     spec = {str(k): int(v) for k, v in _mapping(mc["percentiles"]).items()}
     percentiles = percentile_table(samples, spec)
@@ -922,7 +944,7 @@ def _summary(report: UncertaintyReport) -> str:
             else ""
         )
         + (f"; top driver {top.input_name} (ρ {top.spearman_rho:+.2f})" if top else "")
-        + (f"; largest OAT swing {bar.input_name} {bar.swing:.1f}" if bar else "")
+        + (f"; largest OAT swing {bar.input_name} {bar.swing_per_mwh:.1f}" if bar else "")
     )
     return text[:SUMMARY_MAX_CHARS]
 

@@ -237,8 +237,7 @@ assumptions:
       h = 100 m and Q = 300 m³/h it reproduces DB-26 (23.6 yr at D = 1.0 km, 34 yr at 1.2 km).
     source: RC-02 eq 1 [A]; GEOAGENT_DESIGN_SPEC §2.2 DB-26
     sensitivity: >-
-      No range on RC-02; t_b is linear in (ρC)_a, so a ±x % change moves t_b by ±x % (WP-05/WP-11 to
-      choose the range).
+      No range on RC-02; t_b is linear in (ρC)_a, so a ±x % change moves t_b by ±x % (WP-11 UQ-RANGES: not varied, no range on the card).
     tag: A
     status: default
     added_by: WP-04
@@ -1214,13 +1213,13 @@ assumptions:
     value: 0.3333
     unit: "-"
     justification: >-
-      Choice: simulations keep GEMINI chp.py unchanged — P_el = 1/3 and P_th = 2/3 of efficiency_factor ×
-      fuel power (a class constant, not a parameter). The DEA 1–10 MW_e gas engine has η_e 0.48 and C_b 0.99
+      Choice: simulations keep GEMINI chp.py's default — P_el = 1/3 and P_th = 2/3 of efficiency_factor ×
+      fuel power (class constant; since WP-11 an optional electrical_fraction parameter, written by TL-09
+      only when this entry differs from 1/3). The DEA 1–10 MW_e gas engine has η_e 0.48 and C_b 0.99
       (≈ 1.01 MW_th per MW_e), an electrical share ≈ 0.50 at ≈ 0.96 total efficiency. 1/3 is conservative
       for the electricity a degas + CHP option (DR-07 a) credits and generous on its heat. Economics (WP-08)
       must cost and credit the simulated P_el / P_th (not DEA η_e) so the energy and money balances agree.
-      The 0.50 sensitivity needs an electrical-fraction parameter in chp.py (default 1/3) — add it only if a
-      CHP candidate survives screening.
+      The 0.50 sensitivity is TL-15 case CHP-EL-FRAC=0.5 (UQ-CASES; every degassing concept has a CHP).
     source: GEMINI chp.py ELECTRICAL_POWER_FRACTION; RC-10 Sourced values (DEA ch. 06 gas engines)
     sensitivity: [0.3333, 0.50]
     tag: A
@@ -1381,13 +1380,18 @@ assumptions:
       depth_options_m: [1500.0, 2000.0, 2500.0, 3000.0, 3200.0, 3500.0]
       design_flow_m3h: "DB-11 range (limits.yaml flow_min_active_m3h … flow_max_m3h)"
       peak_boiler_mw: "not searched: largest daily boiler heat of the design, rounded up to size_resolution_mw (cap-only unit)"
-      electric_chiller_mw: "not searched: largest daily electric-chiller duty, rounded up, at least min_equipment_mw (cap-only unit)"
+      electric_chiller_mw: "not searched: larger of the largest daily electric-chiller duty and its duty on the DB-19 peak day at the DB-34b design ambient (the chiller sizing point), rounded up, at least min_equipment_mw (cap-only unit)"
       absorption_chiller_mw: "min_equipment_mw … DB-19 cooling peak (C3, C4; the absorption/electric split)"
       hthp_heating_mw: "min_equipment_mw … HTHP heat at the design point with every doublet at the DB-11 maximum flow (C2, C3, C5)"
       min_equipment_mw: 0.5
       outage_start_indices: "DB-30 A only, second DE stage at the size optimum: one integer per doublet; sorted u_i ∈ [0, 365 − n·35], start_i = u_(i) + i·35 (never overlapping); seeded with SIM-OUTAGE"
       flow_resolution_m3h: 1.0
       size_resolution_mw: 0.05
+      dispatch_levers:
+        DSP-HP-MIN.min_part_load_frac: [0.0, 0.25]
+        DSP-HP-MIN.max_extra_flow_frac: [0.0, 0.25]
+        DSP-ABS-MIN: [0.05, 0.25]
+      derived_not_searched: "plate-HEX UA (CFG-HEX: sized at the design flow for DB-12/DB-16), CHP (burns all associated gas, DB-36; priced at its largest daily heat), free-cooling HEX (largest daily duty) and its tower beyond the chiller plant's (largest daily rejection), storage (C6, unpriced)"
     unit: null
     justification: >-
       Spec §9.1 OPT-01/OPT-03: integers (doublets 1–3, depths 1.5/2.0/2.5/3.0/3.2/3.5 km) are enumerated; the
@@ -1407,6 +1411,13 @@ assumptions:
       DB-30-valid, non-overlapping schedule. Sizes are rounded to the stated resolution (DSP-FLOW resolves
       0.06 m³/h) so repeated vectors are evaluated once. C6 storage sizes are not optimised: RC-10 has no
       HT-ATES cost (they are scanned unpriced). Return temperature (OPT-01 MAY) is a TL-15 case (DB-31).
+      The remaining OPT-01 variables are derived, not searched (derived_not_searched): the plate-HEX UA follows
+      the design flow (CFG-HEX), the CHP burns all associated gas (DB-36), the free-cooling HEX and its extra
+      tower follow their largest daily duty. DSP-* levers are priced at the bounds of their own sensitivity
+      fields (dispatch_levers) on the optimum and reported; the register values are not changed. A year whose
+      WP-07 margins breach DB-11, DB-12 or DB-14 is rejected like a guard violation (golden rule 4); a DB-16/
+      DB-17 supply margin below zero is the temperature view of a capacity shortfall that WP-07 counts as
+      unmet demand (penalised by OPT-OBJ, never selected), and is rejected only without unmet demand.
     source: GEOAGENT_DESIGN_SPEC §9.1 OPT-01, OPT-03; DB-10, DB-11, DB-18, DB-19, DB-30; CFG-SIZING; RC-05 (100-ton floor) [A]
     sensitivity: "top_k and the DE budget (OPT-DE) trade runtime against the size refinement."
     tag: A
@@ -1475,27 +1486,31 @@ assumptions:
       skin: {distribution: uniform, low: -1.0, high: 5.0, source: "DB-38 sensitivity; spec §9.3 UQ-01"}
       heating_demand_scale: {distribution: uniform, low: 0.9, high: 1.1, source: "spec §9.3 UQ-01 demand ±10 %"}
       cooling_demand_scale: {distribution: uniform, low: 0.9, high: 1.1, source: "spec §9.3 UQ-01 demand ±10 %"}
-      heating_return_degc: {distribution: uniform, low: 45.0, high: 65.0, source: "spec §9.3 UQ-01; DB-31"}
-      warm_climate_frac: {distribution: uniform, low: 0.0, high: 1.0, note: "fraction of the DB-34b warm-case offset (+5 K dry bulb, +2.6 K wet bulb) added to every day", source: "DB-34b warm case; spec §9.3 UQ-01"}
-      production_temperature_shift_k: {distribution: uniform, low: -6.0, high: 6.0, note: "reservoir heterogeneity on the production temperature, applied as gradient ± shift/depth", source: "RC-02 item 3 (±6 °C on 30-yr production temperature); spec UQ-01"}
+      heating_return_degc: {distribution: uniform, low: 45.0, high: 65.0, note: "operating return of the built plant (capex fixed); the UQ-CASES DB-31 values are design alternatives (capex re-derived)", source: "spec §9.3 UQ-01; DB-31"}
+      warm_climate_frac: {distribution: uniform, low: 0.0, high: 1.0, note: "[A] fraction of the DB-34b warm-case offset (+5 K dry bulb, +2.6 K wet bulb) added to cooling-season days (cooling demand > 0); one-sided: the base is its P0, not its P50", source: "DB-34b warm case; spec §9.3 UQ-01"}
+      production_temperature_shift_k: {distribution: uniform, low: -6.0, high: 6.0, note: "[A] interpretation: RC-02's Boolean-lens extreme on the 30-yr production temperature (smoother case ±2 °C) applied from year 1 as gradient ± shift/depth (also moves p_b and the DPDT profile)", source: "RC-02 item 3 (±6 °C on 30-yr production temperature); spec UQ-01"}
       hp_carnot_fraction: {distribution: uniform, low: 0.50, high: 0.65, source: "VER-HP-ETA sensitivity (RC-04)"}
       hp_approach_k: {distribution: uniform, low: 3.0, high: 5.0, source: "HP-APPROACH sensitivity (RC-04 eq 4)"}
       absorption_duhring_slope: {distribution: uniform, low: 1.1, high: 1.2, source: "COOL-ABS-B (RC-05 Method B)"}
       electric_chiller_carnot_efficiency: {distribution: uniform, low: 0.44, high: 0.513, source: "COOL-ELC (RC-06)"}
-      esp_intake_margin_factor: {distribution: uniform, low: 1.1, high: 1.3, note: "SUB-PBUB margin = VER-ESP-MARGIN (moved together); VER-ESP-PB scaled by margin/1.2", source: "SUB-PBUB sensitivity; VER-ESP-MARGIN"}
+      esp_intake_margin_factor: {distribution: uniform, low: 1.1, high: 1.3, note: "SUB-PBUB margin = VER-ESP-MARGIN (moved together, TL-05 enforces it); VER-ESP-PB is only the DesignVerifier's fallback (inert in TL-13/15) and is scaled 60 × margin/1.2 so the base is unchanged", source: "SUB-PBUB sensitivity; VER-ESP-MARGIN"}
       injection_pump_suction_barg: {distribution: uniform, low: 0.0, high: 3.0, source: "SUB-PSUC sensitivity"}
-      injectivity_factor: {distribution: uniform, low: 0.8, high: 1.0, note: "II = factor × PI; 0.8 adds ≈ +6 bar on the 26.5 bar(g) injection WHP at 300 m³/h", source: "SUB-II; LIM-SUB-02 (cold injection)"}
+      injectivity_factor: {distribution: uniform, low: 0.65, high: 1.0, note: "[A] II = factor × PI. No card value: 0.8 reproduces LIM-SUB-02's +6 bar on the 26.5 bar(g) injection WHP at 300 m³/h; a near-well cold zone with water viscosity 1.5–1.65 × that at reservoir temperature (55–65 °C injectate) gives ≈ 0.63–0.72, hence 0.65 as the low bound", source: "SUB-II; LIM-SUB-02 (cold injection); WP-11 physics check"}
       well_spacing_m: {distribution: uniform, low: 1000.0, high: 1500.0, source: "SUB-SPACING sensitivity (RC-02)"}
       cost_items: {distribution: uniform, low: "item sensitivity_low", high: "item sensitivity_high", source: "DB-35 / ECO-04: ±30 % or the stated range, whichever is wider (CostBook)"}
     unit: null
     justification: >-
-      Spec §9.3 UQ-01 lists the Monte Carlo inputs; each range is taken from the register entry or card
-      that owns the value (source), so no range is invented here. Where the spec and the register differ
-      the register wins (HTHP performance: VER-HP-ETA 0.50–0.65 instead of ±15 %; absorption: COOL-ABS-B
-      1.1–1.2). Not varied: SUB-RHOC (RC-02 gives no range; t_b is linear in it), SUB-WELL and SUB-ESP
-      (no numeric range on the card; ESP stage/scale changes move the frequency, not the rule-based power),
-      SUB-PWH (the 50 bar(g) value is the C7 pressurised concept, not an uncertainty), HP-ETA-L (inert:
-      the VER-HP-ETA cap binds, WP-06). Samples are Latin-hypercube (seeded), mapped through each
+      Spec §9.3 UQ-01 lists the Monte Carlo inputs; each range is taken from the register entry, card or
+      spec item that owns the value (source); entries marked [A] in their note are our interpretation or
+      derivation and say so. Where the spec and the register differ the register wins (HTHP performance:
+      VER-HP-ETA 0.50–0.65 instead of ±15 %; absorption: COOL-ABS-B 1.1–1.2). Not varied: SUB-RHOC (RC-02
+      gives no range; t_b is linear in it), SUB-WELL and SUB-ESP (no numeric range on the card; ESP
+      stage/scale changes move the frequency, not the rule-based power), SUB-NPSH (a check margin, not a
+      performance input), SUB-PWH (the 50 bar(g) value is the C7 pressurised concept, not an uncertainty),
+      HP-ETA-L (inert: the VER-HP-ETA cap binds, WP-06). Limitation: TL-09 re-plans the design point of each
+      scenario (plate-HEX UA, HTHP brine floor) for its own brine and return temperatures, so a fixed design
+      meets a matched HEX in −6 K or low-gradient samples (slightly optimistic); installed costs stay the
+      base design's. Samples are Latin-hypercube (seeded), mapped through each
       distribution's inverse CDF; one-at-a-time cases take the low and high values.
     source: GEOAGENT_DESIGN_SPEC §9.3 UQ-01; register entries named per input; RC-02, RC-04, RC-05, RC-06
     sensitivity: "Ranges change with the owning entries; UQ-CASES holds the discrete cases."

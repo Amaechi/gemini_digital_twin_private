@@ -36,6 +36,7 @@ import hashlib
 import json
 import math
 import multiprocessing
+import re
 import shutil
 import tempfile
 import time
@@ -71,7 +72,7 @@ from gemini_agent.tools.config_generator import (
     load_generator_basis,
     tower_water_degc,
 )
-from gemini_agent.tools.dispatch import FastPlant, db30_rule
+from gemini_agent.tools.dispatch import FastPlant, db30_rule, dispatch_day
 from gemini_agent.tools.doublet import DoubletDesign
 from gemini_agent.tools.economics import (
     CapexRequest,
@@ -89,6 +90,7 @@ from gemini_agent.tools.simulate_annual import (
     run_annual,
     year_conditions,
 )
+from gemini_agent.tools.simulate_day import CONTROL_TOL_K, HEAT_TOL_MW
 from gemini_agent.verify.design_guard import DesignGuard
 from gemini_simulator.registry import create_component
 
@@ -117,6 +119,23 @@ PLANT_CACHE_SIZE = 2
 """Fast plants kept per evaluator for reuse (outage-schedule search on fixed sizes)."""
 BACKUP_KEYS = ("peak_boiler_mw", "electric_chiller_mw")
 """Cap-only units right-sized by TL-13 (OPT-SPACE): their nameplate only limits output."""
+HARD_LIMIT_MARGINS: tuple[tuple[str, str], ...] = (
+    (r"^doublet_\d+_flow_margin_m3h$", "DB-11"),
+    (r"^doublet_\d+_brine_cooling_margin_k$", "DB-12"),
+    (r"^absorption_drive_cooling_margin_k$", "DB-12"),
+    (r"^doublet_\d+_injection_balance_margin_m3h$", "DB-14"),
+    (r"^heating_supply_margin_k$", "DB-16"),
+    (r"^cooling_supply_margin_k$", "DB-17"),
+)
+"""WP-07 daily margins that are CLAUDE.md hard limits (golden rule 4: never violated silently).
+
+DB-16/DB-17 supply margins fall below zero exactly when the plant's capacity falls short (WP-07
+counts that shortfall as unmet demand, which OPT-OBJ penalises); a supply breach *without*
+unmet demand, and any DB-11/DB-12/DB-14 breach, is a violation and is rejected."""
+SHORTFALL_CODES = {"DB-16": "unmet_heating_mwh", "DB-17": "unmet_cooling_mwh"}
+MARGIN_TOL = CONTROL_TOL_K
+"""Numerical tolerance on a hard-limit margin (TL-11 control tolerance, 1e-6 K or m³/h)."""
+MAX_FLAGS = 10
 
 
 # =========================================================================== settings
@@ -141,6 +160,10 @@ class OptimiserSettings(StrictModel):
     recombination: float
     tol: float
     init: str
+    polish: bool
+    updating: Literal["deferred"] = Field(
+        description="Deferred updating: the population is evaluated as a batch (serial = pool)."
+    )
     top_k: int
 
 
@@ -170,6 +193,8 @@ def load_optimiser_settings(config_dir: Path | str | None = None) -> OptimiserSe
         recombination=float(de["recombination"]),
         tol=float(de["tol"]),
         init=str(de["init"]),
+        polish=bool(de["polish"]),
+        updating=de["updating"],
         top_k=int(de["top_k"]),
     )
 
@@ -261,7 +286,11 @@ def write_scenario_config(
 
 
 def scenario_year(year: YearData, scenario: Scenario) -> YearData:
-    """Scale demand and shift the daily ambient of the design year (UQ-01, DB-34b)."""
+    """Scale demand and shift the daily ambient of the design year (UQ-01, DB-34b).
+
+    The ambient shift (DB-34b warm case) applies to cooling-season days only (cooling demand > 0):
+    DB-34b is a summer design point, not an annual offset, and heating demand is not re-derived.
+    """
     if (
         scenario.heating_demand_scale == 1.0
         and scenario.cooling_demand_scale == 1.0
@@ -272,15 +301,15 @@ def scenario_year(year: YearData, scenario: Scenario) -> YearData:
     days = []
     for day in year.days:
         wet = day.ambient_wet_bulb_degc
+        dry_shift = scenario.dry_bulb_shift_k if day.cooling_demand_mw > 0.0 else 0.0
+        wet_shift = scenario.wet_bulb_shift_k if day.cooling_demand_mw > 0.0 else 0.0
         days.append(
             day.model_copy(
                 update={
                     "heating_demand_mw": day.heating_demand_mw * scenario.heating_demand_scale,
                     "cooling_demand_mw": day.cooling_demand_mw * scenario.cooling_demand_scale,
-                    "ambient_dry_bulb_degc": day.ambient_dry_bulb_degc + scenario.dry_bulb_shift_k,
-                    "ambient_wet_bulb_degc": (
-                        None if wet is None else wet + scenario.wet_bulb_shift_k
-                    ),
+                    "ambient_dry_bulb_degc": day.ambient_dry_bulb_degc + dry_shift,
+                    "ambient_wet_bulb_degc": None if wet is None else wet + wet_shift,
                 }
             )
         )
@@ -397,7 +426,8 @@ def capex_request(
     plates); HTHP = nameplate, else the larger of the design-point and the largest daily HTHP
     heat; CHP from its largest daily heat (it burns all associated gas, CHP-EL-FRAC); boiler and
     chillers = TL-09 nameplates; absorption with RC-05 F on brine (titanium generator tubes);
-    free cooling = largest daily duty, its tower being the chiller plant's (no extra tower).
+    free cooling = largest daily duty plus the tower capacity it needs beyond the chiller plant's
+    (:func:`free_cooling_tower_mw`).
     ``installed_mw`` overrides ``peak_boiler_mw`` / ``electric_chiller_mw`` (TL-13 right-sizing).
     """
     installed = dict(installed_mw or {})
@@ -425,6 +455,9 @@ def capex_request(
                 (plant.hp_reference_w or 0.0) / 1e6, _peak_mw(annual, "heat_by_source_mw", "hthp")
             )
         )
+    chiller_mw = installed.get(
+        "electric_chiller_mw", meta.equipment_mw.get("electric_chiller_mw", 0.0)
+    )
     absorption_mw = meta.equipment_mw.get("absorption_chiller_mw", 0.0)
     fraction = absorption_capacity_fraction(plant) if absorption_mw > 0 else None
     if absorption_mw > 0 and not fraction:
@@ -437,14 +470,38 @@ def capex_request(
         hthp_heating_mw=hthp,
         chp_thermal_mw=_peak_mw(annual, "heat_by_source_mw", "chp"),
         gas_boiler_mw=installed.get("peak_boiler_mw", meta.equipment_mw.get("peak_boiler_mw", 0.0)),
-        electric_chiller_mw=installed.get(
-            "electric_chiller_mw", meta.equipment_mw.get("electric_chiller_mw", 0.0)
-        ),
+        electric_chiller_mw=chiller_mw,
         absorption_chiller_mw=absorption_mw,
         absorption_capacity_fraction=fraction if absorption_mw > 0 else None,
         absorption_titanium_tubes=absorption_mw > 0,
         free_cooling_mw=_peak_mw(annual, "cool_by_source_mw", "free_cooling"),
+        cooling_tower_mw=(
+            free_cooling_tower_mw(annual, chiller_mw) if plant.has_free_cooling else 0.0
+        ),
     )
+
+
+def free_cooling_tower_mw(annual: AnnualResult, chiller_mw: float) -> float:
+    """Tower capacity beyond the RC-05 electric-chiller plant's own tower (WP-08 ``CapexRequest``).
+
+    Daily heat rejected = free-cooling duty + electric-chiller duty + its compressor power; the
+    chiller plant's tower rejects its nameplate × (1 + 1/COP) at the COP of its largest daily duty.
+    The free-cooling HEX and the extra tower share the same water loop (RC-07).
+    """
+    best_day = max(annual.days, key=lambda d: d.cool_by_source_mw.get("electric_chiller", 0.0))
+    duty = best_day.cool_by_source_mw.get("electric_chiller", 0.0)
+    power = best_day.electricity_by_consumer_mw.get("electric_chiller", 0.0)
+    plant_tower = chiller_mw * (1.0 + power / duty) if duty > 0 and power > 0 else chiller_mw
+    rejection = max(
+        (
+            d.cool_by_source_mw.get("free_cooling", 0.0)
+            + d.cool_by_source_mw.get("electric_chiller", 0.0)
+            + d.electricity_by_consumer_mw.get("electric_chiller", 0.0)
+            for d in annual.days
+        ),
+        default=0.0,
+    )
+    return max(0.0, rejection - plant_tower)
 
 
 # =========================================================================== evaluation
@@ -462,8 +519,10 @@ class DesignEvaluation(StrictModel):
     status: EvalStatus
     reason: str = ""
     violations: list[str] = Field(default_factory=list, description="Guard violation codes.")
-    objective: float = Field(description="LCOH + LCOC + unmet penalty; barrier if not ok.")
-    penalty: float = 0.0
+    objective_per_mwh: float = Field(
+        description="LCOH + LCOC + unmet penalty (USD/MWh); barrier if not ok."
+    )
+    penalty_per_mwh: float = 0.0
     lcoh_per_mwh: float | None = None
     lcoc_per_mwh: float | None = None
     capex_million: float | None = None
@@ -487,6 +546,13 @@ class DesignEvaluation(StrictModel):
         default_factory=list, description="Calendar outage starts (default placement if None)."
     )
     thermal_breakthrough_yr: float | None = None
+    limit_breaches: list[str] = Field(
+        default_factory=list,
+        description="Hard-limit margins < 0 in the year (key: value, DB id); never accepted.",
+    )
+    flags: list[str] = Field(
+        default_factory=list, description="TL-12 warnings of the year (first ones)."
+    )
     right_sized_mw: dict[str, float] = Field(
         default_factory=dict,
         description="Backup nameplates sized to the largest daily residual (OPT-SPACE); priced.",
@@ -499,9 +565,24 @@ class DesignEvaluation(StrictModel):
         """Status ok and zero unmet heating and cooling (OPT-02)."""
         return (
             self.status == "ok"
+            and not self.limit_breaches
             and (self.unmet_heating_mwh or 0.0) <= SIGNIFICANT_UNMET_MWH
             and (self.unmet_cooling_mwh or 0.0) <= SIGNIFICANT_UNMET_MWH
         )
+
+
+def _code(breach: str) -> str:
+    return breach.rsplit("(", 1)[-1].rstrip(")")
+
+
+def limit_breaches(margins: dict[str, float]) -> list[str]:
+    """Hard-limit margins below −MARGIN_TOL as ``"key = value (DB-xx)"`` (golden rule 4)."""
+    out = []
+    for key, value in sorted(margins.items()):
+        for pattern, code in HARD_LIMIT_MARGINS:
+            if re.match(pattern, key) and value < -MARGIN_TOL:
+                out.append(f"{key} = {value:.4g} ({code})")
+    return out
 
 
 def design_key(candidate: Candidate, outages: Sequence[int] | None, scenario: str = "base") -> str:
@@ -545,6 +626,8 @@ class Evaluator:
     """Simulated-day subset for quick checks only (economics then cover those days); None: year."""
     right_size_backups: bool = False
     """TL-13: price a boiler/electric chiller without nameplate at its largest daily output."""
+    reject_limit_breaches: bool = True
+    """TL-13: a year with a hard-limit margin < 0 is rejected; TL-15 records it instead."""
     _plants: dict[str, FastPlant] = field(default_factory=dict, repr=False)
 
     def __getstate__(self) -> dict[str, Any]:
@@ -566,6 +649,7 @@ class Evaluator:
         settings: OptimiserSettings | None = None,
         day_indices: Sequence[int] | None = None,
         right_size_backups: bool = False,
+        reject_limit_breaches: bool = True,
     ) -> Evaluator:
         """Load the bases from ``config_dir`` (already the scenario copy if it edits config)."""
         scenario = scenario or Scenario()
@@ -588,6 +672,7 @@ class Evaluator:
             parent_concept=parent_concept,
             day_indices=list(day_indices) if day_indices is not None else None,
             right_size_backups=right_size_backups,
+            reject_limit_breaches=reject_limit_breaches,
         )
 
     # ------------------------------------------------------------------ helpers
@@ -611,8 +696,43 @@ class Evaluator:
             self._plants[key] = plant
         return plant
 
-    def right_size(self, candidate: Candidate, annual: AnnualResult) -> dict[str, float]:
-        """Backup nameplates = largest daily output, rounded up (OPT-SPACE; cap-only units)."""
+    def _dispatch_kwargs(self) -> dict[str, float]:
+        register = load_config("assumptions", self.config_dir)
+        hp: dict[str, Any] = register.get("DSP-HP-MIN").value  # type: ignore[assignment]
+        return {
+            "hp_min_frac": float(hp["min_part_load_frac"]),
+            "hp_extra_flow_frac": float(hp["max_extra_flow_frac"]),
+            "absorption_min_frac": float(register.get("DSP-ABS-MIN").value),  # type: ignore
+        }
+
+    def design_day_chiller_mw(self, plant: FastPlant) -> float:
+        """Electric-chiller duty on the DB-19 peak day at the DB-34b design ambient (RC-06/07).
+
+        DB-34b is the chiller and heat-rejection sizing point; the design year's smoothed
+        normals never reach it, so the year alone would undersize the chiller.
+        """
+        loads = design_loads(self.gb)
+        peak = max(self.year.days, key=lambda d: d.cooling_demand_mw)
+        day = peak.model_copy(
+            update={
+                "cooling_demand_mw": loads.cooling_demand_mw,
+                "ambient_dry_bulb_degc": loads.ambient_dry_bulb_degc,
+                "ambient_wet_bulb_degc": loads.ambient_wet_bulb_degc,
+            }
+        )
+        fast = dispatch_day(plant, day, [True] * plant.n_doublets, **self._dispatch_kwargs())
+        result = fast.day
+        return result.cool_by_source_mw.get("electric_chiller", 0.0) + (
+            result.unmet_cooling_mwh / HOURS_PER_DAY
+        )
+
+    def right_size(
+        self, candidate: Candidate, annual: AnnualResult, plant: FastPlant
+    ) -> dict[str, float]:
+        """Backup nameplates = largest daily output, rounded up (OPT-SPACE; cap-only units).
+
+        The electric chiller also covers the DB-34b design day (``design_day_chiller_mw``).
+        """
         if not self.right_size_backups:
             return {}
         step = self.settings.size_resolution_mw
@@ -629,7 +749,10 @@ class Evaluator:
             if key in candidate.equipment_sizes:
                 continue
             peak = max((getattr(d, attr).get(name, 0.0) for d in annual.days), default=0.0)
-            sizes[key] = round(max(floor, math.ceil(peak / step - 1e-9) * step), 6)
+            if key == "electric_chiller_mw":
+                peak = max(peak, self.design_day_chiller_mw(plant))
+            peak = peak if peak > HEAT_TOL_MW else 0.0  # rounding residue of an idle unit
+            sizes[key] = max(peak, floor, round(math.ceil(peak / step - 1e-9) * step, 6))
         return sizes
 
     def _barrier(
@@ -653,7 +776,7 @@ class Evaluator:
                 status=status,
                 reason=reason[:300],
                 violations=list(violations),
-                objective=self.settings.rejected_objective,
+                objective_per_mwh=self.settings.rejected_objective,
                 elapsed_s=time.perf_counter() - start,
             )
         )
@@ -706,9 +829,14 @@ class Evaluator:
                 sub=self.sub,
                 config_dir=self.config_dir,
             )
-        except (ConfigError, ValueError) as exc:
+        except (ConfigError, ValueError, ArithmeticError, RuntimeError) as exc:
             return self._barrier(
-                candidate, outages, "infeasible", f"TL-09: {exc}", start, stage=stage
+                candidate,
+                outages,
+                "infeasible",
+                f"TL-09 {type(exc).__name__}: {exc}",
+                start,
+                stage=stage,
             )
         guard = self.guard.validate(candidate, config)
         if not guard.approved:
@@ -739,7 +867,7 @@ class Evaluator:
                 plant=plant,
             )
             annual = sim.annual
-            right = self.right_size(candidate, annual)
+            right = self.right_size(candidate, annual, plant)
             eco = economics(
                 EconomicsRequest(
                     capex=self.scenario.capex or capex_request(plant, annual, right),
@@ -751,9 +879,14 @@ class Evaluator:
                 config_dir=self.config_dir,
                 book=self.book,
             ).data
-        except (ConfigError, ValueError) as exc:
+        except (ConfigError, ValueError, ArithmeticError, RuntimeError) as exc:
             return self._barrier(
-                candidate, outages, "infeasible", f"TL-12/TL-14: {exc}", start, stage=stage
+                candidate,
+                outages,
+                "infeasible",
+                f"TL-12/TL-14 {type(exc).__name__}: {exc}",
+                start,
+                stage=stage,
             )
         kpis = eco.kpis
         unmet = annual.unmet_heating_mwh + annual.unmet_cooling_mwh
@@ -768,6 +901,24 @@ class Evaluator:
                 start,
                 stage=stage,
             )
+        breaches = limit_breaches(kpis.min_constraint_margins)
+        violations = [
+            b
+            for b in breaches
+            if not (
+                _code(b) in SHORTFALL_CODES and getattr(annual, SHORTFALL_CODES[_code(b)]) > 0.0
+            )
+        ]
+        if violations and self.reject_limit_breaches:
+            return self._barrier(
+                candidate,
+                outages,
+                "rejected",
+                "hard limit breached in operation (WP-07 margins): " + "; ".join(violations),
+                start,
+                stage=stage,
+                violations=sorted({_code(b) for b in violations}),
+            )
         boiler = [d.heat_by_source_mw.get("peak_boiler", 0.0) for d in annual.days]
         evaluation = DesignEvaluation(
             key=design_key(candidate, outages, self.scenario.name),
@@ -776,9 +927,11 @@ class Evaluator:
             candidate=candidate,
             outage_start_indices=list(outages) if outages is not None else None,
             status="ok",
-            reason="approved by TL-10; " + ("meets demand" if unmet <= 0 else "unmet demand"),
-            objective=(lcoh or 0.0) + (lcoc or 0.0) + penalty,
-            penalty=penalty,
+            reason="approved by TL-10; "
+            + ("meets demand" if unmet <= 0 else "unmet demand")
+            + (f"; hard-limit breaches: {'; '.join(breaches)}" if breaches else ""),
+            objective_per_mwh=(lcoh or 0.0) + (lcoc or 0.0) + penalty,
+            penalty_per_mwh=penalty,
             lcoh_per_mwh=lcoh,
             lcoc_per_mwh=lcoc,
             capex_million=kpis.capex_million,
@@ -799,6 +952,8 @@ class Evaluator:
             outage_start_indices_used=list(sim.calendar.outage_start_indices),
             thermal_breakthrough_yr=kpis.thermal_breakthrough_yr,
             right_sized_mw=right,
+            limit_breaches=breaches,
+            flags=sim.warnings[:MAX_FLAGS],
             kpis=kpis,
             elapsed_s=time.perf_counter() - start,
         )
@@ -823,6 +978,7 @@ def scenario_evaluator(
     year: YearData | None = None,
     day_indices: Sequence[int] | None = None,
     right_size_backups: bool = False,
+    reject_limit_breaches: bool = True,
 ):
     """Yield an :class:`Evaluator` for ``scenario`` (temporary config copy if it edits config).
 
@@ -837,6 +993,7 @@ def scenario_evaluator(
             year=year,
             day_indices=day_indices,
             right_size_backups=right_size_backups,
+            reject_limit_breaches=reject_limit_breaches,
         )
         return
     with tempfile.TemporaryDirectory(prefix="geoagent-scn-") as tmp:
@@ -850,7 +1007,15 @@ def scenario_evaluator(
             year=year,
             day_indices=day_indices,
             right_size_backups=right_size_backups,
+            reject_limit_breaches=reject_limit_breaches,
         )
+
+
+def _fork_context() -> Any:
+    """Return the fork start method (cheap, inherits loaded state), or None: run serially."""
+    if "fork" not in multiprocessing.get_all_start_methods():
+        return None
+    return multiprocessing.get_context("fork")
 
 
 ScenarioTask = tuple[Scenario, Candidate, list[int] | None]
@@ -878,8 +1043,8 @@ def evaluate_scenarios(
     ``context`` holds the :func:`scenario_evaluator` keywords (config_dir, map_cache_dir,
     parent_concept, year, day_indices, right_size_backups) and an optional ``stage`` label.
     """
-    if workers > 1 and len(tasks) > 1:
-        ctx = multiprocessing.get_context("fork")
+    ctx = _fork_context()
+    if workers > 1 and len(tasks) > 1 and ctx is not None:
         with ctx.Pool(
             min(workers, len(tasks)), initializer=_init_scenario_context, initargs=(context,)
         ) as pool:
@@ -913,8 +1078,8 @@ class EvaluationPool:
         self.cache: dict[str, DesignEvaluation] = {}
         self.history: list[DesignEvaluation] = []
         self._pool = None
-        if self.workers > 1:
-            ctx = multiprocessing.get_context("fork")
+        ctx = _fork_context()
+        if self.workers > 1 and ctx is not None:
             self._pool = ctx.Pool(self.workers, initializer=_init_worker, initargs=(evaluator,))
 
     def close(self) -> None:
@@ -1092,7 +1257,7 @@ class DERun(StrictModel):
     variables: list[Variable]
     fixed_sizes: dict[str, float]
     best_key: str | None
-    best_objective: float
+    best_objective_per_mwh: float
     nfev: int
     nit: int
     message: str
@@ -1105,7 +1270,7 @@ class DispatchVariant(StrictModel):
     lever: str
     value: float
     evaluation: DesignEvaluation
-    delta_objective: float | None
+    delta_objective_per_mwh: float | None
 
 
 class OptimisationResult(StrictModel):
@@ -1258,7 +1423,7 @@ class _RecordingMap:
             designs.append((self.make(flow, sizes), outages))
         results = self.pool.evaluate(designs, stage=self.stage)
         self.records.extend(results)
-        return [r.objective for r in results]
+        return [r.objective_per_mwh for r in results]
 
 
 def _never_called(x: np.ndarray) -> float:  # pragma: no cover - the map evaluates
@@ -1308,15 +1473,15 @@ def run_de(
         mutation=s.mutation,
         recombination=s.recombination,
         seed=seed,
-        polish=False,
+        polish=s.polish,
         init=s.init,
-        updating="deferred",
+        updating=s.updating,
         workers=mapper,
         integrality=[v.integer for v in space.variables],
         x0=x0,
     )
     feasible = [r for r in mapper.records if r.meets_demand]
-    best = min(feasible, key=lambda r: r.objective, default=None)
+    best = min(feasible, key=lambda r: r.objective_per_mwh, default=None)
     run = DERun(
         stage=space.stage,
         doublets=space.doublets,
@@ -1324,7 +1489,7 @@ def run_de(
         variables=space.variables,
         fixed_sizes=space.fixed_sizes,
         best_key=best.key if best else None,
-        best_objective=best.objective if best else float(result.fun),
+        best_objective_per_mwh=best.objective_per_mwh if best else float(result.fun),
         nfev=len(mapper.records),
         nit=int(result.nit),
         message=str(result.message),
@@ -1342,7 +1507,7 @@ def pareto_points(evaluations: Sequence[DesignEvaluation], count: int) -> list[D
     for e in evaluations:
         if e.meets_demand and e.co2_t_per_yr is not None:
             pool.setdefault(e.key, e)
-    items = sorted(pool.values(), key=lambda e: (e.objective, e.co2_t_per_yr))
+    items = sorted(pool.values(), key=lambda e: (e.objective_per_mwh, e.co2_t_per_yr))
     front: list[DesignEvaluation] = []
     best_co2 = math.inf
     for e in items:
@@ -1353,12 +1518,12 @@ def pareto_points(evaluations: Sequence[DesignEvaluation], count: int) -> list[D
     if not front:
         return []
     cheapest = front[0]
-    cleanest = min(front, key=lambda e: (e.co2_t_per_yr, e.objective))
-    lo_obj, hi_obj = cheapest.objective, cleanest.objective
+    cleanest = min(front, key=lambda e: (e.co2_t_per_yr, e.objective_per_mwh))
+    lo_obj, hi_obj = cheapest.objective_per_mwh, cleanest.objective_per_mwh
     lo_co2, hi_co2 = cleanest.co2_t_per_yr or 0.0, cheapest.co2_t_per_yr or 0.0
 
     def distance(e: DesignEvaluation) -> float:
-        a = (e.objective - lo_obj) / (hi_obj - lo_obj) if hi_obj > lo_obj else 0.0
+        a = (e.objective_per_mwh - lo_obj) / (hi_obj - lo_obj) if hi_obj > lo_obj else 0.0
         b = ((e.co2_t_per_yr or 0.0) - lo_co2) / (hi_co2 - lo_co2) if hi_co2 > lo_co2 else 0.0
         return math.hypot(a, b)
 
@@ -1370,19 +1535,23 @@ def pareto_points(evaluations: Sequence[DesignEvaluation], count: int) -> list[D
     return chosen[:count]
 
 
-def _dispatch_levers(concept_has_hp: bool, concept_has_abs: bool, config_dir: Path | None):
-    """DSP-* register levers and their sensitivity bounds (register text)."""
+def _dispatch_levers(
+    candidate: Candidate, parent_concept: str | None, config_dir: Path | None
+) -> list[tuple[str, float]]:
+    """DSP-* levers of the concept at their OPT-SPACE bounds (from the DSP-* sensitivity text)."""
+    _, layout, _ = concept_layout(candidate, parent_concept)
     register = load_config("assumptions", config_dir)
+    space: dict[str, Any] = register.get("OPT-SPACE").value  # type: ignore[assignment]
     levers: list[tuple[str, float]] = []
-    if concept_has_hp:
-        # DSP-HP-MIN sensitivity: min_part_load_frac 0–0.25; max_extra_flow_frac 0–0.25.
-        for key in ("min_part_load_frac", "max_extra_flow_frac"):
-            base = float(register.get("DSP-HP-MIN").value[key])  # type: ignore[index]
-            levers += [(f"DSP-HP-MIN.{key}", v) for v in (0.0, 0.25) if v != base]
-    if concept_has_abs:
-        sens: list[float] = register.get("DSP-ABS-MIN").sensitivity  # type: ignore[assignment]
-        base = float(register.get("DSP-ABS-MIN").value)  # type: ignore[arg-type]
-        levers += [("DSP-ABS-MIN", float(v)) for v in sens if float(v) != base]
+    for lever, bounds in space["dispatch_levers"].items():
+        entry_id, _, key = lever.partition(".")
+        if (entry_id == "DSP-HP-MIN" and not layout.heat_pump) or (
+            entry_id == "DSP-ABS-MIN" and not layout.absorption
+        ):
+            continue
+        value = register.get(entry_id).value
+        base = float(value[key] if key else value)  # type: ignore[index,arg-type]
+        levers += [(lever, float(v)) for v in bounds if float(v) != base]
     return levers
 
 
@@ -1414,7 +1583,7 @@ def _write_outputs(
                 "design_flow_m3h": c.design_flow_m3h,
                 "outage_start_indices": " ".join(map(str, e.outage_start_indices_used)),
                 "status": e.status,
-                "objective": e.objective,
+                "objective": e.objective_per_mwh,
                 "lcoh_per_mwh": e.lcoh_per_mwh,
                 "lcoc_per_mwh": e.lcoc_per_mwh,
                 "capex_million": e.capex_million,
@@ -1440,11 +1609,17 @@ def _summary(result: OptimisationResult) -> str:
     if b is None:
         return (head + "no design meets demand within the hard limits" + tail)[:SUMMARY_MAX_CHARS]
     c = b.candidate
+
+    def fmt(value: float | None, spec: str = ".1f") -> str:
+        return "n/a" if value is None else format(value, spec)
+
     sizes = ", ".join(f"{k.removesuffix('_mw')} {v:.2f}" for k, v in c.equipment_sizes.items())
+    unmet = (b.unmet_heating_mwh or 0.0) + (b.unmet_cooling_mwh or 0.0)
     text = (
-        f"{head}best {c.id}: {c.doublets}×{c.depth_m:.0f} m, {c.design_flow_m3h:.0f} m³/h, "
-        f"{sizes} MW; LCOH {b.lcoh_per_mwh:.1f} + LCOC {b.lcoc_per_mwh:.1f} = "
-        f"{b.objective:.1f} USD/MWh, CO2 {b.co2_t_per_yr:.0f} t/yr, unmet 0" + tail
+        f"{head}best {c.id}: {c.doublets}×{fmt(c.depth_m, '.0f')} m, "
+        f"{fmt(c.design_flow_m3h, '.0f')} m³/h, {sizes} MW; LCOH {fmt(b.lcoh_per_mwh)} + LCOC "
+        f"{fmt(b.lcoc_per_mwh)} = {b.objective_per_mwh:.1f} USD/MWh, CO2 "
+        f"{fmt(b.co2_t_per_yr, '.0f')} t/yr, unmet {unmet:.0f} MWh" + tail
     )
     return text[:SUMMARY_MAX_CHARS]
 
@@ -1510,7 +1685,9 @@ def optimise(
             ],
             stage="screen",
         )
-        ranked = sorted((e for e in screening if e.status == "ok"), key=lambda e: e.objective)
+        ranked = sorted(
+            (e for e in screening if e.status == "ok"), key=lambda e: e.objective_per_mwh
+        )
         if not ranked:
             warnings.append("no screened (doublets, depth) combination could be built/approved")
         for rank, screen in enumerate(ranked[:top_k]):
@@ -1522,7 +1699,7 @@ def optimise(
             )
             runs.append(run)
             fits = [r for r in records if r.meets_demand]
-            size_best = min(fits, key=lambda r: r.objective, default=None)
+            size_best = min(fits, key=lambda r: r.objective_per_mwh, default=None)
             outages = outage_space(size_best, evaluator, request) if size_best else None
             if size_best is not None and outages is not None:
                 # Seed with the SIM-OUTAGE default schedule: the search can only improve on it.
@@ -1538,7 +1715,9 @@ def optimise(
                 )
                 runs.append(run)
         history = list(pool.history)
-    searched = min((e for e in history if e.meets_demand), key=lambda e: e.objective, default=None)
+    searched = min(
+        (e for e in history if e.meets_demand), key=lambda e: e.objective_per_mwh, default=None
+    )
     if searched is None:
         warnings.append(
             "no evaluated design meets demand: the result lists the closest ones; enlarge the "
@@ -1553,14 +1732,16 @@ def optimise(
                 "description": "TL-13 optimum (LCOH + LCOC, zero unmet demand)",
             }
         )
-        best = evaluator.evaluate(named, searched.outage_start_indices, stage="final")
-        history.append(best)
-        if not best.meets_demand or not math.isclose(
-            best.objective, searched.objective, rel_tol=1e-6
+        final = evaluator.evaluate(named, searched.outage_start_indices, stage="final")
+        history.append(final)
+        best = final if final.meets_demand else None
+        if best is None or not math.isclose(
+            final.objective_per_mwh, searched.objective_per_mwh, rel_tol=1e-6
         ):
             warnings.append(
-                f"final run with the right-sized nameplates gives {best.objective:.3f} vs "
-                f"{searched.objective:.3f} in the search (unmet {best.unmet_heating_mwh} MWh)"
+                f"final run with the right-sized nameplates: {final.status}, "
+                f"{final.objective_per_mwh:.3f} vs {searched.objective_per_mwh:.3f} USD/MWh in the "
+                f"search ({final.reason[:120]})" + ("; no optimum reported" if best is None else "")
             )
         # Post-search alternatives of the searched design (backups right-sized for each).
         tasks: list[tuple[str, float, ScenarioTask]] = []
@@ -1568,9 +1749,7 @@ def optimise(
             base = Scenario(db30_answer=request.db30_answer)
             tasks.append(("default-outage", 0.0, (base, c, None)))
         if request.dispatch_search:
-            layout_hp = "hthp_heating_mw" in c.equipment_sizes
-            layout_abs = "absorption_chiller_mw" in c.equipment_sizes
-            for lever, value in _dispatch_levers(layout_hp, layout_abs, cfg):
+            for lever, value in _dispatch_levers(c, request.parent_concept, cfg):
                 scenario = Scenario(
                     name=f"{lever}={value:g}",
                     assumptions={lever: value},
@@ -1587,9 +1766,11 @@ def optimise(
                 continue
             e = e.model_copy(update={"stage": "dispatch"})
             history.append(e)
-            delta = e.objective - searched.objective if e.status == "ok" else None
+            delta = e.objective_per_mwh - searched.objective_per_mwh if e.status == "ok" else None
             dispatch_variants.append(
-                DispatchVariant(lever=lever, value=value, evaluation=e, delta_objective=delta)
+                DispatchVariant(
+                    lever=lever, value=value, evaluation=e, delta_objective_per_mwh=delta
+                )
             )
         storage_scan = _storage_scan(request, named, best, evaluator, register, warnings)
         history += storage_scan
@@ -1603,7 +1784,7 @@ def optimise(
         best=best,
         default_outage=default_outage,
         dispatch_variants=dispatch_variants,
-        pareto=pareto_points([e for e in history if e.scenario == "base"], s.pareto_points),
+        pareto=pareto_points(_priced_designs(history), s.pareto_points),
         storage_scan=storage_scan,
         rejected=rejected[:MAX_REJECTED_KEPT],
         n_evaluations=len(history),
@@ -1613,6 +1794,30 @@ def optimise(
         warnings=warnings,
     )
     return result, history
+
+
+def _priced_designs(history: Sequence[DesignEvaluation]) -> list[DesignEvaluation]:
+    """Base-scenario evaluations with their right-sized nameplates written into the candidate.
+
+    So a Pareto point is the design that was priced; the named optimum comes first (it wins
+    the de-duplication by design key against its search twin).
+    """
+    out = []
+    for e in sorted((e for e in history if e.scenario == "base"), key=lambda e: e.stage != "final"):
+        if e.right_sized_mw:
+            sized = e.candidate.equipment_sizes | e.right_sized_mw
+            e = e.model_copy(
+                update={
+                    "candidate": e.candidate.model_copy(update={"equipment_sizes": sized}),
+                    "key": design_key(
+                        e.candidate.model_copy(update={"equipment_sizes": sized}),
+                        e.outage_start_indices,
+                        e.scenario,
+                    ),
+                }
+            )
+        out.append(e)
+    return out
 
 
 def _storage_scan(

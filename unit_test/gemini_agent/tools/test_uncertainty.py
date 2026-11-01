@@ -259,10 +259,16 @@ def test_discrete_cases_include_db31_eco_co2_and_chp(report):
         assert e.candidate.heating_return_degc == float(name.split("=")[1])
         assert cases[name].assumption_id == "DB-31"
     # A colder return lets the plate HEX take more heat: CO₂ and cost fall (the S6 trade-off).
-    cold, hot = cases["DB-31=45"].delta_co2_t, cases["DB-31=75"].delta_co2_t
+    cold, hot = cases["DB-31=45"].delta_co2_t_per_yr, cases["DB-31=75"].delta_co2_t_per_yr
     assert cold is not None and hot is not None and cold < 0 < hot
     chp = cases["CHP-EL-FRAC=0.5"]
-    assert chp.evaluation.status == "ok" and chp.delta_objective is not None
+    assert chp.evaluation.status == "ok" and chp.delta_cost_per_mwh is not None
+    assert chp.delta_lcoh_per_mwh != 0.0 and chp.delta_co2_t_per_yr != 0.0  # reaches chp.py
+    base_margins = report.base.kpis.min_constraint_margins  # type: ignore[union-attr]
+    pure_case = cases["SUB-PBUB.basis=pure_water"].evaluation
+    assert pure_case.kpis is not None
+    pure = pure_case.kpis.min_constraint_margins
+    assert pure["esp_1_intake_margin_bar"] != base_margins["esp_1_intake_margin_bar"]  # TL-05
     assert cases["DB-30=B"].evaluation.outage_start_indices is None
 
 
@@ -289,19 +295,23 @@ def test_one_at_a_time_bars_and_fixed_capex(year):
     report = analyse(request, year=year)
     bars = {b.input_name: b for b in report.one_at_a_time}
     assert set(bars) == set(request.inputs)  # type: ignore[arg-type]
-    swings = [b.swing for b in report.one_at_a_time]
+    swings = [b.swing_per_mwh for b in report.one_at_a_time]
     assert swings == sorted(swings, reverse=True)
     demand = bars["heating_demand_scale"]
-    assert (demand.low_value, demand.high_value) == (0.9, 1.1) and demand.swing > 0
-    assert demand.cost_low is not None and demand.cost_high is not None
-    assert demand.swing == pytest.approx(abs(demand.cost_high - demand.cost_low))
-    assert demand.lcoh_low is not None and demand.lcoc_low is not None
-    assert demand.cost_low == pytest.approx(demand.lcoh_low + demand.lcoc_low)
+    assert (demand.low_value, demand.high_value) == (0.9, 1.1) and demand.swing_per_mwh > 0
+    assert demand.cost_low_per_mwh is not None and demand.cost_high_per_mwh is not None
+    assert demand.swing_per_mwh == pytest.approx(
+        abs(demand.cost_high_per_mwh - demand.cost_low_per_mwh)
+    )
+    assert demand.lcoh_low_per_mwh is not None and demand.lcoc_low_per_mwh is not None
+    assert demand.cost_low_per_mwh == pytest.approx(
+        demand.lcoh_low_per_mwh + demand.lcoc_low_per_mwh
+    )
     assert (
         report.samples == [] and report.percentiles == {} and report.probability_demand_met is None
     )
     # COOL-ELC η is inert while the chiller sits on its COP cap (20 °C chilled water, RC-06).
-    assert bars["electric_chiller_carnot_efficiency"].swing == pytest.approx(0.0, abs=1e-9)
+    assert bars["electric_chiller_carnot_efficiency"].swing_per_mwh == pytest.approx(0.0, abs=1e-9)
 
 
 def test_same_seed_same_monte_carlo_serial_and_parallel(year):

@@ -133,8 +133,10 @@ def test_scenario_year_scales_demand_and_shifts_ambient(year):
     for a, b in zip(year.days, shifted.days, strict=True):
         assert b.heating_demand_mw == pytest.approx(1.1 * a.heating_demand_mw)
         assert b.cooling_demand_mw == pytest.approx(0.9 * a.cooling_demand_mw)
-        assert b.ambient_dry_bulb_degc == pytest.approx(a.ambient_dry_bulb_degc + 5.0)
     assert scenario_year(year, Scenario()) is year
+    for a, b in zip(year.days, shifted.days, strict=True):
+        expected = 5.0 if a.cooling_demand_mw > 0 else 0.0  # DB-34b is a summer design point
+        assert b.ambient_dry_bulb_degc == pytest.approx(a.ambient_dry_bulb_degc + expected)
 
 
 # --------------------------------------------------------------------------- search space
@@ -171,28 +173,32 @@ def test_hard_limit_violation_is_rejected_with_the_guard_reason_never_priced(eva
         e = evaluator.evaluate(bad)
         assert e.status == "rejected" and code in e.violations
         assert e.reason.startswith("TL-10") and code in e.reason
-        assert e.objective == evaluator.settings.rejected_objective
+        assert e.objective_per_mwh == evaluator.settings.rejected_objective
         assert e.kpis is None and e.lcoh_per_mwh is None and not e.meets_demand
 
 
 def test_objective_is_lcoh_plus_lcoc_and_unmet_is_penalised(evaluator):
     """OPT-OBJ: meets demand ⇒ LCOH + LCOC; a too-small boiler ⇒ base + slope × unmet MWh."""
     good = evaluator.evaluate(candidate())
-    assert good.status == "ok" and good.meets_demand and good.penalty == 0.0
-    assert good.objective == pytest.approx(good.lcoh_per_mwh + good.lcoc_per_mwh)
+    assert good.status == "ok" and good.meets_demand and good.penalty_per_mwh == 0.0
+    assert good.objective_per_mwh == pytest.approx(good.lcoh_per_mwh + good.lcoc_per_mwh)
     short = evaluator.evaluate(
         candidate(hthp_heating_mw=1.0, peak_boiler_mw=0.0, electric_chiller_mw=0.5), None
     )
-    unmet = short.unmet_heating_mwh + short.unmet_cooling_mwh
+    assert short.status == "ok", short.reason  # supply shortfall = unmet demand (penalised)
+    assert short.limit_breaches  # DB-16/DB-17 margins < 0 come with the unmet demand
+    unmet = short.unmet_heating_mwh + short.unmet_cooling_mwh  # type: ignore[operator]
     s = evaluator.settings
     assert unmet > 0 and not short.meets_demand
-    assert short.penalty == pytest.approx(
+    assert short.penalty_per_mwh == pytest.approx(
         s.unmet_penalty_base_per_mwh + s.unmet_penalty_per_unmet_mwh * unmet
     )
-    assert short.objective == pytest.approx(short.lcoh_per_mwh + short.lcoc_per_mwh + short.penalty)
+    assert short.objective_per_mwh == pytest.approx(
+        short.lcoh_per_mwh + short.lcoc_per_mwh + short.penalty_per_mwh
+    )
     # (On a full year LCOH + LCOC ≈ 90 USD/MWh, so the 1000 USD/MWh base always dominates; the
     # day subset inflates LCOH, hence no ordering assertion here.)
-    assert short.penalty > s.unmet_penalty_base_per_mwh
+    assert short.penalty_per_mwh > s.unmet_penalty_base_per_mwh
 
 
 def test_capex_request_maps_the_generated_plant(evaluator):
@@ -229,6 +235,59 @@ def test_scenario_model_override_reaches_the_gemini_model(year):
     assert hp and sum(e_low[k] for k in hp) > sum(e_base[k] for k in hp)
 
 
+def test_operational_hard_limit_breach_is_rejected_not_penalised(year, monkeypatch):
+    """A WP-07 margin below zero on DB-11/12/14/16/17 rejects the year (golden rule 4)."""
+    import gemini_agent.tools.optimise as module
+
+    real = module.economics
+
+    def breached(request, annual, **kwargs):
+        result = real(request, annual, **kwargs)
+        margins = result.data.kpis.min_constraint_margins | {"heating_supply_margin_k": -7.4}
+        kpis = result.data.kpis.model_copy(update={"min_constraint_margins": margins})
+        return result.model_copy(update={"data": result.data.model_copy(update={"kpis": kpis})})
+
+    monkeypatch.setattr(module, "economics", breached)
+    e = Evaluator.build(year=year, day_indices=DAYS).evaluate(candidate())
+    assert e.status == "rejected" and e.violations == ["DB-16"]
+    assert "heating_supply_margin_k = -7.4 (DB-16)" in e.reason and e.kpis is None
+    kept = Evaluator.build(year=year, day_indices=DAYS, reject_limit_breaches=False)
+    e = kept.evaluate(candidate())
+    assert e.status == "ok" and e.limit_breaches == ["heating_supply_margin_k = -7.4 (DB-16)"]
+    assert not e.meets_demand  # TL-15 counts it as demand not met
+    assert (
+        module.limit_breaches({"hthp_capacity_margin_mw": -1.0, "doublet_2_flow_margin_m3h": -1e-9})
+        == []
+    )
+
+
+def test_electric_chiller_covers_the_db34b_design_day(year):
+    """Right-sized chiller ≥ its duty on the DB-19 peak day at the DB-34b design ambient."""
+    evaluator = Evaluator.build(year=year, day_indices=DAYS, right_size_backups=True)
+    run = evaluator.run(candidate(hthp_heating_mw=6.0), keep=True)
+    design_duty = evaluator.design_day_chiller_mw(run.plant)  # type: ignore[arg-type]
+    days = run.simulation.annual.days  # type: ignore[union-attr]
+    largest = max(d.cool_by_source_mw.get("electric_chiller", 0.0) for d in days)
+    assert design_duty > largest  # smoothed normals never reach 25/18.4 °C
+    sized = run.evaluation.right_sized_mw["electric_chiller_mw"]
+    assert design_duty <= sized < design_duty + 0.05 + 1e-9
+
+
+def test_free_cooling_tower_is_priced(evaluator):
+    """The free-cooling rejection beyond the chiller plant's own tower is a CapexRequest tower."""
+    run = evaluator.run(candidate(electric_chiller_mw=2.0), keep=True)
+    capex = capex_request(run.plant, run.simulation.annual)  # type: ignore[arg-type,union-attr]
+    days = run.simulation.annual.days  # type: ignore[union-attr]
+    rejection = max(
+        d.cool_by_source_mw.get("free_cooling", 0.0)
+        + d.cool_by_source_mw.get("electric_chiller", 0.0)
+        + d.electricity_by_consumer_mw.get("electric_chiller", 0.0)
+        for d in days
+    )
+    assert 0.0 < capex.cooling_tower_mw < rejection
+    assert capex.free_cooling_mw > 0.0
+
+
 def test_pool_caches_identical_designs(evaluator):
     """Same design twice ⇒ one evaluation (key excludes the candidate id)."""
     a = candidate()
@@ -246,7 +305,7 @@ def test_pareto_points_are_non_dominated():
             key=key,
             candidate=candidate(),
             status="ok",
-            objective=objective,
+            objective_per_mwh=objective,
             co2_t_per_yr=co2,
             unmet_heating_mwh=unmet,
             unmet_cooling_mwh=0.0,
@@ -283,12 +342,17 @@ def test_tiny_optimisation_finds_a_feasible_guarded_design(tiny_run):
     assert best is not None and best.meets_demand and best.status == "ok"
     assert best.candidate.id.endswith("-opt") and best.stage == "final"
     searched = [e for e in history if e.stage.startswith(("screen", "de-")) and e.meets_demand]
-    assert best.objective == pytest.approx(min(e.objective for e in searched), rel=1e-9)
+    assert best.objective_per_mwh == pytest.approx(
+        min(e.objective_per_mwh for e in searched), rel=1e-9
+    )
     assert best.outage_start_indices is not None
     assert result.default_outage is not None and result.default_outage.outage_start_indices is None
     # The outage stage is seeded with the SIM-OUTAGE schedule, so it can only improve on it.
-    assert best.objective <= result.default_outage.objective + 1e-9
-    assert len(result.pareto) <= 3 and result.pareto[0].objective <= result.pareto[-1].objective
+    assert best.objective_per_mwh <= result.default_outage.objective_per_mwh + 1e-9
+    assert len(result.pareto) <= 3
+    assert result.pareto[0].objective_per_mwh <= result.pareto[-1].objective_per_mwh
+    for point in result.pareto:  # the priced design: right-sized nameplates written in
+        assert {"peak_boiler_mw", "electric_chiller_mw"} <= set(point.candidate.equipment_sizes)
     assert result.n_evaluations == len(history)
     assert not [w for w in result.warnings if "right-sized" in w]
 
@@ -301,7 +365,7 @@ def test_backups_are_right_sized_and_confirmed(tiny_run):
     assert {"peak_boiler_mw", "electric_chiller_mw"} <= set(sizes)
     searched = min(
         (e for e in history if e.stage.startswith(("screen", "de-")) and e.meets_demand),
-        key=lambda e: e.objective,
+        key=lambda e: e.objective_per_mwh,
     )
     assert searched.right_sized_mw == {
         k: sizes[k] for k in ("peak_boiler_mw", "electric_chiller_mw")
@@ -323,7 +387,9 @@ def test_outage_stage_reuses_the_plant_and_memoises(year):
     assert second.plant is plant
     assert len(plant._memo_run) < 2 * n_run  # type: ignore[union-attr]
     fresh = Evaluator.build(year=year, day_indices=DAYS).evaluate(design, [50, 200])
-    assert fresh.objective == second.evaluation.objective  # memo gives identical results
+    assert (
+        fresh.objective_per_mwh == second.evaluation.objective_per_mwh
+    )  # memo gives identical results
 
 
 def test_dispatch_levers_are_priced_from_register_bounds(tiny_run):
@@ -335,7 +401,7 @@ def test_dispatch_levers_are_priced_from_register_bounds(tiny_run):
     assert ("DSP-HP-MIN.max_extra_flow_frac", 0.25) in levers
     for variant in result.dispatch_variants:
         assert variant.evaluation.scenario == f"{variant.lever}={variant.value:g}"
-        assert variant.delta_objective is not None
+        assert variant.delta_objective_per_mwh is not None
 
 
 def test_storage_scan_is_unpriced_c6(tiny_run):
@@ -353,15 +419,17 @@ def test_same_seed_same_result_serial_and_parallel(tiny_run, year):
     quick = {"dispatch_search": False, "storage_sizes": []}
     again, history_again = optimise(tiny_request(**quick), year=year)
     parallel, history_parallel = optimise(tiny_request(workers=2, **quick), year=year)
-    reference = [(e.key, e.objective) for e in history if e.stage.startswith(("screen", "de-"))]
+    reference = [
+        (e.key, e.objective_per_mwh) for e in history if e.stage.startswith(("screen", "de-"))
+    ]
     for other in (history_again, history_parallel):
-        assert [(e.key, e.objective) for e in other if e.stage.startswith(("screen", "de-"))] == (
-            reference
-        )
+        assert [
+            (e.key, e.objective_per_mwh) for e in other if e.stage.startswith(("screen", "de-"))
+        ] == (reference)
     for other in (again, parallel):
         assert other.best is not None and first.best is not None
         assert other.best.key == first.best.key
-        assert other.best.objective == first.best.objective
+        assert other.best.objective_per_mwh == first.best.objective_per_mwh
     other_seed, _ = optimise(tiny_request(seed=7, **quick), year=year)
     assert other_seed.seed == 7
 
