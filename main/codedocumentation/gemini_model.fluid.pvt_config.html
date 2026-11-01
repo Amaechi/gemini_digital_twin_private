@@ -201,8 +201,10 @@ keys the block does not set keep the <code class="docutils literal notranslate">
 <li><p><strong>TypeError</strong> – If the block is not a dict, a key is not a string, or a value is not
     a real number.</p></li>
 <li><p><strong>ValueError</strong> – If a key is unknown, an alias and its native key disagree, a value is
-    not finite, a density/viscosity/heat capacity/conductivity is not
-    positive, or <code class="docutils literal notranslate"><span class="pre">GMF</span></code> is outside <code class="docutils literal notranslate"><span class="pre">[0,</span> <span class="pre">1)</span></code>.</p></li>
+    not finite, a density/viscosity/heat capacity/conductivity/surface
+    tension is not positive, or <code class="docutils literal notranslate"><span class="pre">GMF</span></code> is outside <code class="docutils literal notranslate"><span class="pre">[0,</span> <span class="pre">1)</span></code>.</p></li>
+<li><p><strong>Python and numpy real numbers</strong><strong> (</strong><strong>int</strong><strong>, </strong><strong>float</strong><strong>, </strong><strong>np.int64</strong><strong>,</strong> – </p></li>
+<li><p><strong>np.float32` </strong><strong>...</strong><strong>) </strong><strong>are accepted; booleans are not</strong> – </p></li>
 </ul>
 </dd>
 </dl>

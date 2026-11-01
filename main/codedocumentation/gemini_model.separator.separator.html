@@ -179,8 +179,10 @@ gas, kg/s) and <code class="docutils literal notranslate"><span class="pre">co2_
 CO2, kg/s). The species flows are the composition’s mass fractions
 times <code class="docutils literal notranslate"><span class="pre">gas_mass_flow_rate</span></code>, so they always add up to it (also
 with an explicit <code class="docutils literal notranslate"><span class="pre">gas_density</span></code>). Without a composition the
-species/CO2 outputs are 0, and <code class="docutils literal notranslate"><span class="pre">fuel_power_w</span></code> is 0 unless
-<code class="docutils literal notranslate"><span class="pre">fuel_lhv_j_kg</span></code> is given. <code class="docutils literal notranslate"><span class="pre">emission</span></code> stays 0: the separator
+species/CO2 outputs are 0, and <code class="docutils literal notranslate"><span class="pre">fuel_power_w</span></code> needs both
+<code class="docutils literal notranslate"><span class="pre">gas_density</span></code> and <code class="docutils literal notranslate"><span class="pre">fuel_lhv_j_kg</span></code>: it is 0 without an LHV,
+and an LHV with <code class="docutils literal notranslate"><span class="pre">gas_water_ratio</span></code> &gt; 0 but no gas density raises
+<code class="docutils literal notranslate"><span class="pre">ValueError</span></code> (the fuel would silently be 0 W). <code class="docutils literal notranslate"><span class="pre">emission</span></code> stays 0: the separator
 does not emit; the CO2 is counted where the gas is burned (or
 vented).</p>
 </dd></dl>
