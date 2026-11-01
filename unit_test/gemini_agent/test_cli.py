@@ -109,6 +109,16 @@ def test_run_llm_engine_offline(tmp_path, capsys, monkeypatch):
     calls = (tmp_path / "llm1" / "llm_calls.jsonl").read_text().splitlines()
     assert calls and all(json.loads(line)["decision_source"] == "llm" for line in calls)
 
+    # resume without --engine keeps the engine the run was started with
+    base = ["--runs-dir", str(tmp_path)]
+    assert main(["run", "--engine", "llm", *base, "--run-id", "lp", "--input-mode", "pause"]) == (
+        EXIT_PAUSED
+    )
+    before = len((tmp_path / "lp" / "llm_calls.jsonl").read_text().splitlines())
+    assert main(["resume", *base, "--run-id", "lp", "--answer", "A"]) == EXIT_PAUSED
+    after = len((tmp_path / "lp" / "llm_calls.jsonl").read_text().splitlines())
+    assert after > before
+
 
 def test_no_command_prints_help(capsys):
     """Without a command the CLI prints help and exits cleanly."""

@@ -32,8 +32,10 @@ from pydantic import ValidationError
 from gemini_agent import __version__
 from gemini_agent.agents.engine import create_decision_engine
 from gemini_agent.logging.llm_logger import LLMLogger
+from gemini_agent.memory.event_store import SQLiteEventStore
 from gemini_agent.runner.design_runner import (
     RUNS_ROOT,
+    STORE_FILE,
     DesignRunner,
     InvalidAnswer,
     RunResult,
@@ -133,10 +135,26 @@ def ask_terminal(request: InputRequest) -> str | None:
         return None
 
 
-def _runner(args: argparse.Namespace, run_id: str) -> DesignRunner:
+def _stored_engine(runs_root: Path, run_id: str) -> str | None:
+    """Engine a run was started with ('policy' or 'llm'), or None if the run is unknown."""
+    path = runs_root / run_id / STORE_FILE
+    if not path.exists():
+        return None
+    store = SQLiteEventStore(path)
+    try:
+        record = store.get_run(run_id)
+    finally:
+        store.close()
+    if record is None:
+        return None
+    return "llm" if str(record.state.get("engine", "")).startswith("llm") else "policy"
+
+
+def _runner(args: argparse.Namespace, run_id: str, *, resuming: bool = False) -> DesignRunner:
     llm_config = load_config("llm", args.config_dir)
-    engine_name = args.engine or llm_config.engine
     runs_root = args.runs_dir or RUNS_ROOT
+    stored = _stored_engine(runs_root, run_id) if resuming and not args.engine else None
+    engine_name = args.engine or stored or llm_config.engine
     toolbox = default_toolbox()
     engine = create_decision_engine(
         engine_name,
@@ -194,7 +212,7 @@ def _run(args: argparse.Namespace) -> int:
 
 def _resume(args: argparse.Namespace) -> int:
     try:
-        runner = _runner(args, args.run_id)
+        runner = _runner(args, args.run_id, resuming=True)
     except (OSError, yaml.YAMLError, ValidationError) as exc:
         print(f"config error: {exc}", file=sys.stderr)
         return EXIT_CONFIG_ERROR
