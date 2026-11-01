@@ -357,14 +357,16 @@ def test_doublet_off_is_omitted_and_flows_are_validated():
 
 
 def test_tool_result_and_register_ids():
-    """TL-09 result: short summary and every assumption id exists in the register (CFG-CHP 1/3)."""
+    """TL-09 result: short summary; every assumption id exists (CHP share = CHP-EL-FRAC 1/3)."""
     result = generate_gemini_config(ConfigRequest(candidate=make_candidate("C3", 2)))
     assert len(result.summary) <= SUMMARY_MAX_CHARS and result.summary.startswith("TL-09")
     register = load_config("assumptions")
     for assumption_id in result.assumption_ids:
         register.get(assumption_id)
-    chp = register.get("CFG-CHP").value
-    assert chp["electrical_fraction"] == pytest.approx(1 / 3)
+    assert "CHP-EL-FRAC" in result.assumption_ids
+    assert register.get("CHP-EL-FRAC").value == pytest.approx(1 / 3, abs=5e-5)
+    assert set(register.get("CFG-CHP").value) == {"total_efficiency_frac"}  # no duplicate share
+    assert load_generator_basis().chp_electrical_fraction == 0.3333
 
 
 # --------------------------------------------------------------------------- GEMINI example
@@ -436,7 +438,7 @@ def test_doublet_example_reproduced_within_one_percent():
 
 
 def test_register_gas_and_chp_values_match_the_code(tmp_path):
-    """CFG-ASSOC-GAS equals the computed values; CFG-CHP must match GEMINI's hard-coded 1/3."""
+    """CFG-ASSOC-GAS equals the computed values; CHP-EL-FRAC must match GEMINI's hard-coded 1/3."""
     register = load_config("assumptions")
     assoc = register.get("CFG-ASSOC-GAS").value
     lhv, factor, density = gas_burner_values(0.8, 0.2)
@@ -447,10 +449,9 @@ def test_register_gas_and_chp_values_match_the_code(tmp_path):
     shutil.copytree(REPO_ROOT / "config", config_dir)
     path = config_dir / "assumptions.yaml"
     text = path.read_text(encoding="utf-8")
-    path.write_text(
-        text.replace("electrical_fraction: 0.3333333333333333", "electrical_fraction: 0.5"),
-        encoding="utf-8",
-    )
+    start = text.index("  - id: CHP-EL-FRAC\n")
+    block = text[start:].replace("    value: 0.3333\n", "    value: 0.5\n", 1)
+    path.write_text(text[:start] + block, encoding="utf-8")
     with pytest.raises(ConfigError, match="hard-coded"):
         load_generator_basis(config_dir)
 

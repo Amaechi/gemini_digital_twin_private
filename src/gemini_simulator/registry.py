@@ -13,6 +13,8 @@ gives a single place to extend when new gemini_model components are added.
 # Modified by the GeoAgent team for SPE GeoHackathon 2026, 2026-11-01: registered the WP-02
 # cooling models "absorption_chiller", "electric_chiller", "heat_rejection", "free_cooling"
 # (GM-04...GM-07).
+# Modified by the GeoAgent team for SPE GeoHackathon 2026, 2026-11-01: registered the WP-03
+# models "electric_boiler" and "thermal_storage" (GM-08, GM-09).
 
 from gemini_model.absorption_chiller.absorption_chiller import AbsorptionChiller
 from gemini_model.adder.adder import Adder
@@ -21,6 +23,7 @@ from gemini_model.booster_pump.booster_pump import BoosterPump
 from gemini_model.chp.chp import CHP
 from gemini_model.compressor.compressor import Compressor
 from gemini_model.corrosion.co2_corrosion import CO2Corrosion
+from gemini_model.electric_boiler.electric_boiler import ElectricBoiler
 from gemini_model.electric_chiller.electric_chiller import ElectricChiller
 from gemini_model.filter.filter import Filter
 from gemini_model.fluid.pvt_water_stp import PVTConstantSTP
@@ -35,6 +38,7 @@ from gemini_model.reservoir.inflow_performance import IPR
 from gemini_model.reservoir.reservoir_pressuredrop import bottomhole_skin_dp
 from gemini_model.separator.separator import Separator
 from gemini_model.splitter.splitter import Splitter
+from gemini_model.thermal_storage.thermal_storage import ThermalStorage
 from gemini_model.well.pressure_drop import DPDT
 from gemini_simulator.well_components import InjectorWell, ProducerWell
 
@@ -66,6 +70,9 @@ COMPONENT_REGISTRY = {
     "electric_chiller": ElectricChiller,
     "heat_rejection": HeatRejection,
     "free_cooling": FreeCooling,
+    # GM-08, GM-09 (WP-03): electric boiler (static) and thermal storage (DynamicModel).
+    "electric_boiler": ElectricBoiler,
+    "thermal_storage": ThermalStorage,
 }
 
 # Component types that need extra, non-`parameters` setup after

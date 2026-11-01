@@ -72,6 +72,10 @@ GENERATOR_VERSION = 1
 """Bumped when the generated topology changes (part of every design-cache namespace)."""
 
 JOULE_PER_GJ = 1.0e9
+CHP_FRACTION_ID = "CHP-EL-FRAC"
+"""Register id of the CHP electrical share (owned by WP-03; WP-08 reads the same entry)."""
+CHP_FRACTION_TOL = 5e-5
+"""CHP-EL-FRAC is stored to 4 decimals (0.3333) while chp.py uses exactly 1/3."""
 CR_BALANCED_TOL = 1e-9
 """|1 − C_r| below which a counter-flow HEX is treated as balanced (C_r = 1 limit)."""
 DISTRICT_FLUID = heat_exchanger_fluid_parameters()
@@ -94,6 +98,7 @@ GENERATOR_ASSUMPTION_IDS: tuple[str, ...] = (
     "DB-36",
     "DB-40",
     "VER-HP-LIFT",
+    "CHP-EL-FRAC",
 )
 
 ComponentRole = Literal[
@@ -782,7 +787,7 @@ class GeneratorBasis(StrictModel):
     hp_eta: float
     hp_max_lift_k: float = Field(description="VER-HP-LIFT: sink outlet − source outlet.")
     chp_total_efficiency_frac: float
-    chp_electrical_fraction: float
+    chp_electrical_fraction: float = Field(description="CHP-EL-FRAC (WP-03) = chp.py 1/3.")
     boiler_efficiency_frac: float
     grid_gas_lhv_j_kg: float
     grid_gas_emission_kg_per_gj: float
@@ -820,10 +825,14 @@ def load_generator_basis(config_dir: Path | str | None = None) -> GeneratorBasis
     chp_cfg = _entry(register, "CFG-CHP")
     boiler_cfg = _entry(register, "CFG-BOILER")
     grid_cfg = _entry(register, "CFG-GRID-GAS")
-    if not math.isclose(float(chp_cfg["electrical_fraction"]), CHP.ELECTRICAL_POWER_FRACTION):
+    # The CHP electrical share is WP-03's register entry; GEMINI chp.py hard-codes it.
+    electrical_fraction = float(register.get(CHP_FRACTION_ID).value)  # type: ignore[arg-type]
+    if not math.isclose(
+        electrical_fraction, CHP.ELECTRICAL_POWER_FRACTION, abs_tol=CHP_FRACTION_TOL
+    ):
         raise ConfigError(
-            f"CFG-CHP electrical_fraction {chp_cfg['electrical_fraction']} differs from GEMINI "
-            f"chp.py ({CHP.ELECTRICAL_POWER_FRACTION:.4f}), which is hard-coded: add an "
+            f"{CHP_FRACTION_ID} {electrical_fraction} differs from GEMINI chp.py "
+            f"({CHP.ELECTRICAL_POWER_FRACTION:.4f}), which is hard-coded: add an "
             "electrical_fraction parameter to chp.py before changing it"
         )
     brine = basis.brine
@@ -854,7 +863,7 @@ def load_generator_basis(config_dir: Path | str | None = None) -> GeneratorBasis
         hp_eta=float(hp_cfg["eta"]),
         hp_max_lift_k=float(register.get("VER-HP-LIFT").value),  # type: ignore[arg-type]
         chp_total_efficiency_frac=float(chp_cfg["total_efficiency_frac"]),
-        chp_electrical_fraction=float(chp_cfg["electrical_fraction"]),
+        chp_electrical_fraction=electrical_fraction,
         boiler_efficiency_frac=float(boiler_cfg["efficiency_frac"]),
         grid_gas_lhv_j_kg=grid_lhv,
         grid_gas_emission_kg_per_gj=float(grid_cfg["emission_kg_per_gj"]),
