@@ -76,6 +76,9 @@ Status values: todo · in progress · in review · merged · blocked (say why).
 
 - WP-01: none added (all values are [P] DB-08/DB-09, [A] DB-33 already registered, or [D] RC-08).
 
+- WP-02 added (merged as #7; appended to `config/assumptions.yaml`): **COOL-ABS-B** Dühring slope B = 1.15 of the LiBr characteristic equation (RC-05 Method B [A]); **COOL-ABS-CAL** characteristic coefficients calibrated to the Method A rating points (no datasheet) [A]; **COOL-ABS-CAP** capacity never above nameplate (1.0 × nominal) [A]; **COOL-ABS-LB** Method A outside its validity evaluated at the conservative edge (chilled water > 50 °F, cooling water < 75 °F) [A]; **COOL-ABS-AUX** auxiliary power 2.19 % of cooling duty (RC-05, Guidebook p.269 [L]); **COOL-ABS-PL** part-load behaviour (Method B ΔΔt reduction; Method A COP unchanged) [A]; **COOL-ABS-DRV** drive-side consistency with a given drive flow (minimum drive capacity rate; Method A drive outlet ≥ 71.4 °C) [A]; **COOL-ELC** electric-chiller Carnot efficiency 0.508 on the refrigerant basis, calibrated to COP 4.39 (RC-06, Guidebook p.257–258 [D]); **COOL-ELC-APPROACH** evaporator 4 K / condenser 3 K / tower 4.5 K approaches, COP 3–8 (RC-06 [A]); **COOL-HR** heat-rejection defaults: tower approach 4.5 K, range 5 K, aux 2 %, dry cooler (RC-07 [A]/[L]); **COOL-FC** free-cooling defaults: tower 4.5 K + plate-HEX 2 K approach, aux 2 % (RC-07, RC-03 [A]).
+- WP-09 added (appended to `config/assumptions.yaml`): **VER-ESP-PB** ESP-intake / CO₂-release setpoint 60 bar(a) = 1.2 × Henry's-law bubble point, used when no p_b is computed (RC-01 item 9 [A]); **VER-ESP-MARGIN** factor 1.2 the verifier applies to a bare p_b (RC-01 item 9 [A]); **VER-HP-ETA** heat-pump COP ≤ 0.6 × Carnot without a datasheet (RC-04 [A]); **VER-HP-LIFT** heat-pump lift ≤ 60 K (sink outlet − source outlet) without a datasheet (RC-04 [A]).
+
 ## Open questions for organisers (Discord)
 See spec §17. Answers: —
 
