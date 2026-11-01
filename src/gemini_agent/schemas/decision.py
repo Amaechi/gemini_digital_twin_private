@@ -11,6 +11,7 @@ produce engineering numbers: every number comes from a tool result (CLAUDE.md go
 
 from __future__ import annotations
 
+import re
 from enum import StrEnum
 from typing import Any, Literal
 
@@ -132,6 +133,26 @@ class DesignVerdict(StrEnum):
 
 def _word_count(text: str) -> int:
     return len(text.split())
+
+
+_NUMBER_WITH_UNIT = re.compile(
+    r"(?<![\w.\-])\d+(?:[.,]\d+)?\s*(?:°C|degC|K|kW|MW|GW|kWh|MWh|GWh|m3/h|m³/h|m3|m³|bar|barg|"
+    r"kPa|Pa|%|USD|EUR|€|km|m|t/yr|kg|yr|years?)(?![\w/])"
+)
+"""A quantity with a unit, e.g. '55 degC', '300 m3/h', '12 %'."""
+
+
+def reject_llm_quantities(text: str) -> str:
+    """Refuse quantities in free text that ends up in Decision Records (AG-02).
+
+    Numbers in reports come from tool outputs only; rationales cite option or evidence ids.
+    """
+    match = _NUMBER_WITH_UNIT.search(text)
+    if match:
+        raise ValueError(
+            f"do not state quantities ('{match.group(0)}'); cite option or evidence ids instead"
+        )
+    return text
 
 
 class NextStep(StrictModel):
@@ -291,6 +312,11 @@ class RejectedOption(StrictModel):
     option_id: str
     reason: str = Field(min_length=1, max_length=300)
 
+    @field_validator("reason")
+    @classmethod
+    def _no_quantities(cls, text: str) -> str:
+        return reject_llm_quantities(text)
+
 
 class OptionChoice(StrictModel):
     """Structured output of an engine for a Decision Record question."""
@@ -305,7 +331,7 @@ class OptionChoice(StrictModel):
     def _short_rationale(cls, text: str) -> str:
         if _word_count(text) > RATIONALE_MAX_WORDS:
             raise ValueError(f"rationale must be <= {RATIONALE_MAX_WORDS} words")
-        return text
+        return reject_llm_quantities(text)
 
 
 class DecisionRecord(StrictModel):

@@ -11,6 +11,7 @@ from gemini_agent import __version__
 from gemini_agent.agents import engine as engine_module
 from gemini_agent.cli import (
     EXIT_CONFIG_ERROR,
+    EXIT_NOT_APPROVED,
     EXIT_OK,
     EXIT_PAUSED,
     EXIT_REFUSED,
@@ -94,6 +95,12 @@ def test_pause_then_resume_from_the_cli(tmp_path, capsys):
     for answer in ("A", "55", "26"):
         assert main(["resume", *base, "--run-id", "p", "--answer", answer]) == EXIT_PAUSED
     assert main(["resume", *base, "--run-id", "p", "--answer", "yes"]) == EXIT_OK
+
+    assert main(["run", *base, "--run-id", "q", "--input-mode", "pause"]) == EXIT_PAUSED
+    for answer in ("B", "60", "24"):
+        assert main(["resume", *base, "--run-id", "q", "--answer", answer]) == EXIT_PAUSED
+    assert main(["resume", *base, "--run-id", "q", "--answer", "no"]) == EXIT_NOT_APPROVED
+    assert "NOT approved" in capsys.readouterr().out
     assert main(["resume", *base, "--run-id", "missing", "--answer", "x"]) == EXIT_USAGE
     bad_config = ["--config-dir", str(tmp_path / "none")]
     assert main(["resume", *base, *bad_config, "--run-id", "p", "--answer", "x"]) == (
@@ -103,21 +110,34 @@ def test_pause_then_resume_from_the_cli(tmp_path, capsys):
 
 def test_run_llm_engine_offline(tmp_path, capsys, monkeypatch):
     """`--engine llm` with the Ollama model replaced by a FunctionModel; calls are logged."""
-    monkeypatch.setattr(engine_module, "build_ollama_model", lambda *a, **k: fake_model())
+    tags = []
+
+    def fake_build(llm_config, kind="orchestrator", tag=""):
+        tags.append(tag)
+        return fake_model()
+
+    monkeypatch.setattr(engine_module, "build_ollama_model", fake_build)
     code = main(["run", "--engine", "llm", "--runs-dir", str(tmp_path), "--run-id", "llm1"])
     assert code == EXIT_OK, capsys.readouterr().out
     calls = (tmp_path / "llm1" / "llm_calls.jsonl").read_text().splitlines()
     assert calls and all(json.loads(line)["decision_source"] == "llm" for line in calls)
 
-    # resume without --engine keeps the engine the run was started with
+    # resume without --engine/--model keeps the engine and model tag the run started with
     base = ["--runs-dir", str(tmp_path)]
-    assert main(["run", "--engine", "llm", *base, "--run-id", "lp", "--input-mode", "pause"]) == (
-        EXIT_PAUSED
-    )
+    start = ["run", "--engine", "llm", "--model", "qwen-test", *base, "--run-id", "lp"]
+    assert main([*start, "--input-mode", "pause"]) == EXIT_PAUSED
     before = len((tmp_path / "lp" / "llm_calls.jsonl").read_text().splitlines())
     assert main(["resume", *base, "--run-id", "lp", "--answer", "A"]) == EXIT_PAUSED
     after = len((tmp_path / "lp" / "llm_calls.jsonl").read_text().splitlines())
     assert after > before
+    assert tags[-2:] == ["qwen-test", "qwen-test"]
+    assert "OLLAMA_CONTEXT_LENGTH" in capsys.readouterr().err
+
+
+def test_missing_brief_is_a_usage_error(tmp_path, capsys):
+    """A missing --brief file exits 2 with a message, not a traceback."""
+    code = main(["run", "--runs-dir", str(tmp_path), "--brief", str(tmp_path / "none.md")])
+    assert code == EXIT_USAGE and "cannot read brief" in capsys.readouterr().err
 
 
 def test_no_command_prints_help(capsys):

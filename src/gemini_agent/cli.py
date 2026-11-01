@@ -50,6 +50,8 @@ EXIT_USAGE = 2
 EXIT_PAUSED = 3
 EXIT_ESCALATED = 4
 EXIT_REFUSED = 5
+EXIT_NOT_APPROVED = 6
+"""Run completed but the human rejected the recommended design at the P10 approval."""
 
 STATUS_EXIT: dict[RunStatus, int] = {
     RunStatus.COMPLETED: EXIT_OK,
@@ -135,33 +137,42 @@ def ask_terminal(request: InputRequest) -> str | None:
         return None
 
 
-def _stored_engine(runs_root: Path, run_id: str) -> str | None:
-    """Engine a run was started with ('policy' or 'llm'), or None if the run is unknown."""
+OLLAMA_CONTEXT_HINT = (
+    "engine llm: start the Ollama server with OLLAMA_CONTEXT_LENGTH >= {num_ctx} (or a Modelfile "
+    "num_ctx); its OpenAI endpoint may ignore num_ctx from the request (spec §5.4.7)."
+)
+
+
+def _stored_engine(runs_root: Path, run_id: str) -> tuple[str | None, str]:
+    """Engine ('policy'/'llm') and ``--model`` tag a run was started with (None if unknown)."""
     path = runs_root / run_id / STORE_FILE
     if not path.exists():
-        return None
+        return None, ""
     store = SQLiteEventStore(path)
     try:
         record = store.get_run(run_id)
     finally:
         store.close()
     if record is None:
-        return None
-    return "llm" if str(record.state.get("engine", "")).startswith("llm") else "policy"
+        return None, ""
+    engine = "llm" if str(record.state.get("engine", "")).startswith("llm") else "policy"
+    return engine, str(record.state.get("model_tag", "") or "")
 
 
 def _runner(args: argparse.Namespace, run_id: str, *, resuming: bool = False) -> DesignRunner:
     llm_config = load_config("llm", args.config_dir)
     runs_root = args.runs_dir or RUNS_ROOT
-    stored = _stored_engine(runs_root, run_id) if resuming and not args.engine else None
-    engine_name = args.engine or stored or llm_config.engine
+    stored_engine, stored_tag = _stored_engine(runs_root, run_id) if resuming else (None, "")
+    engine_name = args.engine or stored_engine or llm_config.engine
+    if engine_name == "llm":
+        print(OLLAMA_CONTEXT_HINT.format(num_ctx=llm_config.ollama.num_ctx), file=sys.stderr)
     toolbox = default_toolbox()
     engine = create_decision_engine(
         engine_name,
         llm_config,
         logger=LLMLogger(runs_root / run_id),
         run_id=run_id,
-        model_tag=args.model or "",
+        model_tag=args.model or stored_tag,
         validate_args=toolbox.validate_args,
     )
     return DesignRunner(
@@ -184,6 +195,9 @@ def _report(result: RunResult) -> int:
             f"--run-id {result.run_id} --answer '<answer>'"
         )
     print(f"outputs: {result.run_dir}")
+    if result.status == RunStatus.COMPLETED and result.approval == "rejected":
+        print("the recommended design was NOT approved by the user")
+        return EXIT_NOT_APPROVED
     return STATUS_EXIT[result.status]
 
 
@@ -197,11 +211,17 @@ def _run(args: argparse.Namespace) -> int:
     run_id = args.run_id or f"{datetime.now(UTC):%Y%m%dT%H%M%SZ}-{engine_name}"
     prompt = args.prompt or ""
     if not prompt and args.brief is not None:
-        prompt = args.brief.read_text(encoding="utf-8")
+        try:
+            prompt = args.brief.read_text(encoding="utf-8")
+        except OSError as exc:
+            print(f"error: cannot read brief: {exc}", file=sys.stderr)
+            return EXIT_USAGE
     input_mode = args.input_mode or ("ask" if sys.stdin.isatty() else "assume")
     runner = _runner(args, run_id)
     try:
-        result = runner.start(prompt, run_id=run_id, input_mode=input_mode)
+        result = runner.start(
+            prompt, run_id=run_id, input_mode=input_mode, model_tag=args.model or ""
+        )
     except ValueError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return EXIT_USAGE

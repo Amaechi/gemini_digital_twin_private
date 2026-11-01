@@ -42,6 +42,14 @@ class ToolContext:
     selected_id: str | None = None
     decision_records: tuple[dict[str, Any], ...] = ()
     answers: dict[str, Any] = field(default_factory=dict)
+    guard_failed: tuple[str, ...] = ()
+    rejected_ids: tuple[str, ...] = ()
+    violations: tuple[str, ...] = ()
+
+    @property
+    def excluded_ids(self) -> frozenset[str]:
+        """Candidates that failed DesignGuard or were REJECTED by the verifier."""
+        return frozenset(self.guard_failed) | frozenset(self.rejected_ids)
 
 
 ToolFunc = Callable[[BaseModel, ToolContext], ToolResult[Any]]

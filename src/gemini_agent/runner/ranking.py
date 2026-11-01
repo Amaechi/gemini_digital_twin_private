@@ -1,6 +1,7 @@
 """Deterministic candidate ranking shared by the optimiser stub and Decision Record options.
 
-Rule (no LLM, no invented numbers): a candidate with known unmet demand > 0 ranks last; among
+Rule (no LLM, no invented numbers): candidates that failed DesignGuard or were REJECTED by the
+verifier are excluded; a candidate with known unmet demand > 0 ranks last; among
 the rest, the lowest LCOH (from a tool's ``KPISet``) wins; unknown KPIs rank after known ones;
 ties keep the generation order. With stub tools every KPI is ``None``, so the order is the
 generation order and ``has_kpi_evidence`` is False.
@@ -9,7 +10,7 @@ generation order and ``has_kpi_evidence`` is False.
 from __future__ import annotations
 
 import math
-from collections.abc import Mapping, Sequence
+from collections.abc import Collection, Mapping, Sequence
 
 from gemini_agent.schemas.candidate import Candidate
 from gemini_agent.schemas.results import KPISet
@@ -31,11 +32,12 @@ def rank_candidates(
     kpis: Mapping[str, KPISet],
     *,
     exclude_concepts: tuple[str, ...] = ("C0",),
+    exclude_ids: Collection[str] = (),
 ) -> list[str]:
-    """Candidate ids, best first (see module docstring)."""
+    """Return candidate ids, best first (see module docstring)."""
     ranked = []
     for order, candidate in enumerate(candidates):
-        if candidate.concept in exclude_concepts:
+        if candidate.concept in exclude_concepts or candidate.id in exclude_ids:
             continue
         kpi = kpis.get(candidate.id)
         lcoh = kpi.lcoh_per_mwh if kpi is not None else None

@@ -181,6 +181,7 @@ class AgentDeps:
 
     phase: Phase
     allowed_tools: tuple[str, ...]
+    in_scope: bool = True
     open_gaps: tuple[str, ...] = ()
     validate_args: Callable[[str, dict[str, Any]], Any] | None = None
     dr_id: str | None = None
@@ -197,6 +198,8 @@ def check_decision(deps: AgentDeps, decision: Decision) -> str | None:
             return f"tool '{step.tool}' is not in your tool list {list(deps.allowed_tools)}"
         if step.kind == "refuse" and deps.phase != Phase.P0:
             return "refuse is only allowed in P0"
+        if step.kind == "refuse" and deps.in_scope:
+            return "the request is in scope (deterministic scope check); do not refuse"
         if step.kind == "request_input":
             gap = step.args.get("assumption_id")
             if gap not in deps.open_gaps:
@@ -291,6 +294,11 @@ class LLMEngine(DecisionEngine):
     name: str = "llm"
     _agents: dict[tuple[Role, str], Any] = field(default_factory=dict, repr=False)
 
+    def __post_init__(self) -> None:
+        """Every LLM call must be logged (MEM-04): a logger is mandatory."""
+        if self.logger is None:
+            raise ValueError("LLMEngine needs an LLMLogger: every LLM call is logged (MEM-04)")
+
     def _model_for(self, role: Role) -> Any:
         if ROLES[role].model == "coder":
             if self.coder_model is None:
@@ -343,13 +351,22 @@ class LLMEngine(DecisionEngine):
         model = self._model_for(role)
         agent = self._agent(role, kind)
         tokens_left = budget.get("tokens")
+        if tokens_left is not None and tokens_left <= 0:
+            raise EngineBudgetExceeded(f"{role.value} {kind}: no tokens left in the phase budget")
         limits = UsageLimits(
             request_limit=self.llm_config.max_output_retries + 2,
-            total_tokens_limit=tokens_left if tokens_left and tokens_left > 0 else None,
+            total_tokens_limit=tokens_left,
         )
+        ollama = self.llm_config.ollama
         settings = {
             "temperature": self.llm_config.temperatures.planning,
             "seed": self.llm_config.seed,
+            # Best effort: Ollama's OpenAI endpoint may ignore these; the server must also run
+            # with OLLAMA_CONTEXT_LENGTH >= num_ctx (spec §5.4.7, PROGRESS L-1 note).
+            "extra_body": {
+                "keep_alive": ollama.keep_alive,
+                "options": {"num_ctx": ollama.num_ctx},
+            },
         }
         model_name = str(getattr(model, "model_name", type(model).__name__))
         start = time.perf_counter()
@@ -445,6 +462,7 @@ class LLMEngine(DecisionEngine):
         deps = AgentDeps(
             phase=context.phase,
             allowed_tools=tuple(brief.name for brief in context.allowed_tools),
+            in_scope=context.in_scope,
             open_gaps=tuple(context.open_gaps),
             validate_args=self.validate_args,
         )
@@ -527,6 +545,8 @@ def create_decision_engine(
     if engine == "policy":
         return PolicyEngine()
     if engine == "llm":
+        if logger is None:
+            raise ValueError("engine 'llm' needs an LLMLogger: every LLM call is logged (MEM-04)")
         if model is None and model_tag:
             model = build_ollama_model(llm_config, "orchestrator", model_tag)
         primary = LLMEngine(

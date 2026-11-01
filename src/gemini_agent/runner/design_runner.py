@@ -15,6 +15,7 @@ Decision Records. ``--engine policy`` runs the whole pipeline without an LLM (AG
 from __future__ import annotations
 
 import json
+import math
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -86,6 +87,7 @@ _HISTORY_TYPES = frozenset(
         "DECISION_RECORD",
     }
 )
+_REVIEWER_HISTORY_TYPES = frozenset({"TOOL_RESULT", "TOOL_ERROR"})
 _YES = frozenset({"y", "yes", "approve", "approved"})
 _NO = frozenset({"n", "no", "reject", "rejected"})
 
@@ -110,6 +112,7 @@ class RunResult:
     run_dir: Path
     pending: InputRequest | None = None
     decision_records: list[str] = field(default_factory=list)
+    approval: str | None = None
 
 
 def _compact_payload(event_type: str, payload: dict[str, Any]) -> dict[str, Any]:
@@ -173,8 +176,18 @@ class DesignRunner:
             store.close()
         self._stores.clear()
 
-    def start(self, prompt: str, *, run_id: str, input_mode: InputMode = "assume") -> RunResult:
-        """Start a new run from the user's request (empty → the default challenge brief)."""
+    def start(
+        self,
+        prompt: str,
+        *,
+        run_id: str,
+        input_mode: InputMode = "assume",
+        model_tag: str = "",
+    ) -> RunResult:
+        """Start a new run from the user's request (empty → the default challenge brief).
+
+        ``model_tag`` (the CLI ``--model`` override) is stored so ``resume`` reuses it.
+        """
         store = self.store(run_id)
         if store.get_run(run_id) is not None:
             raise ValueError(f"run '{run_id}' already exists; use resume")
@@ -183,6 +196,7 @@ class DesignRunner:
             user_prompt=prompt.strip() or DEFAULT_BRIEF,
             engine=self.engine.name,
             input_mode=input_mode,
+            model_tag=model_tag,
         )
         store.create_run(run_id, state.status.value, state.model_dump(mode="json"))
         self._event(state, "RUN_START", {"engine": self.engine.name, "input_mode": input_mode})
@@ -235,6 +249,7 @@ class DesignRunner:
             run_dir=self.run_dir(state.run_id),
             pending=state.pending,
             decision_records=[record.dr_id for record in state.decision_records],
+            approval=state.approval,
         )
 
     def _budget(self, spec: PhaseSpec) -> PhaseBudget:
@@ -320,9 +335,12 @@ class DesignRunner:
             if tool not in prog.completed_tools:
                 return self._escalate(state, f"required tool {tool} failed in {spec.phase.value}")
         if spec.phase == Phase.P1:
+            # Gaps the agent did not ask about still go through the input mode (AG-05).
             for gap in list(state.open_gaps):
                 request = self._gap_request(state, spec.phase, gap)
-                self._record_answer(state, request, request.default, "assumption")
+                outcome = self._handle_request(state, request)
+                if outcome == "paused":
+                    return "paused"
         for dr_id in spec.decision_records:
             if any(record.dr_id == dr_id for record in state.decision_records):
                 continue
@@ -341,6 +359,8 @@ class DesignRunner:
         if step.kind == "refuse":
             if spec.phase != Phase.P0:
                 return self._reject_step(state, step, "refuse is only allowed in P0")
+            if state.in_scope:
+                return self._reject_step(state, step, "the scope check found the request in scope")
             return self._refuse(state, step.rationale)
         if step.kind == "escalate":
             return self._escalate(state, f"agent escalated in {spec.phase.value}: {step.rationale}")
@@ -386,6 +406,9 @@ class DesignRunner:
             selected_id=state.selected_id,
             decision_records=tuple(r.model_dump(mode="json") for r in state.decision_records),
             answers=state.answer_values(),
+            guard_failed=tuple(state.guard_failed),
+            rejected_ids=tuple(sorted(state.rejected_ids())),
+            violations=tuple(state.violations),
         )
 
     def _call_tool(
@@ -487,7 +510,10 @@ class DesignRunner:
             state.candidates = list(data.candidates)
             return [c.id for c in state.candidates]
         if tool == "design_guard":
-            state.guard_failed = [c.candidate_id for c in data.checks if not c.passed]
+            failed = set(state.guard_failed)  # merge: a single-candidate check keeps the rest
+            for check in data.checks:
+                (failed.discard if check.passed else failed.add)(check.candidate_id)
+            state.guard_failed = sorted(failed)
             return [c.candidate_id for c in data.checks]
         if tool in {"simulate_annual", "economics"}:
             for kpi in data.kpis:
@@ -571,11 +597,13 @@ class DesignRunner:
         text = raw.strip()
         default = request.default
         if isinstance(default, int | float) and not isinstance(default, bool):
+            unit = f" ({request.unit})" if request.unit else ""
             try:
                 value = float(text)
             except ValueError as exc:
-                unit = f" ({request.unit})" if request.unit else ""
                 raise InvalidAnswer(f"{request.assumption_id} needs a number{unit}") from exc
+            if not math.isfinite(value):
+                raise InvalidAnswer(f"{request.assumption_id} needs a finite number{unit}")
             limits = load_config("limits", self.config_dir)
             if request.assumption_id == "DB-31" and value >= limits.heating_supply_degc:
                 raise InvalidAnswer(
@@ -622,17 +650,16 @@ class DesignRunner:
             shown = json.dumps(value, separators=(",", ":")) if isinstance(value, dict) else value
             how = "user answer" if source == "user" else "assumed: register default"
             label = f"{request.assumption_id} = {shown}{unit} ({how})"
-            if request.assumption_id in state.open_gaps:
-                state.open_gaps.remove(request.assumption_id)
-        state.answers.append(
-            InputAnswer(
-                request_id=request.request_id,
-                assumption_id=request.assumption_id,
-                answer=value,
-                source=source,
-                label=label,
-            )
+        answer = InputAnswer(
+            request_id=request.request_id,
+            assumption_id=request.assumption_id,
+            answer=value,
+            source=source,
+            label=label,
         )
+        if request.assumption_id in state.open_gaps:
+            state.open_gaps.remove(request.assumption_id)
+        state.answers.append(answer)
         event = "USER_ANSWER" if source == "user" else "ASSUMPTION"
         # MEM-01: only explicit user answers are candidates for durable project knowledge (WP-09).
         self._event(
@@ -793,6 +820,8 @@ class DesignRunner:
             f"{len(state.decision_records)} Decision Records; approval {state.approval}; "
             f"{stubs}/{len(state.tool_results)} tool calls were stubs."
         )
+        if state.engine != "policy":
+            state.final_summary += f" LLM fallbacks to policy: {state.fallback_count()}."
         self._event(state, "RUN_END", {"message": state.final_summary})
 
     # ------------------------------------------------------------------ context and storage
@@ -819,7 +848,7 @@ class DesignRunner:
             default_args={tool: self._default_args(state, spec, tool) for tool in remaining},
             open_gaps=list(state.open_gaps) if spec.phase == Phase.P1 else [],
             gap_questions=dict(state.gap_questions) if spec.phase == Phase.P1 else {},
-            history=self._history(state),
+            history=self._history(state, role),
             violations=list(state.violations),
             loop_count=state.loop_count,
             budget_left={
@@ -829,11 +858,13 @@ class DesignRunner:
             },
         )
 
-    def _history(self, state: RunState) -> list[dict[str, Any]]:
+    def _history(self, state: RunState, role: Role | None = None) -> list[dict[str, Any]]:
+        # AG-08: the Independent Reviewer sees tool evidence only, not earlier decisions.
+        types = _REVIEWER_HISTORY_TYPES if role == Role.REVIEWER else _HISTORY_TYPES
         events = [
             event
             for event in self.store(state.run_id).list_events(state.run_id)
-            if event.type in _HISTORY_TYPES
+            if event.type in types
         ][-HISTORY_EVENTS:]
         return [
             {"type": e.type, "phase": e.phase, **_compact_payload(e.type, e.payload)}

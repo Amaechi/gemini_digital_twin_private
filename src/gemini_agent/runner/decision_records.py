@@ -82,7 +82,8 @@ def _group_options(
         groups.setdefault(option_id, (label, []))[1].append(candidate.id)
     # Same deterministic rule as the optimiser, so DR-01…08 agree with the selected design.
     top_key = None
-    ranked = ranking.rank_candidates(state.candidates, state.kpis)
+    excluded = state.excluded_ids()
+    ranked = ranking.rank_candidates(state.candidates, state.kpis, exclude_ids=excluded)
     by_id = {c.id: c for c in state.candidates}
     if ranked:
         top = key_fn(by_id[ranked[0]])
@@ -95,14 +96,21 @@ def _group_options(
     options = []
     for option_id, (label, members) in groups.items():
         evidence = [r.id for r in state.evidence_for(candidate_ids=set(members))]
+        usable = [m for m in members if m not in excluded]
+        dropped = [m for m in members if m in excluded]
+        notes = f"candidates: {', '.join(usable) or 'none'}"
+        if dropped:
+            notes += f"; excluded by DesignGuard/verifier: {', '.join(dropped)}"
+        if option_id == top_key:
+            notes += f"; top-ranked ({basis})"
         options.append(
             DecisionOption(
                 id=option_id,
                 label=label,
                 evidence_ids=evidence,
                 recommended=option_id == top_key,
-                notes=f"candidates: {', '.join(members)}"
-                + (f"; top-ranked ({basis})" if option_id == top_key else ""),
+                eligible=bool(usable),
+                notes=notes,
             )
         )
     return options, top_key

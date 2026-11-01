@@ -226,7 +226,13 @@ def generate_candidates(args: NoArgs, context: ToolContext) -> ToolResult[Candid
             f"STUB generate_candidates: {len(candidates)} candidates C0–C8 (spec §3.4 structure, "
             "return temperatures DB-31/DB-32); no equipment sizing or GEMINI JSON yet (WP-06)."
         ),
-        warnings=[stub_warning("WP-06")],
+        warnings=[
+            stub_warning("WP-06"),
+            (
+                "placeholder: design_flow_m3h = DB-11 maximum per doublet for every candidate; "
+                "not a sizing result (WP-06/WP-11 size flows)"
+            ),
+        ],
         assumption_ids=["DB-31", "DB-32"],
         sources=["spec §3.4"],
     )
@@ -287,15 +293,22 @@ def economics(args: CandidateArgs, context: ToolContext) -> ToolResult[KPIBatch]
 
 
 def optimise_design(args: OptimiseArgs, context: ToolContext) -> ToolResult[ShortlistOutput]:
-    """TL-13 stub: shortlist by the deterministic ranking rule (WP-11 sizes the designs)."""
-    ranked = ranking.rank_candidates(context.candidates, context.kpis)
+    """TL-13 stub: shortlist by the deterministic ranking rule (WP-11 sizes the designs).
+
+    Guard-failed and verifier-REJECTED candidates are excluded, so a loop back from P7/P9 moves
+    to the next candidate; WP-11 resizes against ``context.violations`` instead.
+    """
+    excluded = context.excluded_ids
+    ranked = ranking.rank_candidates(context.candidates, context.kpis, exclude_ids=excluded)
     shortlist = ranked[: args.top_n]
     evidence = ranking.has_kpi_evidence(context.kpis)
+    skipped = f"; excluded {', '.join(sorted(excluded))}" if excluded else ""
     return ToolResult[ShortlistOutput](
         data=ShortlistOutput(shortlist=shortlist, kpi_evidence=evidence),
         summary=(
             f"STUB optimise_design: shortlist {', '.join(shortlist) or 'empty'} "
-            f"({'LCOH ranking' if evidence else 'generation order, no KPIs'}); sizing in WP-11."
+            f"({'LCOH ranking' if evidence else 'generation order, no KPIs'}{skipped}); "
+            "sizing in WP-11."
         )[:300],
         warnings=[stub_warning("WP-11")],
     )

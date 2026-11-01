@@ -73,6 +73,7 @@ class RunState(StrictModel):
     user_prompt: str
     engine: str
     input_mode: InputMode
+    model_tag: str = Field(default="", description="CLI --model override, reused by resume.")
     status: RunStatus = RunStatus.RUNNING
     phase: Phase = Phase.P0
     loop_count: int = 0
@@ -104,6 +105,20 @@ class RunState(StrictModel):
     def answer_values(self) -> dict[str, JsonValue]:
         """Assumption id → answered or assumed value."""
         return {a.assumption_id: a.answer for a in self.answers if a.assumption_id}
+
+    def rejected_ids(self) -> set[str]:
+        """Candidates the verifier REJECTED in this run."""
+        return {v.candidate_id for v in self.verifications if v.verdict == DesignVerdict.REJECTED}
+
+    def excluded_ids(self) -> set[str]:
+        """Candidates that failed DesignGuard or were REJECTED (never offered or selected)."""
+        return set(self.guard_failed) | self.rejected_ids()
+
+    def fallback_count(self) -> int:
+        """LLM decisions and Decision Records that fell back to the policy (AG-03)."""
+        steps = sum(progress.fallbacks for progress in self.progress.values())
+        records = sum(1 for r in self.decision_records if r.decision_source == "policy_fallback")
+        return steps + records
 
     def latest_verification(self, candidate_id: str | None) -> Verification | None:
         """Most recent verification of a candidate."""
@@ -138,6 +153,8 @@ class RunState(StrictModel):
             "verdict": self.verdict_value(),
             "approval": self.approval,
             "loop_count": self.loop_count,
+            "excluded_candidates": sorted(self.excluded_ids()),
+            "llm_fallbacks": self.fallback_count(),
             "conflicts": self.conflicts,
             "assumptions_and_answers": [a.label for a in self.answers],
             "decision_records": [

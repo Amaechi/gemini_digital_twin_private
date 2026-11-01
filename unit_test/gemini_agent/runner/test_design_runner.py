@@ -3,21 +3,32 @@
 import json
 
 import pytest
+from pydantic_ai.messages import ModelResponse, TextPart
 
 from gemini_agent.agents.engine import LLMEngine, PolicyEngine, ResilientEngine
 from gemini_agent.logging.llm_logger import LLMLogger
 from gemini_agent.runner.design_runner import DesignRunner, InvalidAnswer
-from gemini_agent.runner.phases import PhaseBudget
+from gemini_agent.runner.phases import PHASE_SPECS, PhaseBudget
 from gemini_agent.runner.tool_stubs import VerificationOutput
 from gemini_agent.runner.toolbox import CandidateArgs, ToolSpec, default_toolbox
 from gemini_agent.schemas.common import ToolResult
 from gemini_agent.schemas.config import load_config
-from gemini_agent.schemas.decision import DR_TITLES, DesignVerdict, Phase, RunStatus
+from gemini_agent.schemas.decision import (
+    DR_TITLES,
+    Decision,
+    DesignVerdict,
+    NextStep,
+    Phase,
+    Role,
+    RunStatus,
+)
 from unit_test.gemini_agent.llm_fakes import (
     Counting,
     always_invalid,
     fake_model,
+    output_name,
     policy_like,
+    user_prompt,
 )
 
 
@@ -169,6 +180,81 @@ def test_rejected_verification_loops_three_times_then_escalates(tmp_path):
     assert state.loop_count == 4 and state.violations == ["brine cooling 45 K > 40 K"]
     starts = _phase_starts(runner, "v1")
     assert starts.count("P6") == 4 and starts.count("P8") == 0
+    # each loop moves on: a REJECTED candidate is never selected again
+    verified = [v.candidate_id for v in state.verifications]
+    assert verified == ["C1-3d", "C2-2d", "C3-2d", "C4-2d"]
+    assert set(
+        json.loads((tmp_path / "v1" / "run_summary.json").read_text())["excluded_candidates"]
+    ) == set(verified)
+
+
+def test_guard_failed_candidates_are_never_selected(tmp_path):
+    """Hard limits (rule 4): a candidate failing DesignGuard is not shortlisted or offered."""
+    from gemini_agent.runner.tool_stubs import GuardCheck, GuardOutput
+
+    def guard(args, context):
+        checks = [
+            GuardCheck(candidate_id=c.id, passed=c.concept != "C1", violations=["test"])
+            for c in context.candidates
+        ]
+        return ToolResult[GuardOutput](data=GuardOutput(checks=checks), summary="fake guard")
+
+    toolbox = default_toolbox()
+    toolbox.register(ToolSpec("design_guard", "fake", CandidateArgs, guard, owner="test"))
+    runner = _runner(tmp_path, toolbox=toolbox)
+    result = runner.start("", run_id="g1")
+    assert result.status == RunStatus.COMPLETED and result.selected_id == "C2-2d"
+    state = runner.load_state("g1")
+    assert state.guard_failed == ["C1-3d"] and "C1-3d" not in state.shortlist
+    dr03 = next(r for r in state.decision_records if r.dr_id == "DR-03")
+    chp = next(o for o in dr03.options if o.id == "gas-boiler-chp-topup")
+    assert not chp.eligible and dr03.choice == "hthp-series"
+
+    # a later single-candidate guard result merges instead of replacing the list
+    single = ToolResult[GuardOutput](
+        data=GuardOutput(checks=[GuardCheck(candidate_id="C3-2d", passed=False)]), summary="x"
+    )
+    runner._apply_result(state, PHASE_SPECS[Phase.P3], "design_guard", "TR-999", single, {})
+    assert state.guard_failed == ["C1-3d", "C3-2d"]
+
+
+def test_p1_gaps_skipped_by_the_agent_still_follow_the_input_mode(tmp_path):
+    """AG-05: if the LLM finalises P1 without asking, pause mode still asks the user."""
+
+    def finalise_early(messages, info):
+        if output_name(info) == "Decision":
+            context = json.loads(user_prompt(messages).split("CONTEXT:\n", 1)[1])
+            if context["phase"] == "P1" and not context["required_tools_remaining"]:
+                step = NextStep(kind="finalise", rationale="done")
+                body = Decision(phase=Phase.P1, steps=[step]).model_dump_json()
+                return ModelResponse(parts=[TextPart(body)])
+        return policy_like(messages, info)
+
+    engine, _ = _llm_engine(tmp_path, "s1", finalise_early)
+    result = _runner(tmp_path, engine=engine).start("", run_id="s1", input_mode="pause")
+    assert result.status == RunStatus.PAUSED and result.pending.assumption_id == "DB-30"
+
+
+def test_non_finite_answers_are_rejected(tmp_path):
+    """'nan' / 'inf' are invalid numbers; the run stays paused."""
+    runner = _runner(tmp_path)
+    runner.start("", run_id="n1", input_mode="pause")
+    runner.resume("n1", "A")
+    for bad in ("nan", "-inf"):
+        with pytest.raises(InvalidAnswer, match="finite"):
+            runner.resume("n1", bad)
+    state = runner.load_state("n1")
+    assert state.status == RunStatus.PAUSED and "DB-31" in state.open_gaps
+
+
+def test_reviewer_sees_tool_evidence_only(tmp_path):
+    """AG-08: the reviewer's history holds tool results, not earlier agent decisions."""
+    runner = _runner(tmp_path)
+    runner.start("", run_id="rv", input_mode="assume")
+    state = runner.load_state("rv")
+    reviewer = runner._history(state, Role.REVIEWER)
+    assert reviewer and {item["type"] for item in reviewer} <= {"TOOL_RESULT", "TOOL_ERROR"}
+    assert "DECISION" in {item["type"] for item in runner._history(state)}
 
 
 def test_only_a_real_verifier_can_accept(tmp_path):

@@ -3,6 +3,8 @@
 LLM paths use Pydantic AI ``TestModel`` / ``FunctionModel``; no network call is made.
 """
 
+import json
+
 import pytest
 from pydantic_ai.messages import ModelResponse, TextPart
 from pydantic_ai.models.test import TestModel
@@ -65,8 +67,8 @@ def _question() -> DecisionQuestion:
     )
 
 
-def _llm(func=policy_like, tmp_path=None) -> tuple[LLMEngine, LLMLogger | None]:
-    logger = LLMLogger(tmp_path) if tmp_path is not None else None
+def _llm(func, tmp_path) -> tuple[LLMEngine, LLMLogger]:
+    logger = LLMLogger(tmp_path)
     engine = LLMEngine(
         LLM_CONFIG,
         model=fake_model(func),
@@ -146,7 +148,7 @@ def test_llm_uses_native_output_mode(tmp_path):
         seen.append(info.model_request_parameters.output_mode)
         return policy_like(messages, info)
 
-    engine, _ = _llm(func)
+    engine, _ = _llm(func, tmp_path)
     engine.decide(_context(required_tools_remaining=["thermal_breakthrough"]))
     assert seen == ["native"]
 
@@ -198,7 +200,7 @@ def test_bad_arguments_and_unknown_gap_are_retried(tmp_path):
             )
         ],
     ).model_dump_json()
-    engine, _ = _llm(lambda m, i: ModelResponse(parts=[TextPart(bad_args)]))
+    engine, _ = _llm(lambda m, i: ModelResponse(parts=[TextPart(bad_args)]), tmp_path)
     with pytest.raises(EngineFailure, match="reservoir_conditions"):
         engine.decide(_context())
 
@@ -213,7 +215,7 @@ def test_bad_arguments_and_unknown_gap_are_retried(tmp_path):
             )
         ],
     ).model_dump_json()
-    engine, _ = _llm(lambda m, i: ModelResponse(parts=[TextPart(bad_gap)]))
+    engine, _ = _llm(lambda m, i: ModelResponse(parts=[TextPart(bad_gap)]), tmp_path)
     with pytest.raises(EngineFailure, match="OPEN_GAPS"):
         engine.decide(_context(Phase.P1, Role.REQUIREMENTS, open_gaps=["DB-31"]))
 
@@ -247,10 +249,68 @@ def test_ollama_model_is_built_from_config_without_network():
     assert build_ollama_model(LLM_CONFIG, tag="qwen3.6:27b").model_name == "qwen3.6:27b"
 
 
-def test_engine_factory():
+def test_engine_factory(tmp_path):
     """Engine factory: policy → PolicyEngine; llm → LLM + policy fallback; else error."""
     assert isinstance(create_decision_engine("policy", LLM_CONFIG), PolicyEngine)
-    engine = create_decision_engine("llm", LLM_CONFIG, model=fake_model())
+    engine = create_decision_engine(
+        "llm", LLM_CONFIG, model=fake_model(), logger=LLMLogger(tmp_path)
+    )
     assert isinstance(engine, ResilientEngine) and isinstance(engine.fallback, PolicyEngine)
     with pytest.raises(ValueError):
         create_decision_engine("adk", LLM_CONFIG)  # type: ignore[arg-type]
+
+
+def test_llm_engine_requires_a_logger():
+    """MEM-04: an LLM engine without a logger cannot be built, so no call goes unlogged."""
+    with pytest.raises(ValueError, match="LLMLogger"):
+        create_decision_engine("llm", LLM_CONFIG, model=fake_model())
+    with pytest.raises(ValueError, match="LLMLogger"):
+        LLMEngine(LLM_CONFIG, model=fake_model())
+
+
+def test_zero_tokens_left_escalates_without_calling(tmp_path):
+    """No LLM call is made once the phase has no tokens left (AG-04)."""
+    counter = Counting(policy_like)
+    engine, _ = _llm(counter, tmp_path)
+    with pytest.raises(EngineBudgetExceeded, match="no tokens left"):
+        engine.decide(_context(tokens=0))
+    assert counter.calls == 0
+
+
+def test_llm_cannot_refuse_an_in_scope_request(tmp_path):
+    """The deterministic scope check is authoritative: refusing an in-scope request is retried."""
+    refuse = Decision(
+        phase=Phase.P0, steps=[NextStep(kind="refuse", rationale="looks off-topic")]
+    ).model_dump_json()
+    engine, _ = _llm(lambda m, i: ModelResponse(parts=[TextPart(refuse)]), tmp_path)
+    with pytest.raises(EngineFailure, match="in scope"):
+        engine.decide(_context(Phase.P0, Role.LEAD_ENGINEER, in_scope=True))
+    result = engine.decide(_context(Phase.P0, Role.LEAD_ENGINEER, in_scope=False))
+    assert result.value.steps[0].kind == "refuse"
+
+
+def test_llm_settings_carry_ollama_context(tmp_path):
+    """num_ctx and keep_alive from config/llm.yaml are sent with every request (best effort)."""
+    seen = []
+
+    def func(messages, info):
+        seen.append(info.model_settings)
+        return policy_like(messages, info)
+
+    engine, _ = _llm(func, tmp_path)
+    engine.decide(_context())
+    body = seen[0]["extra_body"]
+    assert body["options"]["num_ctx"] == LLM_CONFIG.ollama.num_ctx
+    assert body["keep_alive"] == LLM_CONFIG.ollama.keep_alive
+
+
+def test_dr_rationale_must_not_state_quantities(tmp_path):
+    """AG-02: an LLM rationale quoting a quantity is retried, then the policy decides."""
+    bad = OptionChoice(dr_id="DR-05", option_id="ates", rationale="ok").model_dump()
+    bad["rationale"] = "ATES saves 12 % and stores 40 MWh"
+    payload = json.dumps(bad)
+    engine, _ = _llm(lambda m, i: ModelResponse(parts=[TextPart(payload)]), tmp_path)
+    result = ResilientEngine(engine).choose(_question(), _context())
+    assert result.source == "policy_fallback"
+    with pytest.raises(ValueError, match="quantities"):
+        OptionChoice(dr_id="DR-05", option_id="ates", rationale="return 55 degC is best")
