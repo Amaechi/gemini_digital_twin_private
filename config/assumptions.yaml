@@ -1226,3 +1226,134 @@ assumptions:
     tag: A
     status: default
     added_by: WP-03
+
+  - id: SIM-OUTAGE
+    title: Default placement of the DB-30 planned doublet outages (WP-07 calendar)
+    value:
+      placement: greedy lowest-load non-overlapping windows, one per doublet
+      load: "daily heating demand + cooling demand / GM-04 design COP (absorption concepts only)"
+      window_wrap: false
+      ties: earliest window
+      optimiser_parameter: outage_start_indices
+    unit: null
+    justification: >-
+      DB-30 leaves the outage schedule to the optimiser. Until WP-11 chooses it, each doublet's 35-day outage
+      is put where the geothermal-side load is lowest (least backup needed), the first doublet in the year's
+      lowest window and each next one in the lowest window not overlapping those chosen (DB-30: never
+      overlapping). Same window rule as TL-02 (no wrap, earliest on ties). With absorption the drive heat is
+      geothermal load, so cooling counts at the GM-04 model COP (not DEM-COP-HD).
+    source: GEOAGENT_DESIGN_SPEC §2.4 DB-30, §8 SIM-02 [A interpretation]
+    sensitivity: "Any non-overlapping schedule via outage_start_indices (WP-11 optimiser)."
+    tag: A
+    status: default
+    added_by: WP-07
+
+  - id: SIM-DB30B
+    title: Days simulated under DB-30 interpretation B
+    value:
+      simulated_days: "year minus its lowest-load window of (365 − demand_met_days_per_yr) days"
+      outages: none
+    unit: null
+    justification: >-
+      Interpretation B simulates 330 daily steps without outage but does not say which 35 days are dropped.
+      Dropping the lowest-load window (same load as SIM-OUTAGE) keeps every design-relevant day, so a design
+      that passes A also passes B (spec §2.4) and B is never judged on easier days than A.
+    source: GEOAGENT_DESIGN_SPEC §2.4 DB-30 [A interpretation]
+    sensitivity: "Drop the last 35 days of the year instead (less conservative: removes December)."
+    tag: A
+    status: default
+    added_by: WP-07
+
+  - id: SIM-FAST
+    title: Fast and full annual simulation modes (SIM-04)
+    value:
+      fast_wells: TL-06 doublet performance map, linear between 10 m3/h grid points
+      fast_surface: TL-09 design PlantSpec components evaluated once each in the CFG-LAYOUT order
+      full: the fast daily plan run in GEMINI with TL-11 simulate_plant_day (TL-05 points, controls on)
+      comparison: PD-06 metric, warning above 0.02, fail above 0.05
+    unit: null
+    justification: >-
+      SIM-04 asks for a performance-map fast mode and a GEMINI-every-day full mode. The wells (TL-05 root
+      solve, the expensive part) come from the TL-06 map; the surface plant uses the same GEMINI component
+      models and parameters as the full project so both modes differ only by map interpolation and solver
+      order. The dispatch is decided once (fast) and replayed in full mode, so the comparison measures model
+      differences, not different decisions.
+    source: GEOAGENT_DESIGN_SPEC §8 SIM-04 [D]
+    sensitivity: "Map step 5 / 25 m3/h (TL-06 step_m3h)."
+    tag: D
+    status: default
+    added_by: WP-07
+
+  - id: DSP-FLOW
+    title: Daily doublet flow rule (SIM-03 (3))
+    value:
+      split: equal flow on the available doublets
+      switch_off: a doublet is switched off when the equal share would fall below the DB-11 minimum
+      target: smallest flow at which plate HEX + CHP + HTHP (≤ nameplate) meet the plant load without the boiler
+      maximum: candidate design flow (plate HEX and ESP design point), within the DB-11 range
+      resolution_m3h: 0.06
+    unit: null
+    justification: >-
+      The district water passes plate HEX → CHP → HTHP → peak boiler, so the SIM-03 merit order (HEX → HTHP →
+      CHP/boiler) is the topology and the free decision is the brine flow. The smallest flow that keeps the
+      boiler off minimises pumping and the CHP must-run heat of the associated gas (DB-36: all degassed gas
+      is burned), i.e. favours the HTHP over CHP heat as the merit order asks. Equal sharing minimises pump
+      power because ESP power Q·Δp(Q) grows faster than Q (RC-01). When the maximum flow is not enough the
+      boiler fills, then unmet demand is recorded.
+    source: GEOAGENT_DESIGN_SPEC §8 SIM-03; RC-01 [A interpretation]
+    sensitivity: "Spread over all doublets at the minimum flow; or maximum geothermal flow (WP-11)."
+    tag: A
+    status: default
+    added_by: WP-07
+
+  - id: DSP-HP-MIN
+    title: HTHP minimum daily part load before switching the heat pumps off
+    value: 0.10
+    unit: "-"
+    justification: >-
+      RC-04 gives no HTHP turndown. Below 10 % of the reference heat (hthp_heating_mw, else the HTHP heat at
+      the DB-18 peak with all doublets at the design flow) the HTHPs are switched off when HEX + CHP carry the
+      load at the same doublet flows (no extra brine or CHP must-run heat); otherwise a daily average below
+      the minimum is read as on/off cycling within the day and kept (noted). Removes the July "trickle"
+      operation (≈ 150 W, COP 9.8) of WP-06.
+    source: engineering assumption [A]; WP-06 follow-up (PROGRESS)
+    sensitivity: [0.0, 0.25]
+    tag: A
+    status: default
+    added_by: WP-07
+
+  - id: DSP-ABS-MIN
+    title: Absorption chiller minimum load (dispatch)
+    value: 0.10
+    unit: "-"
+    justification: >-
+      COOL-ABS-PL: Method B COP falls to ≈ 0.47 at 10 % load and 0.21 at 2 % (85 °C drive); WP-02 asks dispatch
+      to avoid very low absorption loads. Below 10 % of the absorption nameplate the residual after free
+      cooling goes to the electric chiller. Above it the drive brine is the smallest given flow (≥ the
+      COOL-ABS-DRV minimum + 1 % TL-05 flow tolerance) at which GM-04 meets the residual.
+    source: COOL-ABS-PL (WP-02) [A]
+    sensitivity: [0.05, 0.25]
+    tag: A
+    status: default
+    added_by: WP-07
+
+  - id: DSP-STORAGE
+    title: C6 seasonal HT-ATES dispatch ledger
+    value:
+      sizes: "equipment_sizes storage_capacity_mwh; storage_power_mw (default capacity / 24 h)"
+      charge: spare geothermal capacity (all available doublets at the design flow, no boiler) on days without boiler heat
+      discharge: displaces peak-boiler heat
+      recovery: STO-REC-HT (on discharge)
+      cycles: 2 (second pass starts from the first's end state)
+      outlet_temperature: not modelled (discharge assumed at the supply temperature)
+    unit: null
+    justification: >-
+      C6 has no GEMINI storage component (WP-06). WP-03's ThermalStorage keeps the ledger: the plant serves
+      demand + charge or demand − discharge, and DayResult heat_by_source_mw['storage'] holds the net heat
+      (negative while charging), as ThermalStorage.net_heat_to_plant_w prescribes. RC-09: seasonal ATES needs
+      an annual heat balance — charged/discharged totals are reported.
+    source: RC-09 Thermal storage; WP-03 GM-09 [A interpretation]
+    sensitivity: "Recovery 0.63 → 0.8; storage power ± 50 %."
+    tag: A
+    status: default
+    added_by: WP-07
