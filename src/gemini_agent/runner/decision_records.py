@@ -23,6 +23,7 @@ from gemini_agent.schemas.decision import (
     DecisionQuestion,
     DecisionRecord,
     DecisionSource,
+    DesignVerdict,
     OptionChoice,
     Phase,
     RejectedOption,
@@ -219,7 +220,14 @@ def build_options(dr_id: str, state: RunState, config_dir: Path | None) -> list[
         for candidate_id in state.shortlist or ([state.selected_id] if state.selected_id else []):
             verification = state.latest_verification(candidate_id)
             evidence = [r.id for r in state.evidence_for(candidate_ids={candidate_id})]
-            selected = candidate_id == state.selected_id
+            # A design whose latest verdict is REJECTED (or that failed DesignGuard) is never the
+            # final selection: DR-10 is skipped and the P9 gate loops back or escalates.
+            rejected = verification is not None and verification.verdict == DesignVerdict.REJECTED
+            selected = (
+                candidate_id == state.selected_id
+                and not rejected
+                and candidate_id not in state.guard_failed
+            )
             verdict = verification.verdict.value if verification else "not verified"
             options.append(
                 DecisionOption(
@@ -234,7 +242,7 @@ def build_options(dr_id: str, state: RunState, config_dir: Path | None) -> list[
                     eligible=selected,
                     notes=(
                         f"verifier verdict: {verdict}"
-                        if selected
+                        if selected or candidate_id == state.selected_id
                         else "not the verified design (only the verified design can be selected)"
                     ),
                 )
