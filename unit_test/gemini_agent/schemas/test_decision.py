@@ -98,6 +98,14 @@ def test_option_choice_rationale_limit():
         "1,200 kW",
         "5-10 years",
         "LCOH ４５ is lowest",  # full-width digits
+        # numbers glued to any suffix
+        "supply at 120C",
+        "permeability 50mD",
+        "flow 300m3h",
+        "10x cheaper",
+        "a 35d outage",
+        "90pct availability",
+        "12-15 doublets",
     ],
 )
 def test_llm_text_must_not_state_numbers(text):
@@ -122,6 +130,9 @@ def test_llm_text_must_not_state_numbers(text):
         "depth-2500m wins on TR-003 and TR-007; see DR-01, C1-3d and P10.",
         "3-doublets has the lowest LCOH in TR-012 (RC-10, spec §5.4.3).",
         "dh-return-55 is the register default (DB-31); C0–C7 compared.",
+        "Not eligible: candidates: none; excluded by DesignGuard/verifier: C1-2d, C1-3d",
+        "Not eligible: verifier verdict: REJECTED",
+        "dh-return-45.5 per REQ-01-DB-30, TR-012/TR-013; CO₂ and CO2 in m³.",
     ],
 )
 def test_ids_with_digits_are_allowed_in_llm_text(text):
@@ -129,23 +140,10 @@ def test_ids_with_digits_are_allowed_in_llm_text(text):
     OptionChoice(dr_id="DR-01", option_id="a", rationale=text)
 
 
-def test_escalation_reasons_and_questions_must_not_state_numbers():
-    """An escalate rationale and a request_input question reach the run summary (AG-02)."""
+def test_escalation_reasons_must_not_state_numbers():
+    """An escalate rationale becomes the run summary's escalation reason (AG-02)."""
     with pytest.raises(ValidationError, match="quantities"):
         NextStep(kind="escalate", rationale="Plant needs 4 doublets and LCOH 99 EUR/MWh")
     NextStep(kind="escalate", rationale="No candidate passes DesignGuard; see TR-004.")
-    with pytest.raises(ValidationError, match="quantities"):
-        NextStep(
-            kind="request_input",
-            tool="request_missing_input",
-            args={"assumption_id": "DB-31", "question": "Is a 55 degC return acceptable?"},
-            rationale="DB-31 is open.",
-        )
-    NextStep(
-        kind="request_input",
-        tool="request_missing_input",
-        args={"assumption_id": "DB-31", "question": "Which DH return temperature?"},
-        rationale="DB-31 is open.",
-    )
     # tool-step rationales stay in the trace only; they may quote tool numbers
     NextStep(kind="call_tool", tool="knowledge_search", rationale="Check the 40 K limit.")

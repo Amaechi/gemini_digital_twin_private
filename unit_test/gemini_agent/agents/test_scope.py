@@ -19,6 +19,13 @@ from gemini_agent.schemas.config import load_config
         "Design a geothermal heating system for 30 MW",  # S2
         "Explain the cooling technology choice",
         "How much heat does the plant deliver?",
+        "Heating at 100 degC and cooling at 20 degC",
+        "We need heating and cooling for a new neighbourhood in Delft",
+        "Cool the hospital at 20 degC and heat it at 100 °C",
+        "How many injectors and producers?",
+        "What ESP power do the producers need?",
+        "How much CO2 does it save?",
+        "Which heat exchanger plates?",
     ],
 )
 def test_in_scope(prompt):

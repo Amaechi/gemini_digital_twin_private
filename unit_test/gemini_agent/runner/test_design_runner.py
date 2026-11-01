@@ -406,3 +406,16 @@ def test_llm_escalation_reason_with_numbers_never_reaches_the_summary(tmp_path):
     engine, _ = _llm_engine(tmp_path, "e2", escalate_in_p5("No safe option; see TR-004."))
     result = _runner(tmp_path, engine=engine).start("", run_id="e2")
     assert result.status == RunStatus.ESCALATED and "see TR-004" in result.summary
+
+
+def test_llm_gap_question_with_numbers_is_not_shown(tmp_path):
+    """AG-02: an LLM request_input question is a fallback only, and never one with numbers."""
+    runner = _runner(tmp_path)
+    runner.start("", run_id="q1", input_mode="assume")
+    state = runner.load_state("q1")
+    state.gap_questions = {}
+    title = load_config("assumptions").get("DB-31").title
+    request = runner._gap_request(state, Phase.P1, "DB-31", "Is a 55 degC return acceptable?")
+    assert request.question == title
+    request = runner._gap_request(state, Phase.P1, "DB-31", "Which DH return temperature?")
+    assert request.question == "Which DH return temperature?"

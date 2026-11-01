@@ -135,19 +135,19 @@ def _word_count(text: str) -> int:
     return len(text.split())
 
 
-_UNIT = (
-    r"(?:°C|degC|K|W|kW|MW|GW|Wh|kWh|MWh|GWh|J|kJ|MJ|GJ|TJ|m3|m³|bar|barg|bara|Pa|kPa|MPa|%|"
-    r"USD|EUR|mm|m|km|t|kt|Mt|kg|s|h|hours?|days?|yrs?|years?|k|M|bn)"
-)
 _LLM_NUMBER = re.compile(
-    # a number that is not part of an identifier (DR-01, TR-003, C1-3d, depth-2500m, §10.1, P10)
+    # a digit run that does not start inside an identifier (DR-01, TR-003, C1-3d, depth-2500m,
+    # §10.1, P10, CO2) — with or without a unit ('45 USD/MWh', '120C', '50mD', 'COP 4.2', '-5')
     r"(?<![\w.§\-])-?\d+(?:[.,]\d+)*(?:[eE][+-]?\d+)?"
-    # ... followed by a unit, also compound or suffixed ('55degC', '45 USD/MWh', '1.5 MW_th')
-    rf"(?:\s*{_UNIT}(?:_?(?:th|el|e))?(?:/[\w³]+)*(?![\w/])"
-    # ... or standing alone ('COP 4.2', 'LCOH 45', '-5', '$45'); '3-doublets' is an option id
-    r"|(?!\w|-[^\W\d_]))"
+    # ... unless it starts an option id such as '3-doublets'
+    r"(?!\d|[.,]\d|-[^\W\d_])"
 )
-"""A number an LLM wrote in free text: with or without a unit, but not inside an identifier."""
+"""A number an LLM wrote in free text (not a digit inside an identifier)."""
+
+
+def states_numbers(text: str) -> bool:
+    """Return True if LLM free text states a number outside an identifier (AG-02)."""
+    return _LLM_NUMBER.search(text) is not None
 
 
 def reject_llm_quantities(text: str) -> str:
@@ -159,9 +159,9 @@ def reject_llm_quantities(text: str) -> str:
     """
     match = _LLM_NUMBER.search(text)
     if match:
+        token = text[match.start() :].split()[0]
         raise ValueError(
-            f"do not state numbers or quantities ('{match.group(0).strip()}'); "
-            "cite option or evidence ids instead"
+            f"do not state numbers or quantities ('{token}'); cite option or evidence ids instead"
         )
     return text
 
@@ -187,14 +187,11 @@ class NextStep(StrictModel):
         return text
 
     @model_validator(mode="after")
-    def _no_quantities_in_reported_text(self) -> NextStep:
-        # An escalate rationale becomes the run summary's escalation reason; a request_input
-        # question becomes the pending question (AG-02: no LLM-authored numbers there).
+    def _no_quantities_in_escalation(self) -> NextStep:
+        # An escalate rationale becomes the run summary's escalation reason (AG-02). An LLM
+        # request_input question is checked by the runner, which uses it only as a fallback.
         if self.kind == "escalate":
             reject_llm_quantities(self.rationale)
-        question = self.args.get("question")
-        if self.kind == "request_input" and isinstance(question, str):
-            reject_llm_quantities(question)
         return self
 
     @model_validator(mode="after")

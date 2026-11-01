@@ -20,17 +20,20 @@ DEFAULT_BRIEF = (
 _DOMAIN = re.compile(  # specific to the design task: enough on its own
     r"\b(geotherm\w*|heat[- ]?pumps?|hthp|chillers?|doublets?|brine|reservoirs?|aquifers?|ates|"
     r"gemini|digital twin|lcoh|lcoc|boreholes?|permeability|transmissivity|porosity|"
-    r"district[- ](?:heating|cooling|energy)|(?:heat|heating|cooling) networks?)\b",
+    r"district[- ](?:heating|cooling|energy)|(?:heat|heating|cooling) networks?|"
+    r"heat exchangers?)\b",
     re.IGNORECASE,
 )
-_GENERIC = re.compile(  # everyday words ('summer heat', 'district of Paris'): need a design word
+_GENERIC = re.compile(  # everyday words ('summer heat', 'district of Paris'): need company
     r"\b(heat|heating|cooling|district|co2|injectors?|producers?|esp)\b", re.IGNORECASE
 )
+_GENERIC_ROOT = {"heating": "heat", "injectors": "injector", "producers": "producer"}
 _DESIGN_WORDS = re.compile(
     r"\b(design\w*|systems?|plants?|networks?|demand|loads?|supply|return|temperatures?|"
     r"capacity|siz(?:e|ed|ing)|costs?|capex|opex|kpis?|options?|alternatives?|technolog\w*|"
     r"choices?|choose|chose|decisions?|storage|wells?|pumps?|boilers?|emissions?|efficien\w*|"
-    r"cop|flows?|mw\w*|kw\w*)\b",
+    r"cop|flows?|mw\w*|kw\w*|degc|power|energy|saves?|savings?|reduc\w*|homes?|houses?|"
+    r"buildings?|neighbou?rhoods?|campus|hospitals?)\b|°\s?c\b",
     re.IGNORECASE,
 )
 _DOUBLETS = re.compile(r"\b(\d+)\s*(?:x\s*)?doublets?\b", re.IGNORECASE)
@@ -56,7 +59,8 @@ def scope_check(prompt: str) -> ScopeResult:
     """In scope if the request mentions the design domain (an empty prompt uses the brief).
 
     A specific domain term is enough; an everyday word such as 'heat' or 'district' counts only
-    together with a design word ('heating supply', 'cooling options').
+    together with a design word ('heating supply', 'cooling options') or a second everyday
+    domain word ('heating and cooling', 'injectors and producers').
     """
     text = prompt.strip()
     if not text:
@@ -66,7 +70,8 @@ def scope_check(prompt: str) -> ScopeResult:
         return ScopeResult(True, "mentions the design domain", matched)
     generic = sorted({match.group(0).lower() for match in _GENERIC.finditer(text)})
     design = sorted({match.group(0).lower() for match in _DESIGN_WORDS.finditer(text)})
-    if generic and design:
+    roots = {_GENERIC_ROOT.get(word, word) for word in generic}
+    if generic and (design or len(roots) > 1):
         return ScopeResult(True, "mentions the design domain", generic + design)
     return ScopeResult(False, "no geothermal heating/cooling design topic found in the request")
 

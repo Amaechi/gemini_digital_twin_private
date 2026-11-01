@@ -93,6 +93,32 @@ def test_final_selection_only_the_verified_design_is_eligible(tmp_path):
     assert {r.option_id for r in record.rejected} == {"C3-2d"}
 
 
+def test_final_selection_follows_the_latest_verdict(tmp_path):
+    """DR-10: a REJECTED design is not eligible; once re-verified (same id) it is again."""
+    state = _state(tmp_path)
+    state.shortlist = ["C2-2d", "C3-2d"]
+    state.selected_id = "C2-2d"
+
+    def verify(verdict, phase):
+        state.verifications.append(
+            Verification(
+                candidate_id="C2-2d",
+                verdict=verdict,
+                verifier="fake",
+                tool_result_id="TR-001",
+                phase=phase,
+            )
+        )
+
+    verify(DesignVerdict.REJECTED, Phase.P9)
+    assert build_question("DR-10", state, Phase.P9, None) is None  # skipped, gate loops back
+    verify(DesignVerdict.ACCEPTED, Phase.P9)  # e.g. WP-11 resized the same candidate
+    question = build_question("DR-10", state, Phase.P9, None)
+    assert [(o.id, o.eligible) for o in question.options] == [("C2-2d", True), ("C3-2d", False)]
+    state.guard_failed = ["C2-2d"]
+    assert build_question("DR-10", state, Phase.P9, None) is None
+
+
 def test_records_written_as_json_and_markdown(tmp_path):
     """Each DR becomes DR-xx.json + DR-xx.md, plus an index."""
     state = _state(tmp_path)

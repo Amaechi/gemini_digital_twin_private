@@ -64,6 +64,7 @@ from gemini_agent.schemas.decision import (
     Phase,
     Role,
     RunStatus,
+    states_numbers,
 )
 from gemini_agent.schemas.results import KPISet
 
@@ -103,15 +104,12 @@ def _db30_interpretation_b(default: dict[str, Any]) -> dict[str, Any]:
     Derived from the register's interpretation-A entry so no number is invented: the simulated
     year is ``doublet_available_days_per_yr`` days long and no doublet has a planned outage.
     """
-    days = default["doublet_available_days_per_yr"]
     return {
         **default,
         "interpretation": "B",
-        "doublet_available_days_per_yr": days,
         "planned_outage_days_per_doublet": 0,
-        "outages_may_overlap": False,
         "outage_schedule": "none (interpretation B: no planned outage)",
-        "demand_met_days_per_yr": days,
+        "demand_met_days_per_yr": default["doublet_available_days_per_yr"],
     }
 
 
@@ -581,7 +579,11 @@ class DesignRunner:
         self, state: RunState, phase: Phase, gap: str, question: Any = None
     ) -> InputRequest:
         entry = load_config("assumptions", self.config_dir).get(gap)
-        text = state.gap_questions.get(gap) or (question if isinstance(question, str) else None)
+        # An LLM question is only a fallback, and never one that states numbers (AG-02).
+        llm_question = question if isinstance(question, str) else None
+        if llm_question is not None and states_numbers(llm_question):
+            llm_question = None
+        text = state.gap_questions.get(gap) or llm_question
         return InputRequest(
             request_id=f"REQ-{len(state.answers) + 1:02d}-{gap}",
             phase=phase,
