@@ -17,6 +17,8 @@ Keep it ≤ 20 KB; it is the hand-off between sessions. Old detail: merged PRs a
 | WP-09 | Verifier, memory, logging | merged (901e110) | [#9](https://github.com/Amaechi/gemini_digital_twin_private/pull/9) | 41-check DesignVerifier |
 | WP-10 | Agents, runner, CLI | merged (2285460; review a9083b7) | [#4](https://github.com/Amaechi/gemini_digital_twin_private/pull/4), [#6](https://github.com/Amaechi/gemini_digital_twin_private/pull/6) | policy run P0–P10 on stubs (UNVERIFIED) |
 | WP-11 | Optimisation & uncertainty | todo | | Batch 6 |
+| WP-12 | Model gap & Model Builder | todo | | Batch 5 |
+| WP-13 | Eval suite & submission checks | in review | [#16](https://github.com/Amaechi/gemini_digital_twin_private/pull/16) | S1–S11 policy + TestModel; SUB-01…24 (stub run NOT READY, expected) |
 | WP-12 | Model gap & Model Builder | in review | [#15](https://github.com/Amaechi/gemini_digital_twin_private/pull/15) | TL-17/18 real; S7 FunctionModel demo; 1093 passed |
 | WP-13 | Eval suite & submission checks | todo | | Batch 5 |
 | WP-14 | Integration run & figures | todo | | Batch 7 |
@@ -31,6 +33,15 @@ Next: Batch 5 (WP-07, WP-12, WP-13).
 ## Decisions log (newest first)
 One line per decision, grouped by WP; dated 11-01 (WP-00: 10-31). Why: the `config/assumptions.yaml` entry or the module docstring.
 
+**WP-13**
+- code in `src/gemini_agent/eval/` (harness, scenarios, submission; mirrors `unit_test/gemini_agent/eval/`); `scripts/run_eval.py`, `scripts/validate_submission.py` = thin CLIs; Plant Debugger headers on all four.
+- `evals/scenarios.yaml`: spec text verbatim; `checks` decide (FAIL); `pending` = needs + reason (+ informational check, "now passes: promote") ⇒ PENDING; S10/S11 skip policy (no tokens).
+- engines: policy; testmodel (`TestModel` + `supports_json_schema_output`: never validates ⇒ every call retried, logged, policy fallback); llm (Ollama, `runs/eval/<tag>/`; no `--model` ⇒ profile orchestrator + coder, as the CLI).
+- metrics: outcome, tool calls (stub), LLM calls, validity (used / LLM calls), retries, fallbacks, step rejections, tokens, runtime; `--compare` ⇒ `model_comparison.{json,md}` (S11).
+- S10 naive = `DesignRunner(history_events=None, compact_history=False)` (new kwargs, defaults = today); TestModel 94 k vs 62 k tokens (−34 %).
+- today (policy): pass S3, S4, S9; pending S1 (UNVERIFIED, 19/20 stubs), S2, S5–S8; skipped S10/S11. TestModel: same, S10/S11 pending.
+- WP-10 touch: `constraint_conflicts(prompt, limits, basis=None)` adds S5 supply T ≠ DB-16/17 (skips negative, return/ambient/indoor/driving/approach) and S9 reservoir T at depth vs RC-01 (DB-03/04; tolerance = precision as written, depth × gradient); `_intake` passes the basis.
+- `validate_submission`: SUB-01…24 = §18 + follow-ups; only FAIL blocks; SUB-08 needs `DesignVerifier` via `verify_design`; SUB-14 VERIFY items WARN; SUB-07 unmet > 0 ⇒ MANUAL; SUB-21 fork base from NOTICE (d86e8bb), MANUAL without git; eval root `runs/final/eval` (tracked).
 **WP-12**
 - TL-17 needs = WP-06 `concept_layout` types (= `generate_plant` C0–C8 × 1–3 doublets, tested); C6 `thermal_storage` `in_generated_plant: false`; 15 LIM-* entries with `affects`.
 - Sandbox outside the repo or `runs/<id>/` (runner `<run_dir>/model_builder`); 5 files of a NEW `gemini_model/<name>/`; `screen_python` allow-list (defence in depth).
@@ -146,6 +157,7 @@ One line per decision, grouped by WP; dated 11-01 (WP-00: 10-31). Why: the `conf
 - WP-03: HP-ETA-L, HP-APPROACH, EB-ETA, STO-REC-HT, STO-REC-COLD, CHP-EL-FRAC.
 - WP-08: ECO-CO2-GAS, ECO-CO2-AG, ECO-CO2-SCOPE, ECO-ELEC-NET, ECO-REAL, ECO-ALLOC, ECO-OM, ECO-PUMP-CAPEX, ECO-CHILLER, ECO-SENS-MULT, EXG-FUEL, EXG-KPI, NET-LOSS-FRAC, NET-TRUNK-M, SCL-RULES.
 - WP-06: CFG-LAYOUT, CFG-SURFACE, CFG-HEX, CFG-HP, CFG-CHP, CFG-BOILER, CFG-GRID-GAS, CFG-ASSOC-GAS, CFG-SIZING.
+- WP-13: none.
 - WP-12: none (limitations are gap-analysis entries, not register values).
 
 ## Open follow-ups (grouped by the WP that must act)
@@ -169,7 +181,10 @@ One line per decision, grouped by WP; dated 11-01 (WP-00: 10-31). Why: the `conf
 - L-2: `python -m gemini_agent.agents.model_builder --sandbox runs/s7_demo [--model TAG]` runs generated tests locally (review first). WP-15: promotion = copy folders + registry + `.rst` via PR.
 
 **WP-13**
-- Fail submission if the final verdict ≠ ACCEPTED, any final DR has `stub_evidence: true`, `run_summary.json` `stub_tool_calls > 0`, or `CostAssumptions.unset_placeholders()` is non-empty (empty today). Reports flag `cost_items[].verify` (RC-05).
+- Done: SUB-03 (verdict), SUB-04 (stub calls), SUB-05 (DR stub evidence), SUB-13 (placeholders) fail; SUB-14 flags `cost_items[].verify` (RC-05).
+- WP-14: promote pending checks once they pass (S1 ACCEPTED + 0 stubs; S7 gap via WP-12; S8 re-size + DR explains; S6 DB-31 sensitivity via WP-11); S5 confirm-basis InputRequest; S2 detect inputs missing from the request (DB-30 question names demand, not cooling/reservoir).
+- L-1/L-2: `run_eval.py --engine llm --model <tag> --eval-root runs/final/eval` per model, then `--compare runs/final/eval/<a> runs/final/eval/<b> --eval-root runs/final/eval`; final run in `runs/final/<id>/` in ask mode (SUB-02 approval).
+- WP-15: README must document API placeholders (SUB-22 warns); CI ruff skips `scripts/`; GEMINI non-.py edits (e.g. `pyproject.toml` notice ≈ line 90) checked by hand (SUB-21 warns if any).
 
 **WP-14**
 - Bind real tools under the same names with `stub=False`; keep the `runner/toolbox.py` reducer contract.
