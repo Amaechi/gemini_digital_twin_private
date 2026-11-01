@@ -826,7 +826,7 @@ assumptions:
       fixed/variable O&M (HTHP, CHP, e-boiler) is not used, to keep one rule for all candidates. Replacements at
       multiples of the interval strictly before the end of the analysis period; no salvage value.
     source: RC-10 Opex [L]; config/cost_assumptions.yaml
-    sensitivity: "om_frac_of_capex_per_yr 1–2 % (±30 % wins: 1.05–1.95 %)."
+    sensitivity: "om_frac_of_capex_per_yr 1–2 % (the stated range is wider than ±30 %, DB-35)."
     tag: A
     status: default
     added_by: WP-08
