@@ -73,6 +73,7 @@ def test_alias_and_native_key_may_repeat_the_same_value():
         ({"RHOL": "1030"}, TypeError),  # not a number
         ({"RHOL": True}, TypeError),
         ([("RHOL", 1030.0)], TypeError),  # not a dict
+        ({1: 1030.0}, TypeError),  # key not a string
     ],
 )
 def test_bad_blocks_are_rejected(block, error):

@@ -21,8 +21,10 @@ non-positive ρ/μ/c_p/k and `GMF` outside [0, 1) raise. No block = GEMINI defau
 | c_p,l (J/kg·K) | 4217.4 | 4100 | [A] DB-33 (range 4000–4190), RC-01 Inputs |
 
 The KPI helpers (`gemini_simulator.kpi`) read the same block from the producer
-well; `heat_exchanger_fluid_parameters()` gives the `fluid_density`/`specific_heat`
-parameters of GEMINI `HeatExchanger`, `Boiler` and `CHP` (single source of truth).
+well; `heat_exchanger_fluid_parameters()` gives the matching `fluid_density`/`specific_heat`
+parameters to set on GEMINI `HeatExchanger`, `Boiler` and `CHP` (single source of truth).
+They are not copied automatically: the project builder (WP-06) must set them, and
+`kpi.fluid_consistency_issues` / a `doublet_thermal_power_w` warning report a mismatch.
 Without a block the KPI keeps its legacy 1050 kg/m³ / 4200 J/kg·K defaults.
 
 ## Governing relation (why it matters)

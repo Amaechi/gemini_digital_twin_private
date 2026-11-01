@@ -62,11 +62,28 @@ DEFAULT_EMITTERS = ("boiler", "chp")
 DEFAULT_PVT_COMPONENT = "producer_well"
 
 
+def _pvt_block(solver, component):
+    """Return ``component``'s ``"pvt"`` parameter block, or ``None``.
+
+    A missing component is only allowed for the default name
+    (:data:`DEFAULT_PVT_COMPONENT`, so legacy projects and solvers without
+    a producer well keep working); any other missing name raises
+    ``KeyError`` rather than silently falling back to the legacy constants.
+    """
+    components = getattr(solver, "components", None) or {}
+    model = components.get(component)
+    if model is None:
+        if component != DEFAULT_PVT_COMPONENT:
+            raise KeyError(f"PVT component '{component}' not found in the solver.")
+        return None
+    return getattr(model, "parameters", {}).get("pvt")
+
+
 def fluid_properties(
     solver,
     component=DEFAULT_PVT_COMPONENT,
-    default_density=FLUID_DENSITY,
-    default_specific_heat=SPECIFIC_HEAT,
+    default_density_kg_m3=None,
+    default_specific_heat_j_kgk=None,
 ):
     """Return ``(density_kg_m3, specific_heat_j_kgk)`` of a component's fluid.
 
@@ -74,14 +91,17 @@ def fluid_properties(
     ``producer_well``, ``injector_well`` or ``well``) and returns the
     liquid density and heat capacity the well model uses for it (keys the
     block leaves out keep the ``PVTConstantSTP`` defaults). If the
-    component does not exist or has no ``"pvt"`` block, returns
-    ``(default_density, default_specific_heat)``.
+    component has no ``"pvt"`` block -- or is the default
+    ``"producer_well"`` and does not exist -- returns the defaults
+    (:data:`FLUID_DENSITY`/:data:`SPECIFIC_HEAT` unless given). A
+    non-default ``component`` that does not exist raises ``KeyError``.
     """
-    components = getattr(solver, "components", None) or {}
-    model = components.get(component)
-    pvt = getattr(model, "parameters", {}).get("pvt") if model is not None else None
+    pvt = _pvt_block(solver, component)
     if pvt is None:
-        return default_density, default_specific_heat
+        return (
+            FLUID_DENSITY if default_density_kg_m3 is None else default_density_kg_m3,
+            SPECIFIC_HEAT if default_specific_heat_j_kgk is None else default_specific_heat_j_kgk,
+        )
     return liquid_properties(pvt)
 
 
@@ -100,11 +120,11 @@ def fluid_consistency_issues(
     they differ, a KPI computed with the PVT values does not match the duty
     the component computed (GM-01 single source of truth). Returns an empty
     list if ``pvt_component`` has no ``"pvt"`` block (legacy projects) or a
-    component has no such parameters. A missing component is reported.
+    component has no such parameters. A missing component is reported; a
+    missing non-default ``pvt_component`` raises ``KeyError``.
     """
     model_by_name = getattr(solver, "components", None) or {}
-    pvt_model = model_by_name.get(pvt_component)
-    if pvt_model is None or getattr(pvt_model, "parameters", {}).get("pvt") is None:
+    if _pvt_block(solver, pvt_component) is None:
         return []
     pvt_density, pvt_specific_heat = fluid_properties(solver, pvt_component)
 
@@ -178,15 +198,18 @@ def plant_thermal_power_w(
     secondary_temperature_in,
     *,
     mixer=DEFAULT_SECONDARY_MIXER,
-    fluid_density=FLUID_DENSITY,
-    specific_heat=SPECIFIC_HEAT,
+    fluid_density=None,
+    specific_heat=None,
 ):
     """Return the net thermal power delivered by the secondary network (W).
 
     ``Q_s * rho * Cw * (T_s_out - T_s_in)``. ``fluid_density`` (kg/m3) and
     ``specific_heat`` (J/kg.K) are the *secondary* (district) water's
-    properties, not the brine's.
+    properties, not the brine's; they default to :data:`FLUID_DENSITY` and
+    :data:`SPECIFIC_HEAT` (read at call time).
     """
+    fluid_density = FLUID_DENSITY if fluid_density is None else fluid_density
+    specific_heat = SPECIFIC_HEAT if specific_heat is None else specific_heat
     t_s_out = secondary_outlet_temperature(solver, mixer=mixer)
     return secondary_flow_m3s * fluid_density * specific_heat * (t_s_out - secondary_temperature_in)
 

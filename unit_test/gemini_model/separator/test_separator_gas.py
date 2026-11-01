@@ -77,6 +77,21 @@ def test_explicit_density_and_lhv_override_the_derived_values():
     assert y["gas_density_kg_nm3"] == 0.9
     assert y["fuel_lhv_j_kg"] == 30e6
     assert y["fuel_power_w"] == pytest.approx(240.0 / 3600.0 * 0.9 * 30e6)
+    # Species flows keep the composition's mass fractions and still add up to the total.
+    assert y["ch4_mass_flow_kg_s"] + y["inherent_co2_kg_s"] == pytest.approx(
+        y["gas_mass_flow_rate"]
+    )
+    derived = _run(DESIGN_GAS)
+    assert y["inherent_co2_kg_s"] / y["gas_mass_flow_rate"] == pytest.approx(
+        derived["inherent_co2_kg_s"] / derived["gas_mass_flow_rate"]
+    )
+
+
+def test_explicit_lhv_without_composition_gives_fuel_power():
+    """fuel_lhv_j_kg alone (legacy gas_density) still yields a fuel power; no species flows."""
+    y = _run({"gas_water_ratio": 0.8, "gas_density": 0.965, "fuel_lhv_j_kg": 29.7e6})
+    assert y["fuel_power_w"] == pytest.approx(240.0 / 3600.0 * 0.965 * 29.7e6)
+    assert y["inherent_co2_kg_s"] == 0.0
 
 
 def test_legacy_configuration_is_unchanged():

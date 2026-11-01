@@ -1,5 +1,6 @@
 """GM-02: heatpump, compressor and co2_corrosion are usable from project JSON."""
 
+import numpy as np
 import pytest
 
 from gemini_model.compressor.compressor import Compressor
@@ -75,8 +76,13 @@ def test_heatpump_and_compressor_run_inside_a_project():
     assert compressor["emission"] == 0.0
 
 
-def test_compressor_power_el_matches_hand_calculation():
-    """power_el = n m R T1/(k-1) (r^((k-1)/k) - 1) / (eta_m eta_c), r = (p2/p1)^(1/n)."""
+def test_compressor_power_el_equals_the_gemini_formula():
+    """power_el mirrors GEMINI's formula: n m R T1/(k-1) (r^((k-1)/k) - 1) / (eta_m eta_c).
+
+    This pins the existing implementation, r = (p2/p1)^(1/n); it is not an
+    independent check (the formula lacks the factor k of the steady-flow
+    isentropic work -- see the Compressor docstring and PROGRESS.md).
+    """
     compressor = create_component("compressor")
     compressor.update_parameters(COMPRESSOR_PARAMETERS)
     compressor.calculate_output(
@@ -87,3 +93,43 @@ def test_compressor_power_el_matches_hand_calculation():
     expected = n * 0.064 * r_gas * 333.15 / (k - 1) * (stage_ratio ** ((k - 1) / k) - 1)
     expected /= 0.95 * 0.75
     assert compressor.get_output()["power_el"] == pytest.approx(expected, rel=1e-12)
+
+
+def test_well_type_from_project_json_uses_its_pvt_block():
+    """GM-01: a 'well' (DPDT) built from JSON keeps its brine PVT (hook runs before params)."""
+    project = {
+        "components": {
+            "brine_well": {
+                "type": "well",
+                "parameters": {
+                    "diameter": [0.2],
+                    "length": [2500.0],
+                    "angle": [1.5707963267948966],
+                    "roughness": [4.57e-5],
+                    "friction_correlation": "darcy_weisbach",
+                    "friction_correlation_2p": "BeggsBrill",
+                    "correction_factors": [1, 0],
+                    "pvt": {"liquid_density_kg_m3": 1030.0},
+                },
+            }
+        },
+        "boundary_inputs": [
+            {"component": "brine_well", "key": "direction", "value": "down"},
+            {"component": "brine_well", "key": "pressure", "value": 1e5},
+            {"component": "brine_well", "key": "temperature", "value": 300.0},
+            {"component": "brine_well", "key": "temperature_ambient", "value": 300.0},
+            {"component": "brine_well", "key": "flowrate", "value": 1e-6},
+        ],
+        "connections": [],
+    }
+    solver = build_project(project)
+    well = solver.components["brine_well"]
+    assert well.PVT.parameters["RHOL"] == 1030.0
+    # GEMINI's DPDT needs numpy arrays for its geometry (plain JSON lists fail in
+    # calculate_output -- existing behaviour); a later update without "pvt" keeps the PVT.
+    geometry = ("diameter", "length", "angle", "roughness")
+    well.update_parameters({key: np.asarray(well.parameters[key]) for key in geometry})
+    assert well.PVT.parameters["RHOL"] == 1030.0
+    solver.run()
+    head_bar = solver.get_output("brine_well", "pressuredrop_grav_output") / 1e5
+    assert head_bar == pytest.approx(252.6, abs=0.1)  # RC-01: 1030 kg/m3 over 2500 m

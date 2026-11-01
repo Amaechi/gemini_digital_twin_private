@@ -49,6 +49,8 @@ COMPONENT_REGISTRY = {
     "producer_well": ProducerWell,
     "injector_well": InjectorWell,
     # GM-02 (WP-01): existing GEMINI models, now usable from project JSON.
+    # co2_corrosion is a non-energy component: it has no power_el/power_th/emission
+    # outputs, so do not list it as a kpi generator, consumer or emitter.
     "heatpump": HeatpumpBasic,
     "compressor": Compressor,
     "co2_corrosion": CO2Corrosion,

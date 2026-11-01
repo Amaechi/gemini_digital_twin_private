@@ -134,9 +134,13 @@ class Separator(StaticModel):
         ``fuel_power_w`` (W, LHV basis = gas mass flow x LHV),
         ``ch4_mass_flow_kg_s``, ``inherent_co2_kg_s`` (CO2 contained in the
         gas, kg/s) and ``co2_if_burned_kg_s`` (inherent plus combustion
-        CO2, kg/s). These are 0 without a composition. ``emission`` stays
-        0: the separator does not emit; the CO2 is counted where the gas is
-        burned (or vented).
+        CO2, kg/s). The species flows are the composition's mass fractions
+        times ``gas_mass_flow_rate``, so they always add up to it (also
+        with an explicit ``gas_density``). Without a composition the
+        species/CO2 outputs are 0, and ``fuel_power_w`` is 0 unless
+        ``fuel_lhv_j_kg`` is given. ``emission`` stays 0: the separator
+        does not emit; the CO2 is counted where the gas is burned (or
+        vented).
         """
         pressure = u["pressure"]
         temperature = u["temperature"]
@@ -171,9 +175,14 @@ class Separator(StaticModel):
         gas_mass_flow_rate = gas_flow_rate * gas_density
         fuel_power_w = gas_mass_flow_rate * fuel_lhv_j_kg
         if gas is not None:
-            ch4_mass_flow_kg_s = gas_flow_rate * gas["ch4_kg_per_nm3"]
-            inherent_co2_kg_s = gas_flow_rate * gas["co2_kg_per_nm3"]
-            co2_if_burned_kg_s = gas_flow_rate * gas["co2_if_burned_kg_per_nm3"]
+            # Mass fractions from the composition; scaled to the (possibly explicit) density.
+            ch4_mass_flow_kg_s = gas_mass_flow_rate * gas["ch4_kg_per_nm3"] / gas["density_kg_nm3"]
+            inherent_co2_kg_s = gas_mass_flow_rate * gas["co2_kg_per_nm3"] / gas["density_kg_nm3"]
+            # Burning 1 kmol CH4 gives 1 kmol CO2.
+            co2_if_burned_kg_s = (
+                inherent_co2_kg_s
+                + ch4_mass_flow_kg_s * MOLAR_MASS_CO2_KG_PER_KMOL / MOLAR_MASS_CH4_KG_PER_KMOL
+            )
         else:
             ch4_mass_flow_kg_s = inherent_co2_kg_s = co2_if_burned_kg_s = 0.0
 

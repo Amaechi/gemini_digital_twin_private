@@ -8,8 +8,11 @@ which adds about 7.4 bar of hydrostatic head over 2.5 km.
 
 This module turns an optional ``"pvt"`` block in a component's project-JSON
 parameters into a configured ``PVTConstantSTP``. The same block is the single
-source of truth for the primary-loop liquid density and heat capacity that
-the heat exchanger, boiler/CHP and :mod:`gemini_simulator.kpi` use.
+source of truth for the primary-loop liquid density and heat capacity:
+:mod:`gemini_simulator.kpi` reads it from the producer well, and
+:func:`heat_exchanger_fluid_parameters` gives the matching parameters to set on
+the heat exchanger, boiler or CHP (the project builder must copy them there;
+``kpi.fluid_consistency_issues`` reports a mismatch).
 
 A ``"pvt"`` block may use the native ``PVTConstantSTP`` keys (``RHOL``,
 ``VISL``, ``CPL`` ...) or the unit-suffixed aliases in
@@ -64,7 +67,8 @@ def normalise_pvt_parameters(pvt_parameters):
     Raises
     ------
     TypeError
-        If the block is not a dict, or a value is not a real number.
+        If the block is not a dict, a key is not a string, or a value is not
+        a real number.
     ValueError
         If a key is unknown, an alias and its native key disagree, a value is
         not finite, a density/viscosity/heat capacity/conductivity is not
@@ -78,6 +82,8 @@ def normalise_pvt_parameters(pvt_parameters):
     native_keys = _native_keys()
     normalised = {}
     for key, value in pvt_parameters.items():
+        if not isinstance(key, str):
+            raise TypeError(f"'pvt' keys must be strings, got {key!r}.")
         if key.startswith("_"):
             continue  # comment/description key, same convention as project JSON
         native = PVT_PARAMETER_ALIASES.get(key, key)

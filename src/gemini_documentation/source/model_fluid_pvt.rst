@@ -74,7 +74,9 @@ design-basis brine:
             "liquid_specific_heat_j_kgk": 4100.0}
 
 Over 2.5 km the brine column is about 7.4 bar heavier than water. The same
-block feeds ``gemini_simulator.kpi`` (primary-loop density and heat capacity)
-and, through ``heat_exchanger_fluid_parameters``, the ``fluid_density`` and
-``specific_heat`` parameters of the heat exchanger, boiler and CHP. See
+block sets the primary-loop density and heat capacity in
+``gemini_simulator.kpi``. Use ``heat_exchanger_fluid_parameters`` to set the
+matching ``fluid_density`` and ``specific_heat`` parameters of the heat
+exchanger, boiler and CHP; they are not copied automatically, and
+``kpi.fluid_consistency_issues`` reports a mismatch. See
 ``src/gemini_model/fluid/REFERENCE.md``.

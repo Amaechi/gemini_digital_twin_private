@@ -123,8 +123,13 @@ def test_fluid_properties_fall_back_to_legacy_defaults():
     """No 'pvt' block, or no such component -> the legacy KPI constants."""
     solver = _FakeSolver({"producer_well": {}})
     assert kpi.fluid_properties(solver) == (1050.0, 4200.0)
-    assert kpi.fluid_properties(solver, component="missing") == (1050.0, 4200.0)
-    assert kpi.fluid_properties(object()) == (1050.0, 4200.0)
+    # A non-default component name that does not exist must not fall back silently.
+    with pytest.raises(KeyError):
+        kpi.fluid_properties(solver, component="producer_2")
+    with pytest.raises(KeyError):
+        kpi.fluid_consistency_issues(solver, pvt_component="producer_2")
+    assert kpi.fluid_properties(solver, default_density_kg_m3=1000.0) == (1000.0, 4200.0)
+    assert kpi.fluid_properties(object()) == (1050.0, 4200.0)  # no components at all
     # A partial block keeps the PVT defaults for the keys it leaves out (as the well does).
     partial = _FakeSolver({"well": {}}, parameters={"well": {"pvt": {"RHOL": 1030.0}}})
     assert kpi.fluid_properties(partial, component="well") == (1030.0, 4217.4)
@@ -174,3 +179,12 @@ def test_sum_component_outputs():
         kpi.sum_component_outputs(solver, "power_el", ("a", "c"))
     with pytest.raises(KeyError):
         kpi.sum_component_outputs(solver, "power_th", ("a",))
+
+
+def test_module_defaults_are_read_at_call_time(monkeypatch):
+    """Patching kpi.FLUID_DENSITY/SPECIFIC_HEAT still changes the defaults, as before."""
+    solver = _FakeSolver({"water_mixer": {"temperature": 30.0}})
+    monkeypatch.setattr(kpi, "FLUID_DENSITY", 1000.0)
+    monkeypatch.setattr(kpi, "SPECIFIC_HEAT", 4000.0)
+    assert kpi.plant_thermal_power_w(solver, 0.01, 20.0) == pytest.approx(0.01 * 1000 * 4000 * 10)
+    assert kpi.fluid_properties(solver) == (1000.0, 4000.0)
