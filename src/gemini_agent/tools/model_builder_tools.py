@@ -66,7 +66,8 @@ NAME_PATTERN = r"^[a-z][a-z0-9_]{2,47}$"
 
 ALL_CONCEPTS: tuple[str, ...] = ("C0", "C1", "C2", "C3", "C4", "C5", "C6", "C7", "C8")
 _DEFAULT_DOUBLETS = {"C0": 0, "C1": 3, "C8": 3}
-"""Doublets per concept when no candidates exist yet (spec §3.4); others 2."""
+"""Doublets per concept before candidates exist (spec §3.4; C5 "2–3" taken as 2); others 2.
+Only ``adder`` depends on the count (two or more degassers)."""
 _DERIVED_PARENT = "C2"
 """Parent plant of C6–C8 before screening (WP-06 ``concept_layout`` default)."""
 
@@ -75,14 +76,21 @@ ALLOWED_MODEL_IMPORTS = frozenset(
     | {"gemini_model"}
 )
 ALLOWED_TEST_IMPORTS = ALLOWED_MODEL_IMPORTS | {"pytest"}
+BANNED_MODULES = ("numpy.ctypeslib", "numpy.f2py", "numpy.distutils", "numpy.lib", "scipy.io")
+"""Allowed packages' submodules that reach files, C or compilers."""
 BANNED_NAMES = frozenset(
     {"open", "exec", "eval", "compile", "__import__", "input", "breakpoint", "globals", "locals"}
-    | {"vars", "memoryview", "exit", "quit"}
+    | {"vars", "memoryview", "exit", "quit", "__builtins__", "getattr", "setattr", "delattr"}
 )
 BANNED_ATTRIBUTES = frozenset(
-    {"__subclasses__", "__globals__", "__builtins__", "__code__", "__loader__", "__spec__"}
-    | {"__bases__", "__mro__", "__getattribute__", "f_globals", "f_locals", "gi_frame"}
+    {"sys", "os", "modules", "io", "lib", "ctypeslib", "f2py", "npyio", "importorskip", "exit"}
+    | {"save", "savez", "savez_compressed", "savetxt", "load", "loadtxt", "genfromtxt"}
+    | {"fromfile", "tofile", "memmap", "open_memmap", "fromregex", "DataSource", "dump", "dumps"}
+    | {"f_globals", "f_locals", "f_back", "gi_frame", "cr_frame", "tb_frame"}
+    | {"MonkeyPatch", "chdir", "syspath_prepend"}
 )
+"""Attribute names refused in generated code; any dunder except ``ALLOWED_DUNDERS`` too."""
+ALLOWED_DUNDERS = frozenset({"__init__", "__name__", "__doc__"})
 REQUIRED_OUTPUTS = ("power_th", "power_el", "emission")
 """Every GEMINI energy model sets these outputs (spec §7.2 header)."""
 
@@ -180,12 +188,12 @@ KNOWN_LIMITATIONS: tuple[KnownLimitation, ...] = (
         "subsurface",
         ("producer_well",),
         "ESP has no flow affinity",
-        "GEMINI ESP head/efficiency curve is not scaled with the affinity laws; TL-05 solves "
-        "frequency with brentq on the scaled HC27000 curve (SUB-ESP).",
-        "Part-load ESP power and head are approximate.",
-        "Keep TL-05 operating points inside 30–70 Hz; WP-11 sensitivity on pump power.",
+        "GEMINI's ESP scales head by (f/60)² and power by (f/60)³ at the same flow but has no "
+        "flow affinity, so its curve power is optimistic at reduced frequency (SUB-ESP).",
+        "ESP curve power is approximate at part load.",
+        "Plant power uses the DB-13/DB-40 rule QΔp/0.70; the curve power is a comparison only.",
         "minor",
-        "WP-05 TL-05",
+        "WP-05 TL-05, SUB-ESP",
     ),
     _lim(
         "LIM-SUB-02",
@@ -237,8 +245,8 @@ KNOWN_LIMITATIONS: tuple[KnownLimitation, ...] = (
         "subsurface",
         ("producer_well",),
         "No flashing check above 100 °C",
-        "Brine above 100 °C at surface (C4, about 108 °C) is not checked for flashing in the "
-        "surface letdown; CFG-SURFACE only flags it.",
+        "Brine above 100 °C (C4: 108 °C reservoir at 3.2 km, DB-29) is not checked for "
+        "flashing in the surface letdown; CFG-SURFACE only flags brine above 100 °C.",
         "Deep-concept surface pressures may be optimistic.",
         "Keep the surface loop pressurised above saturation; flag C4 in the report.",
         "moderate",
@@ -250,7 +258,8 @@ KNOWN_LIMITATIONS: tuple[KnownLimitation, ...] = (
         "subsurface",
         ("producer_well",),
         "ESP far from BEP at minimum flow",
-        "At 50 m³/h the ESP runs at Q/Q_BEP 0.33 (BEP 300 m³/h), outside the preferred range.",
+        "At 50 m³/h the ESP runs at Q/(Q_BEP·f/60) 0.33 (TL-05 esp_flow_to_bep_ratio), outside "
+        "the preferred operating range.",
         "Minimum-flow efficiency and pump life uncertain.",
         "Prefer turndown by switching doublets; note in DR-01.",
         "minor",
@@ -259,14 +268,15 @@ KNOWN_LIMITATIONS: tuple[KnownLimitation, ...] = (
     _lim(
         "LIM-SUB-08",
         "subsurface",
-        ("producer_well",),
-        "ESP model is water-only",
-        "The GEMINI ESP ignores free gas at the intake; it relies on the intake staying above "
-        "the bubble point (SUB-PBUB, VER-ESP-MARGIN).",
-        "Gas locking is not predicted if the intake margin is lost.",
-        "Verifier PH-18/PD-10 enforce the intake margin.",
-        "moderate",
-        "WP-05, WP-09",
+        ("esp",),
+        "Standalone esp type is water-only",
+        "The registry type 'esp' is GEMINI's water ESP: head and power are not scaled by the "
+        "brine specific gravity (the producer ESP is, via well_flow._FluidESP; brine ESP Δp "
+        "and power × 1.03).",
+        "A project using 'esp' directly underestimates brine pump Δp and power.",
+        "Use producer_well (the generator does); scale 'esp' by the pvt SG if it is ever used.",
+        "minor",
+        "WP-01 review",
     ),
     _lim(
         "LIM-PLT-01",
@@ -362,6 +372,10 @@ class RequiredComponent(StrictModel):
     model_class: str | None = Field(default=None, description="'module.Class' if registered.")
     gm_id: str | None = None
     reference_card: str | None = None
+    in_generated_plant: bool = Field(
+        default=True,
+        description="False: the concept needs it but the WP-06 generator does not add it yet.",
+    )
 
 
 class MissingComponent(StrictModel):
@@ -404,32 +418,44 @@ class ModelGapReport(StrictModel):
     note: str
 
 
-def _layout_types(layout: Any, doublets: int) -> list[str]:
-    """Component types the WP-06 generator adds for a layout (CFG-LAYOUT, config_generator)."""
+CONCEPTUAL_TYPES = frozenset({"thermal_storage"})
+"""Needed by a concept (C6 storage) but not added by the WP-06 generator (LIM-PLT-01)."""
+
+
+def _layout_types(layout: Any, doublets: int, *, conceptual: bool = True) -> list[str]:
+    """Component types the WP-06 generator adds for a layout (CFG-LAYOUT, config_generator).
+
+    ``adder``: gas adder with two or more degassers, or heat-rejection adder when more than one
+    cooling unit rejects heat (the electric chiller always does). ``conceptual`` adds
+    :data:`CONCEPTUAL_TYPES` the concept needs but the generator does not build.
+    """
     types = ["boiler", "electric_chiller", "heat_rejection"]
+    absorption = layout.absorption and doublets > 0  # no active doublet: no absorption drive
     if doublets > 0:
         types += ["producer_well", "injector_well", "filter", "splitter", "mixer"]
         if layout.degas:
-            types += ["separator", "chp"] + (["adder"] if doublets > 1 else [])
+            types += ["separator", "chp"]
         if layout.direct_hex:
             types.append("heat_exchanger")
         if layout.heat_pump:
             types.append("heatpump")
-        if layout.absorption:
+        if absorption:
             types.append("absorption_chiller")
     if layout.free_cooling:
         types.append("free_cooling")
-    if layout.storage:
+    if (layout.degas and doublets > 1) or layout.free_cooling or absorption:
+        types.append("adder")
+    if conceptual and layout.storage:
         types.append("thermal_storage")
     return types
 
 
-def candidate_component_types(candidate: Candidate) -> list[str]:
+def candidate_component_types(candidate: Candidate, *, conceptual: bool = True) -> list[str]:
     """Registry types a candidate's generated plant uses (WP-06 ``concept_layout``)."""
     from gemini_agent.tools.config_generator import concept_layout
 
     _, layout, _ = concept_layout(candidate)
-    return _layout_types(layout, candidate.doublets)
+    return _layout_types(layout, candidate.doublets, conceptual=conceptual)
 
 
 def concept_component_types(concept: str) -> list[str]:
@@ -506,6 +532,7 @@ def model_gap_analysis(
                 model_class=_class_path(cls) if cls is not None else None,
                 gm_id=info.gm_id,
                 reference_card=info.reference_card,
+                in_generated_plant=ctype not in CONCEPTUAL_TYPES,
             )
         )
         if cls is None:
@@ -640,46 +667,86 @@ def model_file_paths(name: str) -> dict[FileKind, str]:
 
 
 def check_sandbox_root(root: Path, repo_root: Path = REPO_ROOT) -> Path:
-    """Return the resolved root; refuse the repository or a folder in it outside ``runs/``."""
+    """Return the resolved root; refuse the repository or a folder in it outside ``runs/``.
+
+    ``runs/final/`` is tracked (``.gitignore`` un-ignores it), so it is refused as well.
+    """
     resolved = Path(root).resolve()
     repo = Path(repo_root).resolve()
-    if resolved == repo or (
-        resolved.is_relative_to(repo) and not resolved.is_relative_to(repo / "runs")
+    if resolved.is_relative_to(repo) and (
+        not resolved.is_relative_to(repo / "runs")
+        or resolved == repo / "runs"
+        or resolved.is_relative_to(repo / "runs" / "final")
     ):
         raise ModelBuilderError(
-            "sandbox root must be outside the repository or under its git-ignored runs/ folder"
+            "sandbox root must be outside the repository or in a git-ignored runs/<id>/ folder "
+            "(not runs/final/)"
         )
     return resolved
 
 
+def _is_dunder(name: str) -> bool:
+    return name.startswith("__") and name.endswith("__") and name not in ALLOWED_DUNDERS
+
+
+def _check_module(module: str, allowed: frozenset[str], line: int) -> None:
+    if module.split(".")[0] not in allowed:
+        raise ModelBuilderError(
+            f"line {line}: import of '{module}' not allowed (allowed: {', '.join(sorted(allowed))})"
+        )
+    if any(module == banned or module.startswith(banned + ".") for banned in BANNED_MODULES):
+        raise ModelBuilderError(f"line {line}: import of '{module}' not allowed")
+
+
 def screen_python(source: str, kind: Literal["model", "test", "init"]) -> None:
-    """Parse generated Python and refuse disallowed imports/builtins (defence in depth)."""
+    """Parse generated Python and refuse disallowed imports/builtins (defence in depth).
+
+    Refused: imports outside the allow-list or in ``BANNED_MODULES``, star imports, names in
+    ``BANNED_NAMES``, attributes in ``BANNED_ATTRIBUTES``, dunder names/attributes other than
+    ``__init__``/``__name__``/``__doc__``, and string constants containing ``__`` (format-string
+    attribute access) except docstrings and other bare string statements.
+    """
     try:
         tree = ast.parse(source)
     except SyntaxError as exc:
         raise ModelBuilderError(f"syntax error line {exc.lineno}: {exc.msg}") from exc
     allowed = ALLOWED_TEST_IMPORTS if kind == "test" else ALLOWED_MODEL_IMPORTS
+    bare_strings = {
+        id(node.value)
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Expr) and isinstance(node.value, ast.Constant)
+    }
     for node in ast.walk(tree):
+        line = getattr(node, "lineno", 0)
         if isinstance(node, ast.Import):
-            modules = [alias.name for alias in node.names]
+            for alias in node.names:
+                _check_module(alias.name, allowed, line)
         elif isinstance(node, ast.ImportFrom):
             if node.level:
                 if kind == "init" and node.level == 1:
                     continue
-                raise ModelBuilderError(f"line {node.lineno}: relative import not allowed")
-            modules = [node.module or ""]
-        elif isinstance(node, ast.Name) and node.id in BANNED_NAMES:
-            raise ModelBuilderError(f"line {node.lineno}: '{node.id}' is not allowed")
-        elif isinstance(node, ast.Attribute) and node.attr in BANNED_ATTRIBUTES:
-            raise ModelBuilderError(f"line {node.lineno}: attribute '{node.attr}' is not allowed")
-        else:
-            continue
-        for module in modules:
-            if module.split(".")[0] not in allowed:
-                raise ModelBuilderError(
-                    f"line {node.lineno}: import of '{module}' not allowed "
-                    f"(allowed: {', '.join(sorted(allowed))})"
-                )
+                raise ModelBuilderError(f"line {line}: relative import not allowed")
+            module = node.module or ""
+            _check_module(module, allowed, line)
+            for alias in node.names:
+                if alias.name == "*":
+                    raise ModelBuilderError(f"line {line}: star import not allowed")
+                if alias.name in BANNED_ATTRIBUTES or alias.name in BANNED_NAMES:
+                    raise ModelBuilderError(f"line {line}: import of '{alias.name}' not allowed")
+                _check_module(f"{module}.{alias.name}", allowed, line)
+        elif isinstance(node, ast.Name) and (node.id in BANNED_NAMES or _is_dunder(node.id)):
+            raise ModelBuilderError(f"line {line}: '{node.id}' is not allowed")
+        elif isinstance(node, ast.Attribute) and (
+            node.attr in BANNED_ATTRIBUTES or _is_dunder(node.attr)
+        ):
+            raise ModelBuilderError(f"line {line}: attribute '{node.attr}' is not allowed")
+        elif (
+            isinstance(node, ast.Constant)
+            and isinstance(node.value, str)
+            and "__" in node.value
+            and id(node) not in bare_strings
+        ):
+            raise ModelBuilderError(f"line {line}: string constants must not contain '__'")
 
 
 class WrittenFile(StrictModel):
@@ -742,7 +809,8 @@ class ModelSandbox:
         if keyword.iskeyword(name) or name.startswith("test"):
             raise ModelBuilderError(f"model name {name!r} is reserved")
         for area in ("src", "unit_test"):
-            if (self.repo_root / area / "gemini_model" / name).exists():
+            base = self.repo_root / area / "gemini_model"
+            if (base / name).exists() or (base / f"{name}.py").exists():
                 raise ModelBuilderError(
                     f"'{name}' already exists in {area}/gemini_model: write a NEW model folder"
                 )
@@ -781,8 +849,11 @@ class ModelSandbox:
 
     @property
     def state_dir(self) -> Path:
-        """Folder for reports and registration records."""
-        return self.root / STATE_DIR_NAME
+        """Folder for reports and registration records (never a symlink)."""
+        path = self.root / STATE_DIR_NAME
+        if path.is_symlink():
+            raise ModelBuilderError(f"{STATE_DIR_NAME} in the sandbox must not be a symlink")
+        return path
 
     # ------------------------------------------------------------------ files
     def write(self, relative_path: str, content: str) -> WrittenFile:
@@ -865,6 +936,20 @@ _BOOTSTRAP = (
 """Child process: sandbox models become ``gemini_model.<name>`` without shadowing GEMINI."""
 
 
+_POSIX = hasattr(os, "killpg")
+
+
+def _kill_group(process: subprocess.Popen[bytes]) -> None:
+    """Kill the child's process group (POSIX) or the child (elsewhere)."""
+    try:
+        if _POSIX:
+            os.killpg(process.pid, signal.SIGKILL)
+        elif process.poll() is None:
+            process.kill()
+    except (ProcessLookupError, PermissionError):
+        pass
+
+
 def _child_env(sandbox: ModelSandbox) -> dict[str, str]:
     return {
         "PATH": os.environ.get("PATH", "/usr/bin:/bin"),
@@ -932,6 +1017,8 @@ def run_model_tests(
     junit.unlink(missing_ok=True)
     command = [
         python,
+        "-P",  # no script/cwd directory on sys.path
+        "-s",  # no user site-packages
         "-c",
         _BOOTSTRAP,
         str(sandbox.root / "src" / "gemini_model"),
@@ -954,15 +1041,16 @@ def run_model_tests(
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         stdin=subprocess.DEVNULL,
-        start_new_session=True,
+        start_new_session=_POSIX,
     )
     try:
         output, _ = process.communicate(timeout=timeout_s)
         timed_out = False
     except subprocess.TimeoutExpired:
-        os.killpg(process.pid, signal.SIGKILL)
+        _kill_group(process)
         output, _ = process.communicate()
         timed_out = True
+    _kill_group(process)  # nothing the tests started may outlive the run
     base["duration_s"] = round(time.perf_counter() - start, 3)
     base["returncode"] = None if timed_out else process.returncode
     base["timed_out"] = timed_out
@@ -984,6 +1072,8 @@ def run_model_tests(
         error = f"pytest timed out after {timeout_s:.0f} s"
     elif process.returncode == 5 or executed < 1:
         error = "no test ran (REF-02 needs a reference-example test)"
+    if sandbox.files_digest(name) != digest:
+        passed, error = False, "model files changed during the test run"
     report = PytestReport(
         passed=passed,
         failed_tests=failed,
@@ -1015,8 +1105,6 @@ def run_pytest(
 
 # =========================================================================== TL-18 register
 def _load_model_class(sandbox: ModelSandbox, name: str, digest: str, class_name: str | None) -> Any:
-    from gemini_model.model_abstract import DynamicModel, Model, StaticModel
-
     module_name = f"_geoagent_sandbox_{name}_{digest[:12]}"
     spec = importlib.util.spec_from_file_location(module_name, sandbox.path(name, "model"))
     if spec is None or spec.loader is None:
@@ -1032,6 +1120,16 @@ def _load_model_class(sandbox: ModelSandbox, name: str, digest: str, class_name:
         raise ModelBuilderError(f"importing the model failed: {type(exc).__name__}: {exc}") from exc
     finally:
         sys.dont_write_bytecode = keep_bytecode
+    try:
+        return _checked_class(module, module_name, class_name)
+    except ModelBuilderError:
+        sys.modules.pop(module_name, None)
+        raise
+
+
+def _checked_class(module: Any, module_name: str, class_name: str | None) -> Any:
+    from gemini_model.model_abstract import DynamicModel, Model, StaticModel
+
     classes = [
         obj
         for obj in vars(module).values()

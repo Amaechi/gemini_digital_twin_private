@@ -73,6 +73,8 @@ def test_gap_analysis_live_registry_has_no_missing_types():
     assert {"free_cooling", "heatpump", "absorption_chiller", "thermal_storage"} <= set(required)
     assert required["free_cooling"].needed_by == ["C2", "C3", "C4", "C5", "C6", "C7", "C8"]
     assert required["thermal_storage"].needed_by == ["C6"]
+    assert not required["thermal_storage"].in_generated_plant  # LIM-PLT-01
+    assert required["free_cooling"].in_generated_plant
     assert required["separator"].needed_by == ["C1", "C2", "C3", "C4", "C5", "C6", "C8"]
     assert required["heatpump"].model_class.endswith("HeatpumpBasic")
     assert "C0" in required["boiler"].needed_by and "C0" not in required["producer_well"].needed_by
@@ -92,9 +94,10 @@ def test_known_limitations_become_gap_entries():
     assert entries["LIM-PLT-05"].affects == ["C3", "C4"]  # absorption isolation loop
     assert entries["LIM-PLT-02"].affects == ["C2", "C3", "C5", "C6", "C7", "C8"]  # HP fouling
     assert entries["LIM-GEM-01"].affects == []  # Compressor is unused
+    assert entries["LIM-SUB-08"].affects == []  # standalone 'esp' type is unused
     assert "C0" not in entries["LIM-SUB-01"].affects
     titles = " ".join(lim.title + lim.detail for lim in KNOWN_LIMITATIONS)
-    for item in ("affinity", "PVT", "U = 10", "0.4 K", "fracture", "flashing", "Q/Q_BEP"):
+    for item in ("affinity", "PVT", "U = 10", "0.4 K", "fracture", "flashing", "Q/(Q_BEP"):
         assert item in titles, item
     for item in ("water-only", "storage", "fouling", "C_r", "abs(", "isolation", "Compressor"):
         assert item in titles, item
@@ -131,6 +134,30 @@ def test_gap_analysis_uses_candidate_ids(tmp_path):
     assert {by_id[cid] for cid in by_type["absorption_chiller"]} == {"C3", "C4"}
     c7 = next(c.id for c in candidates if c.concept == "C7")
     assert c7 not in by_type["separator"]  # pressurised loop, no degassing
+
+
+def test_required_types_match_the_generated_projects(tmp_path):
+    """TL-17 needs = the types in WP-06 generate_plant projects (C0–C8 at 1–3 doublets)."""
+    from gemini_agent.tools.config_generator import (
+        PlantDispatch,
+        design_loads,
+        generate_plant,
+        load_generator_basis,
+    )
+
+    toolbox = default_toolbox()
+    context = ToolContext(run_id="t", run_dir=tmp_path, config_dir=None)
+    candidates = toolbox.execute("generate_candidates", {}, context).data.candidates
+    loads = design_loads(load_generator_basis())
+    for candidate in candidates:
+        for doublets in (1, 2, 3) if candidate.doublets else (0,):
+            variant = candidate.model_copy(update={"doublets": doublets})
+            project = generate_plant(variant, loads, PlantDispatch()).project
+            built = {spec["type"] for spec in project["components"].values()}
+            predicted = set(mbt.candidate_component_types(variant, conceptual=False))
+            assert predicted == built, (variant.concept, doublets)
+            conceptual = set(mbt.candidate_component_types(variant)) - predicted
+            assert conceptual == ({"thermal_storage"} if variant.concept == "C6" else set())
 
 
 # --------------------------------------------------------------------------- read_reference_card
@@ -184,6 +211,7 @@ def test_sandbox_writes_only_the_five_model_files(sandbox):
         "src/gemini_model/FreeCooling/FreeCooling.py",
         "src/gemini_model/class/class.py",  # keyword
         "src/gemini_model/test_x/test_x.py",  # reserved prefix
+        "src/gemini_model/model_abstract/model_abstract.py",  # clashes with model_abstract.py
         "data/knowledge/reference_cards/RC-07_x.md",
     ],
 )
@@ -204,12 +232,26 @@ def test_symlinks_inside_the_sandbox_are_refused(tmp_path, sandbox):
     assert not any(outside.rglob("*"))
 
 
+def test_symlinked_state_dir_is_refused(tmp_path, sandbox):
+    """Reports are never read from or written through a symlink."""
+    _write_model(sandbox)
+    outside = tmp_path / "elsewhere"
+    outside.mkdir()
+    (sandbox.root / mbt.STATE_DIR_NAME).symlink_to(outside, target_is_directory=True)
+    with pytest.raises(ModelBuilderError, match="symlink"):
+        run_model_tests(sandbox, NAME)
+    assert not any(outside.rglob("*"))
+
+
 def test_sandbox_root_must_not_be_in_the_tracked_tree(tmp_path):
     """Repository root and its folders are refused; runs/ (git-ignored) and outside are fine."""
     repo = tmp_path / "repo"
     (repo / "src").mkdir(parents=True)
     for bad in (repo, repo / "src", repo / "unit_test" / "x", repo / "data"):
         with pytest.raises(ModelBuilderError, match="outside the repository"):
+            check_sandbox_root(bad, repo)
+    for bad in (repo / "runs", repo / "runs" / "final" / "model_builder"):  # runs/final tracked
+        with pytest.raises(ModelBuilderError, match="runs/final"):
             check_sandbox_root(bad, repo)
     assert check_sandbox_root(repo / "runs" / "r1" / "model_builder", repo).is_relative_to(repo)
     assert check_sandbox_root(tmp_path / "elsewhere", repo) == (tmp_path / "elsewhere").resolve()
@@ -229,6 +271,24 @@ def test_sandbox_root_must_not_be_in_the_tracked_tree(tmp_path):
         ("x = __import__('os')\n", "model", "__import__"),
         ("x = ().__class__.__bases__\n", "model", "__bases__"),
         ("from .helpers import x\n", "model", "relative import"),
+        ("x = __builtins__['open']\n", "model", "__builtins__"),
+        ("x = getattr(int, 'real')\n", "model", "'getattr'"),
+        ("setattr(object, 'x', 1)\n", "model", "'setattr'"),
+        ("import typing\nm = typing.sys.modules\n", "model", "'(sys|modules)'"),
+        ("import dataclasses\nx = dataclasses.sys\n", "model", "'sys'"),
+        ("import numpy\nnumpy.savetxt('/tmp/x', [1])\n", "model", "'savetxt'"),
+        ("import numpy as np\nnp.fromfile('/etc/passwd')\n", "model", "'fromfile'"),
+        ("from numpy import save\n", "model", "'save'"),
+        ("from numpy import *\n", "model", "star import"),
+        ("import scipy.io\n", "model", "scipy.io"),
+        ("from scipy import io\n", "model", "'(scipy.)?io'"),
+        ("import numpy.ctypeslib\n", "model", "numpy.ctypeslib"),
+        ("x = type.__subclasses__\n", "model", "__subclasses__"),
+        ("x = (1).__class__\n", "model", "__class__"),
+        ("x = '{0.__class__}'.format(1)\n", "model", "'__'"),
+        ("import pytest\nx = pytest.importorskip('os')\n", "test", "importorskip"),
+        ("import pytest\nx = pytest.MonkeyPatch\n", "test", "MonkeyPatch"),
+        ("x = __file__\n", "model", "__file__"),
         ("def f(:\n", "model", "syntax error"),
     ],
 )
@@ -243,6 +303,7 @@ def test_screen_python_accepts_model_and_test_templates():
     screen_python(_model(), "model")
     screen_python(_test(), "test")
     screen_python("from .free_cooling_rc07 import FreeCoolingRc07\n", "init")
+    screen_python('"""Doc with __init__ in it."""\nif __name__ == "m":\n    pass\n', "model")
 
 
 def test_write_refuses_oversized_and_unsafe_files(sandbox):
@@ -280,6 +341,19 @@ def test_run_pytest_times_out(sandbox):
     report = run_model_tests(sandbox, NAME, timeout_s=2)
     assert report.timed_out and not report.passed and report.returncode is None
     assert "timed out" in report.error and report.duration_s < 30
+
+
+def test_run_pytest_fails_if_tests_edit_the_model(sandbox):
+    """Files changed during the run (digest before ≠ after) never pass."""
+    _write_model(sandbox)
+    tamper = (
+        "from pathlib import Path\n\n\ndef test_tamper():\n"
+        f"    path = Path('{model_file_paths(NAME)['model']}')\n"
+        "    path.write_text(path.read_text() + '# edited')\n"
+    )
+    (sandbox.root / model_file_paths(NAME)["test"]).write_text(tamper)  # bypasses the screen
+    report = run_model_tests(sandbox, NAME)
+    assert not report.passed and "changed during" in report.error
 
 
 def test_run_pytest_needs_files_and_tests(sandbox):

@@ -46,6 +46,7 @@ from gemini_agent.tools.model_builder_tools import (
     ModelSandbox,
     PytestReport,
     RegistrationRecord,
+    check_sandbox_root,
     model_file_paths,
     model_gap_analysis,
     read_reference_card,
@@ -592,7 +593,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     from gemini_agent.agents import engine
 
     llm_config = load_config("llm", args.config_dir)
-    sandbox_root = Path(args.sandbox)
+    sandbox_root = check_sandbox_root(Path(args.sandbox))  # before anything is created
     logger = LLMLogger(sandbox_root)
     coder = LLMCoder(
         llm_config=llm_config,

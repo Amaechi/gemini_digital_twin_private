@@ -10,21 +10,25 @@ Second net (WP-12): the git working tree is snapshotted when pytest starts and
 """
 
 import importlib.util
+from pathlib import Path
 
 import pytest as _pytest
 
-from gemini_agent.schemas.config import REPO_ROOT as _REPO_ROOT
-from unit_test.gemini_agent.working_tree import SNAPSHOT_KEY, TEST_NAME, git_snapshot
+_REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
 def pytest_configure(config):
-    """Snapshot the git working tree before any test runs."""
+    """Snapshot the git working tree before any test runs (stdlib + pytest only)."""
+    from unit_test.gemini_agent.working_tree import SNAPSHOT_KEY, git_snapshot
+
     config.stash[SNAPSHOT_KEY] = git_snapshot(_REPO_ROOT)
 
 
 @_pytest.hookimpl(trylast=True)
 def pytest_collection_modifyitems(config, items):
     """Run the working-tree check after every other collected test."""
+    from unit_test.gemini_agent.working_tree import TEST_NAME
+
     last = [item for item in items if item.name == TEST_NAME]
     items[:] = [item for item in items if item.name != TEST_NAME] + last
 

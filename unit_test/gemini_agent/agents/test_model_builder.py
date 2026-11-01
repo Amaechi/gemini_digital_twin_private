@@ -269,3 +269,11 @@ def test_main_runs_the_s7_demo_with_the_coder_model(tmp_path, monkeypatch):
     assert report["gap_closed"] and report["registered_class"] == "FreeCoolingRc07"
     assert (sandbox / "llm_calls.jsonl").is_file() and scripted.calls == 1
     assert COMPONENT_REGISTRY["free_cooling"] is FreeCooling
+
+
+def test_main_refuses_a_sandbox_in_the_repository_before_creating_it():
+    """--sandbox inside src/ is refused before any folder or log is created."""
+    target = REPO_ROOT / "src" / "zz_model_builder_probe"
+    with pytest.raises(mb.ModelBuilderError, match="outside the repository"):
+        mb.main(["--sandbox", str(target)])
+    assert not target.exists()
