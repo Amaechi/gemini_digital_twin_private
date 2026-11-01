@@ -17,6 +17,7 @@
    chp
    compressor
    corrosion
+   electric_boiler
    electric_chiller
    erosion
    filter
@@ -32,4 +33,5 @@
    reservoir
    separator
    splitter
+   thermal_storage
    well
