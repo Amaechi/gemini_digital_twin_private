@@ -123,6 +123,11 @@ class HeatpumpBasic(StaticModel):
         and stores the results (COP, outlet temperatures, thermal production
         and electrical consumption) in `self.output`.
 
+        Both solvers also output the RC-04 screening (``condensing_temperature_degc``,
+        ``evaporating_temperature_degc``, ``lift_k``, ``cop_cap``, ``within_limits``,
+        ``missing_inputs``, ``validity_warnings`` ...), ``source_heat_w`` (heat drawn from the
+        source, W) and ``heat_pump_point`` (DesignVerifier evidence, see ``_evidence``).
+
         Parameters
         ----------
         u: dict
@@ -134,11 +139,6 @@ class HeatpumpBasic(StaticModel):
             pressure chain is not broken when connecting through a heat pump.
         x: state
             Model state (unused, model is static).
-
-        Both solvers also output the RC-04 screening (``condensing_temperature_degc``,
-        ``evaporating_temperature_degc``, ``lift_k``, ``cop_cap``, ``within_limits``,
-        ``missing_inputs``, ``validity_warnings`` ...), ``source_heat_w`` (heat drawn from the
-        source, W) and ``heat_pump_point`` (DesignVerifier evidence, see :meth:`_evidence`).
         """
         solver = self.parameters.get("solver", "nelder_mead")
         if solver not in SOLVERS:
