@@ -271,3 +271,18 @@ assumptions:
     tag: A
     status: default
     added_by: WP-04
+
+  - id: VER-ESP-PB
+    title: Bubble / CO₂-release pressure for the ESP-intake check (brine chemistry not given)
+    value: 20.0
+    unit: bar(g)
+    justification: >-
+      The brine bubble-point (CO₂-release) pressure is not provided, so the DesignVerifier's ESP-intake
+      check (spec §10.1 physical layer) uses the reference card's default: keep the ESP intake at or
+      above 20 bar(g) and flag the missing input. A tool that computes the release pressure passes it
+      explicitly (EspPoint.release_pressure_bar) and the default is not used.
+    source: RC-01 item 9 [A] (DiPippo eq 4.16–4.20 flash-horizon method; Ch8 p.4)
+    sensitivity: "Release pressure 10 / 30 bar(g): the ESP setting depth moves accordingly."
+    tag: A
+    status: default
+    added_by: WP-09

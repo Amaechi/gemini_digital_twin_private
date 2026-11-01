@@ -694,7 +694,13 @@ class DesignRunner:
         self._event(
             state,
             event,
-            {"message": label, "request_id": request.request_id, "durable": source == "user"},
+            {
+                "message": label,
+                "request_id": request.request_id,
+                "assumption_id": request.assumption_id,
+                "answer": value,
+                "durable": source == "user",
+            },
         )
 
     # ------------------------------------------------------------------ decision records
@@ -765,6 +771,14 @@ class DesignRunner:
             )
             if verification.verdict == DesignVerdict.REJECTED:
                 return self._loop_back(state, verification)
+            if phase == Phase.P9 and self._unverified_without_stubs(state, verification):
+                self._escalate(
+                    state,
+                    f"verifier could not verify {verification.candidate_id}: UNVERIFIED although "
+                    f"no tool in the run is a stub (missing evidence, see "
+                    f"{verification.tool_result_id})",
+                )
+                return None
         if phase == Phase.P10 and state.approval is None:
             verdict = state.verdict_value() or "not verified"
             request = InputRequest(
@@ -779,6 +793,17 @@ class DesignRunner:
             self._handle_request(state, request)
             return None
         return next_phase(phase)
+
+    @staticmethod
+    def _unverified_without_stubs(state: RunState, verification: Verification) -> bool:
+        """WP-09 decision: a real verifier's UNVERIFIED escalates at P9 in a stub-free run.
+
+        UNVERIFIED means missing evidence, not a violation, so it never loops back. While any
+        tool is still a stub the run completes UNVERIFIED (WP-13 blocks submission instead).
+        """
+        return verification.verdict == DesignVerdict.UNVERIFIED and not any(
+            record.stub for record in state.tool_results
+        )
 
     def _loop_back(self, state: RunState, verification: Verification) -> Phase | None:
         state.loop_count += 1

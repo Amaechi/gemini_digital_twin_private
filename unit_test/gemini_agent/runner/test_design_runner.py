@@ -269,6 +269,25 @@ def test_only_a_real_verifier_can_accept(tmp_path):
     assert result.verdict == "UNVERIFIED"
 
 
+def test_real_verifier_unverified_escalates_only_without_stubs(tmp_path):
+    """WP-09 decision: UNVERIFIED never loops back; it escalates at P9 once no tool is a stub."""
+    import dataclasses
+
+    toolbox = default_toolbox()
+    toolbox.register(_verifier(DesignVerdict.UNVERIFIED))
+    result = _runner(tmp_path, toolbox=toolbox).start("", run_id="stubs")
+    assert result.status == RunStatus.COMPLETED and result.verdict == "UNVERIFIED"
+
+    for name in toolbox.names():
+        toolbox.register(dataclasses.replace(toolbox.spec(name), stub=False))
+    runner = _runner(tmp_path, toolbox=toolbox)
+    result = runner.start("", run_id="real")
+    assert result.status == RunStatus.ESCALATED and result.phase == Phase.P9
+    assert "UNVERIFIED" in result.summary
+    events = runner.store("real").list_events("real")
+    assert not [e for e in events if e.type == "LOOP_BACK"]
+
+
 def _llm_engine(tmp_path, run_id, func):
     logger = LLMLogger(tmp_path / run_id)
     llm = LLMEngine(
