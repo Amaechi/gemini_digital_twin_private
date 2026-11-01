@@ -12,9 +12,13 @@ the expected shape), so a project file can describe its own well/
 reservoir/ESP configuration directly, with no extra conversion code.
 """
 
+# Modified by the GeoAgent team for SPE GeoHackathon 2026, 2026-11-01: optional "pvt" block in the
+# well configs (GM-01) is passed to every DPDT built here; without it the fluid is GEMINI's
+# default water PVT, as before.
+
 import numpy as np
 
-from gemini_model.fluid.pvt_water_stp import PVTConstantSTP
+from gemini_model.fluid.pvt_config import build_pvt
 from gemini_model.pump.esp import ESP
 from gemini_model.reservoir.inflow_performance import IPR
 from gemini_model.well.pressure_drop import DPDT
@@ -98,12 +102,15 @@ def _split_trajectory_at_depth(trajectory, split_depth):
     return top, bottom
 
 
-def _build_dpdt(segments, roughness=0.01):
+def _build_dpdt(segments, roughness=0.01, pvt=None):
     """Build a ready-to-use DPDT well-segment model from a segment list.
 
     ``roughness`` is the pipe wall roughness (m) used by the well's
     friction correlation; defaults to 0.01 m if not overridden by a
-    well config's own ``roughness_m``.
+    well config's own ``roughness_m``. ``pvt`` is the well config's
+    optional ``"pvt"`` block (see
+    :func:`gemini_model.fluid.pvt_config.normalise_pvt_parameters`);
+    ``None`` gives GEMINI's default water PVT.
     """
     well = DPDT()
     well.update_parameters(
@@ -117,7 +124,7 @@ def _build_dpdt(segments, roughness=0.01):
             "correction_factors": [1, 0],
         }
     )
-    well.PVT = PVTConstantSTP()
+    well.PVT = build_pvt(pvt)
     return well
 
 
@@ -154,8 +161,13 @@ def solve_primary_flow_m3h(
               "esp_depth_m": float,                  # optional, omit for no ESP
               "esp": {"no_stages": int, "head_coeff": [...], "power_coeff": [...]},
               "esp_freq_hz": float,
+              "pvt": {"liquid_density_kg_m3": 1030.0, ...},  # optional, GM-01
             }
 
+        ``"pvt"`` overrides the well fluid's PVT properties (native
+        ``PVTConstantSTP`` keys or the unit-suffixed aliases in
+        :data:`gemini_model.fluid.pvt_config.PVT_PARAMETER_ALIASES`);
+        omit it for GEMINI's default water PVT.
         ``"trajectory_table"`` is a list of cumulative MD/TVD/ID survey
         stations (station 0 is normally the wellhead, ``MD=TVD=0``),
         matching the MD/TVD/ID nodal-analysis convention used across the
@@ -195,17 +207,18 @@ def solve_primary_flow_m3h(
     esp_config = well_config.get("esp")
     esp_freq = well_config.get("esp_freq_hz")
     roughness_m = well_config.get("roughness_m", 0.01)
+    pvt = well_config.get("pvt")
 
     trajectory_segments = _resolve_trajectory_segments(well_config)
 
     if esp_depth is not None and esp_config is not None:
         top_segments, bottom_segments = _split_trajectory_at_depth(trajectory_segments, esp_depth)
-        dpdt_top = _build_dpdt(top_segments, roughness=roughness_m)
-        dpdt_bottom = _build_dpdt(bottom_segments, roughness=roughness_m)
+        dpdt_top = _build_dpdt(top_segments, roughness=roughness_m, pvt=pvt)
+        dpdt_bottom = _build_dpdt(bottom_segments, roughness=roughness_m, pvt=pvt)
         esp = ESP()
         esp.update_parameters(esp_config)
     else:
-        dpdt_top = _build_dpdt(trajectory_segments, roughness=roughness_m)
+        dpdt_top = _build_dpdt(trajectory_segments, roughness=roughness_m, pvt=pvt)
         dpdt_bottom = None
         esp = None
 
@@ -271,7 +284,11 @@ def producer_esp_pressures_bar(
     top_segments, _ = _split_trajectory_at_depth(
         _resolve_trajectory_segments(well_config), esp_depth
     )
-    dpdt_top = _build_dpdt(top_segments, roughness=well_config.get("roughness_m", 0.01))
+    dpdt_top = _build_dpdt(
+        top_segments,
+        roughness=well_config.get("roughness_m", 0.01),
+        pvt=well_config.get("pvt"),
+    )
     wellhead_temperature_k = wellhead_temperature_c + CELSIUS_TO_KELVIN
     dpdt_top.calculate_output(
         {
@@ -329,10 +346,12 @@ def solve_injector_wellhead_pressure_bar(
               "productivity_index_m3h_per_bar": float,
               "welltrajectory": [{"angle": deg, "depth": m, "diameter": m}, ...],
               "roughness_m": float,                  # optional, defaults to 0.01
+              "pvt": {...},                          # optional, GM-01
             }
 
-        (Same ``"trajectory_table"``-vs-``"welltrajectory"`` choice as
-        :func:`solve_primary_flow_m3h` -- see its docstring.)
+        (Same ``"trajectory_table"``-vs-``"welltrajectory"`` choice and
+        optional ``"pvt"`` block as :func:`solve_primary_flow_m3h` -- see
+        its docstring.)
     flow_m3h: float
         The (known) injection flow rate, in m3/h.
     wellhead_temperature_c: float
@@ -360,6 +379,7 @@ def solve_injector_wellhead_pressure_bar(
     dpdt = _build_dpdt(
         _resolve_trajectory_segments(injector_well_config),
         roughness=injector_well_config.get("roughness_m", 0.01),
+        pvt=injector_well_config.get("pvt"),
     )
 
     pressure_bracket_pa = (pressure_bracket_bar[0] * 1e5, pressure_bracket_bar[1] * 1e5)

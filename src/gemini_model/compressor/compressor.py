@@ -6,6 +6,10 @@ cooled back to inlet temperature between stages) and an equal
 pressure ratio across every stage.
 """
 
+# Modified by the GeoAgent team for SPE GeoHackathon 2026, 2026-11-01: added the standard
+# power_el/power_th/emission outputs (power_el = compressor_power) so the compressor can be
+# used from the registry like other components (GM-02). Existing outputs are unchanged.
+
 from gemini_model.model_abstract import StaticModel
 
 
@@ -45,6 +49,16 @@ class Compressor(StaticModel):
         echoed back unchanged as outputs (this model does not itself alter
         the flow or pressures, it only reports the power required to
         achieve them) so a downstream component can chain off them.
+        ``power_el`` (W) equals ``compressor_power`` (electric drive assumed;
+        the efficiencies are already applied, so ``mechanical_efficiency``
+        must include motor/VFD losses for a wire-to-gas figure);
+        ``power_th`` and ``emission`` are 0.
+
+        Known limitation (GEMINI formula, unchanged): the per-stage work is
+        ``m R T1/(k-1) (r^((k-1)/k) - 1)``, without the factor ``k`` of the
+        steady-flow isentropic work ``m k/(k-1) R T1 (r^((k-1)/k) - 1)``, so
+        the power is low by a factor ``k`` (about 1.3). Flagged for follow-up
+        in docs/hackathon/PROGRESS.md.
         """
         mass_flow = u["mass_flow"]  # kg/s
         pressure_in = u["pressure_in"]  # bar
@@ -60,6 +74,9 @@ class Compressor(StaticModel):
         self.output["pressure_in"] = pressure_in
         self.output["pressure_out"] = pressure_out
         self.output["temperature_in"] = temperature_in
+        self.output["power_el"] = compressor_power
+        self.output["power_th"] = 0.0
+        self.output["emission"] = 0.0
 
     def _power_calculation(self, mass_flow, pressure_in, pressure_out, temperature_in):
         """Compute compressor shaft power assuming ideal intercooling.
