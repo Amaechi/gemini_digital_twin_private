@@ -9,19 +9,28 @@ import pytest
 
 from gemini_agent.schemas.candidate import EQUIPMENT_SIZE_SUFFIXES
 from gemini_agent.schemas.common import HOURS_PER_DAY, SUMMARY_MAX_CHARS
-from gemini_agent.tools.config_generator import PlantDispatch, load_generator_basis
+from gemini_agent.tools.config_generator import (
+    PlantDispatch,
+    generate_plant,
+    load_generator_basis,
+)
 from gemini_agent.tools.design_basis import brine_heat_mw
 from gemini_agent.tools.resource import load_subsurface_basis
 from gemini_agent.tools.simulate_day import (
     DayConditions,
     SimulateDayRequest,
+    brine_cooling_failures,
     day_conditions,
     simulate_day,
     simulate_plant_day,
     verification_evidence,
 )
 from gemini_agent.verify.design_verifier import CheckStatus, DesignVerifier
-from unit_test.gemini_agent.tools.plant_factory import CONCEPT_CASES, make_candidate
+from gemini_simulator.project_loader import build_project
+from unit_test.gemini_agent.tools.plant_factory import (
+    CONCEPT_CASES,
+    make_candidate,
+)
 
 SUMMER = dt.date(2027, 7, 19)
 
@@ -96,7 +105,7 @@ def _balances(sim, gb):
     for q, q_inj in zip(day.doublet_flow_m3h, day.injection_flow_m3h, strict=True):
         assert q_inj == q
     for tp, ti in zip(day.production_temperature_degc, day.injection_temperature_degc, strict=True):
-        assert tp - ti <= gb.brine_cooling_max_k + 1e-6 or day.margins
+        assert tp - ti <= gb.brine_cooling_max_k + 1e-6  # DB-12 is a hard limit
     assert all(key.endswith(EQUIPMENT_SIZE_SUFFIXES) for key in day.margins)
 
 
@@ -255,3 +264,71 @@ def test_verification_evidence_refuses_invalid_or_foreign_days():
         verification_evidence(candidate, [sim])
     with pytest.raises(ValueError, match="no simulated days"):
         verification_evidence(other, [])
+
+
+# --------------------------------------------------------------------------- reviewer findings
+def test_hot_brine_plate_hex_is_held_to_db12_and_100c():
+    """C4 at 3.2 km on the peak day: the plate-HEX share is cut so ΔT ≤ 40 K and supply = 100 °C."""
+    gb, sub = bases()
+    peak, _ = days()
+    candidate = make_candidate("C4", 2, depth_m=3200.0)
+    sim = simulate_plant_day(candidate, peak, gb=gb, sub=sub)
+    assert sim.valid and sim.hex_flow_frac < 1.0
+    for tp, ti in zip(
+        sim.day.production_temperature_degc, sim.day.injection_temperature_degc, strict=True
+    ):
+        assert tp - ti <= 40.0 + 1e-6
+    assert sim.day.heating_supply_degc == pytest.approx(100.0, abs=1e-5)
+    assert sim.heat_surplus_mw == 0.0
+    assert any("plate-HEX share reduced" in w for w in sim.warnings)
+    assert any("flashing is not checked" in w for w in sim.warnings)  # 105 °C let down to 0 bar(g)
+    off_design = simulate_plant_day(
+        make_candidate("C1", 1, depth_m=3200.0),
+        day_conditions(dt.date(2027, 4, 15)),
+        PlantDispatch(doublet_flows_m3h=[100.0]),
+        gb=gb,
+        sub=sub,
+    )
+    brine_dt = off_design.day.production_temperature_degc[0] - (
+        off_design.day.injection_temperature_degc[0]
+    )
+    assert off_design.valid and brine_dt <= 40.0 + 1e-6
+
+
+def test_uncontrolled_hex_breaks_db12_and_is_a_failure():
+    """Without the plate-HEX control the C4 peak day cools the brine 41.3 K: a failure."""
+    gb, _ = bases()
+    peak, _ = days()
+    config = generate_plant(make_candidate("C4", 2, depth_m=3200.0), peak.loads(), gb=gb)
+    solver = build_project(config.project)
+    solver.run()
+    failures = brine_cooling_failures(solver, config, gb)
+    assert len(failures) == 2 and "DB-12: doublet 1 brine cooled 41.3" in failures[0]
+
+
+def test_chp_surplus_is_reported_when_all_gas_must_be_burned():
+    """C1 × 3 at design flow in summer: the CHP alone exceeds the demand (DB-36: no venting)."""
+    _, sim = simulated("C1", 3, 2500.0, None, "summer")
+    assert sim.valid and sim.hex_flow_frac == 0.0
+    assert sim.heat_surplus_mw > 0.5
+    assert sim.day.margins["heat_surplus_margin_mw"] == pytest.approx(-sim.heat_surplus_mw)
+    assert any("lower the doublet flows" in w for w in sim.warnings)
+
+
+def test_candidate_return_temperatures_are_used():
+    """DB-31/DB-32 come from the candidate (user answer), not silently from the register."""
+    gb, sub = bases()
+    _, summer = days()
+    warm = make_candidate("C2", 2)
+    cold = warm.model_copy(update={"heating_return_degc": 45.0, "cooling_return_degc": 24.0})
+    dispatch = PlantDispatch(doublet_flows_m3h=[50.0, 50.0])
+    cold_sim = simulate_plant_day(cold, summer, dispatch, gb=gb, sub=sub)
+    warm_sim = simulate_plant_day(warm, summer, dispatch, gb=gb, sub=sub)
+    assert cold_sim.config.config_hash != warm_sim.config.config_hash
+    assert cold_sim.config.hex_design.district_in_degc == 45.0
+    assert cold_sim.day.heating_return_degc == 45.0 and cold_sim.day.cooling_return_degc == 24.0
+    chiller = cold_sim.config.project["components"]["electric_chiller"]["parameters"]
+    assert chiller["chilled_water_temperature_in_degc"] == 24.0
+    assert cold_sim.config.district_flow_m3s == pytest.approx(
+        warm_sim.config.district_flow_m3s * 45.0 / 55.0
+    )

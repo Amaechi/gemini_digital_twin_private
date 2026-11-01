@@ -4,11 +4,12 @@ from __future__ import annotations
 
 import json
 import math
+import shutil
 from typing import Any
 
 import pytest
 
-from gemini_agent.schemas.common import SUMMARY_MAX_CHARS
+from gemini_agent.schemas.common import SUMMARY_MAX_CHARS, GasHandling
 from gemini_agent.schemas.config import REPO_ROOT, load_config
 from gemini_agent.tools.config_generator import (
     DISTRICT_FLUID,
@@ -26,6 +27,7 @@ from gemini_agent.tools.config_generator import (
     generate_gemini_config,
     generate_plant,
     hex_ua_for_outlet,
+    load_generator_basis,
 )
 from gemini_model.fluid.pvt_config import heat_exchanger_fluid_parameters
 from gemini_model.heat_exchanger.heat_exchanger import HeatExchanger
@@ -431,3 +433,40 @@ def test_doublet_example_reproduced_within_one_percent():
         expected = float(reference.get_output(ref_name, key))
         assert float(solver.get_output(name, key2)) == pytest.approx(expected, rel=0.01), key
     assert solver.get_output("producer_well_1", "flow_rate") == pytest.approx(129.02, abs=0.01)
+
+
+def test_register_gas_and_chp_values_match_the_code(tmp_path):
+    """CFG-ASSOC-GAS equals the computed values; CFG-CHP must match GEMINI's hard-coded 1/3."""
+    register = load_config("assumptions")
+    assoc = register.get("CFG-ASSOC-GAS").value
+    lhv, factor, density = gas_burner_values(0.8, 0.2)
+    assert assoc["lhv_j_kg"] == pytest.approx(lhv, rel=1e-3)
+    assert assoc["emission_kg_per_gj"] == pytest.approx(factor, abs=0.005)
+    assert assoc["density_kg_nm3"] == pytest.approx(density, abs=0.0005)
+    config_dir = tmp_path / "config"
+    shutil.copytree(REPO_ROOT / "config", config_dir)
+    path = config_dir / "assumptions.yaml"
+    text = path.read_text(encoding="utf-8")
+    path.write_text(
+        text.replace("electrical_fraction: 0.3333333333333333", "electrical_fraction: 0.5"),
+        encoding="utf-8",
+    )
+    with pytest.raises(ConfigError, match="hard-coded"):
+        load_generator_basis(config_dir)
+
+
+def test_gas_handling_drives_degassing_and_hp_lift_floor():
+    """Gas handling (DB-36) sets degassing; heat-pump floors respect DB-12 and VER-HP-LIFT."""
+    gb, sub = basis()
+    reinjecting = make_candidate("C2", 2).model_copy(
+        update={"gas_handling": GasHandling.PRESSURISED_REINJECT}
+    )
+    config = generate_plant(reinjecting, gb=gb, sub=sub)
+    assert "separator_1" not in config.roles and "chp" not in config.roles
+    assert any("overrides" in note for note in config.notes)
+    _, c5 = generated("C5", 3, 1500.0, None)
+    floor = c5.project["components"]["hthp_1"]["parameters"]["Ts_in_minimum"]
+    assert floor == pytest.approx(100.0 - 60.0)  # lift limit binds over T_wh − 40 K = 16.4 °C
+    _, c4 = generated("C4", 2, 3200.0, None)
+    assert any("flashing is not checked" in flag for flag in c4.flags)
+    assert "district_split_hex_bypass" in c4.roles

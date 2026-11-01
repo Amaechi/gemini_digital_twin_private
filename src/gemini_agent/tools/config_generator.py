@@ -60,6 +60,7 @@ from gemini_agent.tools.doublet import (
 from gemini_agent.tools.resource import SubsurfaceBasis, load_subsurface_basis
 from gemini_agent.verify.design_verifier import HEX_RATING, PA_PER_PSI, HexPoint
 from gemini_model.absorption_chiller.absorption_chiller import AbsorptionChiller
+from gemini_model.chp.chp import CHP
 from gemini_model.fluid.pvt_config import heat_exchanger_fluid_parameters
 from gemini_model.free_cooling.free_cooling import FreeCooling
 from gemini_model.heat_rejection.heat_rejection import HeatRejection
@@ -92,6 +93,7 @@ GENERATOR_ASSUMPTION_IDS: tuple[str, ...] = (
     "DB-34b",
     "DB-36",
     "DB-40",
+    "VER-HP-LIFT",
 )
 
 ComponentRole = Literal[
@@ -283,6 +285,13 @@ class DistrictSpec(StrictModel):
         description="series: in line after the plate HEXs; parallel: on a side branch (GEMINI).",
     )
     chp_water_frac: float = Field(default=0.0, ge=0, le=1, description="Parallel layout only.")
+    hex_flow_frac: float | None = Field(
+        default=None,
+        ge=0,
+        le=1,
+        description="Share of the district flow through the plate HEXs (rest bypasses); None: no "
+        "bypass components.",
+    )
     hp_flow_frac: float | None = Field(
         default=None,
         ge=0,
@@ -364,6 +373,10 @@ class BuiltProject(StrictModel):
     supply_component: tuple[str, str] | None = Field(
         default=None, description="(component, temperature output) of the district supply."
     )
+    preheat_component: tuple[str, str] | None = Field(
+        default=None,
+        description="District water after plate HEXs + CHP (before heat pumps and peak boiler).",
+    )
 
 
 def _brine_name(kind: str, index: int) -> str:
@@ -399,6 +412,37 @@ def _stage(
         b.connect(splitter, name, [(f"output_{k}", f_in)])
         b.feed(temperature, name, t_in)
         b.connect(name, mixer, [(f_out, f"input_{k}_flow"), (t_out, f"input_{k}_temperature")])
+    return (mixer, "flow"), (mixer, "temperature")
+
+
+def _bypassed_stage(
+    b: ProjectBuilder,
+    flow: Source,
+    temperature: Source,
+    branches: list[tuple[str, str, str, str, str]],
+    fracs: list[float],
+    tag: str,
+    share: float | None,
+) -> tuple[Source, Source]:
+    """:func:`_stage` behind a district bypass: ``share`` goes through, the rest around it.
+
+    ``share=None`` builds no bypass. simulate_day sets the share (DB-12, DB-16 control).
+    """
+    if share is None:
+        return _stage(b, flow, temperature, branches, fracs, tag)
+    split = b.add(
+        f"district_split_{tag}_bypass",
+        "splitter",
+        {"split_fractions": [share, 1.0 - share]},
+        "district_splitter",
+    )
+    b.feed(flow, split, "input")
+    out_flow, out_temp = _stage(b, (split, "output_0"), temperature, branches, fracs, tag)
+    mixer = b.add(f"district_mix_{tag}_bypass", "mixer", {"num_inputs": 2}, "district_mixer")
+    b.feed(out_flow, mixer, "input_0_flow")
+    b.feed(out_temp, mixer, "input_0_temperature")
+    b.connect(split, mixer, [("output_1", "input_1_flow")])
+    b.feed(temperature, mixer, "input_1_temperature")
     return (mixer, "flow"), (mixer, "temperature")
 
 
@@ -518,6 +562,7 @@ def build_plant_project(spec: PlantSpec) -> BuiltProject:
 
     # ---- district heating chain
     supply: tuple[str, str] | None = None
+    preheat: tuple[str, str] | None = None
     if district is not None:
         n = len(spec.doublets)
         fracs = district.branch_fracs or ([1.0 / n] * n if n else [1.0])
@@ -549,7 +594,15 @@ def build_plant_project(spec: PlantSpec) -> BuiltProject:
         hex_fracs = [fracs[k] for k, d in enumerate(spec.doublets) if d.hex is not None]
         if hex_branches:
             total = sum(hex_fracs)
-            flow, temp = _stage(b, flow, temp, hex_branches, [f / total for f in hex_fracs], "hex")
+            flow, temp = _bypassed_stage(
+                b,
+                flow,
+                temp,
+                hex_branches,
+                [f / total for f in hex_fracs],
+                "hex",
+                district.hex_flow_frac,
+            )
 
         if district.chp is not None:
             chp = b.add("chp", "chp", district.chp, "chp")
@@ -566,6 +619,8 @@ def build_plant_project(spec: PlantSpec) -> BuiltProject:
                 b.feed(chp_branch[0], chp, "water_flow_rate")
                 b.feed(chp_branch[1], chp, "temperature_in")
 
+        if isinstance(temp, tuple):
+            preheat = temp
         hp_doublets = [d for d in spec.doublets if d.heat_pump is not None]
         if hp_doublets:
             hp_branches = []
@@ -587,28 +642,15 @@ def build_plant_project(spec: PlantSpec) -> BuiltProject:
                     brine_after_hex[d.index][2],
                 )
             total = sum(hp_fracs)
-            bypass = None
-            if district.hp_flow_frac is not None:
-                share = district.hp_flow_frac
-                bypass = b.add(
-                    "district_split_hp_bypass",
-                    "splitter",
-                    {"split_fractions": [share, 1.0 - share]},
-                    "district_splitter",
-                )
-                b.feed(flow, bypass, "input")
-                flow = (bypass, "output_0")
-            temp_in = temp
-            flow, temp = _stage(b, flow, temp, hp_branches, [f / total for f in hp_fracs], "hp")
-            if bypass is not None:
-                mixer = b.add(
-                    "district_mix_hp_bypass", "mixer", {"num_inputs": 2}, "district_mixer"
-                )
-                b.feed(flow, mixer, "input_0_flow")
-                b.feed(temp, mixer, "input_0_temperature")
-                b.connect(bypass, mixer, [("output_1", "input_1_flow")])
-                b.feed(temp_in, mixer, "input_1_temperature")
-                flow, temp = (mixer, "flow"), (mixer, "temperature")
+            flow, temp = _bypassed_stage(
+                b,
+                flow,
+                temp,
+                hp_branches,
+                [f / total for f in hp_fracs],
+                "hp",
+                district.hp_flow_frac,
+            )
 
         if district.boiler is not None:
             boiler = b.add("peak_boiler", "boiler", district.boiler, "boiler")
@@ -662,6 +704,7 @@ def build_plant_project(spec: PlantSpec) -> BuiltProject:
         doublet_of=b.doublet_of,
         burner_fuels=burner_fuels,
         supply_component=supply,
+        preheat_component=preheat,
     )
 
 
@@ -720,9 +763,7 @@ class GeneratorBasis(StrictModel):
     """Register and design-basis values the generator uses (CFG-*, DB-*)."""
 
     heating_supply_degc: float
-    heating_return_degc: float
     cooling_supply_degc: float
-    cooling_return_degc: float
     brine_cooling_max_k: float
     heating_peak_mw: float
     cooling_peak_mw: float
@@ -739,6 +780,7 @@ class GeneratorBasis(StrictModel):
     hex_plate_material: str
     hp_mode: Literal["carnot", "lorenz"]
     hp_eta: float
+    hp_max_lift_k: float = Field(description="VER-HP-LIFT: sink outlet − source outlet.")
     chp_total_efficiency_frac: float
     chp_electrical_fraction: float
     boiler_efficiency_frac: float
@@ -778,6 +820,12 @@ def load_generator_basis(config_dir: Path | str | None = None) -> GeneratorBasis
     chp_cfg = _entry(register, "CFG-CHP")
     boiler_cfg = _entry(register, "CFG-BOILER")
     grid_cfg = _entry(register, "CFG-GRID-GAS")
+    if not math.isclose(float(chp_cfg["electrical_fraction"]), CHP.ELECTRICAL_POWER_FRACTION):
+        raise ConfigError(
+            f"CFG-CHP electrical_fraction {chp_cfg['electrical_fraction']} differs from GEMINI "
+            f"chp.py ({CHP.ELECTRICAL_POWER_FRACTION:.4f}), which is hard-coded: add an "
+            "electrical_fraction parameter to chp.py before changing it"
+        )
     brine = basis.brine
     assoc_lhv, assoc_factor, assoc_density = gas_burner_values(
         brine.gas_ch4_mol_frac, brine.gas_co2_mol_frac
@@ -787,9 +835,7 @@ def load_generator_basis(config_dir: Path | str | None = None) -> GeneratorBasis
     )
     return GeneratorBasis(
         heating_supply_degc=limits.heating_supply_degc,
-        heating_return_degc=float(register.get("DB-31").value),  # type: ignore[arg-type]
         cooling_supply_degc=limits.cooling_supply_degc,
-        cooling_return_degc=float(register.get("DB-32").value),  # type: ignore[arg-type]
         brine_cooling_max_k=limits.brine_cooling_max_k,
         heating_peak_mw=basis.heating.peak_mw,
         cooling_peak_mw=basis.cooling.peak_mw,
@@ -806,6 +852,7 @@ def load_generator_basis(config_dir: Path | str | None = None) -> GeneratorBasis
         hex_plate_material=str(hex_cfg["plate_material"]),
         hp_mode=hp_cfg["mode"],
         hp_eta=float(hp_cfg["eta"]),
+        hp_max_lift_k=float(register.get("VER-HP-LIFT").value),  # type: ignore[arg-type]
         chp_total_efficiency_frac=float(chp_cfg["total_efficiency_frac"]),
         chp_electrical_fraction=float(chp_cfg["electrical_fraction"]),
         boiler_efficiency_frac=float(boiler_cfg["efficiency_frac"]),
@@ -895,6 +942,9 @@ class PlantDispatch(StrictModel):
         default=None, ge=0, le=1, description="None: the model's required drive flow, capped."
     )
     boiler_gas_kg_s: float = Field(default=0.0, ge=0, description="Peak-boiler grid gas.")
+    hex_flow_frac: float = Field(
+        default=1.0, ge=0, le=1, description="District share through the plate HEXs."
+    )
     hp_flow_frac: float = Field(
         default=1.0, ge=0, le=1, description="District share through the heat pumps."
     )
@@ -954,9 +1004,12 @@ class GeneratedConfig(StrictModel):
     doublet_of: dict[str, int]
     burner_fuels: dict[str, Fuel]
     supply_component: tuple[str, str] | None
+    preheat_component: tuple[str, str] | None = None
     doublets: list[DoubletPlan]
     hex_design: HexDesign | None = None
     reservoir_temperature_degc: float | None = None
+    heating_return_degc: float = Field(description="District return (candidate, DB-31).")
+    cooling_return_degc: float = Field(description="Cooling return (candidate, DB-32).")
     loads: PlantLoads
     district_flow_m3s: float
     equipment_mw: dict[str, float] = Field(
@@ -1207,6 +1260,14 @@ def plan_plant(
     dispatch = dispatch or PlantDispatch()
     layout_concept, layout, notes = concept_layout(candidate, parent_concept)
     flags: list[str] = []
+    if candidate.doublets and candidate.gas_handling is not None:
+        degas = candidate.gas_handling == GasHandling.DEGAS_USE
+        if degas != layout.degas:
+            layout = layout.model_copy(update={"degas": degas})
+            notes.append(
+                f"gas handling '{candidate.gas_handling.value}' overrides the {layout_concept} "
+                "default (DB-36, DR-07)"
+            )
     if layout.heat_pump and (not dispatch.heat_pumps_on or dispatch.hp_flow_frac <= 0.0):
         layout = layout.model_copy(update={"heat_pump": False})
         notes.append("heat pumps off today (dispatch): brine goes from HEX-1 to filter B")
@@ -1219,7 +1280,8 @@ def plan_plant(
     if any(q < 0 for q in flows):
         raise ConfigError(f"doublet flows must be >= 0, got {flows}")
 
-    supply_t, return_t = gb.heating_supply_degc, gb.heating_return_degc
+    # Return temperatures are the candidate's (filled from DB-31/DB-32 or the user's answer).
+    supply_t, return_t = gb.heating_supply_degc, candidate.heating_return_degc
     trains: list[DoubletTrainSpec] = []
     plans: list[DoubletPlan] = []
     hex_design: HexDesign | None = None
@@ -1274,8 +1336,17 @@ def plan_plant(
                         "(RC-03; GNS p.40, Guidebook p.218) and the loop "
                         f"must stay above p_b {release:.1f} bar(g): use shell-and-tube or "
                         "plate-and-shell (no card cost) or degas with inhibitor (DR-07); the "
-                        "verifier fails PH-09/PD-10 for this design"
+                        "verifier fails PH-09 and PD-10 holds with zero margin"
                     )
+        t_design = design_point.wellhead_temperature_degc
+        if layout.degas and t_design > doublet.vapour_pressure_bound_valid_to_degc:
+            flags.append(
+                f"degassed brine at {t_design:.1f} °C is let down to "
+                f"{sub.injection_pump_suction_barg:g} bar(g) (CFG-SURFACE): above "
+                f"{doublet.vapour_pressure_bound_valid_to_degc:g} °C the saturation pressure "
+                "exceeds 1 atm and flashing is not checked (no saturation data, RC-01); hold the "
+                "degasser and HEX above saturation"
+            )
         for k, q in enumerate(flows):
             index = k + 1
             if q <= 0:
@@ -1337,6 +1408,7 @@ def plan_plant(
         },
         boiler_fuel="grid_gas",
         boiler_gas_kg_s=dispatch.boiler_gas_kg_s,
+        hex_flow_frac=dispatch.hex_flow_frac if hex_design is not None and trains else None,
         hp_flow_frac=dispatch.hp_flow_frac if layout.heat_pump and trains else None,
     )
 
@@ -1363,6 +1435,8 @@ def plan_plant(
         doublets=plans,
         hex_design=hex_design,
         reservoir_temperature_degc=doublet.reservoir_temperature_degc if doublet else None,
+        heating_return_degc=return_t,
+        cooling_return_degc=candidate.cooling_return_degc,
         loads=loads,
         district_flow_m3s=district_flow,
         equipment_mw=equipment,
@@ -1431,7 +1505,11 @@ def _train(
             "mode": gb.hp_mode,
             eta_key: gb.hp_eta,
             "Th_out_target": gb.heating_supply_degc,
-            "Ts_in_minimum": point.wellhead_temperature_degc - gb.brine_cooling_max_k,
+            # DB-12 brine floor, and VER-HP-LIFT: sink outlet − source outlet ≤ 60 K.
+            "Ts_in_minimum": max(
+                point.wellhead_temperature_degc - gb.brine_cooling_max_k,
+                gb.heating_supply_degc - gb.hp_max_lift_k,
+            ),
             "rho_s": brine_fluid["fluid_density"],
             "Cp_s": brine_fluid["specific_heat"],
             "rho_h": DISTRICT_FLUID["fluid_density"],
@@ -1479,7 +1557,7 @@ def _cooling_spec(
             "nominal_capacity_w": equipment["electric_chiller_mw"] * 1e6,
             "heat_rejection": "cooling_tower",
             "chilled_water_temperature_out_degc": gb.cooling_supply_degc,
-            "chilled_water_temperature_in_degc": gb.cooling_return_degc,
+            "chilled_water_temperature_in_degc": candidate.cooling_return_degc,
         },
         heat_rejection=tower,
     )
@@ -1488,7 +1566,7 @@ def _cooling_spec(
         cooling.free_cooling = {
             "aux_power_fraction": 0.0,
             "chilled_water_temperature_out_degc": gb.cooling_supply_degc,
-            "chilled_water_temperature_in_degc": gb.cooling_return_degc,
+            "chilled_water_temperature_in_degc": candidate.cooling_return_degc,
         }
     drive_frac: float | None = None
     if layout.absorption:
@@ -1503,7 +1581,7 @@ def _cooling_spec(
             "nominal_capacity_w": equipment["absorption_chiller_mw"] * 1e6,
             "include_heat_rejection_auxiliaries": False,
             "chilled_water_temperature_out_degc": gb.cooling_supply_degc,
-            "chilled_water_temperature_in_degc": gb.cooling_return_degc,
+            "chilled_water_temperature_in_degc": candidate.cooling_return_degc,
             # Brine through titanium generator tubes (RC-05 p.266–267): drive side = brine.
             "drive_density_kg_m3": brine_fluid["fluid_density"],
             "drive_specific_heat_j_kgk": brine_fluid["specific_heat"],
@@ -1554,6 +1632,7 @@ def generate_plant(
             "doublet_of": built.doublet_of,
             "burner_fuels": built.burner_fuels,
             "supply_component": built.supply_component,
+            "preheat_component": built.preheat_component,
         }
     )
 

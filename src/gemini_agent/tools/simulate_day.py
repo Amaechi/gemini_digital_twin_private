@@ -6,11 +6,15 @@ and the day's ambient dry/wet bulb. Procedure:
 1. TL-09 :func:`generate_plant` builds the project for the day's loads and set-points (doublet
    flows → TL-05 ESP frequency and wellhead temperature; district flow from the heating demand).
 2. GEMINI runs it (``build_project`` + ``Solver.run``).
-3. Heat-pump guard (CFG-HP): if a ``HeatpumpBasic`` output is not physical (Th_out outside
+3. Plate-HEX control: if a plate HEX would cool its brine more than DB-12 (40 K) or the district
+   water after the plate HEXs and CHP would exceed DB-16 (100 °C), the share of district water
+   through the plate HEXs is bisected down (the rest bypasses them). A doublet still cooled more
+   than 40 K at the end makes the day invalid (hard limit, never only a warning).
+4. Heat-pump guard (CFG-HP): if a ``HeatpumpBasic`` output is not physical (Th_out outside
    [Th_in, target], COP < 1, source outlet below its DB-12 floor — the source-limited re-solve
    diverges in GEMINI today), the share of district water sent through the heat pumps is
    bisected down until every heat pump is valid; the rest bypasses them to the peak boiler.
-4. Supply control: the peak boiler (grid gas) is fired so the district supply reaches DB-16
+5. Supply control: the peak boiler (grid gas) is fired so the district supply reaches DB-16
    (100 °C), up to its nameplate; the remainder is unmet heat.
 
 Everything reported comes from GEMINI outputs: heat by source, brine heat drawn per user (the
@@ -70,12 +74,14 @@ TOOL_ID = "TL-11"
 SECONDS_PER_DAY = HOURS_PER_DAY * SECONDS_PER_HOUR
 TEMPERATURE_TOL_K = 0.01
 """Tolerance on heat-pump outlet temperatures (Nelder–Mead residual in HeatpumpBasic)."""
+CONTROL_TOL_K = 1e-6
+"""Tolerance of the plate-HEX control (closed-form GEMINI models, no solver noise)."""
 HEAT_TOL_MW = 1e-6
 """Heat-balance noise below which no unmet/surplus heat is reported."""
 HP_OFF_FLOW_M3S = 1e-12
 """Sink flow below which a heat pump is treated as off (its Th_out has no weight)."""
-HP_BISECTION_STEPS = 12
-"""Heat-pump share resolution 1/4096 of the district flow."""
+SHARE_BISECTION_STEPS = 12
+"""Plate-HEX / heat-pump share resolution: 1/4096 of the district flow."""
 BOILER_CONTROL_PASSES = 2
 MARGIN_TOL = 1e-6
 """Negative margins smaller than this are solver noise (e.g. 300.00000000007 m³/h)."""
@@ -155,6 +161,7 @@ class SimulatedDay(StrictModel):
     outputs: dict[str, dict[str, JsonValue]] = Field(
         description="Scalar GEMINI outputs per component (final pass)."
     )
+    hex_flow_frac: float | None = None
     hp_flow_frac: float | None = None
     boiler_gas_kg_s: float = 0.0
     supplied_heat_mw: float = 0.0
@@ -234,6 +241,46 @@ def heat_pump_failures(solver: Solver, config: GeneratedConfig) -> list[str]:
     return problems
 
 
+def hex_problems(solver: Solver, config: GeneratedConfig, gb: GeneratorBasis) -> list[str]:
+    """Plate-HEX control targets: brine outlet ≥ T_wh − DB-12 and no supply overshoot (DB-16).
+
+    The overshoot is read on the district water after the plate HEXs and the CHP, before the heat
+    pumps (fixed 100 °C target) and the peak boiler (fired only up to 100 °C).
+    """
+    problems = []
+    for name, role in config.roles.items():
+        if role != "direct_hex":
+            continue
+        t_wh = _out(solver, f"producer_well_{config.doublet_of[name]}", "temperature_out")
+        cooled = t_wh - _out(solver, name, "primary_temperature_out")
+        if cooled > gb.brine_cooling_max_k + CONTROL_TOL_K:
+            problems.append(f"{name} cools the brine {cooled:.2f} K > {gb.brine_cooling_max_k:g} K")
+    if config.preheat_component is not None:
+        t = _out(solver, *config.preheat_component)
+        if t > gb.heating_supply_degc + CONTROL_TOL_K:
+            problems.append(f"district water {t:.2f} °C > {gb.heating_supply_degc:g} °C")
+    return problems
+
+
+def brine_cooling_failures(
+    solver: Solver, config: GeneratedConfig, gb: GeneratorBasis
+) -> list[str]:
+    """DB-12 hard limit on every active doublet: T_wh − T_inj ≤ 40 K (never only a warning)."""
+    problems = []
+    for plan in config.doublets:
+        if not plan.active:
+            continue
+        i = plan.index
+        cooled = _out(solver, f"producer_well_{i}", "temperature_out") - _inp(
+            solver, f"injector_well_{i}", "wellhead_temperature"
+        )
+        if cooled > gb.brine_cooling_max_k + TEMPERATURE_TOL_K:
+            problems.append(
+                f"DB-12: doublet {i} brine cooled {cooled:.2f} K > {gb.brine_cooling_max_k:g} K"
+            )
+    return problems
+
+
 def _set_split(project: dict[str, Any], name: str, share: float) -> None:
     project["components"][name]["parameters"]["split_fractions"] = [share, 1.0 - share]
 
@@ -278,6 +325,33 @@ def simulate_plant_day(
     failures: list[str] = []
     solver = _run(project)
 
+    hex_share: float | None = None
+    if "district_split_hex_bypass" in config.roles:
+        hex_share = dispatch.hex_flow_frac
+        problems = hex_problems(solver, config, gb)
+        if problems:
+            warnings.append(
+                f"plate-HEX share reduced from {hex_share:g} ({problems[0]}); district water "
+                "bypasses the plate HEXs (DB-12/DB-16 control)"
+            )
+            _set_split(project, "district_split_hex_bypass", 0.0)
+            if hex_problems(_run(project), config, gb):
+                # Even without plate-HEX heat the water is too hot (the CHP burns all the
+                # associated gas, DB-36): no geothermal direct heat; WP-07 lowers the flows.
+                hex_share = 0.0
+            else:
+                low, high = 0.0, hex_share
+                for _ in range(SHARE_BISECTION_STEPS):
+                    mid = 0.5 * (low + high)
+                    _set_split(project, "district_split_hex_bypass", mid)
+                    if hex_problems(_run(project), config, gb):
+                        high = mid
+                    else:
+                        low = mid
+                hex_share = low
+            _set_split(project, "district_split_hex_bypass", hex_share)
+            solver = _run(project)
+
     hp_share: float | None = None
     if "district_split_hp_bypass" in config.roles:
         hp_share = dispatch.hp_flow_frac
@@ -287,13 +361,16 @@ def simulate_plant_day(
                 "heat-pump model invalid at the full district share "
                 f"({problems[0]}); district water bypassed to the peak boiler (CFG-HP, WP-03)"
             )
-            low, high = 0.5**HP_BISECTION_STEPS * hp_share, hp_share
+            low, high = 0.5**SHARE_BISECTION_STEPS * hp_share, hp_share
             _set_split(project, "district_split_hp_bypass", low)
             if heat_pump_failures(_run(project), config):
                 # No positive share is valid (e.g. the water is already above 100 °C): the day's
                 # plant runs without heat pumps.
                 warnings.append("heat pumps switched off today: no valid operating point")
-                dispatch = dispatch.model_copy(update={"heat_pumps_on": False})
+                update: dict[str, Any] = {"heat_pumps_on": False}
+                if hex_share is not None:
+                    update["hex_flow_frac"] = hex_share  # keep the plate-HEX control result
+                dispatch = dispatch.model_copy(update=update)
                 config = generate_plant(
                     candidate,
                     day.loads(),
@@ -306,7 +383,7 @@ def simulate_plant_day(
                 project = copy.deepcopy(config.project)
                 hp_share = 0.0
             else:
-                for _ in range(HP_BISECTION_STEPS):
+                for _ in range(SHARE_BISECTION_STEPS):
                     mid = 0.5 * (low + high)
                     _set_split(project, "district_split_hp_bypass", mid)
                     if heat_pump_failures(_run(project), config):
@@ -347,6 +424,8 @@ def simulate_plant_day(
             solver = _run(project)
         if failures == [] and heat_pump_failures(solver, config):
             failures += heat_pump_failures(solver, config)
+    if not failures:
+        failures += brine_cooling_failures(solver, config, gb)
 
     final = config.model_copy(update={"project": project, "config_hash": project_hash(project)})
     outputs = _scalar_outputs(solver)
@@ -356,13 +435,14 @@ def simulate_plant_day(
         failures=failures,
         config=final,
         outputs=outputs,
+        hex_flow_frac=hex_share,
         hp_flow_frac=hp_share,
         boiler_gas_kg_s=boiler_gas,
         warnings=warnings,
     )
     if failures:
         return result
-    return _assemble(result, solver, day, gb, sub)
+    return _assemble(result, solver, day, gb, sub, candidate)
 
 
 def _assemble(
@@ -371,6 +451,7 @@ def _assemble(
     day: DayConditions,
     gb: GeneratorBasis,
     sub: SubsurfaceBasis,
+    candidate: Candidate,
 ) -> SimulatedDay:
     """Fill the ``DayResult`` and the verifier evidence from the final GEMINI pass."""
     config = result.config
@@ -525,6 +606,9 @@ def _assemble(
                 f"heat surplus {surplus:.3f} MW (supply {supply_t:.2f} °C > "
                 f"{gb.heating_supply_degc:g} °C): lower the doublet flows (WP-07 dispatch)"
             )
+    hp_size = candidate.equipment_sizes.get("hthp_heating_mw")
+    if hp_size is not None and names.get("heat_pump"):
+        margins["hthp_capacity_margin_mw"] = hp_size - sum(heat[n] for n in names["heat_pump"])
     if boiler := next((n for n, r in roles.items() if r == "boiler"), None):
         margins["peak_boiler_capacity_margin_mw"] = config.equipment_mw.get(
             "peak_boiler_mw", 0.0
@@ -543,9 +627,9 @@ def _assemble(
         production_temperature_degc=t_prod,
         injection_temperature_degc=t_inj,
         heating_supply_degc=supply_t,
-        heating_return_degc=gb.heating_return_degc,
+        heating_return_degc=config.heating_return_degc,
         cooling_supply_degc=cooling_supply,
-        cooling_return_degc=gb.cooling_return_degc,
+        cooling_return_degc=config.cooling_return_degc,
         heat_by_source_mw=heat,
         cool_by_source_mw=cool,
         electricity_by_consumer_mw=electricity,
@@ -724,8 +808,10 @@ __all__ = [
     "DayConditions",
     "SimulateDayRequest",
     "SimulatedDay",
+    "brine_cooling_failures",
     "day_conditions",
     "heat_pump_failures",
+    "hex_problems",
     "simulate_day",
     "simulate_plant_day",
     "verification_evidence",

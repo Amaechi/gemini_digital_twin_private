@@ -722,7 +722,8 @@ assumptions:
     title: Plant topology generated for each concept (TL-09)
     value:
       brine_train: "producer → [degasser] → filter A → [brine split → absorption drive] → [plate HEX-1] → [brine mix] → [HP evaporator] → filter B → injector"
-      district_chain: "return → plate HEXs (per doublet, flow shares ∝ doublet flow) → [CHP on associated gas] → [heat pumps, 100 °C target] → [peak boiler, grid gas]"
+      district_chain: "return → [bypass] plate HEXs (per doublet, flow shares ∝ doublet flow) → [CHP on associated gas] → [bypass] heat pumps (100 °C target) → [peak boiler, grid gas]"
+      controls: "simulate_day cuts the plate-HEX share to hold brine ΔT ≤ DB-12 and ≤ 100 °C before the heat pumps, cuts the heat-pump share while HeatpumpBasic is unphysical, and fires the peak boiler to 100 °C"
       cooling_chain: "[free cooling] → [absorption, residual] → electric chiller (unmet); one cooling tower for all"
       absorption_drive: "brine of the first active doublet through titanium generator tubes, taken before HEX-1"
       derived_concepts: "C6 = parent plant (no storage model in GEMINI); C7 = parent without degasser, WHP = SUB-PBUB setpoint, no CHP; C8 = parent"
@@ -751,7 +752,8 @@ assumptions:
       → SUB-PSUC 0 bar(g)) is put into the degasser (gas separates at the lowest pressure), so the injection pump
       sees the same suction as TL-05; filters and plate HEX have zero resistance, and every surface component is
       adiabatic, so the brine-side balance (verifier PH-22) closes exactly. In the pressurised loop (C7) there is
-      no letdown and the brine reaches the injector at the producer WHP.
+      no letdown and the brine reaches the injector at the producer WHP. Brine above 100 °C (C4 at 3.2 km) let
+      down to 0 bar(g) may flash; the generator flags it (no saturation data in RC-01).
     source: SUB-PWH, SUB-PSUC (WP-05); RC-03 control valve at the HEX outlet (Guidebook p.234) [A]
     sensitivity: "Filter/HEX Δp 24 kPa/NTU (RC-03 eq 4) moved from the letdown to the HEX; 1 K surface heat loss."
     tag: A
@@ -786,13 +788,14 @@ assumptions:
     value:
       mode: carnot
       eta: 0.46
-      source_outlet_min: "T_wh − DB-12 (Ts_in_minimum)"
+      source_outlet_min: "max(T_wh − DB-12, 100 °C − VER-HP-LIFT) (Ts_in_minimum)"
       sink_target: "DB-16 (Th_out_target)"
     unit: null
     justification: >-
       GEMINI HeatpumpBasic in Carnot mode with η_C = 0.46, the Guidebook-implied Carnot efficiency of RC-04 (COP_h
       4.41 at 15.6/48.9 °C), on GEMINI's water-temperature basis (sink outlet, source inlet): COP ≈ 4.1 for 58 → 100
-      °C. Evaporator on brine (ρ 1030, c_p 4100), condenser on district water; the source-outlet floor enforces DB-12.
+      °C. Evaporator on brine (ρ 1030, c_p 4100), condenser on district water; the source-outlet floor enforces DB-12
+      and the VER-HP-LIFT 60 K lift limit (C5: brine 56 °C may only be cooled to 40 °C).
       Lorenz mode (RC-04's preferred method, η_L 0.50) is not used because GEMINI's Nelder–Mead Lorenz solve diverges
       at part load (416 of 504 scanned operating points invalid, log of a negative temperature) while the Carnot
       solve is valid at every point whose duty the brine can supply (0 of 446). When the brine cannot supply the
@@ -856,7 +859,7 @@ assumptions:
   - id: CFG-ASSOC-GAS
     title: Associated-gas burner fuel properties (CHP on separated gas)
     value:
-      lhv_j_kg: 29.67e6
+      lhv_j_kg: 29670000.0
       emission_kg_per_gj: 68.56
       density_kg_nm3: 0.965
     unit: null

@@ -473,7 +473,11 @@ class DesignGuard:
                         )
                     )
             elif kind == "absorption_chiller":
-                delta = _num(params[name].get("generator_delta_t_k"))
+                delta = _num(
+                    params[name].get(
+                        "generator_delta_t_k", _default("absorption_chiller", "generator_delta_t_k")
+                    )
+                )
                 if delta is not None and delta > limit:
                     out.append(
                         GuardViolation(
