@@ -1373,3 +1373,183 @@ assumptions:
     tag: A
     status: default
     added_by: WP-07
+
+  - id: OPT-SPACE
+    title: Optimisation variables, integer options and bounds (TL-13)
+    value:
+      doublet_options: [1, 2, 3]
+      depth_options_m: [1500.0, 2000.0, 2500.0, 3000.0, 3200.0, 3500.0]
+      design_flow_m3h: "DB-11 range (limits.yaml flow_min_active_m3h … flow_max_m3h)"
+      peak_boiler_mw: "not searched: largest daily boiler heat of the design, rounded up to size_resolution_mw (cap-only unit)"
+      electric_chiller_mw: "not searched: largest daily electric-chiller duty, rounded up, at least min_equipment_mw (cap-only unit)"
+      absorption_chiller_mw: "min_equipment_mw … DB-19 cooling peak (C3, C4; the absorption/electric split)"
+      hthp_heating_mw: "min_equipment_mw … HTHP heat at the design point with every doublet at the DB-11 maximum flow (C2, C3, C5)"
+      min_equipment_mw: 0.5
+      outage_start_indices: "DB-30 A only, second DE stage at the size optimum: one integer per doublet; sorted u_i ∈ [0, 365 − n·35], start_i = u_(i) + i·35 (never overlapping); seeded with SIM-OUTAGE"
+      flow_resolution_m3h: 1.0
+      size_resolution_mw: 0.05
+    unit: null
+    justification: >-
+      Spec §9.1 OPT-01/OPT-03: integers (doublets 1–3, depths 1.5/2.0/2.5/3.0/3.2/3.5 km) are enumerated; the
+      continuous sizes are refined by seeded differential evolution. Every integer combination is first
+      screened at the CFG-SIZING sizes (DB-18/DB-19 peaks, HTHP without a nameplate) and the DB-11 maximum
+      flow; only the best `top_k` combinations are refined (OPT-DE). The peak boiler and the electric chiller
+      only cap their output in the WP-07 dispatch (constant boiler efficiency; the chiller COP does not depend
+      on its load ratio), so with the CFG-SIZING peaks (never binding) their cost-optimal nameplate given the
+      other choices is the largest daily output: an exact inner optimum that keeps them out of the search; the
+      optimum is re-run with these nameplates to confirm zero unmet demand. Day-average sizing, like the whole
+      model (DB-18/DB-19 are day-average peaks); no N-1 redundancy is required by the hard limits. An HTHP
+      nameplate above its design-point heat (all doublets at the DB-11 maximum, DB-18 peak, brine floor DB-12
+      and VER-HP-LIFT) is never used. The
+      GEMINI chiller and heat-pump models need a positive nominal capacity, hence min_equipment_mw (0.5 MW
+      = 142 tons, above the RC-05 cost functions' 100-ton floor); a concept without the unit is the other
+      concept (C1 = C2 without HTHP). Outage starts use the sorted-gap transform so every DE vector is a
+      DB-30-valid, non-overlapping schedule. Sizes are rounded to the stated resolution (DSP-FLOW resolves
+      0.06 m³/h) so repeated vectors are evaluated once. C6 storage sizes are not optimised: RC-10 has no
+      HT-ATES cost (they are scanned unpriced). Return temperature (OPT-01 MAY) is a TL-15 case (DB-31).
+    source: GEOAGENT_DESIGN_SPEC §9.1 OPT-01, OPT-03; DB-10, DB-11, DB-18, DB-19, DB-30; CFG-SIZING; RC-05 (100-ton floor) [A]
+    sensitivity: "top_k and the DE budget (OPT-DE) trade runtime against the size refinement."
+    tag: A
+    status: default
+    added_by: WP-11
+
+  - id: OPT-OBJ
+    title: Optimisation objective, unmet-demand penalty and hard-limit barrier (TL-13)
+    value:
+      objective: "LCOH + LCOC over the base analysis period (ECO-01, 30 yr), USD/MWh"
+      unmet_penalty_base_per_mwh: 1000.0
+      unmet_penalty_per_unmet_mwh: 1.0
+      rejected_objective: 1000000.0
+      pareto_points: 3
+    unit: USD/MWh
+    justification: >-
+      Spec §9.1 OPT-02: minimise LCOH + LCOC subject to zero unmet demand and the hard limits. Unmet demand
+      > 0 adds 1000 USD/MWh plus 1 USD/MWh per MWh unmet: the base exceeds any LCOH + LCOC of a design that
+      meets demand (C0 LCOH ≈ 137 USD/MWh ≈ the ACM cap, ECO-07), so such a design always ranks first, and
+      the slope steers the search towards feasibility. A design that DesignGuard rejects (golden rule 4) or
+      that the generator/dispatch cannot build is never simulated or priced: it gets the barrier value
+      1e6, is recorded with the guard's reason and can never be selected (only evaluations with status ok
+      and zero unmet demand are reported as optimal). CO₂ Pareto: up to 3 non-dominated points (lowest
+      cost, lowest CO₂, closest to the normalised utopia point) among the evaluated designs that meet demand.
+    source: GEOAGENT_DESIGN_SPEC §9.1 OPT-02; ECO-07 benchmarks [A]
+    sensitivity: "Any base above the largest feasible LCOH + LCOC gives the same optimum."
+    tag: A
+    status: default
+    added_by: WP-11
+
+  - id: OPT-DE
+    title: Differential-evolution settings (seeded, reproducible)
+    value:
+      seed: 2026
+      strategy: best1bin
+      popsize: 5
+      maxiter: 8
+      maxiter_outage: 6
+      mutation: [0.5, 1.0]
+      recombination: 0.7
+      tol: 0.01
+      init: latinhypercube
+      polish: false
+      updating: deferred
+      top_k: 2
+    unit: null
+    justification: >-
+      scipy.optimize.differential_evolution with a fixed seed and deferred updating, so the same seed gives
+      identical results whether the population is evaluated serially or by a process pool (OPT-03); each
+      stage's population is seeded (x0) with the screened design / the SIM-OUTAGE schedule. One fast-mode
+      year takes ≈ 2 s at 2.5 km but 7–25 s at ≥ 3 km (brine ≥ 100 °C: nested HEX-share/HTHP bisections in
+      WP-07), so popsize 5 × (number of variables) with 8 size and 6 outage generations keep the C2 run within
+      the 15-min budget on 4 vCPU (WP-11 acceptance); polish is off (L-BFGS-B on a penalised, rounded
+      objective wastes evaluations). Unit tests use a smaller budget.
+    source: GEOAGENT_DESIGN_SPEC §9.1 OPT-03; scipy differential_evolution docs [A]
+    sensitivity: "More generations refine sizes by a few tenths of a USD/MWh at proportionally more runtime."
+    tag: A
+    status: default
+    added_by: WP-11
+
+  - id: UQ-RANGES
+    title: Uncertainty inputs for the Monte Carlo and one-at-a-time sensitivity (TL-15)
+    value:
+      permeability_md: {distribution: lognormal, low: 100.0, high: 400.0, note: "P90–P10 (10th/90th percentiles); median 200 = DB-06", source: "spec §9.3 UQ-01; DB-06"}
+      geothermal_gradient_k_per_km: {distribution: uniform, low: 28.0, high: 32.0, source: "spec §9.3 UQ-01; DB-03"}
+      skin: {distribution: uniform, low: -1.0, high: 5.0, source: "DB-38 sensitivity; spec §9.3 UQ-01"}
+      heating_demand_scale: {distribution: uniform, low: 0.9, high: 1.1, source: "spec §9.3 UQ-01 demand ±10 %"}
+      cooling_demand_scale: {distribution: uniform, low: 0.9, high: 1.1, source: "spec §9.3 UQ-01 demand ±10 %"}
+      heating_return_degc: {distribution: uniform, low: 45.0, high: 65.0, source: "spec §9.3 UQ-01; DB-31"}
+      warm_climate_frac: {distribution: uniform, low: 0.0, high: 1.0, note: "fraction of the DB-34b warm-case offset (+5 K dry bulb, +2.6 K wet bulb) added to every day", source: "DB-34b warm case; spec §9.3 UQ-01"}
+      production_temperature_shift_k: {distribution: uniform, low: -6.0, high: 6.0, note: "reservoir heterogeneity on the production temperature, applied as gradient ± shift/depth", source: "RC-02 item 3 (±6 °C on 30-yr production temperature); spec UQ-01"}
+      hp_carnot_fraction: {distribution: uniform, low: 0.50, high: 0.65, source: "VER-HP-ETA sensitivity (RC-04)"}
+      hp_approach_k: {distribution: uniform, low: 3.0, high: 5.0, source: "HP-APPROACH sensitivity (RC-04 eq 4)"}
+      absorption_duhring_slope: {distribution: uniform, low: 1.1, high: 1.2, source: "COOL-ABS-B (RC-05 Method B)"}
+      electric_chiller_carnot_efficiency: {distribution: uniform, low: 0.44, high: 0.513, source: "COOL-ELC (RC-06)"}
+      esp_intake_margin_factor: {distribution: uniform, low: 1.1, high: 1.3, note: "SUB-PBUB margin = VER-ESP-MARGIN (moved together); VER-ESP-PB scaled by margin/1.2", source: "SUB-PBUB sensitivity; VER-ESP-MARGIN"}
+      injection_pump_suction_barg: {distribution: uniform, low: 0.0, high: 3.0, source: "SUB-PSUC sensitivity"}
+      injectivity_factor: {distribution: uniform, low: 0.8, high: 1.0, note: "II = factor × PI; 0.8 adds ≈ +6 bar on the 26.5 bar(g) injection WHP at 300 m³/h", source: "SUB-II; LIM-SUB-02 (cold injection)"}
+      well_spacing_m: {distribution: uniform, low: 1000.0, high: 1500.0, source: "SUB-SPACING sensitivity (RC-02)"}
+      cost_items: {distribution: uniform, low: "item sensitivity_low", high: "item sensitivity_high", source: "DB-35 / ECO-04: ±30 % or the stated range, whichever is wider (CostBook)"}
+    unit: null
+    justification: >-
+      Spec §9.3 UQ-01 lists the Monte Carlo inputs; each range is taken from the register entry or card
+      that owns the value (source), so no range is invented here. Where the spec and the register differ
+      the register wins (HTHP performance: VER-HP-ETA 0.50–0.65 instead of ±15 %; absorption: COOL-ABS-B
+      1.1–1.2). Not varied: SUB-RHOC (RC-02 gives no range; t_b is linear in it), SUB-WELL and SUB-ESP
+      (no numeric range on the card; ESP stage/scale changes move the frequency, not the rule-based power),
+      SUB-PWH (the 50 bar(g) value is the C7 pressurised concept, not an uncertainty), HP-ETA-L (inert:
+      the VER-HP-ETA cap binds, WP-06). Samples are Latin-hypercube (seeded), mapped through each
+      distribution's inverse CDF; one-at-a-time cases take the low and high values.
+    source: GEOAGENT_DESIGN_SPEC §9.3 UQ-01; register entries named per input; RC-02, RC-04, RC-05, RC-06
+    sensitivity: "Ranges change with the owning entries; UQ-CASES holds the discrete cases."
+    tag: A
+    status: default
+    added_by: WP-11
+
+  - id: UQ-CASES
+    title: Discrete sensitivity cases run on the selected design (TL-15)
+    value:
+      grid_gas_co2_kg_per_gj: [51.53]
+      heating_return_degc: [45.0, 65.0, 75.0]
+      chp_electrical_fraction: [0.5]
+      bubble_point_basis: [pure_water]
+      warm_climate: [true]
+      db30_interpretation: ["B"]
+    unit: null
+    justification: >-
+      Cases that are alternatives rather than ranges: ECO-CO2-GAS 51.53 kg/GJ (Gippsland, ECO-05), the DB-31
+      return temperatures 45/65/75 °C (eval scenario S6), CHP-EL-FRAC 0.50 (DEA gas engines; chp.py takes an
+      electrical_fraction parameter since WP-11), the SUB-PBUB pure-water bound (52.2 bar(a)), the DB-34b
+      warm climate (whole offset) and DB-30 interpretation B (330 days, no outage). Each case regenerates
+      the plant at the selected sizes and reports LCOH, LCOC, unmet demand and CO₂ against the base.
+    source: ECO-CO2-GAS, DB-31, CHP-EL-FRAC, SUB-PBUB, DB-34b and DB-30 sensitivity fields
+    sensitivity: "—"
+    tag: A
+    status: default
+    added_by: WP-11
+
+  - id: UQ-MC
+    title: Monte Carlo settings and statistics (TL-15)
+    value:
+      samples: 200
+      seed: 2026
+      sampling: latin_hypercube
+      percentiles: {p10: 10, p50: 50, p90: 90}
+      driver_ranking: spearman_rank_correlation
+      top_drivers: 8
+      robust_backup_percentile: 90
+    unit: null
+    justification: >-
+      Spec §9.3 UQ-01/UQ-02: ≥ 200 fast-mode samples; P10/P50/P90 are the 10th/50th/90th percentiles of the
+      sampled KPI (P10 = low value, not an exceedance probability); probability of meeting demand = share of
+      samples (failed samples included) with zero unmet heating and cooling; dominant risk drivers = inputs
+      ranked by |Spearman ρ| with each KPI. Fixed seed ⇒ identical samples and results (OPT-03 spirit).
+      KPISet.min_constraint_margins of the TL-15 result is the smallest margin over the base run and all
+      successful samples (the robustness view); the base run's own margins stay in the base KPIs. The peak
+      boiler and electric chiller are last in the merit order and cap-only, so a sample's required nameplate
+      is the installed one plus its largest day-average unmet MW; robust_backup_mw = the 90th percentile
+      of that requirement (rounded up to OPT-SPACE size_resolution_mw), re-run on the base year to price the
+      robustness. The tornado ranks inputs by the LCOH + LCOC swing; unmet demand is reported per bar, not
+      mixed into the swing through the OPT-OBJ penalty.
+    source: GEOAGENT_DESIGN_SPEC §9.3 UQ-01, UQ-02 [A]
+    sensitivity: "More samples narrow the percentile estimates (≈ ±3 percentile points at 200)."
+    tag: A
+    status: default
+    added_by: WP-11

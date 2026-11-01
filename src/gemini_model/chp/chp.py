@@ -6,6 +6,11 @@ flow is shared with other consumers (e.g. a co-located ``Boiler``), the
 allocation between them should be handled by a ``Splitter`` component.
 """
 
+# Modified by the GeoAgent team for SPE GeoHackathon 2026, 2026-11-01: optional
+# "electrical_fraction" parameter (electricity share of the useful output; default
+# ELECTRICAL_POWER_FRACTION = 1/3, i.e. unchanged behaviour) for the CHP-EL-FRAC 0.50
+# sensitivity (DEA gas engines, RC-08/RC-10; WP-11).
+
 from gemini_model.model_abstract import StaticModel
 
 
@@ -56,7 +61,9 @@ class CHP(StaticModel):
         co-located Boiler), use a ``Splitter`` component to allocate it
         before feeding it into this model. ``water_flow_rate`` is echoed
         back as an output so it can be passed on, in series, to a
-        downstream component on the same water flow path.
+        downstream component on the same water flow path. The optional
+        ``electrical_fraction`` parameter (default 1/3) splits the useful
+        output into electricity and heat.
         """
         temperature_in = u["temperature_in"]
         water_flow_rate = u["water_flow_rate"]
@@ -72,8 +79,11 @@ class CHP(StaticModel):
 
         gas_energy_flow = self.parameters["caloric_value"] * gas_mass_flow_rate  # W
         fuel_power = self.parameters["efficiency_factor"] * gas_energy_flow
-        power_el = self.ELECTRICAL_POWER_FRACTION * fuel_power
-        power_th = (1 - self.ELECTRICAL_POWER_FRACTION) * fuel_power
+        fraction = self.parameters.get("electrical_fraction", self.ELECTRICAL_POWER_FRACTION)
+        if not 0.0 < fraction < 1.0:
+            raise ValueError(f"electrical_fraction must be in (0, 1), got {fraction}")
+        power_el = fraction * fuel_power
+        power_th = (1 - fraction) * fuel_power
 
         mass_flow_water = fluid_density * water_flow_rate  # kg/s
         if mass_flow_water < self._MIN_MASS_FLOW:

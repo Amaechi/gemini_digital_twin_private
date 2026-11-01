@@ -438,7 +438,7 @@ def test_doublet_example_reproduced_within_one_percent():
 
 
 def test_register_gas_and_chp_values_match_the_code(tmp_path):
-    """CFG-ASSOC-GAS equals the computed values; CHP-EL-FRAC must match GEMINI's hard-coded 1/3."""
+    """CFG-ASSOC-GAS equals the computed values; CHP-EL-FRAC ≠ 1/3 reaches chp.py (WP-11)."""
     register = load_config("assumptions")
     assoc = register.get("CFG-ASSOC-GAS").value
     lhv, factor, density = gas_burner_values(0.8, 0.2)
@@ -452,7 +452,14 @@ def test_register_gas_and_chp_values_match_the_code(tmp_path):
     start = text.index("  - id: CHP-EL-FRAC\n")
     block = text[start:].replace("    value: 0.3333\n", "    value: 0.5\n", 1)
     path.write_text(text[:start] + block, encoding="utf-8")
-    with pytest.raises(ConfigError, match="hard-coded"):
+    gb = load_generator_basis(config_dir)
+    assert gb.chp_electrical_fraction == 0.5
+    config = generate_plant(make_candidate("C2", 2), gb=gb, sub=basis()[1])
+    assert config.project["components"]["chp"]["parameters"]["electrical_fraction"] == 0.5
+    _, base = generated("C2", 2, 2500.0, None)
+    assert "electrical_fraction" not in base.project["components"]["chp"]["parameters"]
+    path.write_text(text[:start] + block.replace("value: 0.5\n", "value: 1.0\n", 1), "utf-8")
+    with pytest.raises(ConfigError, match="CHP-EL-FRAC"):
         load_generator_basis(config_dir)
 
 

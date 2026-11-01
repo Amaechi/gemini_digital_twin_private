@@ -550,6 +550,22 @@ def test_injector_on_gravity_reports_signed_whp(basis):
     assert any("gravity" in note for note in point.notes)
 
 
+def test_injectivity_factor_cold_injection(basis, full_flow):
+    """II = 0.8 × PI (WP-11 SUB-II case): ≈ +6 bar on the 26.5 bar(g) injection WHP (LIM-SUB-02)."""
+    doublet = resolve_doublet(DoubletDesign(injectivity_factor=0.8), basis)
+    assert doublet.injectivity_index_m3h_per_bar == pytest.approx(0.8 * _pi(basis))
+    point = operating_point(doublet, 300.0)
+    extra = 300.0 / doublet.injectivity_index_m3h_per_bar - 300.0 / _pi(basis)
+    assert point.injector_wellhead_pressure_barg == pytest.approx(
+        full_flow.injector_wellhead_pressure_barg + extra, abs=1e-6
+    )
+    assert extra == pytest.approx(6.0, abs=0.2)
+    assert point.injection_pump_electric_power_w > full_flow.injection_pump_electric_power_w
+    assert resolve_doublet(DoubletDesign(), basis) == resolve_doublet(
+        DoubletDesign(injectivity_factor=None), basis
+    )
+
+
 def test_suction_above_whp_needs_no_pump(basis):
     """Pump required only when the injector WHP exceeds the suction pressure."""
     doublet = resolve_doublet(DoubletDesign(injection_pump_suction_barg=30.0), basis)
