@@ -11,7 +11,7 @@ Keep it ≤ 20 KB; it is the hand-off between sessions. Old detail: merged PRs a
 | WP-03 | Heat pump, e-boiler, storage | todo | | Batch 4 |
 | WP-04 | Design basis, demand, climate | merged (f7acb2a) | [#2](https://github.com/Amaechi/gemini_digital_twin_private/pull/2) | TL-01/02/02b |
 | WP-05 | Subsurface & doublet tools | merged (bc8baab) | [#8](https://github.com/Amaechi/gemini_digital_twin_private/pull/8) | TL-03…08; 7 SUB-* |
-| WP-06 | Config generator, guard, day sim | todo | | Batch 4 |
+| WP-06 | Config generator, guard, day sim | in review | [#13](https://github.com/Amaechi/gemini_digital_twin_private/pull/13) | TL-09/10/11; 863 passed |
 | WP-07 | Annual simulation & dispatch | todo | | Batch 5 |
 | WP-08 | Economics, CO₂, exergy, scaling | todo | | Batch 4 |
 | WP-09 | Verifier, memory, logging | merged (901e110) | [#9](https://github.com/Amaechi/gemini_digital_twin_private/pull/9) | 41-check DesignVerifier |
@@ -29,6 +29,10 @@ Latest full suite (`main` @ bc8baab, 2026-11-01): `PYTHONPATH=src python -m pyte
 Next: Batch 4 (WP-03, WP-06, WP-08).
 
 ## Decisions log (newest first)
+- 11-01 WP-06: TL-09 `PlantSpec` → `build_plant_project` (unique names, Kahn order); `generate_plant(candidate, loads, PlantDispatch)`; GEMINI example rebuilt within 1 %. Wells via now-public `doublet.producer_well_parameters`/`injector_well_parameters` (WP-05 file, unchanged behaviour). Return temperatures = candidate's; degassing = `gas_handling`.
+- 11-01 WP-06: layout (CFG-LAYOUT): degasser → filter → [absorption drive, Ti tubes] → HEX-1 → [HP evaporator] → injector; district return → [bypass] HEX-1s → CHP (all associated gas) → [bypass] HPs (100 °C) → peak boiler (grid gas, fired by simulate_day). C6 = parent plant (no storage model); C7 WHP 54.25 bar(g), flagged (> plate-HEX rating; PH-09 fails, PD-10 zero margin).
+- 11-01 WP-06: CFG-SURFACE letdown WHP → SUB-PSUC in the degasser, surface adiabatic; brine > 100 °C flagged (flashing). CFG-HEX UA from RC-03 eq 1 inverted (GEMINI bisection 4.7 % high at C_r = 1); 85 °C brine: 82.2/58 °C, UA 3.19 MW/K. CFG-HP Carnot η 0.46 (Lorenz diverges), floor max(T_wh − 40, 100 − VER-HP-LIFT). CFG-CHP GEMINI 1/3 + DEA total 0.96 (enforced). Gas 29.67 MJ/kg & 68.56 kg/GJ; grid 50.03 MJ/kg & 56.6.
+- 11-01 WP-06: TL-11 controls: HEX share bisected for DB-12 and ≤ 100 °C before HPs; HP share bisected while HeatpumpBasic is unphysical, else HPs off; DB-12 breach = invalid day. ESP electricity by rule on GEMINI pressures; burner CO₂ only. `verification_evidence()` uses HEX design points (RC-03 sizing checks). TL-10: limits.yaml + DB-40, Q_inj trace, venting trace, duplicates = hash of {project, design}; ratings are warnings.
 - 11-01 WP-05: TL-05 → verifier passes a **bare p_b in bar(g)**; `OperatingPoint.esp_evidence` = `EspPoint` field for field (tested); the verifier's VER-ESP-MARGIN limit equals TL-05 `intake_setpoint_barg`; SUB-PBUB margin must equal VER-ESP-MARGIN (`load_subsurface_basis` refuses otherwise).
 - 11-01 WP-05: brine bubble point by Henry's law (RC-01 item 9, Sander 2023) at T_res: p_b = Σ c_i/H_i(T); sea-water basis 46.05 bar(a), pure-water bound 52.17 bar(a) at 87 °C; ESP intake setpoint = computed 1.2·p_b = 55.26 bar(a) (not the card's 60); ESP setting depth 840 m (was 510 m).
 - 11-01 WP-05: injector friction sign (RC-01 eq 12) behind `friction_opposes_flow=False` in `nodal_solver`/`well_flow` (`InjectorWell` JSON key; single-phase only); default unchanged; hand case 76.26 vs legacy 13.24 bar. WP-05 tools always pass `True`.
@@ -142,4 +146,10 @@ Next: Batch 4 (WP-03, WP-06, WP-08).
 See spec §17. Answers: —
 
 ## Hand-off notes (latest session writes here, replace previous)
-2026-11-01: PROGRESS.md condensed after batch 3 (no code changes); next is Batch 4 (see above).
+2026-11-01 WP-06 (PR #13): TL-09/10/11 built; register CFG-LAYOUT, -SURFACE, -HEX, -HP, -CHP, -BOILER, -GRID-GAS, -ASSOC-GAS, -SIZING. Runner NOT rewired. Follow-ups:
+- **WP-14:** bind `generate_gemini_config`, `design_guard` (`GuardReport.failed_ids` → `ToolContext.guard_failed`) and `simulate_day` in place of the stubs; collector = `verification_evidence(candidate, days)` + subsurface/scaling/absorption points.
+- **WP-07:** dispatch with `PlantDispatch` (flows, `absorption_drive_frac`, `hex_flow_frac`, `hp_flow_frac`, `boiler_gas_kg_s`) and `simulate_plant_day` (≈ 0.2–0.5 s/day). CHP burns all associated gas: summer surplus at design flows (C1×3: 1.0 MW), so lower flows. Absorption needs ≥ 138 m³/h drive; default drive share starves HEX-1 of doublet 1.
+- **WP-03:** HeatpumpBasic: Lorenz diverges at part load, source-floor re-solve diverges, zero sink flow still cools the brine 10 K. Then go back to Lorenz (RC-04) and drop the HP bypass guard; emit `HeatPumpPoint` (HP concepts stay UNVERIFIED; Carnot on Ts_in may exceed VER-HP-ETA on the outlet basis).
+- **WP-08:** CFG-GRID-GAS 56.6 vs ECO-05; grid-electricity CO₂ (DB-37) not in `co2_by_source_kg`; DEA CHP split needs a chp.py `electrical_fraction` parameter.
+- PROGRESS.md is ≈ 23 KB (> 20 KB): condense after batch 4.
+- **WP-11/WP-12:** CFG-SIZING sizes are peaks; HP nameplate only a margin (`hthp_heating_mw`); no storage component (C6); GEMINI HEX imprecise at C_r → 1; absorption isolation loop not representable (recycle).
