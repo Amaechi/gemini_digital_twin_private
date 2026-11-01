@@ -426,3 +426,30 @@ def test_heat_pump_uses_register_approaches_and_flags_sink_limit():
     assert sim.day.margins["hthp_1_sink_temperature_margin_k"] == pytest.approx(-5.0)
     assert sim.day.margins["hthp_1_rc04_limits_margin_count"] == -1.0
     assert any(f.startswith("hthp_1") and "OUTSIDE" in f for f in sim.day.flags)
+
+
+def test_idle_heat_pump_below_its_floor_is_valid():
+    """Physics check: brine already below the HP floor (35 °C return, DB-12 control) → HP idles."""
+    gb, sub = bases()
+    peak, _ = days()
+    cold = make_candidate("C2", 2).model_copy(update={"heating_return_degc": 35.0})
+    sim = simulate_plant_day(
+        cold, peak, PlantDispatch(doublet_flows_m3h=[50.0, 50.0]), gb=gb, sub=sub
+    )
+    assert sim.valid, sim.failures
+    out = sim.outputs["hthp_1"]
+    assert out["running"] is False and out["power_th"] == 0.0
+    params = sim.config.project["components"]["hthp_1"]["parameters"]
+    assert out["Ts_out"] < params["Ts_in_minimum"]  # passed unchanged, floor not applied
+    assert "hthp_1_rc04_limits_margin_count" not in sim.day.margins  # idle: not a violation
+
+
+def test_heat_pump_equipment_notes_and_cop_plausibility_are_surfaced():
+    """RC-04 notes (multi-pass ΔT > 11 K, cap) and an out-of-band COP reach the warnings."""
+    _, peak = simulated("C2", 2, 2500.0, None)
+    assert any(w.startswith("hthp_1: ") and "11 K" in w for w in peak.warnings)
+    _, summer = simulated("C2", 2, 2500.0, None, "summer")  # design flows: low-lift trickle
+    out = summer.outputs["hthp_1"]
+    assert out["running"] and out["COP"] > 4.5
+    assert any("outside RC-04's typical HTHP band" in w for w in summer.warnings)
+    assert not any("typical HTHP band" in w for w in peak.warnings)  # 3.86 at design

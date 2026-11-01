@@ -798,12 +798,14 @@ assumptions:
       Generated heat pumps use WP-03's closed-form HeatpumpBasic path (GM-03: RC-04 eq. 1–3 with a bracketed root, no
       Nelder–Mead starting guess) in Lorenz mode, RC-04's preferred method, with η_L from HP-ETA-L; the COP is capped
       at VER-HP-ETA × Carnot at the refrigerant temperatures (HP-APPROACH 4 K) and the model reports its RC-04
-      screening (within_limits, missing_inputs, heat_pump_point). GEMINI's default Nelder–Mead solver is unchanged
+      screening (within_limits, missing_inputs, heat_pump_point). The cap binds at every point simulated (C2 design:
+      Lorenz 4.67 → 3.86, i.e. ≈ 0.52 × Carnot on water temperatures), so the COP is set by VER-HP-ETA and HP-APPROACH,
+      not by η_L (inert above ≈ 0.41). GEMINI's default Nelder–Mead solver is unchanged
       for every other user. Evaporator on brine (ρ 1030, c_p 4100), condenser on district water; the source-outlet
       floor enforces DB-12 and the VER-HP-LIFT 60 K lift (C5: 56 °C brine is cooled to 40 °C at most). No HTHP
       datasheet is cited, so every heat-pump day is flagged with the MISSING datasheet values.
     source: RC-04 (Lorenz preferred; η_L default 0.50); WP-03 GM-03 closed form; HP-ETA-L, HP-APPROACH, VER-HP-ETA
-    sensitivity: "η_L per HP-ETA-L (0.40–0.55); a cited HTHP datasheet replaces the RC-04 defaults."
+    sensitivity: "Run on VER-HP-ETA and HP-APPROACH: the cap binds at every simulated point (η_L inert above ≈ 0.41); a cited HTHP datasheet replaces the RC-04 defaults."
     tag: A
     status: default
     added_by: WP-06

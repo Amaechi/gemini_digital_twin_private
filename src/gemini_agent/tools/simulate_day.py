@@ -86,6 +86,8 @@ HEAT_TOL_MW = 1e-6
 """Heat-balance noise below which no unmet/surplus heat is reported."""
 HP_OFF_FLOW_M3S = 1e-12
 """Sink flow below which a heat pump is treated as off (its Th_out has no weight)."""
+RC04_TYPICAL_COP = (3.5, 4.5)
+"""RC-04 typical HTHP COP band (WP-03 decision log); outside it a plausibility warning is given."""
 HP_CAPACITY_TOL_MW = 1e-6
 """Heat-pump heat above the hthp_heating_mw nameplate by less than this is not controlled."""
 SHARE_BISECTION_STEPS = 12
@@ -252,10 +254,22 @@ def heat_pump_failures(solver: Solver, config: GeneratedConfig) -> list[str]:
         th_out, ts_out, _cop, power_th, power_el = values
         th_in, ts_in = _inp(solver, name, "Th_in"), _inp(solver, name, "Ts_in")
         reasons = []
-        if _inp(solver, name, "hot_flow_rate") <= HP_OFF_FLOW_M3S:
-            # No sink flow: valid only if the brine passes unchanged (GEMINI cools it anyway).
-            if abs(ts_out - ts_in) > TEMPERATURE_TOL_K or abs(power_th) > 1e-6:
-                problems.append(f"{name}: no sink flow but Ts_out {ts_out:.2f} ≠ Ts_in {ts_in:.2f}")
+        idle = out.get("running") is False or _inp(solver, name, "hot_flow_rate") <= HP_OFF_FLOW_M3S
+        if idle:
+            # An idle heat pump (no sink flow, water already at target, or brine already at or
+            # below its floor) must pass both streams unchanged at zero power; its floor does not
+            # apply (GEMINI's Nelder-Mead cools the brine anyway, the closed form does not).
+            unchanged = (
+                abs(ts_out - ts_in) <= TEMPERATURE_TOL_K
+                and abs(th_out - th_in) <= TEMPERATURE_TOL_K
+                and abs(power_th) <= 1e-6
+                and abs(power_el) <= 1e-6
+            )
+            if not unchanged:
+                problems.append(
+                    f"{name}: idle but changes the streams (Ts_out {ts_out:.2f} vs Ts_in "
+                    f"{ts_in:.2f} °C, Th_out {th_out:.2f} vs Th_in {th_in:.2f} °C)"
+                )
             continue
         if not all(math.isfinite(v) for v in values):
             reasons.append("non-finite output")
@@ -440,7 +454,10 @@ def simulate_config_day(
             and heat > nameplate + HP_CAPACITY_TOL_MW
         ):
             # Genuine capacity control: the heat pumps cannot deliver more than their nameplate;
-            # the rest of the district water bypasses them to the peak boiler.
+            # the rest of the district water bypasses them to the peak boiler. Heat is not
+            # monotone in the share once source-limited (Q_h = Q_src·COP/(COP−1) falls with the
+            # lift), so the bisection lands on the rising branch: correct but conservative (a
+            # smaller share at a higher lift than compressor turndown would give; WP-07/WP-11).
             low, high = 0.0, hp_share
             for _ in range(SHARE_BISECTION_STEPS):
                 mid = 0.5 * (low + high)
@@ -602,6 +619,18 @@ def _assemble(
         flag, point = _heat_pump_screening(name, out)
         if flag is not None:
             hp_flags.append(flag)
+        if out.get("running"):
+            # RC-04 equipment notes of the model (multi-pass ΔT > 11 K, COP capped …) and a
+            # plausibility note outside RC-04's typical HTHP band (cap-limited low-lift points).
+            warnings += [f"{name}: {w}" for w in out.get("validity_warnings") or []]
+            cop = float(out["COP"])
+            low, high = RC04_TYPICAL_COP
+            if not low <= cop <= high:
+                warnings.append(
+                    f"{name}: COP {cop:.2f} outside RC-04's typical HTHP band {low:g}–{high:g} "
+                    f"(lift {float(out.get('lift_k') or 0.0):.1f} K, "
+                    f"{float(out['power_th']) / 1e6:.3f} MW; cap-limited, plausibility only)"
+                )
         if point is not None:
             hp_points.append(point)
         _heat_pump_margins(name, out, params=config.project["components"][name], margins=margins)
