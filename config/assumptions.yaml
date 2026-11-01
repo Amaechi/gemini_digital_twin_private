@@ -226,3 +226,48 @@ assumptions:
     tag: A
     status: default
     added_by: WP-00
+
+  - id: SUB-RHOC
+    title: Aquifer volumetric heat capacity (thermal-breakthrough screening)
+    value: 2500000.0
+    unit: J/(m3 K)
+    justification: >-
+      Gringarten–Sauty (1975) breakthrough time t_b = π h D² (ρC)_a / (3 (ρC)_w Q) needs the
+      volumetric heat capacity of the saturated aquifer; RC-02 gives ≈ 2.5e6 J/(m³ K) [A]. With
+      h = 100 m and Q = 300 m³/h it reproduces DB-26 (23.6 yr at D = 1.0 km, 34 yr at 1.2 km).
+    source: RC-02 eq 1 [A]; GEOAGENT_DESIGN_SPEC §2.2 DB-26
+    sensitivity: >-
+      No range on RC-02; t_b is linear in (ρC)_a, so a ±x % change moves t_b by ±x % (WP-05/WP-11 to
+      choose the range).
+    tag: A
+    status: default
+    added_by: WP-04
+
+  - id: DEM-COP-HD
+    title: Screening COP of heat-driven cooling (demand profiling only)
+    value: 0.75
+    unit: "-"
+    justification: >-
+      Used only by the demand tool to build the screening profile "heating + cooling / COP" (the heat a
+      geothermal plant would supply if all cooling were heat-driven). Spec §3.2 states this screening
+      value (window 6 May–9 Jun, ≈ 143 GWh/yr). Sizing and simulation use the calibrated RC-05
+      absorption-chiller model, which gives COP ≈ 0.60–0.70 for 85–105 °C drive heat.
+    source: GEOAGENT_DESIGN_SPEC §3.2 [A]; RC-05 (COP 0.60–0.70) [L]
+    sensitivity: [0.60, 0.70]
+    tag: A
+    status: default
+    added_by: WP-04
+
+  - id: SUB-II
+    title: Injectivity index of the injector
+    value: equal_to_pi
+    unit: null
+    justification: >-
+      The injector's injectivity index II is taken equal to the producer's PI (same reservoir, same
+      completion), so injection bottom-hole pressure is P_res + Q/II (RC-01 item 4, DiPippo eq
+      4.14–4.15). Used by TL-01 to show that an injection pump is needed (DB-21).
+    source: RC-01 item 4 [A]
+    sensitivity: "Cold-water injection usually lowers II (viscosity); WP-05 may add a factor."
+    tag: A
+    status: default
+    added_by: WP-04
