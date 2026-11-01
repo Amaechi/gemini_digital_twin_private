@@ -5,6 +5,11 @@ both outlet temperatures using the NTU-effectiveness method for a
 parallel- or counter-flow plate heat exchanger.
 """
 
+# Modified by the GeoAgent team for SPE GeoHackathon 2026, 2026-11-01: optional
+# secondary-side "secondary_fluid_density"/"secondary_specific_heat" parameters (default: the
+# primary values, i.e. unchanged behaviour), so brine (primary) and district water
+# (secondary) can have their own rho/c_p (WP-02 decision on the WP-01 follow-up).
+
 import math
 
 from gemini_model.model_abstract import StaticModel
@@ -89,12 +94,15 @@ class HeatExchanger(StaticModel):
         """Compute heat duty and outlet temperatures with the NTU-effectiveness method."""
         rho = self.parameters.get("fluid_density", self.DEFAULT_FLUID_DENSITY)
         cw = self.parameters.get("specific_heat", self.DEFAULT_SPECIFIC_HEAT)
+        # Secondary side defaults to the primary properties (original GEMINI behaviour).
+        rho_secondary = self.parameters.get("secondary_fluid_density", rho)
+        cw_secondary = self.parameters.get("secondary_specific_heat", cw)
 
         mass_flow_primary = rho * primary_flow_rate  # kg/s
-        mass_flow_secondary = rho * secondary_flow_rate  # kg/s
+        mass_flow_secondary = rho_secondary * secondary_flow_rate  # kg/s
 
         capacity_primary = mass_flow_primary * cw  # W/K
-        capacity_secondary = mass_flow_secondary * cw  # W/K
+        capacity_secondary = mass_flow_secondary * cw_secondary  # W/K
         capacity_min = min(capacity_primary, capacity_secondary)
         capacity_max = max(capacity_primary, capacity_secondary)
 

@@ -271,3 +271,154 @@ assumptions:
     tag: A
     status: default
     added_by: WP-04
+
+  - id: COOL-ABS-B
+    title: Dühring slope B of the LiBr absorption-chiller characteristic equation
+    value: 1.15
+    unit: "-"
+    justification: >-
+      RC-05 Method B (ΔΔt = (t_G − t_AC) − B (t_AC − t_E)) gives B ≈ 1.1–1.2 for LiBr without a single
+      value; the mid-point is used. With B = 1.15, raising the mean evaporator temperature by 14 K is worth
+      ≈ 16 K of drive temperature (RC-05 screening statement 15–17 K).
+    source: RC-05 Method B [A]; gemini_model.absorption_chiller (GM-04)
+    sensitivity: [1.1, 1.2]
+    tag: A
+    status: default
+    added_by: WP-02
+
+  - id: COOL-ABS-CAL
+    title: Absorption-chiller characteristic coefficients calibrated to Method A (no datasheet)
+    value:
+      fit: weighted least squares (relative error) on Method A rating points
+      rating_points: "T_chw 44 °F, T_cw 85 °F, T_hw 180–240 °F every 5 °F"
+      generator_delta_t_k: 7.2
+      cooling_water_range_k: 5.0
+      chilled_water_delta_t_k: 6.0
+      s_e_per_k: 0.022260
+      ddt_min_k: 9.503
+      s_g_per_k: 0.032491
+      ddt_min_g_k: 7.453
+    unit: null
+    justification: >-
+      RC-05 leaves the Method B coefficients MISSING and says to calibrate them to a datasheet or, failing
+      that, to Method A at its rating points. Method A gives inlet/leaving temperatures, so circuit means use
+      the generator ΔT 7.2 K [L Guidebook p.267], a cooling-water range of 5 K [A RC-07] and a chilled-water
+      ΔT of 6 K [A: the DB-32 design ΔT; the card gives no rating ΔT]. On the rating points the fit matches
+      Method A within 1.0 % (capacity) and 2.1 % (COP). At 20 °C chilled water the method is extrapolated
+      (RC-05: uncertain); off the rating line Method A's product form F_T·F_c diverges from ΔΔt (up to 0.27
+      of nominal capacity at 180 °F / 50 °F / 75 °F).
+    source: RC-05 Method B option (ii); gemini_model.absorption_chiller.characteristic.calibrate_to_ghc1989
+    sensitivity: >-
+      Method A ("ghc1989", conservative lower bound) and B = 1.1 / 1.2; replace with a datasheet fit
+      (characteristic.fit_coefficients) if one is found.
+    tag: A
+    status: default
+    added_by: WP-02
+
+  - id: COOL-ABS-CAP
+    title: Absorption-chiller capacity never exceeds the nameplate rating
+    value: 1.0
+    unit: fraction of nominal capacity
+    justification: >-
+      With cold cooling water and 20 °C chilled water the calibrated characteristic equation (and Method A
+      outside validity) can exceed the nominal capacity; the model credits at most the nameplate rating
+      (max_capacity_fraction), which is conservative for sizing.
+    source: engineering judgement [A]; GM-04
+    sensitivity: null
+    tag: A
+    status: default
+    added_by: WP-02
+
+  - id: COOL-ABS-LB
+    title: Method A outside its validity is evaluated at the conservative validity edge
+    value:
+      chilled_water_above_degf: 50.0
+      cooling_water_below_degf: 75.0
+    unit: degF
+    justification: >-
+      RC-05: outside 40–50 °F chilled / 75–90 °F cooling water Method A is a lower bound only. F rises with the
+      chilled-water and falls with the cooling-water temperature, so chilled water above 50 °F is evaluated
+      at 50 °F and cooling water below 75 °F at 75 °F (never overstates capacity); a validity warning is
+      reported. Other excursions are extrapolated with a warning.
+    source: RC-05 Method A [A interpretation]; parameter ghc1989_conservative_clamp
+    sensitivity: "ghc1989_conservative_clamp: false (raw extrapolation)."
+    tag: A
+    status: default
+    added_by: WP-02
+
+  - id: COOL-ABS-AUX
+    title: Absorption-chiller auxiliary power (extra tower fan and cooling-water pump)
+    value: 0.021894
+    unit: fraction of cooling duty
+    justification: >-
+      0.077 kW/ton ÷ 3.517 kW/ton ≈ 2.2 % of Q_cool (Guidebook p.269), the extra tower fan and cooling-water
+      pump of absorption versus electric chilling. If the project also has a heat_rejection component that
+      counts the tower fan and pumps (2 % of heat rejected), set the chiller's aux_power_fraction to 0 to avoid
+      counting them twice.
+    source: RC-05 Auxiliaries [L Guidebook p.269]
+    sensitivity: null
+    tag: L
+    status: default
+    added_by: WP-02
+
+  - id: COOL-ELC
+    title: Electric-chiller COP model defaults
+    value:
+      carnot_efficiency: 0.40
+      evaporator_approach_k: 4.0
+      condenser_approach_k: 3.0
+      tower_approach_k: 4.5
+      cooling_water_range_k: 5.0
+      dry_cooler_condenser_offset_k: 8.0
+      cop_max: 8.0
+      cop_min: 3.0
+    unit: null
+    justification: >-
+      COP = η T_evap/(T_cond − T_evap); η 0.39–0.40 implied by the Guidebook (COP 4.39 at 45/90 °F, 4.07 at
+      45/95 °F) [L]; T_evap = supply − 4 K, T_cond = tower leaving water (T_wb + 4–5 K approach + 5 K range)
+      + 3 K, or T_db + 8 K with a dry cooler; COP capped at 8 and floored at 3 [A]. The constant-η model is
+      steeper (−4.0 %/K at 7.2/32.2 °C) than the Guidebook data (≈ −2.6 %/K): conservative in hot weather.
+    source: RC-06 [L Guidebook p.257–258] and [A]; spec GM-05
+    sensitivity: "η 0.39; tower approach 4–5 K."
+    tag: A
+    status: default
+    added_by: WP-02
+
+  - id: COOL-HR
+    title: Heat-rejection (cooling tower / dry cooler) defaults
+    value:
+      tower_approach_k: 4.5
+      range_k: 5.0
+      aux_power_fraction: 0.02
+      dry_cooler_approach_k: 5.0
+      dry_cooler_power_factor: 3.0
+      latent_heat_j_kg: 2450000.0
+    unit: null
+    justification: >-
+      Tower leaving water = T_wb + approach (4–5 K → 4.5) [A], range ≈ 5 K [A], fan + pump ≈ 2 % of heat
+      rejected [A]; dry cooler leaving water = T_db + 5 K [L RTES], fan power ≈ 3× wet [L DiPippo Ch23], applied
+      to the whole 2 % (→ 6 %) [A]. Tower water use = Q_reject / h_fg with h_fg 2.45 MJ/kg (water at ≈ 20 °C,
+      steam tables) [A]: an upper bound (all heat by evaporation). Cost and area ≈ 3× wet for a dry cooler are
+      for economics (WP-08).
+    source: RC-07 Heat rejection [A]/[L]; steam tables for h_fg [A]
+    sensitivity: "tower approach 4–5 K; dry-cooler power factor 3 applied to the fan only."
+    tag: A
+    status: default
+    added_by: WP-02
+
+  - id: COOL-FC
+    title: Free-cooling (water-side economiser) defaults
+    value:
+      tower_approach_k: 4.5
+      hex_approach_k: 2.0
+      aux_power_fraction: 0.02
+    unit: null
+    justification: >-
+      Full free cooling when T_wb + 4.5 + 2 ≤ 20 °C (T_wb ≤ 13.5 °C), partial pre-cooling of the 26 °C return
+      while T_wb + 6.5 < 26 °C; power = fan + pumps ≈ 2 % of the heat moved, i.e. a performance factor of 50
+      (inside the 24–53 seasonal range).
+    source: RC-07 Free cooling [A]; RC-03 plate-HEX approach 2–3 K
+    sensitivity: "HEX approach 3 K; tower approach 5 K."
+    tag: A
+    status: default
+    added_by: WP-02
