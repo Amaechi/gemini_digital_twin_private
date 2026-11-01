@@ -10,11 +10,18 @@ of RC-02 eq 2: the streamline leaving the injector at angle θ (from the well ax
 t_a(3π/4) = 20.13 t_a(0)), and a fraction θ/π of the flow travels on streamlines faster than θ,
 so after breakthrough ``T_prod = (1 − θ/π) T_res + (θ/π) T_inj`` with ``t_a(θ) = t``. No heat
 recharge from the cap/base rock is included (conservative). RC-02 eq 3 gives the ±6 K
-heterogeneity band on the 30-year temperature.
+heterogeneity band on the 30-year temperature. The default injection temperature is the TL-05
+wellhead temperature at this flow minus the DB-12 maximum brine cooling.
 
 TL-08: steady line-source superposition of every other doublet's producer (sink) and injector
-(source), ``ΔP = Q μ / (2π k h) · ln(r_prod / r_inj)`` at a well (RC-02 eq 4; positive = pressure
-rise), against the ≤ 1 bar regulator rule (RC-02, Dogger).
+(source), ``ΔP = Q μ / (2π k h) · ln(r_prod / r_inj)`` at a well, against the ≤ 1 bar regulator
+rule (RC-02, Dogger). Sign: RC-02 eq 4 prints ``ln(r_inj / r_prod)``, i.e. *drawdown* positive;
+here a pressure *rise* is positive (source = injector), so the sign is deliberately reversed. The
+magnitude and the ≤ 1 bar check (on |ΔP|) are the same.
+
+Flows above the DB-11 maximum are refused (hard limit); lower flows are allowed because TL-07 and
+TL-08 are also used with annual-average flows. Card status: RC-02 marks the closed-form t_b as
+``VERIFY`` (Gringarten–Sauty 1975 not printed in the source paper).
 """
 
 from __future__ import annotations
@@ -27,6 +34,7 @@ from pydantic import Field
 from scipy.optimize import brentq
 
 from gemini_agent.schemas.common import StrictModel, ToolResult
+from gemini_agent.tools import doublet as doublet_tools
 from gemini_agent.tools.design_basis import (
     M2_PER_MILLIDARCY,
     PA_PER_BAR,
@@ -53,6 +61,15 @@ INTERFERENCE_LIMIT_BAR = 1.0
 MAX_HORIZON_YR = 100.0
 """Upper bound of the production-temperature curve horizon."""
 _THETA_SMALL = 1e-4
+
+
+def _check_flow_limit(flow_m3h: float, basis: SubsurfaceBasis) -> None:
+    """Refuse flows above the DB-11 maximum per doublet (golden rule 4)."""
+    if flow_m3h > basis.flow_max_m3h:
+        raise ValueError(
+            f"flow {flow_m3h:g} m³/h exceeds the DB-11 hard limit {basis.flow_max_m3h:g} m³/h "
+            "per doublet"
+        )
 
 
 # --------------------------------------------------------------------------- RC-02 eq 2 helpers
@@ -123,8 +140,11 @@ class ThermalBreakthroughRequest(StrictModel):
     spacing_m: float | None = Field(default=None, gt=0, description="None: SUB-SPACING.")
     flow_m3h: float | None = Field(default=None, gt=0, description="None: DB-11 maximum.")
     depth_m: float | None = Field(default=None, gt=0, description="None: DB-01 (sets T_res).")
+    wellhead_temperature_degc: float | None = Field(
+        default=None, description="Producer wellhead T; None: TL-05 wellbore model at this flow."
+    )
     injection_temperature_degc: float | None = Field(
-        default=None, description="None: T_res − DB-12 maximum brine cooling."
+        default=None, description="None: wellhead T − DB-12 maximum brine cooling."
     )
     horizon_yr: float | None = Field(
         default=None, gt=0, le=MAX_HORIZON_YR, description="None: analysis period (ECO-01)."
@@ -145,7 +165,9 @@ class ThermalBreakthroughReport(StrictModel):
     flow_m3h: float
     thickness_m: float
     reservoir_temperature_degc: float
+    wellhead_temperature_degc: float = Field(description="Producer wellhead (TL-05 model).")
     injection_temperature_degc: float
+    brine_cooling_k: float = Field(description="Wellhead − injection temperature (≤ DB-12).")
     rho_c_aquifer_j_per_m3_k: float
     rho_c_water_j_per_m3_k: float
     breakthrough_time_yr: float = Field(description="RC-02 eq 1 (Gringarten & Sauty 1975).")
@@ -165,15 +187,29 @@ def thermal_breakthrough_report(
     request = request or ThermalBreakthroughRequest()
     spacing = request.spacing_m or basis.well_spacing_m
     flow = request.flow_m3h or basis.flow_max_m3h
+    _check_flow_limit(flow, basis)
     depth = request.depth_m or basis.design_depth_m
     t_res = formation_temperature_degc(depth, basis)
+    t_wh = request.wellhead_temperature_degc
+    if t_wh is None:
+        design = doublet_tools.DoubletDesign(depth_m=depth)
+        t_wh = doublet_tools.wellhead_temperature_degc(
+            doublet_tools.resolve_doublet(design, basis), flow
+        )
+    if t_wh > t_res:
+        raise ValueError("wellhead temperature must not exceed the reservoir temperature")
     t_inj = (
-        t_res - basis.brine_cooling_max_k
+        t_wh - basis.brine_cooling_max_k
         if request.injection_temperature_degc is None
         else request.injection_temperature_degc
     )
     if t_inj > t_res:
         raise ValueError("injection temperature must not exceed the reservoir temperature")
+    if t_wh - t_inj > basis.brine_cooling_max_k + 1e-9:
+        raise ValueError(
+            f"brine cooling {t_wh - t_inj:.1f} K exceeds the hard limit "
+            f"{basis.brine_cooling_max_k:g} K (DB-12)"
+        )
     horizon = request.horizon_yr or basis.analysis_period_yr
     rho_c_water = basis.density_kg_m3 * basis.cp_j_per_kg_k
     rho_c_aquifer = basis.aquifer_rho_c_j_per_m3_k
@@ -193,7 +229,9 @@ def thermal_breakthrough_report(
         flow_m3h=flow,
         thickness_m=basis.thickness_m,
         reservoir_temperature_degc=t_res,
+        wellhead_temperature_degc=t_wh,
         injection_temperature_degc=t_inj,
+        brine_cooling_k=t_wh - t_inj,
         rho_c_aquifer_j_per_m3_k=rho_c_aquifer,
         rho_c_water_j_per_m3_k=rho_c_water,
         breakthrough_time_yr=t_b,
@@ -326,6 +364,7 @@ def interference_report(
             f"{basis.doublet_count_min}–{basis.doublet_count_max}"
         )
     flow = request.flow_m3h or basis.flow_max_m3h
+    _check_flow_limit(flow, basis)
     spacing = request.spacing_m or basis.well_spacing_m
     k_m2 = basis.permeability_md * M2_PER_MILLIDARCY
     unit_bar = (

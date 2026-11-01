@@ -7,6 +7,10 @@ assumptions). Values are never re-typed here; the physics helpers come from
 
 Sources: RC-01 eq 1–4 (temperature and pressure at depth, radial-Darcy PI, drawdown);
 GEMINI ``gemini_model.reservoir.reservoir_pressuredrop.bottomhole_skin_dp`` (PI cross-check).
+Card status: RC-01 marks the DiPippo equations ``VERIFY``.
+
+Pressure at depth follows DB-07/RC-01 eq 2 literally: the given 250 bar(g) at DB-01 and ``ρ g z``
+elsewhere, so a depth sweep sees a 2.6 bar step at 2500 m (``ρ g z`` = 252.6 bar there).
 """
 
 from __future__ import annotations
@@ -83,6 +87,7 @@ class SubsurfaceBasis(StrictModel):
     bubble_pressure_barg: float = Field(description="SUB-PBUB [A] (RC-01 item 9).")
     npsh_margin_m: float = Field(description="SUB-NPSH [A] (RC-01 item 8).")
     vapour_pressure_bound_bara: float = Field(description="SUB-NPSH [A].")
+    vapour_pressure_bound_valid_to_degc: float = Field(description="SUB-NPSH [A].")
     atmospheric_pressure_bara: float = Field(description="SUB-NPSH.")
     esp_stage_head_coeff: list[float] = Field(description="SUB-ESP (GEMINI ESP polynomial).")
     esp_stage_power_coeff: list[float] = Field(description="SUB-ESP (GEMINI ESP polynomial).")
@@ -184,6 +189,7 @@ def load_subsurface_basis(config_dir: Path | str | None = None) -> SubsurfaceBas
         bubble_pressure_barg=_number(register, ASSUMPTION_BUBBLE_PRESSURE),
         npsh_margin_m=float(npsh["npsh_margin_m"]),
         vapour_pressure_bound_bara=float(npsh["vapour_pressure_bound_bara"]),
+        vapour_pressure_bound_valid_to_degc=float(npsh["vapour_pressure_bound_valid_to_degc"]),
         atmospheric_pressure_bara=float(npsh["atmospheric_pressure_bara"]),
         esp_stage_head_coeff=[float(c) for c in esp["stage_head_coeff"]],
         esp_stage_power_coeff=[float(c) for c in esp["stage_power_coeff"]],
@@ -272,6 +278,12 @@ def reservoir_conditions(
     depth = request.depth_m if request.depth_m is not None else basis.design_depth_m
     data = reservoir_conditions_at(depth, basis)
     warnings: list[str] = []
+    if data.pressure_model == "hydrostatic":
+        warnings.append(
+            f"Pressure is hydrostatic ρgz (DB-07): at {basis.design_depth_m:.0f} m this gives "
+            f"{hydrostatic_pressure_barg(basis.design_depth_m, basis.density_kg_m3):.1f} bar(g), "
+            f"not the given {basis.design_pressure_barg:g} bar(g)."
+        )
     if data.heating_supply_gap_k > 0.0:
         warnings.append(
             f"Reservoir temperature is below the {basis.heating_supply_degc:.0f} °C heating "

@@ -285,7 +285,8 @@ assumptions:
       because the pump chamber is ≥ 13⅜-inch casing (RC-01 item 11). Wall roughness is that of steel pipe,
       0.0457 mm (RC-01 eq 5); it is always passed explicitly as roughness_m, never GEMINI's 0.01 m default
       (WP-01 follow-up). Wellbore heat loss uses GEMINI DPDT's hard-coded U = 10 W/(m² K) against the
-      undisturbed geothermal gradient (RC-01 eq 1 and envelope note).
+      undisturbed geothermal gradient (RC-01 eq 1 and envelope note); this steady value is
+      conservative (start-up) at part load, e.g. ≈ 10 K loss at 50 m³/h.
     source: RC-01 items 1, 5, 11; GEOAGENT_DESIGN_SPEC §2.4 DB-38
     sensitivity: >-
       A larger flow diameter (13⅜-inch casing above the pump) lowers friction; scaling or corrosion raises
@@ -331,6 +332,7 @@ assumptions:
     value:
       npsh_margin_m: 15.0
       vapour_pressure_bound_bara: 1.01325
+      vapour_pressure_bound_valid_to_degc: 100.0
       atmospheric_pressure_bara: 1.01325
     unit: null
     justification: >-

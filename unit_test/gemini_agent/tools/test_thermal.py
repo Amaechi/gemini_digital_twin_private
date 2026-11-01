@@ -74,7 +74,9 @@ def test_thermal_report_curve_and_horizon():
     temps = [p.production_temperature_degc for p in data.curve]
     assert temps == sorted(temps, reverse=True)
     assert temps[0] == pytest.approx(87.0)
-    assert data.injection_temperature_degc == pytest.approx(87.0 - 40.0)  # T_res − DB-12
+    assert 85.0 < data.wellhead_temperature_degc < 86.0  # TL-05 wellbore model at 300 m³/h
+    assert data.injection_temperature_degc == pytest.approx(data.wellhead_temperature_degc - 40.0)
+    assert data.brine_cooling_k == pytest.approx(40.0)  # DB-12
     assert not data.breakthrough_after_horizon
     assert data.decline_at_horizon_k > 0.0
     assert data.heterogeneity_band_k == 6.0
@@ -101,6 +103,28 @@ def test_thermal_rejects_warm_injection():
     """Injection hotter than the reservoir is not a cooling doublet."""
     with pytest.raises(ValueError):
         thermal_breakthrough(ThermalBreakthroughRequest(injection_temperature_degc=95.0))
+
+
+def test_thermal_enforces_hard_limits():
+    """DB-11: flow above 300 m³/h refused; DB-12: cooling above 40 K refused."""
+    with pytest.raises(ValueError, match="DB-11"):
+        thermal_breakthrough(ThermalBreakthroughRequest(flow_m3h=301.0))
+    with pytest.raises(ValueError, match="DB-12"):
+        thermal_breakthrough(ThermalBreakthroughRequest(injection_temperature_degc=5.0))
+    with pytest.raises(ValueError, match="DB-12"):
+        thermal_breakthrough(
+            ThermalBreakthroughRequest(
+                wellhead_temperature_degc=86.0, injection_temperature_degc=45.0
+            )
+        )
+
+
+def test_thermal_accepts_annual_average_flow():
+    """Flows below the DB-11 minimum are allowed (annual-average use); t_b grows as 1/Q."""
+    low = thermal_breakthrough(ThermalBreakthroughRequest(flow_m3h=30.0)).data
+    full = thermal_breakthrough().data
+    assert low.breakthrough_time_yr == pytest.approx(10.0 * full.breakthrough_time_yr)
+    assert low.wellhead_temperature_degc < full.wellhead_temperature_degc
 
 
 # --------------------------------------------------------------------------- TL-08
@@ -144,6 +168,12 @@ def test_three_doublets_need_more_separation():
     assert abs(middle[0].pressure_change_bar) > abs(outer[0].pressure_change_bar)
     alternating = pressure_interference(InterferenceRequest(doublets=3, layout="alternating"))
     assert alternating.data.wells[2].y_m == alternating.data.spacing_m  # flipped producer
+
+
+def test_interference_refuses_flow_above_limit():
+    """DB-11: 600 m³/h per doublet is refused, not reported as within the 1 bar limit."""
+    with pytest.raises(ValueError, match="DB-11"):
+        pressure_interference(InterferenceRequest(flow_m3h=600.0))
 
 
 def test_single_doublet_and_limits():

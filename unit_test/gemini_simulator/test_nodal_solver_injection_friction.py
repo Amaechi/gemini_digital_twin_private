@@ -107,6 +107,12 @@ def test_false_flag_equals_absent_key():
     assert explicit == solve_injector_wellhead_pressure_bar(_config(), FLOW_M3H, 20.0)
 
 
+def test_flag_must_be_boolean():
+    """A string such as 'false' is refused instead of being read as true."""
+    with pytest.raises(ValueError, match="true or false"):
+        solve_injector_wellhead_pressure_bar(_config(friction_opposes_flow="false"), FLOW_M3H, 20.0)
+
+
 def test_nodal_wellhead_pressure_solver_flag():
     """The Pa-level solver honours the flag (default unchanged)."""
     legacy = solve_injection_wellhead_pressure(_ipr(), _dpdt(), FLOW_M3H / 3600.0, 293.15)

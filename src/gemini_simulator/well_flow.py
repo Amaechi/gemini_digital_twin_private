@@ -434,6 +434,11 @@ def solve_injector_wellhead_pressure_bar(
             "injectivity_index": injector_well_config["productivity_index_m3h_per_bar"] / 3.6e8,
         }
     )
+    friction_opposes_flow = injector_well_config.get("friction_opposes_flow", False)
+    if not isinstance(friction_opposes_flow, bool):
+        raise ValueError(
+            f"friction_opposes_flow must be true or false, got {friction_opposes_flow!r}"
+        )
     dpdt = _build_dpdt(
         _resolve_trajectory_segments(injector_well_config),
         roughness=injector_well_config.get("roughness_m", 0.01),
@@ -447,6 +452,6 @@ def solve_injector_wellhead_pressure_bar(
         flow_rate=flow_m3h / 3600.0,
         wellhead_temperature=wellhead_temperature_c + CELSIUS_TO_KELVIN,
         pressure_bracket=pressure_bracket_pa,
-        friction_opposes_flow=bool(injector_well_config.get("friction_opposes_flow", False)),
+        friction_opposes_flow=friction_opposes_flow,
     )
     return wellhead_pressure_pa / 1e5

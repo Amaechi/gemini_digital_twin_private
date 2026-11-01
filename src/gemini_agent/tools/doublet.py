@@ -19,11 +19,19 @@ Injection equals production (DB-14). The ESP is sized once per design at the max
 
 Every [A] value comes from ``config/assumptions.yaml`` through
 :func:`gemini_agent.tools.resource.load_subsurface_basis`.
+
+Limitations (stated in PROGRESS.md): GEMINI's steady U = 10 W/(m² K) against the undisturbed
+gradient overstates the wellbore heat loss at part load (conservative T_wh); the brine PVT has
+constant properties (the colder injected brine is not denser or more viscous); the heat the ESP
+adds to the brine is neglected; GEMINI's ESP has no flow affinity, so its curve power is only a
+comparison. Card status: RC-01 marks the DiPippo equations ``VERIFY``.
 """
 
 from __future__ import annotations
 
+import functools
 import hashlib
+import importlib
 import itertools
 import json
 import math
@@ -57,7 +65,7 @@ from gemini_simulator.well_components import InjectorWell, ProducerWell
 
 # The same DPDT/ESP builders ProducerWell uses, so the inverse solve and the GEMINI check run on
 # identical well and pump objects (brine PVT, explicit roughness, specific-gravity-scaled ESP).
-from gemini_simulator.well_flow import _build_dpdt, _build_esp
+from gemini_simulator.well_flow import CELSIUS_TO_KELVIN, _build_dpdt, _build_esp
 
 TOOL_ID_OPERATING_POINT = "TL-05"
 TOOL_ID_MAP = "TL-06"
@@ -70,15 +78,47 @@ RUNOUT_SEARCH_MAX_M3H = 2000.0
 """Numerical: upper end of the scan for the ESP curve's zero-head (run-out) flow."""
 INJECTION_PRESSURE_BRACKET_BAR = (0.001, 500.0)
 """GEMINI ``InjectorWell`` default bracket; the floor means 'no pump needed'."""
+LINESHAFT_ECONOMICAL_MAX_M = 730.0
+"""RC-01 item 11: lineshaft pumps are economical for setting depths below ≈ 730–800 m [L]."""
 MAP_STEP_M3H = 10.0
 """TL-06 default flow step."""
-MAP_CACHE_VERSION = "wp05-1"
+MAP_CACHE_VERSION = "wp05-2"
 """Bump when the operating-point algorithm changes: it is part of the cache key."""
 DEFAULT_CACHE_DIR = REPO_ROOT / "runs" / "cache" / "doublet_maps"
 """Performance maps are cached here (``runs/`` is git-ignored)."""
 _FLOW_EPS_M3H = 1e-9
 _DRY_INTAKE_BARG = 1e-6
 """GEMINI DPDT clamps pressures at 0.001 Pa: an intake at or below this is a dry pump."""
+_POWER_FIELDS = frozenset(
+    {
+        "esp_hydraulic_power_w",
+        "esp_shaft_power_w",
+        "esp_electric_power_w",
+        "esp_curve_shaft_power_w",
+        "esp_curve_efficiency_frac",
+        "injection_pump_hydraulic_power_w",
+        "injection_pump_shaft_power_w",
+        "injection_pump_electric_power_w",
+        "total_pump_electric_power_w",
+    }
+)
+"""Withheld on infeasible points, so no infeasible power can be dispatched by mistake."""
+_CODE_FINGERPRINT_MODULES = (
+    "gemini_agent.tools.doublet",
+    "gemini_agent.tools.resource",
+    "gemini_agent.tools.design_basis",
+    "gemini_simulator.well_flow",
+    "gemini_simulator.well_components",
+    "gemini_simulator.nodal_solver",
+    "gemini_model.well.pressure_drop",
+    "gemini_model.well.correlation.darcyweisbach",
+    "gemini_model.well.correlation.temperaturedrop",
+    "gemini_model.pump.esp",
+    "gemini_model.reservoir.inflow_performance",
+    "gemini_model.fluid.pvt_config",
+    "gemini_model.fluid.pvt_water_stp",
+)
+"""Source files whose bytes are part of the TL-06 cache key (stale maps are never reused)."""
 
 
 # --------------------------------------------------------------------------- models
@@ -146,6 +186,7 @@ class ResolvedDoublet(StrictModel):
     bubble_pressure_barg: float
     npsh_margin_m: float
     vapour_pressure_bound_bara: float
+    vapour_pressure_bound_valid_to_degc: float
     atmospheric_pressure_bara: float
     surface_temperature_degc: float
     gradient_k_per_km: float
@@ -176,7 +217,11 @@ class ResolvedDoublet(StrictModel):
 
 
 class OperatingPoint(StrictModel):
-    """TL-05 result at one flow; ``feasible=False`` lists the reasons, numbers may be missing."""
+    """TL-05 result at one flow.
+
+    ``feasible=False`` lists the reasons; pressures and Δp are kept for diagnosis but every power
+    field is ``None`` (gate dispatch on ``feasible``).
+    """
 
     flow_m3h: float
     feasible: bool
@@ -203,7 +248,12 @@ class OperatingPoint(StrictModel):
     esp_shaft_power_w: float | None = Field(default=None, description="Q Δp / 0.70 (DB-13).")
     esp_electric_power_w: float | None = Field(default=None, description="Shaft / (0.93·0.97).")
     esp_curve_shaft_power_w: float | None = Field(default=None, description="GEMINI ESP curve.")
-    esp_curve_efficiency_frac: float | None = Field(default=None, description="Q Δp / curve.")
+    esp_curve_efficiency_frac: float | None = Field(
+        default=None, description="Q Δp / GEMINI curve power (GEMINI form: ∝ 60/f at fixed Q)."
+    )
+    esp_flow_to_bep_ratio: float | None = Field(
+        default=None, description="Q / (Q_BEP · f/60): flow vs the affinity-scaled BEP."
+    )
     intake_margin_bar: float | None = Field(default=None, description="P_intake − P_bubble.")
     npsh_available_m: float | None = None
     gas_release_depth_m: float | None = Field(
@@ -263,15 +313,27 @@ class DoubletPerformanceMap(StrictModel):
     from_cache: bool = Field(default=False, description="Set on load; not stored in the file.")
 
     def interpolate(self, field: str, flow_m3h: float) -> float:
-        """Linear interpolation of a numeric point field over the feasible points."""
-        points = [p for p in self.points if p.feasible]
-        flows = [p.flow_m3h for p in points]
-        if not points or not flows[0] - _FLOW_EPS_M3H <= flow_m3h <= flows[-1] + _FLOW_EPS_M3H:
-            raise ValueError(f"flow {flow_m3h} m³/h outside the feasible map range")
-        values = [getattr(p, field) for p in points]
+        """Interpolate a numeric point field linearly between the two bracketing grid points.
+
+        Raises ``ValueError`` outside the grid or when a bracketing point is infeasible, so an
+        infeasible gap in the map is never bridged.
+        """
+        flows = [p.flow_m3h for p in self.points]
+        if not flows[0] - _FLOW_EPS_M3H <= flow_m3h <= flows[-1] + _FLOW_EPS_M3H:
+            raise ValueError(f"flow {flow_m3h} m³/h outside the map range")
+        index = int(np.searchsorted(flows, flow_m3h - _FLOW_EPS_M3H))
+        if abs(flows[index] - flow_m3h) <= _FLOW_EPS_M3H:
+            bracket = [self.points[index]]
+        else:
+            bracket = [self.points[index - 1], self.points[index]]
+        if not all(p.feasible for p in bracket):
+            raise ValueError(f"flow {flow_m3h} m³/h is next to an infeasible map point")
+        values = [getattr(p, field) for p in bracket]
         if any(not isinstance(v, int | float) or isinstance(v, bool) for v in values):
-            raise ValueError(f"field {field!r} is not numeric on every feasible point")
-        return float(np.interp(flow_m3h, flows, values))
+            raise ValueError(f"field {field!r} is not numeric at {flow_m3h} m³/h")
+        if len(bracket) == 1:
+            return float(values[0])
+        return float(np.interp(flow_m3h, [p.flow_m3h for p in bracket], values))
 
 
 # --------------------------------------------------------------------------- ESP curve helpers
@@ -364,8 +426,8 @@ def _walk(
         roughness=doublet.well_roughness_m,
         pvt=doublet.pvt,
     )
-    temperature_k = temperature_degc + 273.15
-    ambient_k = temperature_k if ambient_degc is None else ambient_degc + 273.15
+    temperature_k = temperature_degc + CELSIUS_TO_KELVIN
+    ambient_k = temperature_k if ambient_degc is None else ambient_degc + CELSIUS_TO_KELVIN
     dpdt.calculate_output(
         {
             "pressure": pressure_barg * PA_PER_BAR,
@@ -453,7 +515,7 @@ def _producer_hydraulics(
     }
 
 
-def _wellhead_temperature_degc(doublet: ResolvedDoublet, flow_m3h: float) -> float:
+def wellhead_temperature_degc(doublet: ResolvedDoublet, flow_m3h: float) -> float:
     """Walk GEMINI DPDT *up* from T_res, one cell per ≤ 100 m, ambient = formation T (RC-01)."""
     n_cells = max(1, math.ceil(doublet.depth_m / WELLBORE_CELL_M))
     edges = np.linspace(doublet.depth_m, 0.0, n_cells + 1)
@@ -462,7 +524,7 @@ def _wellhead_temperature_degc(doublet: ResolvedDoublet, flow_m3h: float) -> flo
     for bottom, top in itertools.pairwise(edges):
         ambient = _formation_temperature_degc(doublet, 0.5 * float(bottom + top))
         output = _walk(doublet, float(bottom - top), pressure, temperature, flow_m3h, "up", ambient)
-        temperature = output["temperature_output"] - 273.15
+        temperature = output["temperature_output"] - CELSIUS_TO_KELVIN
         pressure = output["pressure_output"] / PA_PER_BAR
     return float(temperature)
 
@@ -567,6 +629,7 @@ def resolve_doublet(design: DoubletDesign, basis: SubsurfaceBasis) -> ResolvedDo
             bubble_pressure_barg=basis.bubble_pressure_barg,
             npsh_margin_m=basis.npsh_margin_m,
             vapour_pressure_bound_bara=basis.vapour_pressure_bound_bara,
+            vapour_pressure_bound_valid_to_degc=basis.vapour_pressure_bound_valid_to_degc,
             atmospheric_pressure_bara=basis.atmospheric_pressure_bara,
             surface_temperature_degc=basis.surface_temperature_degc,
             gradient_k_per_km=basis.gradient_k_per_km,
@@ -630,12 +693,19 @@ def resolve_doublet(design: DoubletDesign, basis: SubsurfaceBasis) -> ResolvedDo
             z_release = _root_depth(margin, 0.0, depth)
             step = basis.esp_setting_depth_step_m
             setting_depth = min(math.ceil(z_release / step - 1e-9) * step, reservoir_top)
+    if setting_depth < LINESHAFT_ECONOMICAL_MAX_M:
+        notes.append(
+            f"ESP setting depth {setting_depth:.0f} m is in the lineshaft-economical range "
+            f"(< ≈{LINESHAFT_ECONOMICAL_MAX_M:.0f} m, RC-01 item 11); the GEMINI ESP is kept."
+        )
     return build(stages, float(setting_depth))
 
 
 # --------------------------------------------------------------------------- TL-05 core
 def _infeasible(base: dict, reasons: list[str], notes: list[str]) -> OperatingPoint:
-    return OperatingPoint(**base, feasible=False, reasons=reasons, notes=notes)
+    """Return an infeasible point: pressures and Δp kept for diagnosis, no power numbers."""
+    kept = {key: value for key, value in base.items() if key not in _POWER_FIELDS}
+    return OperatingPoint(**kept, feasible=False, reasons=reasons, notes=notes)
 
 
 def operating_point(doublet: ResolvedDoublet, flow_m3h: float) -> OperatingPoint:
@@ -716,6 +786,8 @@ def operating_point(doublet: ResolvedDoublet, flow_m3h: float) -> OperatingPoint
         esp_electric_power_w=shaft / (doublet.motor_efficiency_frac * doublet.vfd_efficiency_frac),
         esp_curve_shaft_power_w=curve_power,
         esp_curve_efficiency_frac=hydraulic / curve_power if curve_power > 0 else None,
+        esp_flow_to_bep_ratio=flow_m3h
+        / (esp.best_efficiency_flow_m3h * frequency / esp.frequency_nominal_hz),
     )
     if curve_power > 0 and hydraulic / curve_power > 1.0:
         notes.append(
@@ -724,11 +796,17 @@ def operating_point(doublet: ResolvedDoublet, flow_m3h: float) -> OperatingPoint
         )
 
     # Wellhead temperature (DPDT up from T_res) and the GEMINI ProducerWell check.
-    t_wellhead = _wellhead_temperature_degc(doublet, flow_m3h)
+    t_wellhead = wellhead_temperature_degc(doublet, flow_m3h)
     base.update(
         wellhead_temperature_degc=t_wellhead,
         wellbore_cooling_k=doublet.reservoir_temperature_degc - t_wellhead,
     )
+    if t_wellhead > doublet.vapour_pressure_bound_valid_to_degc:
+        # Below this temperature any WHP ≥ 0 bar(g) is above saturation (bound = 1 atm at 100 °C).
+        notes.append(
+            f"Wellhead {t_wellhead:.1f} °C > {doublet.vapour_pressure_bound_valid_to_degc:g} °C: "
+            "flashing not checked (no saturation-pressure data); hold the WHP above saturation."
+        )
     reasons: list[str] = []
 
     # ESP setting checks: intake vs bubble point, NPSH, gas-release depths (RC-01 items 8–9).
@@ -744,7 +822,7 @@ def operating_point(doublet: ResolvedDoublet, flow_m3h: float) -> OperatingPoint
             f"ESP intake {hyd['p_intake']:.1f} bar(g) is below the bubble/CO₂-release pressure "
             f"{p_bubble:g} bar(g) (SUB-PBUB): set the pump deeper"
         )
-    if doublet.reservoir_temperature_degc <= 100.0:
+    if doublet.reservoir_temperature_degc <= doublet.vapour_pressure_bound_valid_to_degc:
         npsh = (
             (
                 hyd["p_intake"]
@@ -758,7 +836,10 @@ def operating_point(doublet: ResolvedDoublet, flow_m3h: float) -> OperatingPoint
         if npsh < doublet.npsh_margin_m:
             reasons.append(f"NPSH available {npsh:.1f} m < {doublet.npsh_margin_m:g} m (SUB-NPSH)")
     else:
-        notes.append("Brine above 100 °C: vapour-pressure bound not valid, NPSH not evaluated.")
+        notes.append(
+            f"Brine above {doublet.vapour_pressure_bound_valid_to_degc:g} °C: vapour-pressure "
+            "bound not valid (SUB-NPSH), NPSH not evaluated."
+        )
     p_wf = hyd["p_wf"]
 
     def unboosted_margin(z: float) -> float:
@@ -805,6 +886,11 @@ def operating_point(doublet: ResolvedDoublet, flow_m3h: float) -> OperatingPoint
     # Injector: GEMINI InjectorWell with brine PVT and friction as a loss (RC-01 eq 12).
     t_injection = t_wellhead - doublet.brine_cooling_k
     base["injection_temperature_degc"] = t_injection
+    if t_injection < doublet.surface_temperature_degc:
+        notes.append(
+            f"Injection at {t_injection:.1f} °C is below the {doublet.surface_temperature_degc:g} "
+            "°C surface temperature (DB-04): pass a smaller brine_cooling_k for this design."
+        )
     base["brine_heat_mw"] = brine_heat_mw(
         flow_m3h, doublet.density_kg_m3, doublet.cp_j_per_kg_k, doublet.brine_cooling_k
     )
@@ -814,9 +900,17 @@ def operating_point(doublet: ResolvedDoublet, flow_m3h: float) -> OperatingPoint
         reasons.append(f"GEMINI InjectorWell did not converge: {exc}")
     else:
         base.update(injector)
-        if not injector["injection_pump_required"]:
+        injector_whp = injector["injector_wellhead_pressure_barg"]
+        if injector_whp <= 0.0:
             notes.append(
-                "Injector takes the flow under gravity (required WHP ≤ 0): choke the injection."
+                f"Injector takes the flow under gravity (required WHP {injector_whp:.2f} bar(g)): "
+                "choke the injection."
+            )
+        if injector_whp < p_bubble:
+            notes.append(
+                f"Injector wellhead {injector_whp:.1f} < {p_bubble:g} bar(g): dissolved gas can "
+                "leave solution at the injector top unless the loop is degassed or held above "
+                "SUB-PBUB (C7)."
             )
         if not reasons:
             base["total_pump_electric_power_w"] = (
@@ -877,10 +971,8 @@ def _injector(doublet: ResolvedDoublet, flow_m3h: float, injection_temperature_d
             "pvt": doublet.pvt,
             "friction_opposes_flow": True,
             "pressure_bracket_bar": INJECTION_PRESSURE_BRACKET_BAR,
-            "injector_pump": {
-                "efficiency_factor": doublet.wire_to_water_efficiency_frac,
-                "electricity_emission_factor": 0.0,
-            },
+            # Power only; CO₂ of the electricity is WP-08's (GEMINI's emission factor default 0).
+            "injector_pump": {"efficiency_factor": doublet.wire_to_water_efficiency_frac},
         }
     )
     suction = doublet.injection_pump_suction_barg
@@ -893,14 +985,18 @@ def _injector(doublet: ResolvedDoublet, flow_m3h: float, injection_temperature_d
     )
     output = well.get_output()
     whp = float(output["wellhead_pressure"])
-    pump_required = whp > INJECTION_PRESSURE_BRACKET_BAR[0]
-    dp = max(0.0, whp - suction) if pump_required else 0.0
+    bottomhole = _bottomhole_pressure_barg(doublet, flow_m3h, "injection_reservoir")
+    if whp <= INJECTION_PRESSURE_BRACKET_BAR[0]:
+        # GEMINI returns its bracket floor when the column alone over-delivers; report the signed
+        # requirement instead (≤ 0: the column free-falls, a choke or flow control is needed).
+        column = _walk(doublet, doublet.depth_m, 0.0, injection_temperature_degc, -flow_m3h, "down")
+        whp = float(bottomhole - column["pressure_output"] / PA_PER_BAR)
+    pump_required = bool(whp > suction)
+    dp = whp - suction if pump_required else 0.0
     hydraulic = flow_m3h / SECONDS_PER_HOUR * dp * PA_PER_BAR
     friction = _walk(doublet, doublet.depth_m, whp, injection_temperature_degc, -flow_m3h, "down")
     return {
-        "injector_bottomhole_pressure_barg": _bottomhole_pressure_barg(
-            doublet, flow_m3h, "injection_reservoir"
-        ),
+        "injector_bottomhole_pressure_barg": bottomhole,
         "injector_friction_bar": abs(friction["pressuredrop_fric_output"]) / PA_PER_BAR,
         "injector_wellhead_pressure_barg": whp,
         "injection_pump_required": pump_required,
@@ -961,10 +1057,21 @@ def map_flows(basis_min: float, basis_max: float, step: float) -> list[float]:
     return [round(q, 9) for q in flows]
 
 
+@functools.cache
+def code_fingerprint() -> str:
+    """SHA-256 of the source of every module the map depends on (WP-05 tools and GEMINI)."""
+    digest = hashlib.sha256()
+    for name in _CODE_FINGERPRINT_MODULES:
+        digest.update(name.encode("utf-8"))
+        digest.update(Path(importlib.import_module(name).__file__).read_bytes())
+    return digest.hexdigest()
+
+
 def map_cache_key(doublet: ResolvedDoublet, flows: list[float]) -> str:
-    """Hash of everything the map depends on (inputs, sizing, grid, algorithm version)."""
+    """Hash of everything the map depends on (inputs, sizing, grid, version, source code)."""
     payload = {
         "version": MAP_CACHE_VERSION,
+        "code": code_fingerprint(),
         "doublet": doublet.model_dump(mode="json"),
         "flows_m3h": flows,
     }
@@ -1078,6 +1185,7 @@ __all__ = [
     "PerformanceMapRequest",
     "ResolvedDoublet",
     "build_performance_map",
+    "code_fingerprint",
     "curve_runout_and_bep",
     "doublet_operating_point",
     "doublet_performance_map",
@@ -1085,4 +1193,5 @@ __all__ = [
     "map_flows",
     "operating_point",
     "resolve_doublet",
+    "wellhead_temperature_degc",
 ]

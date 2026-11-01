@@ -15,6 +15,7 @@ from pydantic import ValidationError
 from gemini_agent.runner.toolbox import FlowArgs
 from gemini_agent.schemas.common import SUMMARY_MAX_CHARS
 from gemini_agent.schemas.config import REPO_ROOT, load_config
+from gemini_agent.tools import doublet as doublet_module
 from gemini_agent.tools.design_basis import productivity_index_m3h_per_bar
 from gemini_agent.tools.doublet import (
     DEFAULT_CACHE_DIR,
@@ -31,6 +32,7 @@ from gemini_agent.tools.doublet import (
     resolve_doublet,
 )
 from gemini_agent.tools.resource import load_subsurface_basis
+from gemini_model.well.correlation.darcyweisbach import DarcyWeisbach
 from gemini_simulator.well_flow import solve_injector_wellhead_pressure_bar
 
 G = 9.81
@@ -80,6 +82,18 @@ def _pi(basis):
         basis.wellbore_radius_m,
         basis.skin,
     )
+
+
+# --------------------------------------------------------------------------- RC-01 card checks
+def test_swamee_jain_card_validation():
+    """RC-01 validation: Swamee–Jain at Re = 1e6, ε/D = 0.0003 gives f = 0.0158 (±1 %)."""
+    rho, mu, diameter, length = 1000.0, 1.0e-3, 0.1, 1.0
+    velocity = 1.0e6 * mu / (rho * diameter)
+    dp_fric, _ = DarcyWeisbach.calculate_dp(
+        velocity, rho, math.pi / 2, mu, diameter, 0.0003 * diameter, length
+    )
+    friction_factor = dp_fric * diameter / (length * rho * velocity**2 / 2.0)
+    assert friction_factor == pytest.approx(0.0158, rel=0.01)
 
 
 # --------------------------------------------------------------------------- ESP sizing
@@ -296,16 +310,71 @@ def test_infeasible_points_are_flagged(basis, design, flow, reason):
     point = operating_point(resolve_doublet(design, basis), flow)
     assert not point.feasible
     assert any(reason in text for text in point.reasons)
-    assert point.total_pump_electric_power_w is None
+    for field in (
+        "esp_shaft_power_w",
+        "esp_electric_power_w",
+        "esp_curve_shaft_power_w",
+        "injection_pump_shaft_power_w",
+        "injection_pump_electric_power_w",
+        "total_pump_electric_power_w",
+    ):
+        assert getattr(point, field) is None, field
 
 
 def test_shallow_design_sets_pump_at_reservoir_top(basis):
     """If no depth keeps the intake ≥ P_bubble at Q_max the pump sits at the reservoir top."""
     doublet = resolve_doublet(DoubletDesign(depth_m=400.0), basis)
     assert doublet.esp.setting_depth_m == pytest.approx(400.0 - 0.5 * basis.thickness_m)
-    assert doublet.esp.notes
+    assert any("reservoir top" in note for note in doublet.esp.notes)
     perf = build_performance_map(doublet, map_flows(50.0, 300.0, 50.0))
     assert perf.points[0].feasible and not perf.points[-1].feasible
+    assert any("DB-04" in note for note in perf.points[0].notes)  # T_inj below 12 °C
+
+
+def test_lineshaft_range_is_noted(doublet):
+    """RC-01 item 11: a 510 m setting is in the lineshaft-economical range (informational)."""
+    assert any("lineshaft" in note for note in doublet.esp.notes)
+
+
+def test_esp_flow_to_affinity_bep_ratio(full_flow, doublet):
+    """Q / (Q_BEP · f/60) is reported; ≈ 1 at full flow (BEP placed at Q_max)."""
+    expected = 300.0 / (doublet.esp.best_efficiency_flow_m3h * full_flow.esp_frequency_hz / 60.0)
+    assert full_flow.esp_flow_to_bep_ratio == pytest.approx(expected)
+    assert 1.0 < full_flow.esp_flow_to_bep_ratio < 1.05
+
+
+def test_injector_on_gravity_reports_signed_whp(basis):
+    """Skin −5 at 50 m³/h: required WHP = P_res + Q/II − ρgH + ΔP_fric < 0 ⇒ no pump, choke."""
+    doublet = resolve_doublet(DoubletDesign(skin=-5.0), basis)
+    point = operating_point(doublet, 50.0)
+    hydrostatic = basis.density_kg_m3 * G * basis.design_depth_m / 1e5
+    expected = (
+        basis.design_pressure_barg
+        + 50.0 / doublet.injectivity_index_m3h_per_bar
+        - hydrostatic
+        + _friction_bar(basis, 50.0)
+    )
+    assert expected < 0.0
+    assert point.injector_wellhead_pressure_barg == pytest.approx(expected, abs=1e-6)
+    assert not point.injection_pump_required
+    assert point.injection_pump_electric_power_w == 0.0
+    assert any("gravity" in note for note in point.notes)
+
+
+def test_suction_above_whp_needs_no_pump(basis):
+    """Pump required only when the injector WHP exceeds the suction pressure."""
+    doublet = resolve_doublet(DoubletDesign(injection_pump_suction_barg=30.0), basis)
+    point = operating_point(doublet, 300.0)
+    assert point.injector_wellhead_pressure_barg < 30.0
+    assert not point.injection_pump_required
+    assert point.injection_pump_dp_bar == 0.0 and point.injection_pump_electric_power_w == 0.0
+
+
+def test_hot_wellhead_flags_flashing_not_checked(basis):
+    """Above 100 °C at the wellhead the saturation check cannot be done: noted, not hidden."""
+    point = operating_point(resolve_doublet(DoubletDesign(depth_m=5000.0), basis), 300.0)
+    assert point.wellhead_temperature_degc > 100.0
+    assert any("flashing" in note for note in point.notes)
 
 
 def test_deep_design_skips_npsh_above_100c(basis):
@@ -426,3 +495,28 @@ def test_map_interpolation(perf_map):
         perf_map.interpolate("esp_dp_bar", 310.0)
     with pytest.raises(ValueError, match="numeric"):
         perf_map.interpolate("esp_mode", 150.0)
+
+
+def test_interpolation_never_bridges_infeasible_points(basis):
+    """A flow next to an infeasible grid point raises instead of bridging the gap."""
+    perf = build_performance_map(
+        resolve_doublet(DoubletDesign(depth_m=400.0), basis), map_flows(50.0, 300.0, 50.0)
+    )
+    first_bad = next(i for i, p in enumerate(perf.points) if not p.feasible)
+    assert first_bad > 0 and perf.points[first_bad - 1].feasible
+    low, high = perf.points[first_bad - 1].flow_m3h, perf.points[first_bad].flow_m3h
+    assert perf.interpolate("esp_dp_bar", low) == perf.points[first_bad - 1].esp_dp_bar
+    with pytest.raises(ValueError, match="infeasible"):
+        perf.interpolate("esp_dp_bar", 0.5 * (low + high))
+    with pytest.raises(ValueError, match="infeasible"):
+        perf.interpolate("esp_dp_bar", high)
+
+
+def test_cache_key_covers_source_code(monkeypatch, basis, doublet):
+    """A change in the GEMINI/WP-05 source changes the key, so stale maps are not reused."""
+    flows = map_flows(basis.flow_min_m3h, basis.flow_max_m3h, 10.0)
+    fingerprint = doublet_module.code_fingerprint()
+    assert len(fingerprint) == 64
+    key = doublet_module.map_cache_key(doublet, flows)
+    monkeypatch.setattr(doublet_module, "code_fingerprint", lambda: "edited source")
+    assert doublet_module.map_cache_key(doublet, flows) != key
