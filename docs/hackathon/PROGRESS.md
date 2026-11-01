@@ -11,11 +11,11 @@ Keep it ≤ 20 KB; it is the hand-off between sessions. Old detail: merged PRs a
 | WP-03 | Heat pump, e-boiler, storage | merged (6fa9667) | [#11](https://github.com/Amaechi/gemini_digital_twin_private/pull/11) | closed-form HP (capped 3.71 @ design); e-boiler; storage |
 | WP-04 | Design basis, demand, climate | merged (f7acb2a) | [#2](https://github.com/Amaechi/gemini_digital_twin_private/pull/2) | TL-01/02/02b |
 | WP-05 | Subsurface & doublet tools | merged (bc8baab) | [#8](https://github.com/Amaechi/gemini_digital_twin_private/pull/8) | TL-03…08; 7 SUB-* |
-| WP-06 | Config generator, guard, day sim | in review | [#13](https://github.com/Amaechi/gemini_digital_twin_private/pull/13) | TL-09/10/11; 993 passed after merging main (WP-03, WP-08) |
+| WP-06 | Config generator, guard, day sim | merged (9eb7beb) | [#13](https://github.com/Amaechi/gemini_digital_twin_private/pull/13) | TL-09/10/11; 9 CFG-*; `DayResult.flags` |
 | WP-07 | Annual simulation & dispatch | todo | | Batch 5 |
-| WP-08 | Economics, CO₂, exergy, scaling | in review | [#12](https://github.com/Amaechi/gemini_digital_twin_private/pull/12) | TL-14/22/23; C0 LCOH 137 $/MWh ≈ ACM cap |
+| WP-08 | Economics, CO₂, exergy, scaling | merged (66acde7) | [#12](https://github.com/Amaechi/gemini_digital_twin_private/pull/12) | TL-14/22/23; C0 LCOH 137 $/MWh ≈ ACM cap |
 | WP-09 | Verifier, memory, logging | merged (901e110) | [#9](https://github.com/Amaechi/gemini_digital_twin_private/pull/9) | 41-check DesignVerifier |
-| WP-10 | Agents, runner, CLI | merged (2285460; review a9083b7) | [#4](https://github.com/Amaechi/gemini_digital_twin_private/pull/4), [#6](https://github.com/Amaechi/gemini_digital_twin_private/pull/6) | policy run completes P0–P10 on stubs (UNVERIFIED) |
+| WP-10 | Agents, runner, CLI | merged (2285460; review a9083b7) | [#4](https://github.com/Amaechi/gemini_digital_twin_private/pull/4), [#6](https://github.com/Amaechi/gemini_digital_twin_private/pull/6) | policy run P0–P10 on stubs (UNVERIFIED) |
 | WP-11 | Optimisation & uncertainty | todo | | Batch 6 |
 | WP-12 | Model gap & Model Builder | todo | | Batch 5 |
 | WP-13 | Eval suite & submission checks | todo | | Batch 5 |
@@ -25,62 +25,109 @@ Keep it ≤ 20 KB; it is the hand-off between sessions. Old detail: merged PRs a
 | WP-15 | Final review & packaging | todo | | |
 
 Status values: todo · in progress · in review · merged · blocked (say why).
-Latest full suite (`main` @ bc8baab, 2026-11-01): `PYTHONPATH=src python -m pytest -q unit_test/gemini_model unit_test/gemini_simulator unit_test/gemini_agent -x` → **772 passed**.
-Next: Batch 4 (WP-03, WP-06, WP-08).
+Latest full suite (`main` @ 9eb7beb, 2026-11-01): `PYTHONPATH=src python -m pytest -q unit_test/gemini_model unit_test/gemini_simulator unit_test/gemini_agent -x` → **993 passed**.
+Next: Batch 5 (WP-07, WP-12, WP-13).
 
 ## Decisions log (newest first)
-- 11-01 WP-06: heat pumps = WP-03 closed form (Lorenz, HP-ETA-L; GEMINI default NM untouched); the validity bypass and "HPs off" rebuild are gone (source-limited → floor, else idle). The VER-HP-ETA cap binds everywhere (C2 design COP 3.86, physics-checked), so η_L is inert above ≈ 0.41. Never hidden: `within_limits` False or MISSING datasheet → `DayResult.flags` (new optional field) + `heat_pump_flags`; margins `hthp_i_rc04_limits_margin_count`, lift, datasheet sink T; `heat_pump_point` → PH-13/14. CHP share = CHP-EL-FRAC, grid-gas CO₂ = ECO-CO2-GAS (one owner each).
-- 11-01 WP-06: TL-09 `PlantSpec` → `build_plant_project` (unique names, Kahn order); `generate_plant(candidate, loads, PlantDispatch)`; GEMINI example rebuilt within 1 %. Wells via now-public `doublet.producer_well_parameters`/`injector_well_parameters` (WP-05 file, unchanged behaviour). Return temperatures = candidate's; degassing = `gas_handling`.
-- 11-01 WP-06: layout (CFG-LAYOUT): degasser → filter → [absorption drive, Ti tubes] → HEX-1 → [HP evaporator] → injector; district return → [bypass] HEX-1s → CHP (all associated gas) → [bypass] HPs (100 °C) → peak boiler (grid gas, fired by simulate_day). C6 = parent plant (no storage model); C7 WHP 54.25 bar(g), flagged (> plate-HEX rating; PH-09 fails, PD-10 zero margin).
-- 11-01 WP-06: CFG-SURFACE letdown WHP → SUB-PSUC in the degasser, surface adiabatic; brine > 100 °C flagged (flashing). CFG-HEX UA from RC-03 eq 1 inverted (GEMINI bisection 4.7 % high at C_r = 1); 85 °C brine: 82.2/58 °C, UA 3.19 MW/K. CFG-HP: WP-03 closed form, Lorenz, η_L = HP-ETA-L, approaches HP-APPROACH; floor max(T_wh − 40, 100 − VER-HP-LIFT). CFG-CHP = DEA total 0.96 only; electrical share read from WP-03's CHP-EL-FRAC and checked = chp.py 1/3. Gas 29.67 MJ/kg & 68.56 kg/GJ; grid 50.03 MJ/kg & ECO-CO2-GAS (WP-08).
-- 11-01 WP-06: TL-11 controls: HEX share bisected for DB-12 and ≤ 100 °C before HPs; HP share cut only to an `hthp_heating_mw` nameplate (capacity control, reason in `controls`); DB-12 breach = invalid day. ESP electricity by rule on GEMINI pressures; burner CO₂ only. `verification_evidence()` uses HEX design points (RC-03 sizing checks). TL-10: limits.yaml + DB-40, Q_inj trace, venting trace, duplicates = hash of {project, design}; ratings are warnings.
-- 11-01 WP-08: cost values only via `CostBook.usd(name)`/`usd_value` (economics.py): EUR × 1.13 (DEA EUR2020 × 1.168 first), AUD × 0.63, `escalation_index: cepci` × CEPCI 2023/year; unit from the name (M EUR/MW → USD/kW; EUR/GJ_GCV → USD/MWh_LHV × 3.6 × 1.111); `usd_range` as is; bounds max(±30 %, range), `*_multiplier` on the premium (ECO-SENS-MULT). Call `economics`/`cost_sensitivity` with any book: each takes `book.fresh()`.
-- 11-01 WP-08: LCOH/LCOC = Gippsland Eq. 1, r 8 % real, 30 yr + 20 yr (`KPISet.lcoh_20yr_per_mwh`), FCR form and allocation-free combined cost reported; energy and CO₂ prices escalate 2.44 %/yr real = 1.05/1.025 − 1 (ECO-REAL; request 0 for constant prices); O&M 1.5 % of capex; HTHP replaced at 15 yr; pumps at 7 yr only with a caller pump capex (ECO-PUMP-CAPEX: not on RC-10 ⇒ MISSING INPUT); no salvage. Shared costs (wells, pumps, flaring) by `brine_heat_drawn_mw` per service (absorption drive = cool, rest heat), else by delivered energy (ECO-ALLOC).
-- 11-01 WP-08: carriers: purchased power = daily max(0, consumed − generated), surplus not credited (ECO-ELEC-NET); degas_use ⇒ burners take associated gas first, rest grid gas, surplus flared; `gas_handling` unset with associated gas raises. CO₂: grid gas 56.6 kg/GJ (ECO-CO2-GAS; 51.53 sensitivity, its HHV/LHV basis VERIFY), associated 68.56 kg/GJ from DB-09 (DB-28), 0.3 kg/kWh on purchased power (DB-37); CO₂ price on direct emissions only (ECO-CO2-SCOPE).
-- 11-01 WP-08: capex: 2 large-diameter wells/doublet (NREL table, no extrapolation, step flagged); RC-05 chiller plant functions × CEPCI 2.51 (VERIFY; include heat rejection; units ≤ 1000 nominal ton, absorption nominal = duty/F; ECO-CHILLER); gas boiler 270 $/kW 2014 × CEPCI = 374; e-boiler small ≤ 10 MW 175 $/kW, large 79; dry cooler 3× tower; Ti tubes 1.125; CHP needs `chp_electric_mw` or `chp_thermal_mw` + CHP-EL-FRAC (register wins, else parameter). Benchmarks: ACM cap 137.7 $/MWh, Gippsland 43.5, WVU 41.5 (2012 $).
-- 11-01 WP-08: exergy: T₀ = daily dry-bulb of `tools/climate.py` (DB-34d); `exergy_efficiency_frac` = functional (E_heat + E_cold + W_gen)/(brine e at T_prod + W_cons + 1.04 × fuel LHV) (EXG-KPI, EXG-FUEL); spec η_u → new `exergy_utilisation_frac` (None without brine). Pass `base_kpis` to merge with the economics KPIs.
-- 11-01 WP-08: TL-22: no chemistry ⇒ "insufficient data" + analytes + required mitigations (= PD-07 set); K_c(T), log K_gyp(T) are inputs (not on RC-12); fail on RI < 5.5, RS > 1.2, pressurised loop below release, or (complete data) a missing mitigation (SCL-RULES). TL-23: layered resistance needs geometry + soil (no defaults); surface = DB-34c annual-mean air; else 10 % of demand (NET-LOSS-FRAC), 5 km trunk (NET-TRUNK-M).
-- 11-01 WP-03: heat pump `solver: "closed_form"` behind a parameter (default `nelder_mead` unchanged: 1920 cases vs `main`, 0 new errors, 0 output diffs). Same problem as NM (sink at target; else source held at `Ts_in_minimum`), RC-04 COP + bracketed `brentq`; ≤ 1.5e-5 from NM wherever NM converges physically (NM gives COP < 0 or 800 °C outlets in some valid cases). Idle (not raise) on zero flow / no need / source ≤ min / COP ≤ 1 / no lift; negative or NaN inputs raise; `within_limits` None when off.
-- 11-01 WP-03: closed form caps COP at VER-HP-ETA × Carnot(sink out + 4 K, source out − 4 K; HP-APPROACH) by default: η_L 0.5 Lorenz exceeds it at our glides (design 82→100 / brine 60: 4.79 → 3.71, brine out 47.1 °C; RC-04 3.5–4.5; DEA 3.57 @ 52.9 K). While capped η_L is inactive: vary VER-HP-ETA (0.50/0.55/0.65 → 3.14/3.43/4.00) and HP-APPROACH (3/5 K → 3.82/3.61). Evidence passes PH-14 at margin 0. NM evidence is uncapped (fails PH-14 at design) and withheld if NM did not converge.
-- 11-01 WP-03: HTHP limits `datasheet`, `max_lift_k`, `max_sink_temperature_degc` (condenser leaving water = sink outlet), `max_carnot_fraction` default None = MISSING; limits without a citation raise; else VER-HP-LIFT 60 K (outlet to outlet) screens, no max-T check. `heat_pump_point` = `HeatPumpPoint` fields minus `name`. DEA table only as `dea_reference_cop` (40–100 K). E-boiler η 0.99 (EB-ETA). Storage: recovery on discharge (η_d 0.63 HT-ATES / 0.96 cold), capacity = injected energy, use `net_heat_to_plant_w` not `power_th`. CHP-EL-FRAC: GEMINI 1/3 kept (chp.py unchanged), DEA 0.50 = sensitivity. Cross-WP: edited WP-09's VER-HP-ETA (sensitivity, text) and VER-HP-LIFT (text); values unchanged.
-- 11-01 WP-05: TL-05 → verifier passes a **bare p_b in bar(g)**; `OperatingPoint.esp_evidence` = `EspPoint` field for field (tested); the verifier's VER-ESP-MARGIN limit equals TL-05 `intake_setpoint_barg`; SUB-PBUB margin must equal VER-ESP-MARGIN (`load_subsurface_basis` refuses otherwise).
-- 11-01 WP-05: brine bubble point by Henry's law (RC-01 item 9, Sander 2023) at T_res: p_b = Σ c_i/H_i(T); sea-water basis 46.05 bar(a), pure-water bound 52.17 bar(a) at 87 °C; ESP intake setpoint = computed 1.2·p_b = 55.26 bar(a) (not the card's 60); ESP setting depth 840 m (was 510 m).
-- 11-01 WP-05: injector friction sign (RC-01 eq 12) behind `friction_opposes_flow=False` in `nodal_solver`/`well_flow` (`InjectorWell` JSON key; single-phase only); default unchanged; hand case 76.26 vs legacy 13.24 bar. WP-05 tools always pass `True`.
-- 11-01 WP-05: TL-05 inverts GEMINI (Δp_ESP,req from IPR + DPDT, `brentq` on 30–70 Hz, `ProducerWell` check > 1 % ⇒ infeasible; < 30 Hz ⇒ choked). Plant power by rule P_shaft = QΔp/0.70, P_el = P_shaft/(0.93·0.97) (DB-13/DB-40); GEMINI curve power for comparison only; infeasible points carry no powers.
-- 11-01 WP-05: ESP (SUB-ESP): GEMINI HC27000 curve flow-scaled ×1.642 so BEP = 300 m³/h; 16 stages; shallowest depth with intake ≥ setpoint.
-- 11-01 WP-05: base case 300 m³/h (2500 m, WHP 3 bar(g)): 58.9 Hz, Δp 34.7 bar, shaft 0.413 MW, intake 54.7 bar(g), NPSHA 541 m, T_wh 85.2 °C, injector WHP 26.5 bar(g), pumps 0.81 MW_e; 50 m³/h: 30 Hz, 0.025 MW_e, T_wh 77.1 °C. Map 50–300 all feasible, cached in `runs/cache/doublet_maps/`; never interpolated across infeasible points.
-- 11-01 WP-05: TL-07 Gringarten–Sauty mixing, ±6 K band, 30 yr; t_b 33.9 yr @ 1.2 km, 23.6 yr @ 1.0 km; D_min 1128 m. TL-08 line-source superposition (rise positive); ≤ 1 bar needs 1141 m (2 doublets) / 1787 m (3). Both refuse flow > DB-11 and cooling > DB-12; T_inj default T_wh − 40 K. TL-03 keeps DB-07 literally (2.6 bar step, warned).
-- 11-01 WP-05: modules `resource.py` (TL-03/04, `load_subsurface_basis`), `doublet.py` (TL-05/06, `resolve_doublet`), `thermal.py` (TL-07/08), signatures as WP-04. Injector at GEMINI's 0.001 bar floor reports the signed required WHP; notes flag injector WHP < p_b, T_wh > 100 °C, injection below DB-04. `FlowArgs` bounded 50–300 m³/h.
-- 11-01 WP-09: a given p_b is bare; the verifier applies VER-ESP-MARGIN in PH-18 and PD-10; per-ESP p_b wins over `co2_release_pressure_barg`. VER-ESP-PB does not follow VER-ESP-MARGIN (sensitivity changes both).
-- 11-01 WP-09: without p_b, VER-ESP-PB = 60 bar(a) = 58.99 bar(g) drives PH-18 and PD-10, so a pressurised loop (DB-36 b) behind any plate HEX (≈ 20 / 20.68 bar(g)) fails PD-10: degas + inhibitor or shell-and-tube.
-- 11-01 WP-09: verdict: REJECTED iff any check fails; UNVERIFIED if a required check is `not_evaluated` or `stub_evidence`; else ACCEPTED. 41 checks (SY, SE, PH-01…24, PD-01…10; EX-01 reported only); margin ≥ 0 passes; thresholds only from limits/cards/spec/register.
-- 11-01 WP-09: PH-22 brine-side balance via new `DayResult.brine_heat_drawn_mw` (1 %/day) + first law per user; `heat_by_source_mw` = network heat only. HP lift outlet to outlet, COP ≥ 1. PH-16 absorption pumping ≤ 50 % of electric.
-- 11-01 WP-09: runner: a real verifier's UNVERIFIED never loops back; escalates at P9 only if no tool result is a stub; P7 UNVERIFIED continues; ACCEPTED → UNVERIFIED if any earlier tool result is a stub.
-- 11-01 WP-09: evidence = `VerificationEvidence` (project, full + fast results, KPIs, equipment points, subsurface, scaling, `stub_evidence`); real verifier not in `default_toolbox` (`verify_design_spec` for WP-14); `context_evidence` never reaches ACCEPTED.
-- 11-01 WP-09: append-only events + `replay`; design cache key = SHA-256 canonical JSON + `<tool>:<mode>:v<N>`, never stubs; project knowledge ingests only durable `USER_ANSWER`s with `assumption_id`. One `LLMCallRecord.from_messages`; `compare_token_summaries` (MEM-06).
-- 11-01 WP-02: electric chiller η 0.508 [D] on the refrigerant basis (COP 4.39 at 7.2/32.2 °C), supersedes η 0.40; COP cap 8 binds at Dutch design points. Absorption `include_heat_rejection_auxiliaries` supersedes zeroing `aux_power_fraction`.
-- 11-01 WP-02: cooling models are registered GEMINI `StaticModel`s; `power_th` = useful cooling; chilled side by load or flow; 20/26 °C (DB-32); per-circuit ρ/c_p.
-- 11-01 WP-02: absorption default Method B (B 1.15) calibrated to GHC1989 rating points; 85 °C drive → COP 0.64 (extrapolated, warned); capped at nameplate; `ghc1989` = lower bound. RC-05 ±5 % holds on the rating line only (card clarified).
-- 11-01 WP-02: drive side needs ρc_pV_G ≥ s_G/2 (≈ 13.9 m³/h per MW) else off; Method A drive outlet ≥ 71.4 °C; part load COP 0.65 → 0.47 at 10 %; aux 2.2 % of Q_cool is extra vs electric; `dry_cooler` T_db + 8 K.
-- 11-01 WP-02: `HeatExchanger` got optional `secondary_fluid_density`/`secondary_specific_heat` (default = primary); one ρc_p errs 0.13 % (brine vs water), 4.4–4.6 % with legacy 1050/4200.
-- 11-01 WP-10 review: AG-02 refuses any digit run outside an id; AG-06 everyday words need a design word; DB-30 'B' = no outage; DR-10 never offers a REJECTED design.
-- 11-01 WP-10: agents output typed `Decision`s; the runner executes every tool; role tool lists (≤ 6) enforced; `NativeOutput`, 2 retries, then `policy_fallback`; `UsageLimitExceeded` escalates.
-- 11-01 WP-10: phases: DR-09 in P2, DR-01…05/07/08 in P5, DR-06 in P6, DR-10 end of P9; P7/P9 REJECTED → P6 (≤ 3 loops, 4th escalates); approval after P10.
-- 11-01 WP-10: DR options built by code; recommended = top of `rank_candidates` (unmet last, lowest LCOH), register default (DR-06 DB-30, DR-08 DB-31) or spec rule (DR-09 Ti); guard-failed/REJECTED candidates ineligible.
-- 11-01 WP-10: P1 gaps DB-30/31/32; input modes assume/ask/pause; answers logged as durable `USER_ANSWER`. Stubs never ACCEPTED. CLI exits 0 ok, 1 config, 2 usage, 3 paused, 4 escalated, 5 refused, 6 user rejected.
-- 11-01 WP-10: scope check authoritative both ways; LLM engine needs an `LLMLogger`; DR rationales state no quantities; P9 reviewer sees tool results only.
-- 11-01 WP-01 review: producer ESP scales head/power by pvt SG (brine ×1.03; no block unchanged); separator raises if `fuel_lhv_j_kg` is set without gas density.
-- 11-01 WP-01: `"pvt"` block on `well`/`producer_well`/`injector_well` (unit-suffixed aliases); omitted keys keep water defaults, so give ρ, μ, c_p together for brine (DB-08/DB-33: 1030, 0.40e-3, 4100). GM-11 `us_g` fix.
-- 11-01 WP-01: `kpi.py` ρ/c_p from the producer `pvt`, else legacy 1050/4200; HEX/boiler/CHP not fed automatically (`fluid_consistency_issues` warns).
-- 11-01 WP-01: separator gas composition (CH₄ + CO₂ = 1, 22.414 Nm³/kmol, LHV 35.8 MJ/Nm³); `emission` 0, reports `inherent_co2_kg_s`, `co2_if_burned_kg_s` (0.314 kg CO₂/m³ ideal gas). Registered `heatpump`, `compressor` (+`power_el`), `co2_corrosion`.
-- 11-01 WP-04: tool I/O models in tool modules; signature `(request=None, *, config_dir=None)` + config-object variants; DB-20…29 helpers public in `design_basis.py` (reused by WP-05); demand warns if the CSV ≠ DB-18/19.
-- 11-01 WP-04: DB-25 drawdown follows the card (PI 12.2 → 24.5 bar), not the spec's ≈ 22 bar. Base case needs ESP and injection pump.
-- 11-01 WP-04: lowest-load window = min rolling 35-day sum, no wrap, earliest on ties; days-above thresholds k × DB-23. Climate: interpolate T_db and RH daily, Stull T_wb on daily values.
-- 10-31 WP-00: ECO-04 placeholders filled from RC-10 sourced values in native units/currency/year; USD derived in code (`eur_to_usd` 1.13, `dea_eur2020_to_eur2025` 1.168, `cepci_index`); sensitivity max(±30 %, stated range).
-- 10-31 WP-00: reporting currency USD (ECO-CUR); KPI money fields currency-neutral + `currency`.
-- 10-31 WP-00: schemas derive from `StrictModel`; day-average MW, MWh = Σ MW × 24. `Candidate` checks structure only; hard limits in DesignGuard; return temperatures from the register (DB-31/32).
-- 10-31 WP-00: Ollama tags in `llm.yaml` verified on ollama.com 31 Oct (alternatives not); lint pins below (All WPs).
-- 10-31: Pydantic AI 2.64.0; Ollama local models; deterministic phase skeleton; cloud sessions use policy engine / TestModel only (spec v2 §4).
+One line per decision, grouped by WP; dated 11-01 (WP-00: 10-31). Why: the `config/assumptions.yaml` entry or the module docstring.
+
+**WP-06**
+- generated HPs = WP-03 closed form, Lorenz, η_L = HP-ETA-L (GEMINI NM default kept); no validity bypass / "HPs off" rebuild.
+- VER-HP-ETA cap binds everywhere (C2 design COP 3.86): η_L inert above ≈ 0.41.
+- HP `within_limits` False / MISSING datasheet → new optional `DayResult.flags`, `heat_pump_flags`, margins (`hthp_i_rc04_limits_margin_count`, lift, sink T); `heat_pump_point` → PH-13/14.
+- one owner each: CHP share = CHP-EL-FRAC; grid-gas CO₂ = ECO-CO2-GAS.
+- TL-09 `PlantSpec` → `build_plant_project` (unique names, Kahn order); `generate_plant(candidate, loads, PlantDispatch)`; example within 1 %.
+- wells via doublet.py `producer_/injector_well_parameters` (now public); return T = candidate's; degassing = `gas_handling`.
+- CFG-LAYOUT brine: degasser → filter → [absorption, Ti] → HEX-1 → [HP evap] → injector; district: [bypass] HEX-1s → CHP → [bypass] HPs → peak boiler.
+- C6 = parent plant (no storage model); C7 WHP 54.25 bar(g), flagged (PH-09 fails, PD-10 zero margin).
+- CFG-SURFACE letdown to SUB-PSUC in the degasser, adiabatic; brine > 100 °C flagged.
+- CFG-HEX UA = RC-03 eq 1 inverted; 85 °C brine → 82.2/58 °C, UA 3.19 MW/K.
+- CFG-HP floor max(T_wh − 40, 100 − VER-HP-LIFT), approaches HP-APPROACH.
+- CFG-CHP total 0.96; CFG-BOILER η 0.90; CFG-ASSOC-GAS 29.67 MJ/kg, 68.56 kg/GJ; CFG-GRID-GAS 50.03 MJ/kg; CFG-SIZING = peaks.
+- TL-11 HEX share bisected for DB-12 and ≤ 100 °C before HPs; HP share cut only to `hthp_heating_mw`; DB-12 breach ⇒ invalid day.
+- TL-11 ESP power by rule; `co2_by_source_kg` = burners only; `verification_evidence()` uses HEX design points.
+- TL-10 limits.yaml + DB-40, Q_inj and venting traces; duplicate = hash {project, design}; ratings warn.
+
+**WP-08**
+- costs only via `CostBook.usd(name)`/`usd_value` (EUR × 1.13, DEA EUR2020 × 1.168, AUD × 0.63, CEPCI 2023; EUR/GJ_GCV → USD/MWh_LHV × 3.6 × 1.111); `usd_range` as is.
+- sensitivity max(±30 %, range), ECO-SENS-MULT; `economics`/`cost_sensitivity` use `book.fresh()`.
+- LCOH/LCOC Gippsland Eq. 1, 8 % real, 30 + 20 yr; FCR form and allocation-free cost reported.
+- ECO-REAL +2.44 %/yr; ECO-OM 1.5 %; HTHP replaced 15 yr; pumps 7 yr if capex given (ECO-PUMP-CAPEX MISSING); no salvage.
+- ECO-ALLOC by `brine_heat_drawn_mw` per service (absorption = cool), else delivered energy.
+- ECO-ELEC-NET daily max(0, consumed − generated), no credit.
+- degas_use ⇒ associated gas first, then grid gas, surplus flared; no `gas_handling` + associated gas raises.
+- ECO-05: ECO-CO2-GAS 56.6 kg/GJ (51.53 sensitivity, VERIFY); ECO-CO2-AG 68.56 (DB-09, DB-28); DB-37 0.3 kg/kWh; ECO-CO2-SCOPE direct only.
+- capex: 2 wells/doublet (NREL, no extrapolation); ECO-CHILLER RC-05 × CEPCI 2.51 (VERIFY, ≤ 1000 ton, absorption nominal = duty/F).
+- capex: gas boiler 374 $/kW; e-boiler 175 (≤ 10 MW) / 79; dry cooler 3× tower; Ti × 1.125; CHP from `chp_electric_mw`/`chp_thermal_mw` + CHP-EL-FRAC.
+- ECO-07 benchmarks: ACM cap 137.7 $/MWh, Gippsland 43.5, WVU 41.5 (2012 $).
+- exergy T₀ = daily dry-bulb (DB-34d); EXG-KPI, EXG-FUEL 1.04; `exergy_utilisation_frac` = spec η_u; `base_kpis` merges.
+- TL-22 SCL-RULES: no chemistry ⇒ "insufficient data" + PD-07 mitigations; fail RI < 5.5, RS > 1.2, loop < release, missing mitigation.
+- TL-23 needs geometry + soil; surface DB-34c; else NET-LOSS-FRAC 10 %, NET-TRUNK-M 5 km.
+
+**WP-03**
+- HP `solver: "closed_form"` (default `nelder_mead`: 1920 cases, 0 diffs); ≤ 1.5e-5 from converged NM.
+- idle on zero flow / no need / source ≤ min / COP ≤ 1; negative or NaN raise; `within_limits` None when off.
+- COP cap VER-HP-ETA × Carnot (HP-APPROACH 4 K): design 3.71 (uncapped 4.79), brine out 47.1 °C; VER-HP-ETA 0.50/0.55/0.65 → 3.14/3.43/4.00; HP-APPROACH 3/5 K → 3.82/3.61.
+- NM evidence uncapped (fails PH-14), withheld if not converged; closed form passes PH-14 at margin 0.
+- HTHP limits default None = MISSING; uncited limits raise; else VER-HP-LIFT 60 K; DEA only as `dea_reference_cop`.
+- EB-ETA 0.99; STO-REC-HT 0.63 / STO-REC-COLD 0.96 on discharge; use `net_heat_to_plant_w`.
+- CHP-EL-FRAC 1/3 (chp.py), DEA 0.50 sensitivity; VER-HP-ETA/-LIFT text edited, values unchanged.
+
+**WP-05**
+- verifier gets a bare p_b bar(g); `esp_evidence` = `EspPoint`; VER-ESP-MARGIN = `intake_setpoint_barg` = SUB-PBUB margin (enforced).
+- SUB-PBUB Henry's law 46.05 bar(a) (pure water 52.17 @ 87 °C); setpoint 55.26 bar(a); ESP depth 840 m.
+- injector friction sign behind `friction_opposes_flow=False` (76.26 vs 13.24 bar); WP-05 tools pass `True`.
+- TL-05 `brentq` 30–70 Hz (> 1 % infeasible, < 30 Hz choked); P_shaft = QΔp/0.70, P_el = P_shaft/(0.93·0.97) (DB-13/DB-40).
+- SUB-ESP HC27000 × 1.642 (BEP 300 m³/h), 16 stages, shallowest depth meeting setpoint.
+- 300 m³/h: 58.9 Hz, Δp 34.7 bar, 0.413 MW shaft, intake 54.7 bar(g), T_wh 85.2 °C, inj. WHP 26.5 bar(g), 0.81 MW_e; 50 m³/h: 30 Hz, 0.025 MW_e, 77.1 °C.
+- maps 50–300 m³/h cached in `runs/cache/doublet_maps/`; never interpolated across infeasible points.
+- TL-07 ±6 K: t_b 33.9 yr @ 1.2 km, 23.6 @ 1.0 km, D_min 1128 m; TL-08 ≤ 1 bar: 1141 m (2) / 1787 m (3); refuse > DB-11/DB-12.
+- TL-03 keeps DB-07 (2.6 bar step, warned); notes flag inj. WHP < p_b, T_wh > 100 °C, injection < DB-04; 0.001 bar floor ⇒ signed required WHP.
+
+**WP-09**
+- given p_b is bare; PH-18/PD-10 apply VER-ESP-MARGIN; per-ESP p_b wins; VER-ESP-PB does not follow VER-ESP-MARGIN.
+- no p_b ⇒ VER-ESP-PB 60 bar(a) = 58.99 bar(g); pressurised loop (DB-36 b) behind a plate HEX fails PD-10.
+- REJECTED iff any fail; UNVERIFIED if a required check is `not_evaluated` or stub; else ACCEPTED; 41 checks (SY, SE, PH-01…24, PD-01…10; EX-01 info); margin ≥ 0 passes; thresholds only from limits/cards/spec/register.
+- PH-22 via `DayResult.brine_heat_drawn_mw` (1 %/day) + first law; `heat_by_source_mw` = network heat; lift outlet to outlet, COP ≥ 1; PH-16 ≤ 50 %.
+- runner: real UNVERIFIED never loops; P9 escalates only without stubs; P7 UNVERIFIED continues; any stub ⇒ not ACCEPTED.
+- `VerificationEvidence`; real verifier not in `default_toolbox` (`verify_design_spec`); `context_evidence` never ACCEPTED.
+- append-only events + `replay`; cache key SHA-256 + `<tool>:<mode>:v<N>`, no stubs; knowledge = durable `USER_ANSWER`s; one `LLMCallRecord.from_messages`; MEM-06.
+
+**WP-02**
+- COOL-ELC η 0.508 [D] refrigerant basis (COP 4.39 @ 7.2/32.2 °C) supersedes 0.40; COP cap 8.
+- COOL-HR `include_heat_rejection_auxiliaries` supersedes zeroing `aux_power_fraction`.
+- cooling = registered `StaticModel`s; `power_th` = useful cooling; chilled side by load or flow; 20/26 °C (DB-32).
+- COOL-ABS-B 1.15 (COOL-ABS-CAL); 85 °C drive → COP 0.64 (warned); COOL-ABS-CAP nameplate; COOL-ABS-LB `ghc1989`.
+- COOL-ABS-DRV ≈ 13.9 m³/h per MW else off; Method A drive out ≥ 71.4 °C; COOL-ABS-PL 0.65 → 0.47 at 10 %; COOL-ABS-AUX 2.2 %; COOL-ELC-APPROACH; COOL-FC T_db + 8 K.
+- `HeatExchanger` optional `secondary_fluid_density`/`secondary_specific_heat` (default = primary).
+
+**WP-10 review**
+- AG-02 refuses digits outside an id; AG-06 needs a design word; DB-30 'B' = no outage; DR-10 never offers REJECTED.
+
+**WP-10**
+- typed `Decision`s; runner executes tools; role lists ≤ 6; `NativeOutput`, 2 retries, `policy_fallback`; `UsageLimitExceeded` escalates.
+- DR-09 P2, DR-01…05/07/08 P5, DR-06 P6, DR-10 end P9; P7/P9 REJECTED → P6 (≤ 3, 4th escalates); approval after P10.
+- recommended = top `rank_candidates` (unmet last, lowest LCOH), DR-06 DB-30, DR-08 DB-31, DR-09 Ti; guard-failed/REJECTED ineligible.
+- P1 gaps DB-30/31/32; assume/ask/pause; CLI exits 0 ok, 1 config, 2 usage, 3 paused, 4 escalated, 5 refused, 6 rejected.
+- scope check both ways; LLM engine needs `LLMLogger`; DR rationales have no quantities; P9 reviewer sees tool results only.
+
+**WP-01 review**
+- ESP head/power × pvt SG; separator raises on `fuel_lhv_j_kg` without gas density.
+
+**WP-01**
+- `"pvt"` on `well`/`producer_well`/`injector_well`; give ρ, μ, c_p together (DB-08/DB-33: 1030, 0.40e-3, 4100); GM-11 `us_g` fix.
+- `kpi.py` ρ/c_p from producer `pvt`, else 1050/4200; HEX/boiler/CHP not fed (`fluid_consistency_issues`).
+- separator gas CH₄ + CO₂ = 1, LHV 35.8 MJ/Nm³, `emission` 0 (reports inherent/if-burned CO₂); registered `heatpump`, `compressor`, `co2_corrosion`.
+
+**WP-04**
+- tool signature `(request=None, *, config_dir=None)`; DB-20…29 helpers public; demand warns if CSV ≠ DB-18/19.
+- DB-25 per card (PI 12.2 → 24.5 bar); base case needs ESP and injection pump.
+- lowest-load window = min rolling 35-day sum (no wrap, earliest); days-above k × DB-23; daily climate, Stull T_wb.
+
+**WP-00**
+- ECO-04 native units/currency/year, USD in code (1.13, 1.168, CEPCI); ECO-CUR USD, money fields + `currency`.
+- `StrictModel` schemas; day-average MW, MWh = Σ MW × 24; `Candidate` structural; hard limits in DesignGuard.
+- Ollama tags verified 31 Oct; Pydantic AI 2.64.0; cloud = policy / TestModel only (spec v2 §4).
 
 ## Assumptions added during build
 (Record id → `config/assumptions.yaml` entry; never only here.)
@@ -90,63 +137,52 @@ Next: Batch 4 (WP-03, WP-06, WP-08).
 - WP-02: COOL-ABS-B, COOL-ABS-CAL, COOL-ABS-CAP, COOL-ABS-LB, COOL-ABS-AUX, COOL-ABS-PL, COOL-ABS-DRV, COOL-ELC (η 0.508 [D]), COOL-ELC-APPROACH, COOL-HR, COOL-FC.
 - WP-09: VER-ESP-PB (60 bar(a)), VER-ESP-MARGIN (1.2), VER-HP-ETA (0.6 × Carnot), VER-HP-LIFT (60 K).
 - WP-05: SUB-WELL (ID 0.216 m, roughness 0.0457 mm), SUB-PWH (WHP 3.0 bar(g)), SUB-PBUB (Henry's law, margin 1.2), SUB-NPSH (≥ 15 m), SUB-ESP, SUB-PSUC (0 bar(g)), SUB-SPACING (1200 m).
+- WP-03: HP-ETA-L, HP-APPROACH, EB-ETA, STO-REC-HT, STO-REC-COLD, CHP-EL-FRAC.
+- WP-08: ECO-CO2-GAS, ECO-CO2-AG, ECO-CO2-SCOPE, ECO-ELEC-NET, ECO-REAL, ECO-ALLOC, ECO-OM, ECO-PUMP-CAPEX, ECO-CHILLER, ECO-SENS-MULT, EXG-FUEL, EXG-KPI, NET-LOSS-FRAC, NET-TRUNK-M, SCL-RULES.
+- WP-06: CFG-LAYOUT, CFG-SURFACE, CFG-HEX, CFG-HP, CFG-CHP, CFG-BOILER, CFG-GRID-GAS, CFG-ASSOC-GAS, CFG-SIZING.
 
 ## Open follow-ups (grouped by the WP that must act)
-**WP-03**
-- Emit `HeatPumpPoint` evidence (condensing/evaporating and outlet temperatures; datasheet lift/fraction if cited); without a datasheet VER-HP-ETA and VER-HP-LIFT apply.
-- HP COP for the ≈ 15–25 K lift from the RC-04 Lorenz/Carnot method, not the DEA table (starts at 40 K).
-- CHP: GEMINI `chp.py` electrical fraction 1/3 vs DEA ≈ 0.50 — state the choice in the register (with WP-08).
-
-**WP-06**
-- Doublet JSON from `resolve_doublet(DoubletDesign(...), load_subsurface_basis())`: injector `friction_opposes_flow: true`, `roughness_m`, `pvt`; producer `pvt`, `roughness_m`, `esp_depth_m` = `esp.setting_depth_m`, `esp` {`no_stages`, `head_coeff`, `power_coeff`} (already flow-scaled), `esp_freq_hz` and boundary inputs (`producer_wellhead_pressure_barg`, `wellhead_temperature_degc`) from the TL-05 point; injector reservoir pressure = producer's; injector pump `efficiency_factor` = 0.70 × 0.93 × 0.97. Never use the 0.01 m default roughness.
-- Brine-side HEX/boiler/CHP: `fluid_density`/`specific_heat` = `heat_exchanger_fluid_parameters(pvt)`; HEX `secondary_*` = district water (1000/4217.4). `kpi.plant_thermal_power_w` defaults to 1050 kg/m³: pass explicit values.
-- Absorption chiller: brine drive with Ti tubes or a clean loop behind an isolation HEX; drive flow ≥ `minimum_drive_flow_rate_m3s`; DesignGuard checks `drive_delta_t_k` vs 40 K. With `heat_rejection` wired set `include_heat_rejection_auxiliaries: false` (free cooling `aux_power_fraction: 0`). Electric chiller `power_el` = compressor only; cooling `power_th` is not heating.
-- DR-07 / C7: a pressurised loop must hold > p_b ≈ 45 bar(g) everywhere, above RC-03 plate-HEX ratings (PD-10 fails it): flag it or use shell-and-tube/plate-and-shell (no card cost).
-- Separator gas → burner (with WP-08): separator `gas_water_ratio` 0.8, `ch4_fraction` 0.8, `co2_fraction` 0.2 (DB-09); burner `caloric_value` = `fuel_lhv_j_kg` (29.67e6) and `gas_emission_factor` 68.56 kg/GJ (legacy 50e6/56.6: fuel ×1.69, CO₂ ×1.39).
-- Use `producer_well`/`injector_well`, not raw `well`. Keep GMF = 0 (DPDT uses STP gas density).
-- If C7 uses GEMINI `Compressor`: power omits factor k (≈ 1.3 low) and motor/VFD 0.93 × 0.97; fix behind a parameter (`test_compressor.py:42` pins today's formula), add `compressor/REFERENCE.md`, register the efficiency.
-- GEMINI `HeatExchanger` uses `abs(T_s,in − T_p,in)`: a HEX wired with the primary side colder moves heat the wrong way.
-- Emit `HexPoint` (passes, NTU and Δp per pass, design/min brine pressure bar(g), construction, plate material) and `PumpPoint` evidence.
-
 **WP-07**
-- Fast mode: `doublet_performance_map(...).data.interpolate(field, Q)` for `total_pump_electric_power_w`, `wellhead_temperature_degc`, `esp_electric_power_w`, `injection_pump_electric_power_w`. TL-05 T_inj = T_wh − `brine_cooling_k` (default 40 K); pass the dispatched ΔT for reporting.
-- Fill `DayResult.brine_heat_drawn_mw` every producing day (HP keys shared with `heat_by_source_mw`/`electricity_by_consumer_mw`); absorption drive heat stays out of `heat_by_source_mw`; fast and full results for the same days; margin keys unit-suffixed.
-- Cooling: daily `ClimateProfile` T_wb/T_db (no re-interpolation); free cooling first, residual (`residual_cooling_w`, `chilled_water_temperature_out_degc`) to chillers; avoid very low absorption loads; dispatch with the model COP (0.64 at design), not DEM-COP-HD 0.75.
-- DB-30 outages: lowest 35-day windows (heat-only 9 Jul–12 Aug; heat + cooling/0.75 6 May–9 Jun); non-overlapping placement (with WP-11). Read `answers['DB-30']` (B recorded, not applied; also DR-06).
-
-**WP-08**
-- One `usd_value(name)` cost accessor: never read `.value` of the eight RC-10 items (names say USD, `.value` is native, e.g. `hthp_capex_usd_per_kw_th.value` = 1.20 M EUR/MW_th); don't reconvert `usd_range`.
-- ECO-05 CO₂ factors in the register: state grid gas 56.6 vs 51.53 kg/GJ; associated gas 68.6 kg/GJ. Optional ECO-07 RC-10 benchmarks.
-- RC-05 chiller cost functions (1986 $, `VERIFY`), Ti generator tubes +10–15 %, dry cooler ≈ 3× wet-tower cost/area. TL-22 → `ScalingEvidence`.
+- Day engine `simulate_plant_day`/`simulate_config_day` (≈ 0.2–0.5 s/day) with `PlantDispatch` (flows, `absorption_drive_frac`, `hex_flow_frac`, `hp_flow_frac`, `boiler_gas_kg_s`); its `DayResult` already fits WP-08 (`classify_service` keys, brine heat, associated gas, dry-bulb). Fast and full results for the same days.
+- Fast mode: `doublet_performance_map(...).data.interpolate(field, Q)` for `total_pump_electric_power_w`, `wellhead_temperature_degc`, `esp_electric_power_w`, `injection_pump_electric_power_w`; T_inj = T_wh − `brine_cooling_k` (40 K); report the dispatched ΔT.
+- Cooling: daily `ClimateProfile` T_wb/T_db; free cooling first, residual to chillers; absorption needs ≥ 138 m³/h drive, avoid tiny loads; model COP (0.64), not DEM-COP-HD 0.75.
+- CHP burns all associated gas → summer surplus (C1×3: 1.0 MW; flared). No HP minimum turndown: July trickle (≈ 150 W, COP 9.8) and shoulder COP 5–6.4 (warned outside 3.5–4.5).
+- Annual CO₂ via WP-08 `co2_emissions` (`co2_by_source_kg` lacks DB-37 grid power). Storage balance: `charged/discharged_total_mwh`.
+- DB-30 outages: lowest 35-day windows (heat 9 Jul–12 Aug; heat + cooling/0.75 6 May–9 Jun), non-overlapping (WP-11); read `answers['DB-30']` (B recorded, unapplied; DR-06).
 
 **WP-11**
-- Sensitivity cases: SUB-* ranges; SUB-PBUB (pure-water 52.2 bar(a); margin 1.1–1.3 — change VER-ESP-MARGIN and VER-ESP-PB with it); SUB-PSUC; SUB-II (cold injection: est. ≈ +6 bar net on the 26.5 bar injector WHP); TL-07 ±6 K band; COOL-ELC η 0.44–0.513.
-- `ToolContext` carries `guard_failed`, `rejected_ids`, `violations`; outage windows with WP-07.
+- Sensitivities: SUB-* ranges; SUB-PBUB (52.2 bar(a); margin 1.1–1.3 with VER-ESP-MARGIN and VER-ESP-PB); SUB-PSUC; SUB-II (cold injection ≈ +6 bar on 26.5 bar WHP); TL-07 ±6 K; COOL-ELC η 0.44–0.513.
+- HP: vary VER-HP-ETA, HP-APPROACH (not HP-ETA-L). CHP-EL-FRAC 0.50 needs a chp.py parameter. CFG-SIZING = peaks.
+- `cost_sensitivity` (tornado, top 8); `Co2Request(grid_gas_kg_per_gj=51.53)` (cross-check warns ≈ 9 %, expected); WACC view (ECO-06) not implemented.
+- `ToolContext` has `guard_failed`, `rejected_ids`, `violations`; outages with WP-07.
 
 **WP-12**
-- `agents/model_builder.py` is yours; role + 5 tools in `agents/roles.py`, stubbed in `runner/tool_stubs.py`; P4 only calls `model_gap_analysis`.
-- Gaps: GEMINI `ESP` has no flow affinity; constant-property PVT (no μ(T), no cold-injection II factor); steady U = 10 W/m²K (T_wh 77.1 °C at 50 m³/h vs ≈ 81–83 transient); ESP heating ≈ 0.4 K; no injector fracture-pressure limit; no flashing check > 100 °C; ESP at Q/Q_BEP 0.33 at 50 m³/h (datasheet question; rule power optimistic); standalone `esp` type is water-only.
-- `tools/doublet.py` imports private `well_flow._build_dpdt`/`_build_esp`: treat as API.
+- Yours: `agents/model_builder.py`; role + 5 tools in `agents/roles.py`, stubs in `runner/tool_stubs.py`; P4 only calls `model_gap_analysis`. `tools/doublet.py` uses private `well_flow._build_dpdt`/`_build_esp`: treat as API.
+- Subsurface gaps: `ESP` no flow affinity; constant PVT (no μ(T), cold-injection II); steady U = 10 W/m²K (T_wh 77.1 vs ≈ 81–83 °C transient, 50 m³/h); ESP heating ≈ 0.4 K; no fracture limit; no flashing check > 100 °C; Q/Q_BEP 0.33 at 50 m³/h; `esp` water-only.
+- Plant gaps: no storage component (C6; ATES outlet T unmodelled, needs a booster); HP fouling; HEX imprecise at C_r → 1, uses `abs(T_s,in − T_p,in)` (colder primary ⇒ wrong-way heat); no absorption isolation loop.
+- GEMINI `Compressor` (unused) omits k (≈ 1.3 low) and 0.93 × 0.97: if used, fix behind a parameter, add `REFERENCE.md`.
 
 **WP-13**
-- Fail submission unless the final verdict is ACCEPTED, or if any final DR has `stub_evidence: true`, `run_summary.json` has `stub_tool_calls > 0`, or `CostAssumptions.unset_placeholders()` is non-empty.
+- Fail submission if the final verdict ≠ ACCEPTED, any final DR has `stub_evidence: true`, `run_summary.json` `stub_tool_calls > 0`, or `CostAssumptions.unset_placeholders()` is non-empty (empty today). Reports flag `cost_items[].verify` (RC-05).
 
 **WP-14**
-- Bind real tools under the same names with `stub=False`; keep the reducer contract in `runner/toolbox.py`.
-- WP-04 tools are still stubs: pass `context.config_dir`; bind `climate` to `profile_climate`; `DesignBasisReport` has no `open_gaps`, so the adapter adds DB-30…32.
-- WP-05 tools: `reservoir_conditions` (DepthArgs), `productivity_index` (NoArgs), `doublet_operating_point` (FlowArgs → `OperatingPointRequest`), `thermal_breakthrough`, `pressure_interference`; give TL-07/08 argument models first (else TL-08 always uses 2 doublets).
-- Register `verify_design_spec(collector)` before switching stubs off (else every stub-free run escalates at P9). Collector: raw project JSON, results, `esps` = `EspPoint(**point.esp_evidence.model_dump())`, `co2_release_pressure_barg` = `ResolvedDoublet.bubble_point.release_pressure_barg` (bare, gauge), `AbsorptionPoint`, subsurface, scaling, `stub_evidence`.
-- Verifier gaps: no check on TL-05 `feasible`, `flow_error_frac ≤ 0.01`, `intake_margin_bar ≥ 0`, TL-08 `within_limit`, TL-07 `breakthrough_after_horizon` (ENG-06); cooling `validity_warnings` not read.
-- Wire `DesignCache` (versioned namespace) and `JsonProjectKnowledgeStore(runs_root).ingest_events(...)`; later runs may pre-fill P1 gaps. State WP-12 gaps as report limitations.
+- Bind real tools under the same names with `stub=False`; keep the `runner/toolbox.py` reducer contract.
+- WP-04: pass `context.config_dir`; `climate` → `profile_climate`; adapter adds DB-30…32 (no `open_gaps`).
+- WP-05: `reservoir_conditions` (DepthArgs), `productivity_index` (NoArgs), `doublet_operating_point` (FlowArgs → `OperatingPointRequest`), `thermal_breakthrough`, `pressure_interference`; add TL-07/08 argument models (else TL-08 uses 2 doublets).
+- WP-06: `generate_gemini_config`, `design_guard` (`failed_ids` → `ToolContext.guard_failed`), `simulate_day`; map `GeneratedConfig` (`hex_design`, `equipment_mw`, brine ṁ/ΔT) to `CapexRequest` (MW; `plate_hexes` ṁ/ΔT; `absorption_capacity_fraction` from WP-02; `cooling_tower_mw` only outside RC-05 plants).
+- WP-08: `economics(EconomicsRequest, annual)`, `co2_emissions(Co2Request, annual)`, `exergy_kpi(annual, climate=, base_kpis=)`, `cost_sensitivity`, `scaling_check(ScalingRequest)` (C7 `co2_release_pressure_barg` from TL-05), `pipe_heat_loss`; C0 CO₂ first (`c0_co2_t_per_yr`).
+- Register `verify_design_spec(collector)` before stubs go off (else P9 escalates); collector = `verification_evidence(candidate, days)` + `EspPoint(**point.esp_evidence.model_dump())`, `bubble_point.release_pressure_barg` (bare, gauge), `AbsorptionPoint`, subsurface, scaling, `stub_evidence`.
+- Verifier gaps: unchecked TL-05 `feasible`, `flow_error_frac ≤ 0.01`, `intake_margin_bar ≥ 0`, TL-08 `within_limit`, TL-07 `breakthrough_after_horizon` (ENG-06); unread cooling `validity_warnings`, `DayResult.flags` (margins carry them, PH-21); `HeatPumpPoint` lacks max sink T.
+- Wire `DesignCache` (versioned), `JsonProjectKnowledgeStore(runs_root).ingest_events(...)` (may pre-fill P1 gaps). WP-12 gaps = report limitations.
 
 **L-1 / L-2**
-- Confirm tags with `ollama show <tag>` (must list `tools`). Set `OLLAMA_CONTEXT_LENGTH=65536` before `cli run --engine llm` (request `num_ctx` ignored); `--model TAG` overrides orchestrator and coder.
-- Act/format split (spec §5.4.3) not implemented; add it if L-1 shows tool-call problems. Paused LLM runs saved before a9083b7 may not reload.
+- Confirm tags with `ollama show <tag>` (must list `tools`). Set `OLLAMA_CONTEXT_LENGTH=65536` before `cli run --engine llm` (`num_ctx` ignored); `--model TAG` overrides orchestrator and coder.
+- Act/format split (spec §5.4.3) not implemented: add it if L-1 shows tool-call problems. Paused LLM runs from before a9083b7 may not reload.
 
 **WP-15**
-- Header audit of the Plant Debugger adapted files listed in `NOTICE`.
-- Spec fixes: GM-05 row says η ≈ 0.40 and omits the 5 K range (code follows RC-06); DB-25 says ≈ 22 bar (card 24.5).
-- Known nits: negative `gas_water_ratio` accepted; DPDT stores params before a bad `pvt` raises; kpi `fluid_density`/`specific_heat` lack unit suffixes; PH-17 checks pump triples, not daily electricity; dissolved-gas NPSH margin not quantified; DB-30 fact stores the coerced value; SY-01 and SE-02 each build the project; `resume` of an unknown id creates `runs/<id>/`; `--run-id` not sanitised.
+- Header audit of adapted Plant Debugger files (`NOTICE`).
+- Spec/card: GM-05 says η ≈ 0.40, no 5 K range (code follows RC-06); DB-25 says ≈ 22 bar (card 24.5); RC-09 "0.55 K/km" not reproducible (needs R_total ≈ 1.24 < R_ins 1.59 m·K/W of 25 mm PUR); RC-10 lacks ESP/injection-pump capex.
+- Nits: negative `gas_water_ratio` accepted; DPDT stores params before a bad `pvt` raises; kpi `plant_thermal_power_w` default 1050 kg/m³, unsuffixed `fluid_density`/`specific_heat`; PH-17 checks pump triples, not daily power; dissolved-gas NPSH margin unquantified; DB-30 fact stores the coerced value; SY-01, SE-02 both build the project; `resume <unknown id>` creates `runs/<id>/`; `--run-id` unsanitised; `resource.py:235` reads `costs.items[...].value`; `heat_pump_1987_usd_per_kw` unescalated.
 
 **All WPs**
 - Lint with GEMINI's pins: black 25.11.0, isort 7.0.0, flake8 7.3.0 + flake8-docstrings 1.7.0 (`--max-line-length=100`). `/opt/geo-venv` has no isort and PATH black is 26.x: `uv pip install --python /opt/geo-venv/bin/python isort==7.0.0 black==25.11.0 flake8-pyproject==1.2.3`.
@@ -156,22 +192,4 @@ Next: Batch 4 (WP-03, WP-06, WP-08).
 See spec §17. Answers: —
 
 ## Hand-off notes (latest session writes here, replace previous)
-2026-11-01 WP-06 (PR #13): TL-09/10/11; register CFG-LAYOUT, -SURFACE, -HEX, -HP, -CHP (total efficiency; share = CHP-EL-FRAC), -BOILER, -GRID-GAS (LHV; CO₂ = ECO-CO2-GAS), -ASSOC-GAS, -SIZING; `DayResult.flags` added (schema extended). Merged main after WP-03 and WP-08. Runner NOT rewired. Follow-ups:
-- **WP-14:** bind `generate_gemini_config`, `design_guard` (`GuardReport.failed_ids` → `ToolContext.guard_failed`) and `simulate_day` in place of the stubs; collector = `verification_evidence(candidate, days)` (+ subsurface/scaling/absorption points); map `GeneratedConfig` (`hex_design`, `equipment_mw`, brine ṁ/ΔT) to WP-08's `CapexRequest` (WP-08's WP-06 item, deferred here). The verifier does not read `DayResult.flags`; margins carry the violations (PH-21).
-- **WP-07:** dispatch with `PlantDispatch` (flows, `absorption_drive_frac`, `hex_flow_frac`, `hp_flow_frac`, `boiler_gas_kg_s`) and `simulate_plant_day`/`simulate_config_day` (≈ 0.2–0.5 s/day). CHP burns all associated gas → summer surplus at design flows (C1×3: 1.0 MW; WP-08 would flare the excess); absorption needs ≥ 138 m³/h drive. Keys already fit WP-08's `classify_service`. No HP minimum turndown: trickle points (≈ 150 W at COP 9.8 in July) and shoulder COP 5–6.4 are cap-limited (warned outside 3.5–4.5); the capacity bypass is conservative vs compressor turndown.
-- **WP-08/WP-11:** HP sensitivity on VER-HP-ETA and HP-APPROACH (not η_L); the ECO-CO2-GAS 51.53 case makes WP-08's simulator cross-check warn ≈ 9 % (expected). Grid-electricity CO₂ (DB-37) is not in `co2_by_source_kg`.
-- **WP-11/WP-12:** CFG-SIZING sizes are peaks; no storage component (C6); GEMINI HEX imprecise at C_r → 1; absorption isolation loop not representable.
-- PROGRESS.md is ≈ 33 KB (> 20 KB): condense after batch 4; WP-08's row and block header still say "in review" (merged 66acde7).
-2026-11-01 WP-08 ([#12](https://github.com/Amaechi/gemini_digital_twin_private/pull/12), in review): `tools/{economics,exergy,scaling,network}.py`; `PYTHONPATH=src python -m pytest -q unit_test/gemini_model unit_test/gemini_simulator unit_test/gemini_agent -x` → **837 passed**; after merging `main` (WP-03 #11) → **894 passed**. wp-reviewer + physics-checker: no blockers; should-fixes resolved in 6141c7c. The three WP-08 items under "Open follow-ups" are done (accessor, ECO-05 factors, RC-05 functions; TL-22 → `ScalingReport.evidence`). Register: ECO-CO2-GAS, ECO-CO2-AG, ECO-CO2-SCOPE, ECO-ELEC-NET, ECO-REAL, ECO-ALLOC, ECO-OM, ECO-PUMP-CAPEX, ECO-CHILLER, ECO-SENS-MULT, EXG-FUEL, EXG-KPI, NET-LOSS-FRAC, NET-TRUNK-M, SCL-RULES. Sanity (crude, real profiles): C0 LCOH 137 / LCOC 45 $/MWh; C2 63 (20 yr 66) / 49.5; CO₂ −57 %; exergy 16.6 % vs 37.5 %.
-New follow-ups (to move into "Open follow-ups" at the next condense; this file is now > 20 KB):
-- WP-06: `CHP-EL-FRAC` is in the register since WP-03 (0.3333 = GEMINI 1/3; DEA 0.50 sensitivity), read by `chp_electric_capacity_mw` (tested against the real register); map candidate equipment to `CapexRequest` (sizes in MW; `plate_hexes` with brine ṁ and ΔT; `absorption_capacity_fraction` from the WP-02 model; `cooling_tower_mw` only for rejection outside RC-05 chiller plants).
-- WP-07: name consumers/burners so `classify_service` resolves them (chiller/cool/tower/absorption/free/rejection → cool; hp/hthp/heat_pump/boiler/chp → heat; esp/pump/injection → shared) or pass `service_by_key`; fill `brine_heat_drawn_mw` (absorption drive key with "absorption") and `associated_gas_produced_nm3`; `ambient_dry_bulb_degc` = climate dry-bulb.
-- WP-11: use `cost_sensitivity` (tornado, top 8) and `Co2Request(grid_gas_kg_per_gj=51.53)`; WACC finance view (ECO-06) not implemented.
-- WP-13: `CostAssumptions.unset_placeholders()` still empty; reports should flag `cost_items[].verify` (RC-05).
-- WP-14: bind `economics(EconomicsRequest, annual)`, `co2_emissions(Co2Request, annual)`, `exergy_kpi(annual, climate=, base_kpis=)`, `cost_sensitivity(...)`, `scaling_check(ScalingRequest)` (`co2_release_pressure_barg` from TL-05 for C7), `pipe_heat_loss(...)`; C0 CO₂ first (for `c0_co2_t_per_yr`).
-- WP-15: RC-09 "0.55 K/km" not reproducible from the card's PUR data (needs R_total ≈ 1.24 m·K/W < R_ins 1.59 of 25 mm PUR) — documented discrepancy; ESP/injection-pump capex missing on RC-10; `resource.py:235` reads `costs.items[...].value` directly (harmless, breaks the accessor rule); `heat_pump_1987_usd_per_kw` unescalated if ever used.
-
-2026-11-01 WP-03 (branch `claude/elegant-gauss-btr6ry`): `heatpump` closed form + HTHP screening + evidence, new `electric_boiler`, `thermal_storage` (registered; `model_heating.rst`; REFERENCE.md each). Tests `PYTHONPATH=src python -m pytest -q unit_test/gemini_model unit_test/gemini_simulator unit_test/gemini_agent -x` → **827 passed**. wp-reviewer + physics-checker findings fixed. Register added: HP-ETA-L, HP-APPROACH, EB-ETA, STO-REC-HT, STO-REC-COLD, CHP-EL-FRAC. The three WP-03 follow-ups above are done (entries left for the next condense; file now > 20 KB). New follow-ups:
-- WP-06/07: HP JSON `solver: "closed_form"`, `mode: "lorenz"`, brine side `Cp_s` 4100 / `rho_s` 1030, district `Cp_h` 4217.4 / `rho_h` 1000; `source_heat_w` = brine heat drawn (PH-22); evidence `HeatPumpPoint(name=…, **out["heat_pump_point"])`, skip None. Storage: ATES outlet temperature not modelled (C6 needs a booster); annual balance from `charged/discharged_total_mwh`.
-- WP-09/14: `HeatPumpPoint` has no max sink temperature, so a datasheet max T is only in the model's `within_limits`.
-- WP-08: cost/credit CHP from simulated P_el/P_th (CHP-EL-FRAC); reuse that entry. WP-11: sensitivities above; CHP 0.50 needs a chp.py fraction parameter. WP-12 gaps: HP fouling, storage outlet temperature.
+2026-11-01, after batch 4 (WP-03, WP-06, WP-08 merged): full suite on `main` @ 9eb7beb → **993 passed**. Real tools exist for TL-01…11, 14, 22, 23; the runner still uses stubs (WP-14 binds them). Next: batch 5 (WP-07, WP-12, WP-13).
