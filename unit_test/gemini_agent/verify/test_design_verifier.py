@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import dataclasses
 import json
 from collections.abc import Callable
 from pathlib import Path
@@ -12,12 +13,15 @@ import pytest
 from gemini_agent.agents.engine import PolicyEngine
 from gemini_agent.runner import toolbox
 from gemini_agent.runner.design_runner import DesignRunner
-from gemini_agent.runner.toolbox import CandidateArgs, ToolContext, ToolSpec
+from gemini_agent.runner.toolbox import CandidateArgs, ToolContext
 from gemini_agent.schemas.common import SUMMARY_MAX_CHARS, GasHandling
 from gemini_agent.schemas.decision import DesignVerdict, RunStatus
 from gemini_agent.schemas.results import KPISet
 from gemini_agent.verify.design_verifier import (
     ESP_RELEASE_PRESSURE_ID,
+    HP_CARNOT_FRACTION_ID,
+    HP_MAX_LIFT_ID,
+    PA_PER_PSI,
     VERIFIER_NAME,
     CheckStatus,
     DesignVerifier,
@@ -29,6 +33,8 @@ from gemini_agent.verify.design_verifier import (
     VerificationEvidence,
     VerificationReport,
     VerifyDesignTool,
+    is_copper_alloy,
+    is_titanium,
     verify_design_spec,
 )
 from unit_test.gemini_agent.verify import evidence_factory as ef
@@ -45,8 +51,7 @@ def _with(**overrides: Any) -> VerificationEvidence:
 
 
 def _hex(**changes: Any) -> dict[str, Any]:
-    point = ef.good_evidence().hex_points[0].model_copy(update=changes)
-    return {"hex_points": [point]}
+    return {"hex_points": [ef.hex_point(**changes)]}
 
 
 def _first(field: str, **changes: Any) -> dict[str, Any]:
@@ -58,6 +63,11 @@ def _days(**changes: Any) -> dict[str, Any]:
     """Change day 0 of the full-mode results (and keep fast mode identical)."""
     days = [ef.day(0, **changes), ef.day(1)]
     return {"annual": ef.annual(days), "fast_annual": ef.annual(days)}
+
+
+def _day0(field: str, **changes: float) -> dict[str, float]:
+    """Day-0 dict ``field`` with some entries changed."""
+    return {**getattr(ef.day(0), field), **changes}
 
 
 def _project(mutate: Callable[[dict[str, Any]], None]) -> dict[str, Any]:
@@ -79,6 +89,12 @@ def _duplicate_component_text() -> dict[str, Any]:
     return {"project": text[:first] + duplicate + text[first:]}
 
 
+def _unmet_day() -> dict[str, Any]:
+    heat = _day0("heat_by_source_mw")
+    heat["boiler"] -= 2.0
+    return _days(heat_by_source_mw=heat, unmet_heating_mwh=48.0)
+
+
 # --------------------------------------------------------------------------- verdicts
 def test_good_design_is_accepted_with_margins_and_short_summary():
     """Every layer passes: ACCEPTED, margins for each bounded check, summary ≤ 300 chars."""
@@ -95,13 +111,23 @@ def test_good_design_is_accepted_with_margins_and_short_summary():
     }
     assert len(report.summary) <= SUMMARY_MAX_CHARS and "ACCEPTED" in report.summary
     assert report.check("PH-02").margin == pytest.approx(0.0)  # 86 → 46 °C is exactly 40 K
-    assert report.check("PH-07").margin == pytest.approx(3.0 - 1.1)  # RC-03 approach
-    assert report.check("PH-10").value == pytest.approx(24.0)  # 72 kPa / 3 NTU (RC-03 eq. 4)
-    assert report.check("PH-13").margin == pytest.approx(374.15 / 57.0 - 4.0)  # Carnot
+    assert report.check("PH-07").margin == pytest.approx(4.0 - 1.1)  # RC-03 approach
+    assert report.check("PH-10").value == pytest.approx(24.0)  # 84 kPa / 3.5 NTU (RC-03 eq. 4)
+    assert report.check("PH-13").margin == pytest.approx(376.15 / 62.0 - 3.5)  # Carnot
+    assert report.check("PH-22").value == pytest.approx(0.0, abs=1e-9)  # brine balance closes
     assert report.check("PD-09").limit == pytest.approx(87.0)  # DB-20: 12 + 0.03 × 2500
+    assert set(report.assumption_ids) == {"DB-33", HP_CARNOT_FRACTION_ID, HP_MAX_LIFT_ID}
     assert all(value >= 0 for value in report.margins.values())
     assert report.check("EX-01").status == CheckStatus.INFO
     VerificationReport.model_validate(report.model_dump(mode="json"))  # strict round trip
+
+
+def test_fixture_brine_heat_matches_db23():
+    """DB-23: 300 m³/h × 1030 kg/m³ × 4100 J/(kg K) × 40 K = 14.08 MW, split over three users."""
+    drawn = ef.day(0).brine_heat_drawn_mw
+    assert sum(drawn.values()) == pytest.approx(300 / 3600 * 1030 * 4100 * 40 / 1e6)
+    assert drawn["hthp"] == pytest.approx(6.0 - 6.0 / 3.5)  # Q_evap = Q_cond − W
+    assert drawn["absorption"] == pytest.approx(2.0 / 0.65)  # drive heat = cooling / COP
 
 
 def test_candidate_only_is_unverified_never_accepted():
@@ -109,7 +135,7 @@ def test_candidate_only_is_unverified_never_accepted():
     report = _verify(VerificationEvidence(candidate=ef.candidate()))
     assert report.verdict == DesignVerdict.UNVERIFIED
     assert report.violations == []
-    assert {"SY-01", "SE-02", "PH-01", "PH-07", "PH-18", "PD-01", "PD-06"} <= set(
+    assert {"SY-01", "SE-02", "PH-01", "PH-07", "PH-18", "PH-22", "PD-01", "PD-06"} <= set(
         report.not_evaluated
     )
     assert "lack evidence" in report.summary and len(report.summary) <= SUMMARY_MAX_CHARS
@@ -164,42 +190,50 @@ FAILING_CASES: list[tuple[str, Callable[[], dict[str, Any]]]] = [
         ),
     ),
     ("SE-04", lambda: _project(_drop_connection_to_injector)),
-    # physical (one failing case per check)
-    ("PH-01", lambda: _days(heat_by_source_mw={"geothermal_hex": 13.0, "hthp": 6.0})),
+    # physical (one failing case per check, more for the subtle ones)
+    ("PH-01", lambda: _days(heat_by_source_mw=_day0("heat_by_source_mw", boiler=6.0))),
     ("PH-02", lambda: _days(injection_temperature_degc=[45.0, 46.0])),
+    ("PH-02", lambda: _days(injection_temperature_degc=[90.0, 46.0])),  # injection hotter
     ("PH-03", lambda: _days(doublet_flow_m3h=[320.0, 0.0], injection_flow_m3h=[320.0, 0.0])),
     ("PH-03", lambda: _days(doublet_flow_m3h=[40.0, 0.0], injection_flow_m3h=[40.0, 0.0])),
     ("PH-03", lambda: _days(doublet_flow_m3h=[300.0, 60.0], injection_flow_m3h=[300.0, 60.0])),
-    ("PH-03", lambda: {"candidate": ef.candidate(doublets=4)}),
     ("PH-04", lambda: _days(injection_flow_m3h=[299.0, 0.0])),
     ("PH-05", lambda: _days(heating_supply_degc=99.0)),
     ("PH-06", lambda: _days(cooling_supply_degc=21.0)),
     ("PH-07", lambda: _hex(cold_out_degc=85.5)),
     ("PH-07", lambda: _hex(hot_out_degc=90.0)),
+    ("PH-07", lambda: _hex(hot_out_degc=86.0)),  # no hot-side duty, cold side heats up
     ("PH-08", lambda: _hex(hot_in_degc=155.0)),
-    ("PH-09", lambda: _hex(design_pressure_bar=25.0)),
+    ("PH-09", lambda: _hex(design_pressure_barg=25.0)),
+    ("PH-09", lambda: _hex(design_pressure_barg=20.5)),  # gasketed rating 20 bar
     ("PH-10", lambda: _hex(pressure_drop_pa=150_000.0)),
     ("PH-11", lambda: _hex(ntu=5.0, pressure_drop_pa=120_000.0)),
     ("PH-12", lambda: _hex(area_m2=1500.0)),
     ("PH-12", lambda: _hex(flow_m3h=1400.0)),
     ("PH-13", lambda: _first("heat_pumps", cop=7.0)),
-    ("PH-13", lambda: _first("heat_pumps", source_degc=101.0)),
+    ("PH-13", lambda: _first("heat_pumps", evaporating_degc=104.0)),  # configuration error
+    ("PH-13", lambda: _first("heat_pumps", condensing_degc=99.0)),  # below the sink outlet
     ("PH-14", lambda: _first("heat_pumps", max_lift_k=50.0)),
+    ("PH-14", lambda: _first("heat_pumps", cop=3.8)),  # > 0.6 × Carnot 6.07 (RC-04 [A])
     ("PH-15", lambda: _first("absorption", cop=0.8)),
     ("PH-15", lambda: _first("absorption", cooling_mw=3.5)),
     ("PH-16", lambda: _first("absorption", pumping_power_mw=0.4)),
     ("PH-17", lambda: _first("pumps", shaft_power_w=100_000.0)),
-    ("PH-18", lambda: _first("esps", intake_pressure_bar=15.0)),
+    ("PH-18", lambda: _first("esps", intake_pressure_barg=14.0)),
     ("PH-19", lambda: _first("esps", npsh_available_m=30.0)),
     ("PH-20", lambda: _days(electricity_by_consumer_mw={"esp": -0.4})),
     ("PH-21", lambda: _days(margins={"hex_approach_k": -0.5})),
-    # performance & design
-    (
-        "PD-01",
-        lambda: _days(
-            heat_by_source_mw={"geothermal_hex": 12.0, "hthp": 6.0}, unmet_heating_mwh=48
-        ),
+    ("PH-22", lambda: _days(brine_heat_drawn_mw=_day0("brine_heat_drawn_mw", absorption=4.0))),
+    (  # heat-pump first law: Q_cond ≠ Q_evap + W
+        "PH-22",
+        lambda: _days(electricity_by_consumer_mw=_day0("electricity_by_consumer_mw", hthp=2.5)),
     ),
+    ("PH-23", lambda: _hex(ntu=2.5, pressure_drop_pa=60_000.0)),  # too small for 86→70/55→82
+    ("PH-23", lambda: _hex(passes=3)),  # 3 × 3.5 = 10.5 > 3.24/0.85
+    ("PH-24", lambda: {"candidate": ef.candidate(doublets=4)}),
+    ("PH-24", lambda: {"candidate": ef.candidate(doublets=3)}),  # results hold 2 doublets
+    # performance & design
+    ("PD-01", _unmet_day),
     (
         "PD-02",
         lambda: _days(
@@ -211,14 +245,7 @@ FAILING_CASES: list[tuple[str, Callable[[], dict[str, Any]]]] = [
     ("PD-03", lambda: {"subsurface": SubsurfaceEvidence(well_spacing_m=1000.0)}),
     ("PD-04", lambda: {"subsurface": SubsurfaceEvidence(interference_bar=1.5)}),
     ("PD-05", lambda: {"subsurface": SubsurfaceEvidence(thermal_breakthrough_yr=25.0)}),
-    (
-        "PD-06",
-        lambda: {
-            "fast_annual": ef.annual(
-                [ef.day(0, heat_by_source_mw={"geothermal_hex": 12.0, "hthp": 6.0}), ef.day(1)]
-            )
-        },
-    ),
+    ("PD-06", lambda: {"fast_annual": ef.annual([ef.fast_day(0, 2.0), ef.fast_day(1)])}),
     ("PD-07", lambda: {"scaling": ScalingEvidence(status="fail", detail="RI 4.2")}),
     (
         "PD-07",
@@ -237,6 +264,8 @@ FAILING_CASES: list[tuple[str, Callable[[], dict[str, Any]]]] = [
             production_temperature_degc=[90.0, 86.0], injection_temperature_degc=[52.0, 46.0]
         ),
     ),
+    ("PD-10", lambda: {"co2_release_pressure_barg": None}),  # default 20 bar(g) > 16 bar(g)
+    ("PD-10", lambda: _hex(min_brine_pressure_barg=14.0)),
 ]
 
 
@@ -269,7 +298,7 @@ def test_summary_stays_short_with_many_failures():
     """VR-01: ≤ 300 characters even when many checks fail."""
     change = {
         **_days(heating_supply_degc=90.0, cooling_supply_degc=25.0, injection_flow_m3h=[1.0, 0]),
-        **_hex(cold_out_degc=85.5, design_pressure_bar=30.0, area_m2=2000.0),
+        **_hex(cold_out_degc=85.5, design_pressure_barg=30.0, area_m2=2000.0),
         "subsurface": SubsurfaceEvidence(well_spacing_m=500.0, interference_bar=3.0),
     }
     report = _verify(_with(**change))
@@ -278,28 +307,77 @@ def test_summary_stays_short_with_many_failures():
 
 
 # --------------------------------------------------------------------------- details
-def test_hex_approach_below_typical_range_warns_but_passes():
-    """RC-03: 1.1 K is achievable (pass); below the typical 2–5.6 K the check warns."""
-    report = _verify(_with(**_hex(cold_out_degc=84.5)))  # approach 1.5 K
+def test_values_exactly_at_a_limit_pass_despite_float_error():
+    """85.9 − 45.9 = 40.000000000000014 K and an approach of 86 − 84.9 K still pass."""
+    days = _days(production_temperature_degc=[85.9, 86.0], injection_temperature_degc=[45.9, 46.0])
+    report = _verify(_with(**days, **_hex(cold_out_degc=84.9)))
+    assert report.check("PH-02").status == CheckStatus.PASS
+    assert report.check("PH-07").status == CheckStatus.PASS
+
+
+def test_guidebook_plate_hex_example_passes():
+    """RC-03 validation case: 160→130 °F / 110→150 °F, NTU 3.1, Δp 10.9 psi (≈ 24 kPa/NTU)."""
+
+    def f_to_c(fahrenheit: float) -> float:
+        return (fahrenheit - 32.0) / 1.8
+
+    point = ef.hex_point(
+        hot_in_degc=f_to_c(160.0),
+        hot_out_degc=f_to_c(130.0),
+        cold_in_degc=f_to_c(110.0),
+        cold_out_degc=f_to_c(150.0),
+        ntu=3.1,
+        pressure_drop_pa=10.9 * PA_PER_PSI,
+        flow_m3h=200.0 * 0.2271247,  # 200 gpm
+        area_m2=259.0 * 0.09290304,  # 259 ft²
+    )
+    report = _verify(_with(hex_points=[point]))
+    for check_id in ("PH-07", "PH-10", "PH-11", "PH-23"):
+        assert report.check(check_id).status == CheckStatus.PASS, report.check(check_id)
+    assert report.check("PH-10").value == pytest.approx(10.9 / 3.1 * PA_PER_PSI / 1000.0)
+
+
+def test_hex_approach_outside_typical_range_warns_but_passes():
+    """RC-03: 1.1 K is achievable (pass); outside the typical 2–5.6 K the check warns."""
+    report = _verify(_with(**_hex(cold_out_degc=84.5, ntu=4.0, pressure_drop_pa=96_000.0)))
     check = report.check("PH-07")
     assert check.status == CheckStatus.PASS and check.warnings
-    assert report.verdict == DesignVerdict.ACCEPTED
+
+
+def test_welded_plate_hex_rating():
+    """RC-03: welded plate units are rated 300 psig / 400 °F; gasketed ones ~20 bar / 150 °C."""
+    report = _verify(_with(**_hex(construction="welded", design_pressure_barg=20.5)))
+    assert report.check("PH-09").status == CheckStatus.PASS
+    assert report.check("PH-08").status == CheckStatus.PASS
 
 
 def test_hex_without_pressure_is_not_evaluated():
-    """A HEX point without its design pressure cannot pass the 20-bar rating check."""
-    report = _verify(_with(**_hex(design_pressure_bar=None)))
+    """A HEX point without its design pressure cannot pass the rating check."""
+    report = _verify(_with(**_hex(design_pressure_barg=None)))
     assert report.check("PH-09").status == CheckStatus.NOT_EVALUATED
     assert report.verdict == DesignVerdict.UNVERIFIED
 
 
-def test_esp_release_pressure_defaults_to_register():
+def test_release_pressure_defaults_to_register():
     """RC-01 item 9: without a bubble-point pressure the [A] default 20 bar(g) is used."""
-    esp = EspPoint(name="ESP-1", intake_pressure_bar=19.0, npsh_available_m=60, npsh_required_m=20)
-    report = _verify(_with(esps=[esp]))
+    esp = EspPoint(name="ESP-1", intake_pressure_barg=19.0, npsh_available_m=60, npsh_required_m=20)
+    report = _verify(_with(esps=[esp], co2_release_pressure_barg=None))
     check = report.check("PH-18")
     assert check.status == CheckStatus.FAIL and check.margin == pytest.approx(-1.0)
     assert ESP_RELEASE_PRESSURE_ID in report.assumption_ids and check.warnings
+    assert report.check("PD-10").status == CheckStatus.FAIL  # brine HEX at 16 < 20 bar(g)
+    explicit = esp.model_copy(update={"release_pressure_barg": 18.0})
+    report = _verify(_with(esps=[explicit]))
+    assert report.check("PH-18").status == CheckStatus.PASS
+    assert ESP_RELEASE_PRESSURE_ID not in report.assumption_ids
+
+
+def test_heat_pump_datasheet_overrides_rc04_defaults():
+    """With datasheet limits the RC-04 [A] defaults are not used (and not cited)."""
+    report = _verify(_with(**_first("heat_pumps", max_lift_k=58.0, max_carnot_fraction=0.65)))
+    assert report.check("PH-14").status == CheckStatus.PASS
+    assert HP_CARNOT_FRACTION_ID not in report.assumption_ids
+    assert HP_MAX_LIFT_ID not in report.assumption_ids
 
 
 def test_degassing_needs_calcite_inhibitor_when_chemistry_missing():
@@ -312,17 +390,59 @@ def test_degassing_needs_calcite_inhibitor_when_chemistry_missing():
     report = _verify(_with(candidate=candidate, scaling=scaling))
     assert report.check("PD-07").status == CheckStatus.FAIL
     assert "calcite_inhibitor" in report.check("PD-07").detail
+    assert report.check("PD-10").status == CheckStatus.NOT_APPLICABLE  # degassed loop
     fixed = scaling.model_copy(update={"mitigations": [*scaling.mitigations, "calcite_inhibitor"]})
     assert _verify(_with(candidate=candidate, scaling=fixed)).verdict == DesignVerdict.ACCEPTED
 
 
 def test_fast_full_discrepancy_between_two_and_five_percent_warns():
-    """SIM-04: a 3 % daily discrepancy warns but passes."""
-    fast = ef.annual(
-        [ef.day(0, heat_by_source_mw={"geothermal_hex": 13.4, "hthp": 6.0}), ef.day(1)]
-    )
+    """SIM-04: a 3 % daily discrepancy warns but passes; missing fast days are not evaluated."""
+    fast = ef.annual([ef.fast_day(0, 0.6), ef.fast_day(1)])
     check = _verify(_with(fast_annual=fast)).check("PD-06")
     assert check.status == CheckStatus.PASS and check.warnings
+    partial = ef.annual([ef.fast_day(0)])
+    check = _verify(_with(fast_annual=partial)).check("PD-06")
+    assert check.status == CheckStatus.NOT_EVALUATED
+
+
+@pytest.mark.parametrize(
+    ("material", "copper"),
+    [
+        ("CuNi 90/10", True),
+        ("CuNi10Fe1Mn", True),
+        ("CuZn37", True),
+        ("Monel 400", True),
+        ("UNS C70600", True),
+        ("Sn-Pb solder", True),
+        ("admiralty brass tubes", True),
+        ("Cu-free duplex", False),
+        ("copper-free gasket", False),
+        ("Custom alloy", False),
+        ("carbon steel Sch 80", False),
+        ("titanium Gr.2", False),
+    ],
+)
+def test_copper_alloy_detection(material, copper):
+    """RC-12: copper alloys and solder are refused in brine contact; Cu-free is fine."""
+    assert is_copper_alloy(material) is copper
+
+
+@pytest.mark.parametrize(
+    ("material", "titanium"),
+    [
+        ("titanium Gr.1", True),
+        ("Ti Gr.2", True),
+        ("Ti-0.15Pd (Gr.7)", True),
+        ("SS 316 Ti", False),
+        ("AISI 321 (Ti-stabilised)", False),
+        ("316Ti", False),
+        ("not titanium", False),
+        ("duplex 2205", False),
+    ],
+)
+def test_titanium_plate_detection(material, titanium):
+    """RC-12/RC-03: only titanium plates count; Ti-stabilised steels do not."""
+    assert is_titanium(material) is titanium
 
 
 def test_titanium_not_required_for_non_saline_brine():
@@ -343,20 +463,9 @@ def test_c0_candidate_skips_geothermal_checks():
     )
     report = _verify(VerificationEvidence(candidate=c0))
     not_applicable = {c.check_id for c in report.checks if c.status == CheckStatus.NOT_APPLICABLE}
-    assert {
-        "PH-02",
-        "PH-03",
-        "PH-04",
-        "PH-07",
-        "PH-17",
-        "PH-18",
-        "PD-02",
-        "PD-03",
-        "PD-05",
-        "PD-07",
-        "PD-08",
-        "PD-09",
-    } <= not_applicable
+    expected = {"PH-02", "PH-03", "PH-04", "PH-07", "PH-17", "PH-18", "PH-22", "PH-23", "PH-24"}
+    expected |= {"PD-02", "PD-03", "PD-05", "PD-07", "PD-08", "PD-09", "PD-10"}
+    assert expected <= not_applicable
     assert report.verdict == DesignVerdict.UNVERIFIED  # project and daily results still missing
 
 
@@ -364,10 +473,16 @@ def test_heat_pump_listed_in_equipment_needs_evidence():
     """A candidate with an HTHP but no heat-pump operating point is not verifiable."""
     report = _verify(_with(heat_pumps=[]))
     assert report.check("PH-13").status == CheckStatus.NOT_EVALUATED
-    report = _verify(
-        _with(heat_pumps=[], candidate=ef.candidate(equipment_sizes={"absorption_cooling_mw": 3.0}))
-    )
+    candidate = ef.candidate(equipment_sizes={"absorption_cooling_mw": 3.0})
+    report = _verify(_with(heat_pumps=[], candidate=candidate))
     assert report.check("PH-13").status == CheckStatus.NOT_APPLICABLE
+
+
+def test_brine_heat_drawn_is_required_for_producing_days():
+    """Without the brine-side breakdown the brine balance cannot be closed: not evaluated."""
+    report = _verify(_with(**_days(brine_heat_drawn_mw={})))
+    assert report.check("PH-22").status == CheckStatus.NOT_EVALUATED
+    assert report.verdict == DesignVerdict.UNVERIFIED
 
 
 def test_kpi_fallbacks_for_unmet_and_breakthrough():
@@ -417,19 +532,23 @@ def test_tool_with_full_evidence_accepts(tmp_path):
     assert result.data.verdict == DesignVerdict.ACCEPTED and result.data.verifier == VERIFIER_NAME
 
 
-def test_only_the_real_verifier_binding_makes_accepted_stick(tmp_path):
-    """AG-11 end to end: stub=False keeps ACCEPTED; the same tool bound as a stub is downgraded."""
+def _run(tmp_path: Path, box: toolbox.Toolbox, run_id: str):
+    return DesignRunner(PolicyEngine(), runs_root=tmp_path, toolbox=box).start("", run_id=run_id)
+
+
+def test_only_the_real_verifier_on_real_evidence_makes_accepted_stick(tmp_path):
+    """AG-11 end to end: ACCEPTED stands only from a stub=False verifier in a stub-free run."""
     spec = verify_design_spec(_good_provider, VERIFIER)
     assert spec.stub is False and spec.name == "verify_design"
     box = toolbox.default_toolbox()
     box.register(spec)
-    result = DesignRunner(PolicyEngine(), runs_root=tmp_path, toolbox=box).start("", run_id="real")
+    result = _run(tmp_path, box, "stub_tools")  # upstream tools are still stubs
+    assert result.status == RunStatus.COMPLETED and result.verdict == "UNVERIFIED"
+
+    for name in box.names():
+        box.register(dataclasses.replace(box.spec(name), stub=False))
+    result = _run(tmp_path, box, "real")
     assert result.status == RunStatus.COMPLETED and result.verdict == "ACCEPTED"
 
-    box.register(
-        ToolSpec(spec.name, spec.description, spec.args_model, spec.func, owner="test", stub=True)
-    )
-    result = DesignRunner(PolicyEngine(), runs_root=tmp_path, toolbox=box).start(
-        "", run_id="stubbed"
-    )
-    assert result.verdict == "UNVERIFIED"
+    box.register(dataclasses.replace(spec, stub=True))
+    assert _run(tmp_path, box, "stub_verifier").verdict == "UNVERIFIED"

@@ -31,6 +31,8 @@ from gemini_agent.schemas.results import KPISet
 
 CACHE_FILE = "design_cache.sqlite"
 """Default file name (shared by the runs of one project, e.g. ``runs/design_cache.sqlite``)."""
+CACHE_SUFFIXES = (".sqlite", ".sqlite3", ".db")
+"""A path with one of these suffixes is the cache file; any other path is a directory."""
 
 
 def _normalise(value: Any, ignore: frozenset[str]) -> Any:
@@ -86,9 +88,10 @@ class DesignCache:
     """SQLite-backed design cache (thread-safe, one file per project)."""
 
     def __init__(self, path: str | Path) -> None:
-        """Open (or create) the cache file; a directory gets ``design_cache.sqlite`` inside."""
+        """Open (or create) the cache; a directory path gets ``design_cache.sqlite`` inside."""
         target = Path(path)
-        self.path = target / CACHE_FILE if target.suffix == "" else target
+        is_file = target.suffix in CACHE_SUFFIXES and not target.is_dir()
+        self.path = target if is_file else target / CACHE_FILE
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self._lock = threading.RLock()
         self._conn = sqlite3.connect(str(self.path), check_same_thread=False)
@@ -133,8 +136,14 @@ class DesignCache:
         candidate_id: str | None = None,
         run_id: str | None = None,
         ignore: Iterable[str] = (),
+        stub: bool = False,
     ) -> CacheEntry:
-        """Store (or overwrite) the result for ``config`` and return the entry."""
+        """Store (or overwrite) the result for ``config`` and return the entry.
+
+        ``stub=True`` raises: a stub result must never be served to a later run as real.
+        """
+        if stub:
+            raise ValueError("stub tool results are never cached")
         ignore = tuple(ignore)
         key = self.key(config, namespace, ignore)
         entry = CacheEntry(

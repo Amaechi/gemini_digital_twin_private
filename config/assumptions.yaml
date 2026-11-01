@@ -286,3 +286,30 @@ assumptions:
     tag: A
     status: default
     added_by: WP-09
+
+  - id: VER-HP-ETA
+    title: Heat-pump COP cap as a fraction of Carnot when no datasheet is cited
+    value: 0.6
+    unit: "-"
+    justification: >-
+      RC-04 flags the 100 °C HTHP datasheet as MISSING and sets a default cap COP ≤ 0.6 × Carnot
+      (Carnot from the condensing/evaporating temperatures, RC-04 eq. 1). The DesignVerifier applies
+      it (check PH-14) unless the heat-pump operating point carries a datasheet value.
+    source: RC-04 parameter table, HTHP at 100 °C supply [A]
+    sensitivity: "0.50 / 0.55 (RC-04 η_L default 0.50, range 0.40–0.55)"
+    tag: A
+    status: default
+    added_by: WP-09
+
+  - id: VER-HP-LIFT
+    title: Heat-pump lift limit (sink outlet − source outlet) when no datasheet is cited
+    value: 60.0
+    unit: K
+    justification: >-
+      RC-04 default cap "lift ≤ 60 K [A]" for a 100 °C HTHP without a cited datasheet. The
+      DesignVerifier applies it (check PH-14) unless the operating point carries a datasheet lift.
+    source: RC-04 parameter table, HTHP at 100 °C supply [A]
+    sensitivity: "50 / 70 K"
+    tag: A
+    status: default
+    added_by: WP-09

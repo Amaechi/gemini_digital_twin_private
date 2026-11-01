@@ -110,9 +110,10 @@ class JsonProjectKnowledgeStore:
     """JSON-file store (atomic replace on write), Plant Debugger ``JsonSiteKnowledgeStore``."""
 
     def __init__(self, path: str | Path) -> None:
-        """Use ``path`` (a directory gets ``project_knowledge.json`` inside)."""
+        """Use ``path``: a ``.json`` file, or a directory that gets ``project_knowledge.json``."""
         target = Path(path)
-        self.path = target / KNOWLEDGE_FILE if target.suffix == "" else target
+        is_file = target.suffix == ".json" and not target.is_dir()
+        self.path = target if is_file else target / KNOWLEDGE_FILE
         self._lock = threading.RLock()
 
     def list(self) -> list[ProjectFact]:

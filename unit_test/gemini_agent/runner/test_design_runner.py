@@ -258,9 +258,16 @@ def test_reviewer_sees_tool_evidence_only(tmp_path):
 
 
 def test_only_a_real_verifier_can_accept(tmp_path):
-    """AG-11: ACCEPTED comes from the verifier; a stub claiming ACCEPTED is downgraded."""
+    """AG-11: ACCEPTED comes from a real verifier on real evidence; otherwise it is downgraded."""
+    import dataclasses
+
     toolbox = default_toolbox()
     toolbox.register(_verifier(DesignVerdict.ACCEPTED))
+    result = _runner(tmp_path, toolbox=toolbox).start("", run_id="stub_evidence")
+    assert result.status == RunStatus.COMPLETED and result.verdict == "UNVERIFIED"
+
+    for name in toolbox.names():
+        toolbox.register(dataclasses.replace(toolbox.spec(name), stub=False))
     result = _runner(tmp_path, toolbox=toolbox).start("", run_id="ok")
     assert result.status == RunStatus.COMPLETED and result.verdict == "ACCEPTED"
 

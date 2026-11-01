@@ -173,8 +173,23 @@ class EventStore(ABC):
         """Append one event and return it with its sequence number."""
 
     @abstractmethod
-    def list_events(self, run_id: str) -> list[EventRecord]:
-        """Return the events of a run in order."""
+    def list_events(
+        self,
+        run_id: str,
+        *,
+        types: Iterable[str] | None = None,
+        phase: str | None = None,
+        after_seq: int = 0,
+    ) -> list[EventRecord]:
+        """Return the events of a run in order, optionally filtered by type, phase or seq."""
+
+    @abstractmethod
+    def list_runs(self, status: str | None = None) -> list[RunRecord]:
+        """Return all runs (optionally with one status), oldest first."""
+
+    @abstractmethod
+    def last_event(self, run_id: str) -> EventRecord | None:
+        """Return the most recent event of a run, or None."""
 
     @abstractmethod
     def close(self) -> None:

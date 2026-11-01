@@ -192,3 +192,29 @@ def test_naive_vs_optimised_comparison(tmp_path):
     assert comparison["by_phase"]["P1"]["saved_tokens"] == 90
     path = write_token_comparison(tmp_path / "naive", tmp_path / "opt", tmp_path / "cmp.json")
     assert json.loads(path.read_text())["total"]["saved_tokens"] == 240
+
+
+def test_reading_a_missing_run_creates_nothing(tmp_path):
+    """create=False only reads; comparing with a missing run does not make its directory."""
+    reader = LLMLogger(tmp_path / "absent", create=False)
+    assert reader.records() == [] and not (tmp_path / "absent").exists()
+    write_token_comparison(tmp_path / "absent", tmp_path / "absent2", tmp_path / "cmp.json")
+    assert not (tmp_path / "absent").exists() and not (tmp_path / "absent2").exists()
+
+
+def test_usage_method_is_called():
+    """An older Pydantic AI ``result.usage()`` bound method still yields the token counts."""
+
+    class Usage:
+        input_tokens, output_tokens, requests = 7, 3, 1
+
+    record = LLMCallRecord.from_messages(
+        run_id="r",
+        agent="a",
+        phase="P1",
+        model="m",
+        messages=[],
+        decision_source="llm",
+        usage=lambda: Usage(),
+    )
+    assert (record.input_tokens, record.output_tokens, record.token_source) == (7, 3, "usage")

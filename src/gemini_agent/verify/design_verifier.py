@@ -12,17 +12,19 @@ results, component operating points, subsurface and scaling screens) against the
 ``config/limits.yaml``, the reference cards and the spec §10.1 table.
 
 Every check returns pass/fail, the value, the limit and a **margin** in the check's unit
-(``margin >= 0`` means satisfied; the margins are the report's deltas, VR-01). A check whose
-evidence is missing is ``not_evaluated``; a check that does not apply to the candidate is
-``not_applicable``. Verdict:
+(``margin >= 0`` means satisfied; a floating-point tolerance of ``NUMERIC_TOL`` relative is
+allowed, so a value exactly at its limit passes; the margins are the report's deltas, VR-01). A
+check whose evidence is missing is ``not_evaluated``; a check that does not apply to the candidate
+is ``not_applicable``. Verdict:
 
 - any failed check → ``REJECTED`` (violations listed);
 - otherwise any required check not evaluated, or evidence from a stub tool → ``UNVERIFIED``;
 - otherwise → ``ACCEPTED``.
 
 The exergy layer is reported, never pass/fail (spec §10.1). Sources: spec §10.1; RC-03 (plate
-HEX limits); RC-12 (scaling, materials); RC-01 items 6, 8, 9 (pumps, NPSH, CO₂ release); spec
-ENG-06 (spacing, interference, t_b); spec SIM-04 (fast vs full).
+HEX); RC-12 (scaling, materials); RC-01 items 6, 8, 9 (pumps, NPSH, CO₂ release); RC-04 (heat
+pump defaults); DB-08/DB-33 (brine ρ, c_p); spec ENG-06 (spacing, interference, t_b); spec SIM-04
+(fast vs full). Pressures named ``_barg`` are gauge.
 """
 
 from __future__ import annotations
@@ -50,7 +52,7 @@ from gemini_agent.schemas.common import (
 )
 from gemini_agent.schemas.decision import DesignVerdict
 from gemini_agent.schemas.results import AnnualResult, DayResult, KPISet
-from gemini_agent.tools.design_basis import temperature_at_depth_degc
+from gemini_agent.tools.design_basis import brine_heat_mw, temperature_at_depth_degc
 
 VERIFIER_NAME = "DesignVerifier"
 """Value of ``verifier`` in every report (the runner records it with the verdict)."""
@@ -62,16 +64,21 @@ HEX_MIN_APPROACH_K = 1.1
 """Smallest achievable plate-HEX approach (RC-03; Guidebook p.217–223)."""
 HEX_TYPICAL_APPROACH_K = (2.0, 5.6)
 """Typical approach 2–5.6 K (spec §10.1; RC-03: economical 2.8–5.6 K, GNS 2–3 K) → warning only."""
-HEX_MAX_TEMPERATURE_DEGC = 150.0
-"""Gasketed plate-HEX temperature rating ~150 °C (RC-03; GNS p.40)."""
-HEX_MAX_PRESSURE_BAR = 20.0
-"""Gasketed plate-HEX pressure rating ~20 bar (RC-03; GNS p.40)."""
 PA_PER_PSI = 6894.757
 """1 psi in Pa (unit conversion)."""
+HEX_RATING: dict[str, tuple[float, float]] = {
+    "gasketed": (150.0, 20.0),
+    "welded": ((400.0 - 32.0) / 1.8, 300.0 * PA_PER_PSI / 1.0e5),
+}
+"""Plate-HEX rating (max °C, max bar(g)): gasketed ~150 °C / ~20 bar (RC-03; GNS p.40); welded
+400 °F / 300 psig = 204.4 °C / 20.68 bar(g) (RC-03; Guidebook p.218)."""
 HEX_DP_PER_NTU_PA = (1.0 * PA_PER_PSI, 6.0 * PA_PER_PSI)
 """Δp per NTU 1–6 psi (≈ 6.9–41.4 kPa); typical 3.5 psi ≈ 24 kPa (RC-03 eq. 4; Guidebook p.221)."""
 HEX_NTU_PER_PASS = (0.6, 4.0)
 """NTU per pass 0.6–4.0 (RC-03; Guidebook p.221)."""
+HEX_CORRECTION_FACTOR_MIN = 0.85
+"""LMTD correction factor F_c 0.85–1.0 (RC-03 eq. 2; GNS p.57–58): total NTU of a counter-flow
+unit lies between the ideal NTU and NTU/0.85."""
 HEX_MAX_UNIT_FLOW_M3H = 1360.0
 """Largest plate-HEX unit flow (RC-03 limits)."""
 HEX_MAX_UNIT_AREA_M2 = 1208.0
@@ -82,7 +89,13 @@ p.270)."""
 NPSH_MARGIN_M = 15.0
 """NPSH_A ≥ NPSH_R + 15 m (RC-01 item 8; DiPippo Problem 4.5 heuristic)."""
 ESP_RELEASE_PRESSURE_ID = "VER-ESP-PB"
-"""Register entry for the default bubble/CO₂-release pressure (RC-01 item 9 [A], 20 bar(g))."""
+"""Register entry: default bubble/CO₂-release pressure (RC-01 item 9 [A], 20 bar(g))."""
+HP_CARNOT_FRACTION_ID = "VER-HP-ETA"
+"""Register entry: COP ≤ 0.6 × Carnot without a datasheet (RC-04 [A])."""
+HP_MAX_LIFT_ID = "VER-HP-LIFT"
+"""Register entry: lift ≤ 60 K without a datasheet (RC-04 [A])."""
+BRINE_CP_ID = "DB-33"
+"""Register entry: brine specific heat 4100 J/(kg K) (spec §2.4 [A])."""
 WELL_SPACING_MIN_M = 1200.0
 """Well spacing ≥ 1.2 km (spec ENG-06, §10.1)."""
 INTERFERENCE_MAX_BAR = 1.0
@@ -96,18 +109,40 @@ FAST_FULL_FAIL_FRAC = 0.05
 SPLIT_FRACTION_TOL = 1e-6
 """Splitter fractions must sum to 1 within this tolerance (GEMINI ``Splitter``)."""
 NUMERIC_TOL = 1e-6
-"""Relative floating-point tolerance of the equality checks (Q_inj = Q_prod, supply temperatures
-met); not an engineering coefficient. Such a check passes when ``margin >= -tolerance``."""
+"""Relative floating-point tolerance of every bound check; not an engineering coefficient."""
 PUMP_POWER_TOL_FRAC = ENERGY_BALANCE_TOL_FRAC
-"""Reported pump shaft power must match Q·Δp/η within the 1 % balance tolerance."""
-
-_COPPER = re.compile(r"\b(cu|cuni|cu-ni|copper|brass|bronze|cupro\w*)\b", re.IGNORECASE)
-"""Copper alloys and solder are unacceptable in brine contact (RC-12; Guidebook p.152, 211)."""
-_TITANIUM = re.compile(r"\b(ti|titanium)\b", re.IGNORECASE)
-"""Titanium plates for saline brine (RC-12; RC-03 materials; DiPippo Ch22)."""
+"""Numerical consistency tolerance of the reported pump power vs Q·Δp/η (same 1 % as the energy
+balance; not a card value)."""
 
 PROJECT_KEYS = ("components", "boundary_inputs", "connections")
 """Top-level keys of a GEMINI project JSON (``_``-prefixed keys are comments)."""
+
+_COPPER_FREE = re.compile(r"(?i)\b(?:copper|cu)[\s-]*free\b|\bno[nt]?[\s-]+(?:copper|cu)\b")
+_COPPER_SYMBOL = re.compile(r"\bCu(?![a-z])")  # Cu, CuNi10Fe1Mn, CuZn37, Cu-Ni (case-sensitive)
+_COPPER_WORDS = re.compile(
+    r"(?i)\b(?:copper|brass|bronze|cupro\w*|monel|solder\w*|gunmetal|admiralty|muntz)\b"
+    r"|\bUNS\s*C\d{5}\b"
+)
+_TITANIUM = re.compile(r"(?i)\b(?:titanium|ti)\b")
+_NOT_TITANIUM_PLATE = re.compile(
+    r"(?i)\bno[nt]?[\s-]+ti(?:tanium)?\b|stainless|\baisi\b|\bss\b|\bsteel\b|duplex"
+    r"|stabili[sz]ed|\b(?:304|316|317|321|347|904)\w*"
+)
+
+
+def is_copper_alloy(material: str) -> bool:
+    """Return True for copper, its alloys (CuNi, CuZn, brass, bronze, Monel, UNS C) and solder.
+
+    RC-12: copper alloys and solder are unacceptable in brine contact (Guidebook p.152, 211).
+    """
+    if _COPPER_FREE.search(material):
+        return False
+    return bool(_COPPER_SYMBOL.search(material) or _COPPER_WORDS.search(material))
+
+
+def is_titanium(material: str) -> bool:
+    """Return True for titanium plates (Ti grades); False for Ti-stabilised steels or 'not Ti'."""
+    return bool(_TITANIUM.search(material)) and not _NOT_TITANIUM_PLATE.search(material)
 
 
 class Layer(StrEnum):
@@ -149,8 +184,13 @@ class HexPoint(StrictModel):
     hot_out_degc: float
     cold_in_degc: float
     cold_out_degc: float
-    design_pressure_bar: float | None = Field(
+    construction: Literal["gasketed", "welded"] = "gasketed"
+    passes: int = Field(default=1, ge=1, description="Number of passes in series.")
+    design_pressure_barg: float | None = Field(
         default=None, description="Highest operating pressure on either side, bar(g)."
+    )
+    min_brine_pressure_barg: float | None = Field(
+        default=None, description="Lowest brine-side pressure, bar(g) (CO₂ release, RC-12)."
     )
     ntu: float | None = Field(default=None, gt=0, description="NTU per pass.")
     pressure_drop_pa: float | None = Field(default=None, ge=0, description="Per pass.")
@@ -161,17 +201,21 @@ class HexPoint(StrictModel):
 
 
 class HeatPumpPoint(StrictModel):
-    """Heat-pump operating point.
+    """Heat-pump operating point (RC-04).
 
-    ``sink_degc``/``source_degc`` are the condensing/evaporating temperatures or the
-    entropic-mean stream temperatures (both give an upper bound on the COP).
+    COP is bounded by Carnot at the refrigerant condensing/evaporating temperatures (RC-04 eq. 1);
+    lift is sink outlet − source outlet. ``max_lift_k`` / ``max_carnot_fraction`` come from a
+    cited datasheet; None → the RC-04 defaults (register VER-HP-LIFT, VER-HP-ETA).
     """
 
     name: str
     cop: float = Field(gt=0, description="Heating COP.")
-    sink_degc: float
-    source_degc: float
-    max_lift_k: float | None = Field(default=None, gt=0, description="Datasheet lift limit.")
+    condensing_degc: float
+    evaporating_degc: float
+    sink_out_degc: float
+    source_out_degc: float
+    max_lift_k: float | None = Field(default=None, gt=0)
+    max_carnot_fraction: float | None = Field(default=None, gt=0, le=1)
 
 
 class AbsorptionPoint(StrictModel):
@@ -204,9 +248,9 @@ class EspPoint(StrictModel):
     """ESP intake conditions (RC-01 items 8–9)."""
 
     name: str
-    intake_pressure_bar: float = Field(description="bar(g).")
-    release_pressure_bar: float | None = Field(
-        default=None, description="Bubble/CO₂-release pressure, bar(g); None → VER-ESP-PB."
+    intake_pressure_barg: float
+    release_pressure_barg: float | None = Field(
+        default=None, description="Bubble/CO₂-release pressure here; None → evidence/register."
     )
     npsh_available_m: float | None = None
     npsh_required_m: float | None = Field(default=None, ge=0)
@@ -248,6 +292,9 @@ class VerificationEvidence(StrictModel):
     esps: list[EspPoint] = Field(default_factory=list)
     subsurface: SubsurfaceEvidence | None = None
     scaling: ScalingEvidence | None = None
+    co2_release_pressure_barg: float | None = Field(
+        default=None, description="Computed bubble/CO₂-release pressure; None → VER-ESP-PB."
+    )
     brine_contact_materials: dict[str, str] = Field(
         default_factory=dict, description="Component → material of brine-wetted parts."
     )
@@ -404,8 +451,15 @@ class _Checks:
         source: str,
         ok_detail: str = "",
         warnings: Iterable[str] = (),
-        tolerance: float = 0.0,
+        tolerance: float | None = None,
     ) -> None:
+        """Pass if the worst margin ≥ −tolerance (default ``NUMERIC_TOL`` relative)."""
+        if worst.count == 0:
+            self.missing(check_id, name, "no evaluable item (see related checks)", source)
+            return
+        if tolerance is None:
+            scale = max(1.0, abs(limit or 0.0), abs(worst.value or 0.0))
+            tolerance = NUMERIC_TOL * scale
         status = CheckStatus.PASS if worst.margin >= -tolerance else CheckStatus.FAIL
         detail = worst.detail if status == CheckStatus.FAIL else (ok_detail or worst.detail)
         self.add(
@@ -464,12 +518,23 @@ def _active_doublets(day: DayResult) -> Iterable[tuple[int, float]]:
             yield index, flow
 
 
+def _lmtd(dt_a: float, dt_b: float) -> float:
+    if abs(dt_a - dt_b) <= 1e-9 * max(dt_a, dt_b):
+        return dt_a
+    return (dt_a - dt_b) / math.log(dt_a / dt_b)
+
+
+def _note(ids: list[str], assumption_id: str) -> None:
+    if assumption_id not in ids:
+        ids.append(assumption_id)
+
+
 # --------------------------------------------------------------------------- verifier
 class DesignVerifier:
     """Deterministic 4-layer verifier (spec §10.1).
 
     Thresholds: ``config/limits.yaml`` (hard limits), the module constants (cards/spec, cited)
-    and the assumptions register (``VER-ESP-PB``).
+    and the assumptions register (``VER-ESP-PB``, ``VER-HP-ETA``, ``VER-HP-LIFT``, ``DB-33``).
     """
 
     def __init__(
@@ -481,7 +546,10 @@ class DesignVerifier:
         """Bind the hard limits, the design basis and the assumptions register."""
         self.limits = limits
         self.design_basis = design_basis
-        self.release_pressure_default_bar = float(register.get(ESP_RELEASE_PRESSURE_ID).value)
+        self.release_pressure_default_barg = float(register.get(ESP_RELEASE_PRESSURE_ID).value)
+        self.hp_carnot_fraction_default = float(register.get(HP_CARNOT_FRACTION_ID).value)
+        self.hp_max_lift_default_k = float(register.get(HP_MAX_LIFT_ID).value)
+        self.brine_cp_j_per_kg_k = float(register.get(BRINE_CP_ID).value)
 
     @classmethod
     def from_config(cls, config_dir: Path | str | None = None) -> DesignVerifier:
@@ -495,7 +563,6 @@ class DesignVerifier:
     # ------------------------------------------------------------------ entry point
     def verify(self, evidence: VerificationEvidence) -> VerificationReport:
         """Run every layer and return the report (never raises on bad evidence)."""
-        candidate = evidence.candidate
         project, duplicates, load_error = None, [], ""
         if evidence.project is not None:
             try:
@@ -508,10 +575,16 @@ class DesignVerifier:
             *self._syntactic(evidence, project, load_error),
             *self._semantic(evidence, project, duplicates, load_error),
             *self._physical(evidence, types, assumption_ids),
-            *self._performance(evidence),
+            *self._performance(evidence, assumption_ids),
             *self._exergy(evidence),
         ]
-        return self._report(candidate.id, checks, evidence.stub_evidence, assumption_ids)
+        return self._report(evidence.candidate.id, checks, evidence.stub_evidence, assumption_ids)
+
+    def _release_pressure(self, ev: VerificationEvidence, ids: list[str]) -> float:
+        if ev.co2_release_pressure_barg is not None:
+            return ev.co2_release_pressure_barg
+        _note(ids, ESP_RELEASE_PRESSURE_ID)
+        return self.release_pressure_default_barg
 
     # ------------------------------------------------------------------ layer 1: syntactic
     def _syntactic(
@@ -526,7 +599,6 @@ class DesignVerifier:
         else:
             assert project is not None
             unknown = [k for k in project if k not in PROJECT_KEYS and not k.startswith("_")]
-            problem = ""
             if not isinstance(project.get("components"), dict) or not project["components"]:
                 problem = "'components' must be a non-empty object"
             elif not isinstance(project.get("connections", []), list):
@@ -545,28 +617,21 @@ class DesignVerifier:
                 source="spec §10.1; gemini_simulator.project_loader",
             )
 
+        parts = (("annual", ev.annual), ("fast_annual", ev.fast_annual), ("kpis", ev.kpis))
         mismatched = [
             label
-            for label, part in (
-                ("annual", ev.annual),
-                ("fast_annual", ev.fast_annual),
-                ("kpis", ev.kpis),
-            )
+            for label, part in parts
             if part is not None and part.candidate_id != ev.candidate.id
         ]
-        try:
-            Candidate.model_validate(ev.candidate.model_dump())
-            schema_error = ""
-        except ValueError as exc:  # pragma: no cover - the model is validated on construction
-            schema_error = str(exc)
-        problem = schema_error or (
-            f"candidate_id of {mismatched} differs from '{ev.candidate.id}'" if mismatched else ""
-        )
         out.add(
             "SY-02",
             "schemas valid and consistent",
-            CheckStatus.FAIL if problem else CheckStatus.PASS,
-            detail=problem or "candidate, results and KPIs validate",
+            CheckStatus.FAIL if mismatched else CheckStatus.PASS,
+            detail=(
+                f"candidate_id of {mismatched} differs from '{ev.candidate.id}'"
+                if mismatched
+                else "candidate, results and KPIs validate"
+            ),
             source="spec §10.1; gemini_agent.schemas",
         )
 
@@ -624,7 +689,7 @@ class DesignVerifier:
 
         problems = _reference_problems(components, connections, boundary)
         if not problems:
-            problems = _solve_problems(project, connections)
+            problems = _solve_problems(project)
         out.add(
             "SE-02",
             names["SE-02"],
@@ -667,6 +732,7 @@ class DesignVerifier:
     def _pairing(
         candidate: Candidate, components: dict[str, Any], connections: list[Any]
     ) -> CheckResult:
+        """SE-04. The project may model one representative doublet of an N-doublet candidate."""
         out = _Checks(Layer.SEMANTIC)
         types = {n: (s.get("type") if isinstance(s, dict) else None) for n, s in components.items()}
         producers = sorted(n for n, t in types.items() if t == "producer_well")
@@ -703,6 +769,7 @@ class DesignVerifier:
             detail=problem or f"{len(producers)} producer/injector pair(s)",
             value=len(producers),
             limit=len(injectors),
+            unit="count",
             source=source,
         )
         return out.items[0]
@@ -713,8 +780,9 @@ class DesignVerifier:
     ) -> list[CheckResult]:
         out = _Checks(Layer.PHYSICAL)
         self._daily_checks(out, ev)
+        self._brine_balance(out, ev, assumption_ids)
         self._hex_checks(out, ev, types)
-        self._heat_pump_checks(out, ev, types)
+        self._heat_pump_checks(out, ev, types, assumption_ids)
         self._absorption_checks(out, ev, types)
         self._pump_checks(out, ev, types)
         self._esp_checks(out, ev, types, assumption_ids)
@@ -725,16 +793,17 @@ class DesignVerifier:
         lim = self.limits
         geothermal = ev.candidate.doublets > 0
         names = {
-            "PH-01": "daily energy balance < 1 %",
-            "PH-02": f"brine cooling ≤ {_fmt(lim.brine_cooling_max_k)} K",
+            "PH-01": "daily energy balance < 1 % (supplied + unmet = demand)",
+            "PH-02": f"brine cooling 0–{_fmt(lim.brine_cooling_max_k)} K",
             "PH-03": (
-                f"{lim.doublet_count_min}–{lim.doublet_count_max} doublets, "
-                f"{_fmt(lim.flow_min_active_m3h)}–{_fmt(lim.flow_max_m3h)} m3/h per active doublet"
+                f"{_fmt(lim.flow_min_active_m3h)}–{_fmt(lim.flow_max_m3h)} m3/h per active "
+                "doublet, 0 on outage"
             ),
             "PH-04": "Q_inj = Q_prod",
             "PH-05": f"heating supply {_fmt(lim.heating_supply_degc)} °C met",
             "PH-06": f"cooling supply {_fmt(lim.cooling_supply_degc)} °C met",
         }
+        self._doublet_count(out, ev)
         if ev.annual is None:
             for check_id, name in names.items():
                 if check_id in {"PH-02", "PH-03", "PH-04"} and not geothermal:
@@ -799,25 +868,39 @@ class DesignVerifier:
                     f"{day.date}: supply {_fmt(temperature)} °C vs {'≤' if upper else '≥'} "
                     f"{_fmt(setpoint)} °C",
                 )
+            source = "DB-16/DB-17; limits.yaml"
             if missing:
                 out.missing(
-                    check_id,
-                    names[check_id],
-                    f"supply temperature on {missing} day(s)",
-                    "DB-16/DB-17",
+                    check_id, names[check_id], f"supply temperature on {missing} day(s)", source
                 )
             elif worst.count == 0:
-                out.not_applicable(check_id, names[check_id], "no demand", "DB-16/DB-17")
+                out.not_applicable(check_id, names[check_id], "no demand", source)
             else:
                 out.bound(
-                    check_id,
-                    names[check_id],
-                    worst,
-                    limit=setpoint,
-                    unit="degC",
-                    source="DB-16/DB-17; limits.yaml",
-                    tolerance=NUMERIC_TOL * max(1.0, abs(setpoint)),
+                    check_id, names[check_id], worst, limit=setpoint, unit="degC", source=source
                 )
+
+    def _doublet_count(self, out: _Checks, ev: VerificationEvidence) -> None:
+        lim = self.limits
+        name = f"{lim.doublet_count_min}–{lim.doublet_count_max} doublets, matching the results"
+        count = ev.candidate.doublets
+        if count == 0:
+            out.not_applicable("PH-24", name, "no doublets (C0)", "limits.yaml DB-10")
+            return
+        worst = _Bound()
+        worst.add(
+            min(count - lim.doublet_count_min, lim.doublet_count_max - count),
+            count,
+            f"{count} doublets vs {lim.doublet_count_min}–{lim.doublet_count_max}",
+        )
+        for day in ev.annual.days if ev.annual else []:
+            if day.doublet_flow_m3h and len(day.doublet_flow_m3h) != count:
+                worst.add(
+                    -abs(len(day.doublet_flow_m3h) - count),
+                    len(day.doublet_flow_m3h),
+                    f"{day.date}: {len(day.doublet_flow_m3h)} doublet flows for {count} doublets",
+                )
+        out.bound("PH-24", name, worst, limit=lim.doublet_count_max, unit="count", source="DB-10")
 
     def _doublet_day_checks(
         self, out: _Checks, ev: VerificationEvidence, names: dict[str, str]
@@ -825,43 +908,28 @@ class DesignVerifier:
         lim = self.limits
         assert ev.annual is not None
         days = ev.annual.days
+        source = "limits.yaml (DB-11/12/14)"
         if not any(day.doublet_flow_m3h for day in days):
             for check_id in ("PH-02", "PH-03", "PH-04"):
-                out.missing(check_id, names[check_id], "per-doublet flows", "spec §10.1")
+                out.missing(check_id, names[check_id], "per-doublet flows", source)
             return
 
         cooling, cooling_missing = _Bound(), False
         flow = _Bound()
         balance, injection_missing = _Bound(), False
-        count = ev.candidate.doublets
-        if not lim.doublet_count_min <= count <= lim.doublet_count_max:
-            flow.add(
-                -1.0,
-                count,
-                f"{count} doublets vs {lim.doublet_count_min}–{lim.doublet_count_max}",
-            )
         for day in days:
-            if day.doublet_flow_m3h and len(day.doublet_flow_m3h) != count:
-                flow.add(
-                    -1.0,
-                    len(day.doublet_flow_m3h),
-                    f"{day.date}: {len(day.doublet_flow_m3h)} doublet flows for {count} "
-                    "doublets",
-                )
             available = day.doublet_available or [True] * len(day.doublet_flow_m3h)
             for index, q in enumerate(day.doublet_flow_m3h):
                 label = f"{day.date} doublet {index + 1}"
-                if not available[index]:
+                if index < len(available) and not available[index]:
                     if q > 0:
                         flow.add(-q, q, f"{label}: {_fmt(q)} m3/h during planned outage")
                     continue
                 if q > 0:
-                    margin = min(q - lim.flow_min_active_m3h, lim.flow_max_m3h - q)
                     flow.add(
-                        margin,
+                        min(q - lim.flow_min_active_m3h, lim.flow_max_m3h - q),
                         q,
-                        f"{label}: {_fmt(q)} m3/h vs "
-                        f"{_fmt(lim.flow_min_active_m3h)}–"
+                        f"{label}: {_fmt(q)} m3/h vs {_fmt(lim.flow_min_active_m3h)}–"
                         f"{_fmt(lim.flow_max_m3h)} m3/h",
                     )
             for index, q in _active_doublets(day):
@@ -877,6 +945,8 @@ class DesignVerifier:
                         f"{label}: brine cooled {_fmt(dt_k)} K vs ≤ "
                         f"{_fmt(lim.brine_cooling_max_k)} K",
                     )
+                    if dt_k < 0:  # injection hotter than production: not a heat-extraction loop
+                        cooling.add(dt_k, dt_k, f"{label}: injection hotter than production")
                 else:
                     cooling_missing = True
                 if day.injection_flow_m3h:
@@ -888,7 +958,6 @@ class DesignVerifier:
                     )
                 else:
                     injection_missing = True
-        source = "limits.yaml (DB-10/11/12/14)"
         if cooling_missing:
             out.missing("PH-02", names["PH-02"], "production/injection temperatures", source)
         elif cooling.count:
@@ -911,8 +980,9 @@ class DesignVerifier:
                 "PH-03",
                 names["PH-03"],
                 CheckStatus.PASS,
-                detail="no doublet produced",
+                detail="no doublet produced on any day",
                 source=source,
+                warnings=["geothermal candidate without production"],
             )
         if injection_missing:
             out.missing("PH-04", names["PH-04"], "injection flows", source)
@@ -925,19 +995,92 @@ class DesignVerifier:
                 unit="m3/h",
                 source=source,
                 ok_detail="injection equals production on every doublet-day",
-                tolerance=NUMERIC_TOL * self.limits.flow_max_m3h,
+                tolerance=NUMERIC_TOL * lim.flow_max_m3h,
             )
         else:
             out.not_applicable("PH-04", names["PH-04"], "no doublet produced", source)
 
+    def _brine_balance(
+        self, out: _Checks, ev: VerificationEvidence, assumption_ids: list[str]
+    ) -> None:
+        """PH-22: Σ heat drawn from the brine = Σ ρ·Q·c_p·(T_prod − T_inj) within 1 % per day.
+
+        A user that both draws brine heat and delivers network heat obeys the first law:
+        delivered = drawn + electricity (direct HEX: none; heat pump: Q_cond = Q_evap + W).
+        """
+        name = "brine-side energy balance < 1 % (heat drawn = ρ·Q·c_p·ΔT; first law per user)"
+        source = "spec §10.1; DB-08, DB-33; DB-23/DB-24"
+        if ev.candidate.doublets == 0:
+            out.not_applicable("PH-22", name, "no doublets (C0)", source)
+            return
+        if ev.annual is None:
+            out.missing("PH-22", name, "full-mode daily results", source)
+            return
+        rho = self.design_basis.brine.density_kg_m3
+        cp = self.brine_cp_j_per_kg_k
+        _note(assumption_ids, BRINE_CP_ID)
+        worst, missing = _Bound(), 0
+        for day in ev.annual.days:
+            active = list(_active_doublets(day))
+            if active and not (day.production_temperature_degc and day.injection_temperature_degc):
+                missing += 1
+                continue
+            available = sum(
+                brine_heat_mw(
+                    q,
+                    rho,
+                    cp,
+                    day.production_temperature_degc[i] - day.injection_temperature_degc[i],
+                )
+                for i, q in active
+            )
+            if available <= 0 and not day.brine_heat_drawn_mw:
+                continue
+            if not day.brine_heat_drawn_mw:
+                missing += 1
+                continue
+            drawn = sum(day.brine_heat_drawn_mw.values())
+            scale = max(abs(available), abs(drawn))
+            error = abs(drawn - available) / scale if scale > 0 else 0.0
+            worst.add(
+                ENERGY_BALANCE_TOL_FRAC - error,
+                error,
+                f"{day.date}: heat drawn {_fmt(drawn)} MW vs brine ρQc_pΔT {_fmt(available)} MW "
+                f"({_fmt(100 * error)} %)",
+            )
+            for key, drawn_k in day.brine_heat_drawn_mw.items():
+                if key not in day.heat_by_source_mw:
+                    continue  # e.g. absorption drive heat: not delivered to the network
+                delivered = day.heat_by_source_mw[key]
+                expected = drawn_k + day.electricity_by_consumer_mw.get(key, 0.0)
+                scale = max(abs(delivered), abs(expected))
+                error = abs(delivered - expected) / scale if scale > 0 else 0.0
+                worst.add(
+                    ENERGY_BALANCE_TOL_FRAC - error,
+                    error,
+                    f"{day.date} '{key}': delivered {_fmt(delivered)} MW vs drawn + electricity "
+                    f"{_fmt(expected)} MW",
+                )
+        if missing:
+            out.missing(
+                "PH-22", name, f"brine heat drawn or temperatures on {missing} day(s)", source
+            )
+        elif worst.count == 0:
+            out.not_applicable("PH-22", name, "no doublet produced", source)
+        else:
+            out.bound(
+                "PH-22", name, worst, limit=ENERGY_BALANCE_TOL_FRAC, unit="frac", source=source
+            )
+
     def _hex_checks(self, out: _Checks, ev: VerificationEvidence, types: dict[str, str]) -> None:
         names = {
             "PH-07": f"plate-HEX approach ≥ {_fmt(HEX_MIN_APPROACH_K)} K",
-            "PH-08": f"plate-HEX temperature ≤ {_fmt(HEX_MAX_TEMPERATURE_DEGC)} °C",
-            "PH-09": f"plate-HEX pressure ≤ {_fmt(HEX_MAX_PRESSURE_BAR)} bar",
+            "PH-08": "plate-HEX temperature within rating (gasketed 150 °C, welded 204 °C)",
+            "PH-09": "plate-HEX pressure within rating (gasketed 20 bar, welded 20.7 bar(g))",
             "PH-10": "plate-HEX Δp 1–6 psi per NTU (≈ 24 kPa/NTU)",
             "PH-11": "plate-HEX NTU per pass 0.6–4.0",
             "PH-12": "plate-HEX unit ≤ 1360 m3/h and ≤ 1208 m2",
+            "PH-23": "plate-HEX NTU consistent with its terminal temperatures (F_c 0.85–1)",
         }
         source = "RC-03"
         required = (
@@ -950,112 +1093,50 @@ class DesignVerifier:
                 else:
                     out.not_applicable(check_id, name, "no heat exchanger", source)
             return
-        approach, temperature, pressure = _Bound(), _Bound(), _Bound()
-        dp, ntu, size = _Bound(), _Bound(), _Bound()
-        missing: dict[str, list[str]] = {"PH-09": [], "PH-10": [], "PH-11": [], "PH-12": []}
+        bounds = {check_id: _Bound() for check_id in names}
+        missing: dict[str, list[str]] = {key: [] for key in ("PH-09", "PH-10", "PH-11", "PH-12")}
         warnings: list[str] = []
         for point in ev.hex_points:
-            terminal = min(
-                point.hot_in_degc - point.cold_out_degc, point.hot_out_degc - point.cold_in_degc
-            )
-            if point.hot_out_degc > point.hot_in_degc or point.cold_out_degc < point.cold_in_degc:
-                approach.add(
-                    -abs(point.hot_out_degc - point.hot_in_degc) - 1.0,
-                    terminal,
-                    f"{point.name}: hot side heats up or cold side cools down",
-                )
-            approach.add(
-                terminal - HEX_MIN_APPROACH_K,
-                terminal,
-                f"{point.name}: approach {_fmt(terminal)} K vs ≥ {_fmt(HEX_MIN_APPROACH_K)} K",
-            )
-            if HEX_MIN_APPROACH_K <= terminal < HEX_TYPICAL_APPROACH_K[0]:
-                warnings.append(f"{point.name}: approach {_fmt(terminal)} K below typical 2–5.6 K")
-            t_max = max(
-                point.hot_in_degc, point.hot_out_degc, point.cold_in_degc, point.cold_out_degc
-            )
-            temperature.add(
-                HEX_MAX_TEMPERATURE_DEGC - t_max,
-                t_max,
-                f"{point.name}: {_fmt(t_max)} °C vs ≤ {_fmt(HEX_MAX_TEMPERATURE_DEGC)} °C",
-            )
-            if point.design_pressure_bar is None:
-                missing["PH-09"].append(point.name)
-            else:
-                pressure.add(
-                    HEX_MAX_PRESSURE_BAR - point.design_pressure_bar,
-                    point.design_pressure_bar,
-                    f"{point.name}: {_fmt(point.design_pressure_bar)} bar vs ≤ "
-                    f"{_fmt(HEX_MAX_PRESSURE_BAR)} bar",
-                )
-            if point.ntu is None or point.pressure_drop_pa is None:
-                missing["PH-10"].append(point.name)
-            else:
-                per_ntu = point.pressure_drop_pa / point.ntu
-                lo, hi = HEX_DP_PER_NTU_PA
-                dp.add(
-                    min(per_ntu - lo, hi - per_ntu) / 1000.0,
-                    per_ntu / 1000.0,
-                    f"{point.name}: Δp {_fmt(per_ntu / 1000.0)} kPa per NTU vs "
-                    f"{_fmt(lo / 1000.0)}–{_fmt(hi / 1000.0)} kPa",
-                )
-            if point.ntu is None:
-                missing["PH-11"].append(point.name)
-            else:
-                lo, hi = HEX_NTU_PER_PASS
-                ntu.add(
-                    min(point.ntu - lo, hi - point.ntu),
-                    point.ntu,
-                    f"{point.name}: NTU {_fmt(point.ntu)} vs {_fmt(lo)}–{_fmt(hi)}",
-                )
-            if point.flow_m3h is None and point.area_m2 is None:
-                missing["PH-12"].append(point.name)
-            if point.flow_m3h is not None:
-                size.add(
-                    (HEX_MAX_UNIT_FLOW_M3H - point.flow_m3h) / HEX_MAX_UNIT_FLOW_M3H,
-                    point.flow_m3h / HEX_MAX_UNIT_FLOW_M3H,
-                    f"{point.name}: {_fmt(point.flow_m3h)} m3/h vs ≤ "
-                    f"{_fmt(HEX_MAX_UNIT_FLOW_M3H)} m3/h per unit",
-                )
-            if point.area_m2 is not None:
-                size.add(
-                    (HEX_MAX_UNIT_AREA_M2 - point.area_m2) / HEX_MAX_UNIT_AREA_M2,
-                    point.area_m2 / HEX_MAX_UNIT_AREA_M2,
-                    f"{point.name}: {_fmt(point.area_m2)} m2 vs ≤ "
-                    f"{_fmt(HEX_MAX_UNIT_AREA_M2)} m2 per unit",
-                )
+            _hex_point(point, bounds, missing, warnings)
         out.bound(
             "PH-07",
             names["PH-07"],
-            approach,
+            bounds["PH-07"],
             limit=HEX_MIN_APPROACH_K,
             unit="K",
             source="RC-03; Guidebook p.217–223",
             warnings=warnings,
         )
-        out.bound(
-            "PH-08",
-            names["PH-08"],
-            temperature,
-            limit=HEX_MAX_TEMPERATURE_DEGC,
-            unit="degC",
-            source="RC-03; GNS p.40",
-        )
-        for check_id, worst, limit, unit, src in (
-            ("PH-09", pressure, HEX_MAX_PRESSURE_BAR, "bar", "RC-03; GNS p.40"),
-            ("PH-10", dp, HEX_DP_PER_NTU_PA[1] / 1000.0, "kPa", "RC-03 eq. 4; Guidebook p.221"),
-            ("PH-11", ntu, HEX_NTU_PER_PASS[1], "-", "RC-03; Guidebook p.221"),
-            ("PH-12", size, 1.0, "frac", "RC-03 limits"),
+        out.bound("PH-08", names["PH-08"], bounds["PH-08"], limit=None, unit="degC", source=source)
+        for check_id, limit, unit, src in (
+            ("PH-09", None, "bar", "RC-03; GNS p.40; Guidebook p.218"),
+            ("PH-10", HEX_DP_PER_NTU_PA[1] / 1000.0, "kPa", "RC-03 eq. 4; Guidebook p.221"),
+            ("PH-11", HEX_NTU_PER_PASS[1], "-", "RC-03; Guidebook p.221"),
+            ("PH-12", 1.0, "frac", "RC-03 limits"),
         ):
             if missing[check_id]:
                 out.missing(check_id, names[check_id], f"data for {missing[check_id]}", src)
             else:
-                out.bound(check_id, names[check_id], worst, limit=limit, unit=unit, source=src)
+                out.bound(
+                    check_id, names[check_id], bounds[check_id], limit=limit, unit=unit, source=src
+                )
+        src = "RC-03 eq. 1–2 (ε-NTU / LMTD, counter-flow)"
+        if missing["PH-11"]:
+            out.missing("PH-23", names["PH-23"], f"NTU for {missing['PH-11']}", src)
+        else:
+            out.bound("PH-23", names["PH-23"], bounds["PH-23"], limit=None, unit="-", source=src)
 
     def _heat_pump_checks(
-        self, out: _Checks, ev: VerificationEvidence, types: dict[str, str]
+        self,
+        out: _Checks,
+        ev: VerificationEvidence,
+        types: dict[str, str],
+        assumption_ids: list[str],
     ) -> None:
-        names = {"PH-13": "heat-pump COP ≤ Carnot", "PH-14": "heat-pump lift within datasheet"}
+        names = {
+            "PH-13": "heat-pump COP ≤ Carnot (condensing/evaporating temperatures)",
+            "PH-14": "heat-pump lift and COP within datasheet (or RC-04 defaults)",
+        }
         required = (
             bool(ev.heat_pumps)
             or "heatpump" in types.values()
@@ -1068,44 +1149,59 @@ class DesignVerifier:
                 else:
                     out.not_applicable(check_id, name, "no heat pump", "RC-04")
             return
-        carnot, lift, missing = _Bound(), _Bound(), []
-        for point in ev.heat_pumps:
-            sink_k, source_k = point.sink_degc + 273.15, point.source_degc + 273.15
-            if sink_k <= source_k:
+        carnot, datasheet = _Bound(), _Bound()
+        for p in ev.heat_pumps:
+            cond_k, evap_k = p.condensing_degc + 273.15, p.evaporating_degc + 273.15
+            if (
+                cond_k <= evap_k
+                or p.condensing_degc < p.sink_out_degc
+                or p.evaporating_degc > p.source_out_degc
+            ):
                 carnot.add(
-                    -point.cop,
-                    point.cop,
-                    f"{point.name}: sink {_fmt(point.sink_degc)} °C not above source "
-                    f"{_fmt(point.source_degc)} °C",
+                    -1.0,
+                    p.cop,
+                    f"{p.name}: configuration error (condensing {_fmt(p.condensing_degc)} °C must "
+                    f"exceed the evaporating {_fmt(p.evaporating_degc)} °C and the sink outlet; "
+                    "evaporating must be below the source outlet)",
                 )
-            else:
-                limit = sink_k / (sink_k - source_k)
-                carnot.add(
-                    limit - point.cop,
-                    point.cop,
-                    f"{point.name}: COP {_fmt(point.cop)} vs Carnot {_fmt(limit)}",
-                )
-            if point.max_lift_k is None:
-                missing.append(point.name)
-            else:
-                value = point.sink_degc - point.source_degc
-                lift.add(
-                    point.max_lift_k - value,
-                    value,
-                    f"{point.name}: lift {_fmt(value)} K vs datasheet ≤ {_fmt(point.max_lift_k)} K",
-                )
+                continue
+            cop_carnot = cond_k / (cond_k - evap_k)
+            carnot.add(
+                cop_carnot - p.cop,
+                p.cop,
+                f"{p.name}: COP {_fmt(p.cop)} vs Carnot {_fmt(cop_carnot)}",
+            )
+            fraction = p.max_carnot_fraction
+            if fraction is None:
+                fraction = self.hp_carnot_fraction_default
+                _note(assumption_ids, HP_CARNOT_FRACTION_ID)
+            max_lift = p.max_lift_k
+            if max_lift is None:
+                max_lift = self.hp_max_lift_default_k
+                _note(assumption_ids, HP_MAX_LIFT_ID)
+            cap = fraction * cop_carnot
+            datasheet.add(
+                (cap - p.cop) / cap,
+                p.cop / cap,
+                f"{p.name}: COP {_fmt(p.cop)} vs ≤ {_fmt(fraction)} × Carnot = {_fmt(cap)}",
+            )
+            lift = p.sink_out_degc - p.source_out_degc
+            datasheet.add(
+                (max_lift - lift) / max_lift,
+                lift / max_lift,
+                f"{p.name}: lift {_fmt(lift)} K (outlet to outlet) vs ≤ {_fmt(max_lift)} K",
+            )
         out.bound(
-            "PH-13",
-            names["PH-13"],
-            carnot,
-            limit=None,
-            unit="-",
-            source="spec §10.1; COP_Carnot = T_sink/(T_sink − T_source)",
+            "PH-13", names["PH-13"], carnot, limit=None, unit="-", source="spec §10.1; RC-04 eq. 1"
         )
-        if missing:
-            out.missing("PH-14", names["PH-14"], f"datasheet lift for {missing}", "RC-04")
-        else:
-            out.bound("PH-14", names["PH-14"], lift, limit=None, unit="K", source="RC-04")
+        out.bound(
+            "PH-14",
+            names["PH-14"],
+            datasheet,
+            limit=1.0,
+            unit="frac",
+            source=f"RC-04 ({HP_CARNOT_FRACTION_ID}, {HP_MAX_LIFT_ID} without a datasheet)",
+        )
 
     def _absorption_checks(
         self, out: _Checks, ev: VerificationEvidence, types: dict[str, str]
@@ -1178,11 +1274,10 @@ class DesignVerifier:
         worst = _Bound()
         for p in ev.pumps:
             expected = p.flow_m3h / 3600.0 * p.pressure_rise_pa / eta
-            error = (
-                abs(p.shaft_power_w - expected) / expected
-                if expected > 0
-                else (0.0 if p.shaft_power_w == 0 else 1.0)
-            )
+            if expected > 0:
+                error = abs(p.shaft_power_w - expected) / expected
+            else:
+                error = 0.0 if p.shaft_power_w == 0 else 1.0
             worst.add(
                 PUMP_POWER_TOL_FRAC - error,
                 error,
@@ -1211,27 +1306,25 @@ class DesignVerifier:
             return
         intake, npsh, missing, warnings = _Bound(), _Bound(), [], []
         for p in ev.esps:
-            release = p.release_pressure_bar
+            release = p.release_pressure_barg
             if release is None:
-                release = self.release_pressure_default_bar
-                if ESP_RELEASE_PRESSURE_ID not in assumption_ids:
-                    assumption_ids.append(ESP_RELEASE_PRESSURE_ID)
-                warnings.append(
-                    f"{p.name}: release pressure not given; default "
-                    f"{_fmt(release)} bar(g) ({ESP_RELEASE_PRESSURE_ID})"
-                )
+                release = self._release_pressure(ev, assumption_ids)
+                if ev.co2_release_pressure_barg is None:
+                    warnings.append(
+                        f"{p.name}: release pressure not given; default {_fmt(release)} bar(g) "
+                        f"({ESP_RELEASE_PRESSURE_ID})"
+                    )
             intake.add(
-                p.intake_pressure_bar - release,
-                p.intake_pressure_bar,
-                f"{p.name}: intake {_fmt(p.intake_pressure_bar)} bar(g) vs release ≥ "
+                p.intake_pressure_barg - release,
+                p.intake_pressure_barg,
+                f"{p.name}: intake {_fmt(p.intake_pressure_barg)} bar(g) vs release ≥ "
                 f"{_fmt(release)} bar(g)",
             )
             if p.npsh_available_m is None or p.npsh_required_m is None:
                 missing.append(p.name)
             else:
-                margin = p.npsh_available_m - p.npsh_required_m - NPSH_MARGIN_M
                 npsh.add(
-                    margin,
+                    p.npsh_available_m - p.npsh_required_m - NPSH_MARGIN_M,
                     p.npsh_available_m,
                     f"{p.name}: NPSH_A {_fmt(p.npsh_available_m)} m vs NPSH_R "
                     f"{_fmt(p.npsh_required_m)} + {_fmt(NPSH_MARGIN_M)} m",
@@ -1264,6 +1357,7 @@ class DesignVerifier:
                     ("cooling", day.cool_by_source_mw),
                     ("electricity", day.electricity_by_consumer_mw),
                     ("gas fuel", day.gas_fuel_by_consumer_mw),
+                    ("brine heat drawn", day.brine_heat_drawn_mw),
                 ):
                     for key, value in values.items():
                         worst.add(value, value, f"{day.date} {label} '{key}' = {_fmt(value)} MW")
@@ -1296,21 +1390,22 @@ class DesignVerifier:
             out.bound("PH-21", name, worst, limit=0.0, unit="suffix", source="DayResult.margins")
 
     # ------------------------------------------------------------------ layer 4: performance
-    def _performance(self, ev: VerificationEvidence) -> list[CheckResult]:
+    def _performance(
+        self, ev: VerificationEvidence, assumption_ids: list[str]
+    ) -> list[CheckResult]:
         out = _Checks(Layer.PERFORMANCE)
         candidate, geothermal = ev.candidate, ev.candidate.doublets > 0
 
         name = "unmet demand = 0"
+        unmet: float | None = None
         if ev.annual is not None:
             unmet = ev.annual.unmet_heating_mwh + ev.annual.unmet_cooling_mwh
         elif (
             ev.kpis
             and ev.kpis.unmet_heating_mwh is not None
-            and (ev.kpis.unmet_cooling_mwh is not None)
+            and ev.kpis.unmet_cooling_mwh is not None
         ):
             unmet = ev.kpis.unmet_heating_mwh + ev.kpis.unmet_cooling_mwh
-        else:
-            unmet = None
         if unmet is None:
             out.missing("PD-01", name, "daily results or unmet-demand KPIs", "spec §10.1")
         else:
@@ -1350,193 +1445,38 @@ class DesignVerifier:
         breakthrough = sub.thermal_breakthrough_yr if sub else None
         if breakthrough is None and ev.kpis is not None:
             breakthrough = ev.kpis.thermal_breakthrough_yr
-        for check_id, name, value, limit, upper, unit, applies in (
-            (
-                "PD-03",
-                "well spacing ≥ 1.2 km",
-                sub.well_spacing_m if sub else None,
-                WELL_SPACING_MIN_M,
-                False,
-                "m",
-                geothermal,
-            ),
-            (
-                "PD-04",
-                "inter-doublet interference ≤ 1 bar",
-                sub.interference_bar if sub else None,
-                INTERFERENCE_MAX_BAR,
-                True,
-                "bar",
-                candidate.doublets > 1,
-            ),
-            (
-                "PD-05",
-                "thermal breakthrough ≥ 30 yr",
-                breakthrough,
-                BREAKTHROUGH_MIN_YR,
-                False,
-                "yr",
-                geothermal,
-            ),
-        ):
+        subsurface_checks: tuple[tuple[str, str, float | None, float, bool, str, bool], ...] = (
+            ("PD-03", "well spacing ≥ 1.2 km", sub.well_spacing_m if sub else None,
+             WELL_SPACING_MIN_M, False, "m", geothermal),
+            ("PD-04", "inter-doublet interference ≤ 1 bar", sub.interference_bar if sub else None,
+             INTERFERENCE_MAX_BAR, True, "bar", candidate.doublets > 1),
+            ("PD-05", "thermal breakthrough ≥ 30 yr", breakthrough, BREAKTHROUGH_MIN_YR, False,
+             "yr", geothermal),
+        )  # fmt: skip
+        for check_id, name, value, limit, upper, unit, applies in subsurface_checks:
             src = "spec ENG-06; RC-02"
             if not applies:
                 out.not_applicable(check_id, name, f"{candidate.doublets} doublet(s)", src)
             elif value is None:
                 out.missing(check_id, name, "subsurface screening result", src)
             else:
-                margin = limit - value if upper else value - limit
-                out.add(
-                    check_id,
-                    name,
-                    CheckStatus.PASS if margin >= 0 else CheckStatus.FAIL,
-                    detail=f"{_fmt(value)} {unit} vs {'≤' if upper else '≥'} {_fmt(limit)}",
-                    value=value,
-                    limit=limit,
-                    margin=margin,
-                    unit=unit,
-                    source=src,
+                worst = _Bound()
+                worst.add(
+                    limit - value if upper else value - limit,
+                    value,
+                    f"{_fmt(value)} {unit} vs {'≤' if upper else '≥'} {_fmt(limit)} {unit}",
                 )
+                out.bound(check_id, name, worst, limit=limit, unit=unit, source=src)
 
-        self._fast_full(out, ev)
-        self._scaling(out, ev)
-        self._materials(out, ev)
+        _fast_full(out, ev)
+        _scaling(out, ev)
+        _materials(out, ev)
         self._envelope(out, ev)
+        self._pressurised_loop(out, ev, assumption_ids)
         return out.items
 
-    @staticmethod
-    def _fast_full(out: _Checks, ev: VerificationEvidence) -> None:
-        name = "fast vs full simulation agree (≤ 5 % daily)"
-        source = "spec SIM-04"
-        if ev.annual is None or ev.fast_annual is None:
-            missing = "fast-mode" if ev.annual is not None else "full-mode"
-            out.missing("PD-06", name, f"{missing} daily results", source)
-            return
-        fast = {day.day_index: day for day in ev.fast_annual.days}
-        worst, warnings, compared = _Bound(), [], 0
-        for day in ev.annual.days:
-            other = fast.get(day.day_index)
-            if other is None:
-                continue
-            compared += 1
-            for label, full_mw, fast_mw, demand_mw in (
-                ("heat", day.heat_supplied_mw, other.heat_supplied_mw, day.heating_demand_mw),
-                ("cooling", day.cool_supplied_mw, other.cool_supplied_mw, day.cooling_demand_mw),
-            ):
-                scale = max(demand_mw, full_mw)
-                if scale <= 0:
-                    continue
-                error = abs(full_mw - fast_mw) / scale
-                if FAST_FULL_WARN_FRAC < error <= FAST_FULL_FAIL_FRAC:
-                    warnings.append(f"{day.date} {label}: {_fmt(100 * error)} % (> 2 %)")
-                worst.add(
-                    FAST_FULL_FAIL_FRAC - error,
-                    error,
-                    f"{day.date} {label}: fast {_fmt(fast_mw)} vs full {_fmt(full_mw)} MW "
-                    f"({_fmt(100 * error)} %)",
-                )
-        if compared == 0:
-            out.missing("PD-06", name, "days present in both fast and full results", source)
-        elif worst.count == 0:
-            out.add(
-                "PD-06",
-                name,
-                CheckStatus.PASS,
-                detail="no demand on the compared days",
-                source=source,
-            )
-        else:
-            out.bound(
-                "PD-06",
-                name,
-                worst,
-                limit=FAST_FULL_FAIL_FRAC,
-                unit="frac",
-                source=source,
-                warnings=warnings[:5],
-            )
-
-    @staticmethod
-    def _scaling(out: _Checks, ev: VerificationEvidence) -> None:
-        name = "scaling screen passed or mitigated"
-        source = "RC-12 (TL-22)"
-        candidate = ev.candidate
-        if candidate.doublets == 0:
-            out.not_applicable("PD-07", name, "no brine loop (C0)", source)
-            return
-        if ev.scaling is None:
-            out.missing("PD-07", name, "scaling/corrosion screen", source)
-            return
-        status = ev.scaling.status
-        if status != "insufficient data":
-            out.add(
-                "PD-07",
-                name,
-                CheckStatus.PASS if status == "pass" else CheckStatus.FAIL,
-                detail=f"screen {status}. {ev.scaling.detail}".strip(),
-                source=source,
-            )
-            return
-        required = {Mitigation.TITANIUM_PLATES, Mitigation.OXYGEN_EXCLUSION, Mitigation.NO_COPPER}
-        if candidate.gas_handling == GasHandling.DEGAS_USE:
-            required.add(Mitigation.CALCITE_INHIBITOR)  # degassing raises pH: dose downhole
-        else:
-            required.add(Mitigation.PRESSURISED_LOOP)  # keep pressure above CO₂ release
-        lacking = sorted(m.value for m in required - set(ev.scaling.mitigations))
-        out.add(
-            "PD-07",
-            name,
-            CheckStatus.FAIL if lacking else CheckStatus.PASS,
-            detail=(
-                f"brine chemistry missing and mitigations {lacking} not in the design"
-                if lacking
-                else "brine chemistry missing; required mitigations are in the design"
-            ),
-            value=len(lacking),
-            limit=0.0,
-            margin=-len(lacking),
-            unit="count",
-            source=source,
-            warnings=["MISSING INPUT: brine chemistry (Ca, alkalinity, pH, Cl, SO4, TDS)"],
-        )
-
-    @staticmethod
-    def _materials(out: _Checks, ev: VerificationEvidence) -> None:
-        name = "materials compatible (no Cu in brine; Ti plates for saline brine)"
-        source = "RC-12; RC-03; spec §10.1"
-        if ev.candidate.doublets == 0:
-            out.not_applicable("PD-08", name, "no brine loop (C0)", source)
-            return
-        brine_hex = [p for p in ev.hex_points if p.brine_side]
-        materials = dict(ev.brine_contact_materials)
-        unknown = [p.name for p in brine_hex if p.plate_material is None]
-        materials.update({p.name: p.plate_material for p in brine_hex if p.plate_material})
-        if unknown or not materials:
-            what = f"plate material of {unknown}" if unknown else "brine-contact materials"
-            out.missing("PD-08", name, what, source)
-            return
-        problems = [
-            f"{part}: copper alloy '{m}'" for part, m in materials.items() if _COPPER.search(m)
-        ]
-        if ev.saline_brine:
-            problems += [
-                f"{p.name}: plates '{p.plate_material}' not titanium"
-                for p in brine_hex
-                if p.plate_material and not _TITANIUM.search(p.plate_material)
-            ]
-        out.add(
-            "PD-08",
-            name,
-            CheckStatus.FAIL if problems else CheckStatus.PASS,
-            detail="; ".join(problems) or f"{len(materials)} brine-contact materials compatible",
-            value=len(problems),
-            limit=0.0,
-            margin=-len(problems),
-            unit="count",
-            source=source,
-        )
-
     def _envelope(self, out: _Checks, ev: VerificationEvidence) -> None:
+        """PD-09. Heat per doublet ≤ ρQc_pΔT follows from PH-02/03 and the PH-22 balance."""
         name = "sanity envelope: production temperature ≤ reservoir temperature"
         source = "spec §2.2 DB-20/DB-29; RC-01"
         candidate = ev.candidate
@@ -1561,14 +1501,41 @@ class DesignVerifier:
                     worst.add(
                         t_res - t,
                         t,
-                        f"{day.date} doublet {index + 1}: {_fmt(t)} °C vs ≤ "
-                        f"reservoir {_fmt(t_res)} °C at "
-                        f"{_fmt(candidate.depth_m)} m",
+                        f"{day.date} doublet {index + 1}: {_fmt(t)} °C vs ≤ reservoir "
+                        f"{_fmt(t_res)} °C at {_fmt(candidate.depth_m)} m",
                     )
         if worst.count == 0:
             out.not_applicable("PD-09", name, "no doublet produced", source)
         else:
             out.bound("PD-09", name, worst, limit=t_res, unit="degC", source=source)
+
+    def _pressurised_loop(
+        self, out: _Checks, ev: VerificationEvidence, assumption_ids: list[str]
+    ) -> None:
+        """PD-10 (RC-12): without degassing, brine stays above the CO₂-release pressure."""
+        name = "pressurised brine loop above the CO₂-release pressure"
+        source = f"RC-12; RC-01 item 9; {ESP_RELEASE_PRESSURE_ID}"
+        candidate = ev.candidate
+        if candidate.doublets == 0 or candidate.gas_handling != GasHandling.PRESSURISED_REINJECT:
+            out.not_applicable("PD-10", name, "loop is degassed or has no brine", source)
+            return
+        brine_hex = [p for p in ev.hex_points if p.brine_side]
+        lacking = [p.name for p in brine_hex if p.min_brine_pressure_barg is None]
+        if not brine_hex or lacking:
+            what = f"minimum brine pressure of {lacking or 'the brine HEX'}"
+            out.missing("PD-10", name, what, source)
+            return
+        release = self._release_pressure(ev, assumption_ids)
+        worst = _Bound()
+        for p in brine_hex:
+            assert p.min_brine_pressure_barg is not None
+            worst.add(
+                p.min_brine_pressure_barg - release,
+                p.min_brine_pressure_barg,
+                f"{p.name}: brine {_fmt(p.min_brine_pressure_barg)} bar(g) vs release ≥ "
+                f"{_fmt(release)} bar(g)",
+            )
+        out.bound("PD-10", name, worst, limit=release, unit="bar", source=source)
 
     # ------------------------------------------------------------------ layer 5: exergy
     @staticmethod
@@ -1625,20 +1592,257 @@ class DesignVerifier:
                     layer=layer, status=status, passed=n_pass, failed=n_fail, not_evaluated=n_miss
                 )
             )
-        violations = [f"{c.check_id} {c.name}: {c.detail}" for c in failed]
-        margins = {c.check_id: c.margin for c in checks if c.margin is not None}
         return VerificationReport(
             candidate_id=candidate_id,
             verdict=verdict,
-            violations=violations,
+            violations=[f"{c.check_id} {c.name}: {c.detail}" for c in failed],
             layers=layers,
             checks=checks,
             not_evaluated=missing,
-            margins=margins,
+            margins={c.check_id: c.margin for c in checks if c.margin is not None},
             assumption_ids=assumption_ids,
             stub_evidence=stub_evidence,
             summary=_summary(candidate_id, verdict, checks, failed, missing, stub_evidence),
         )
+
+
+# --------------------------------------------------------------------------- stateless checks
+def _hex_point(
+    p: HexPoint, bounds: dict[str, _Bound], missing: dict[str, list[str]], warnings: list[str]
+) -> None:
+    """Add one plate-HEX operating point to the RC-03 bound checks."""
+    duty_hot = p.hot_in_degc - p.hot_out_degc
+    duty_cold = p.cold_out_degc - p.cold_in_degc
+    dt_a = p.hot_in_degc - p.cold_out_degc
+    dt_b = p.hot_out_degc - p.cold_in_degc
+    approach = min(dt_a, dt_b)
+    if duty_hot < 0 or duty_cold < 0 or (duty_hot > 0) != (duty_cold > 0):
+        bounds["PH-07"].add(
+            -max(-duty_hot, -duty_cold, 1.0),
+            approach,
+            f"{p.name}: inconsistent temperatures (hot ΔT {_fmt(duty_hot)} K, cold ΔT "
+            f"{_fmt(duty_cold)} K)",
+        )
+    bounds["PH-07"].add(
+        approach - HEX_MIN_APPROACH_K,
+        approach,
+        f"{p.name}: approach {_fmt(approach)} K vs ≥ {_fmt(HEX_MIN_APPROACH_K)} K",
+    )
+    lo_typ, hi_typ = HEX_TYPICAL_APPROACH_K
+    if approach >= HEX_MIN_APPROACH_K and not lo_typ <= approach <= hi_typ:
+        warnings.append(f"{p.name}: approach {_fmt(approach)} K outside typical 2–5.6 K")
+    t_rating, p_rating = HEX_RATING[p.construction]
+    t_max = max(p.hot_in_degc, p.hot_out_degc, p.cold_in_degc, p.cold_out_degc)
+    bounds["PH-08"].add(
+        t_rating - t_max,
+        t_max,
+        f"{p.name}: {_fmt(t_max)} °C vs ≤ {_fmt(t_rating)} °C ({p.construction})",
+    )
+    if p.design_pressure_barg is None:
+        missing["PH-09"].append(p.name)
+    else:
+        bounds["PH-09"].add(
+            p_rating - p.design_pressure_barg,
+            p.design_pressure_barg,
+            f"{p.name}: {_fmt(p.design_pressure_barg)} bar(g) vs ≤ {_fmt(p_rating)} bar(g) "
+            f"({p.construction})",
+        )
+    if p.ntu is None or p.pressure_drop_pa is None:
+        missing["PH-10"].append(p.name)
+    else:
+        per_ntu = p.pressure_drop_pa / p.ntu
+        lo, hi = HEX_DP_PER_NTU_PA
+        bounds["PH-10"].add(
+            min(per_ntu - lo, hi - per_ntu) / 1000.0,
+            per_ntu / 1000.0,
+            f"{p.name}: Δp {_fmt(per_ntu / 1000.0)} kPa per NTU vs {_fmt(lo / 1000.0)}–"
+            f"{_fmt(hi / 1000.0)} kPa",
+        )
+    if p.ntu is None:
+        missing["PH-11"].append(p.name)
+    else:
+        lo, hi = HEX_NTU_PER_PASS
+        bounds["PH-11"].add(
+            min(p.ntu - lo, hi - p.ntu),
+            p.ntu,
+            f"{p.name}: NTU {_fmt(p.ntu)} per pass vs {_fmt(lo)}–{_fmt(hi)}",
+        )
+        if dt_a > 0 and dt_b > 0 and max(duty_hot, duty_cold) > 0:
+            ideal = max(duty_hot, duty_cold) / _lmtd(dt_a, dt_b)  # counter-flow, C_min side
+            total = p.ntu * p.passes
+            upper = ideal / HEX_CORRECTION_FACTOR_MIN
+            bounds["PH-23"].add(
+                min(total - ideal, upper - total),
+                total,
+                f"{p.name}: total NTU {_fmt(total)} ({p.passes} pass(es)) vs {_fmt(ideal)}–"
+                f"{_fmt(upper)} from the temperatures",
+            )
+    if p.flow_m3h is None and p.area_m2 is None:
+        missing["PH-12"].append(p.name)
+    if p.flow_m3h is not None:
+        bounds["PH-12"].add(
+            (HEX_MAX_UNIT_FLOW_M3H - p.flow_m3h) / HEX_MAX_UNIT_FLOW_M3H,
+            p.flow_m3h / HEX_MAX_UNIT_FLOW_M3H,
+            f"{p.name}: {_fmt(p.flow_m3h)} m3/h vs ≤ {_fmt(HEX_MAX_UNIT_FLOW_M3H)} m3/h per unit",
+        )
+    if p.area_m2 is not None:
+        bounds["PH-12"].add(
+            (HEX_MAX_UNIT_AREA_M2 - p.area_m2) / HEX_MAX_UNIT_AREA_M2,
+            p.area_m2 / HEX_MAX_UNIT_AREA_M2,
+            f"{p.name}: {_fmt(p.area_m2)} m2 vs ≤ {_fmt(HEX_MAX_UNIT_AREA_M2)} m2 per unit",
+        )
+
+
+def _fast_full(out: _Checks, ev: VerificationEvidence) -> None:
+    """PD-06 (SIM-04): every day, per source, unmet demand and electricity within 5 %."""
+    name = "fast vs full simulation agree (≤ 5 % daily, per source)"
+    source = "spec SIM-04"
+    if ev.annual is None or ev.fast_annual is None:
+        missing = "fast-mode" if ev.annual is not None else "full-mode"
+        out.missing("PD-06", name, f"{missing} daily results", source)
+        return
+    fast = {day.day_index: day for day in ev.fast_annual.days}
+    absent = [day.day_index for day in ev.annual.days if day.day_index not in fast]
+    if absent:
+        what = f"fast-mode results for {len(absent)} of {len(ev.annual.days)} days"
+        out.missing("PD-06", name, what, source)
+        return
+    worst, warnings = _Bound(), []
+
+    def compare(label: str, full: float, quick: float, scale: float) -> None:
+        if scale <= 0:
+            return
+        error = abs(full - quick) / scale
+        if FAST_FULL_WARN_FRAC < error <= FAST_FULL_FAIL_FRAC:
+            warnings.append(f"{label}: {_fmt(100 * error)} % (> 2 %)")
+        worst.add(
+            FAST_FULL_FAIL_FRAC - error,
+            error,
+            f"{label}: fast {_fmt(quick)} vs full {_fmt(full)} ({_fmt(100 * error)} %)",
+        )
+
+    for day in ev.annual.days:
+        other = fast[day.day_index]
+        sides = (
+            ("heat", day.heat_by_source_mw, other.heat_by_source_mw, day.heating_demand_mw,
+             day.unmet_heating_mwh, other.unmet_heating_mwh),
+            ("cooling", day.cool_by_source_mw, other.cool_by_source_mw, day.cooling_demand_mw,
+             day.unmet_cooling_mwh, other.unmet_cooling_mwh),
+        )  # fmt: skip
+        for kind, full_src, fast_src, demand, full_unmet, fast_unmet in sides:
+            scale = max(demand, sum(full_src.values()))
+            for key in sorted(set(full_src) | set(fast_src)):
+                compare(
+                    f"{day.date} {kind} '{key}' MW",
+                    full_src.get(key, 0.0),
+                    fast_src.get(key, 0.0),
+                    scale,
+                )
+            compare(f"{day.date} unmet {kind} MWh", full_unmet, fast_unmet, scale * HOURS_PER_DAY)
+        full_el, fast_el = day.electricity_consumed_mw, other.electricity_consumed_mw
+        compare(f"{day.date} electricity MW", full_el, fast_el, max(full_el, fast_el))
+    if worst.count == 0:
+        out.add(
+            "PD-06",
+            name,
+            CheckStatus.PASS,
+            detail="no demand or supply on the compared days",
+            source=source,
+        )
+    else:
+        out.bound(
+            "PD-06",
+            name,
+            worst,
+            limit=FAST_FULL_FAIL_FRAC,
+            unit="frac",
+            source=source,
+            warnings=warnings[:5],
+        )
+
+
+def _scaling(out: _Checks, ev: VerificationEvidence) -> None:
+    """PD-07. A computed scaling 'fail' fails even with mitigations: it needs a design change."""
+    name = "scaling screen passed or mitigated"
+    source = "RC-12 (TL-22)"
+    candidate = ev.candidate
+    if candidate.doublets == 0:
+        out.not_applicable("PD-07", name, "no brine loop (C0)", source)
+        return
+    if ev.scaling is None:
+        out.missing("PD-07", name, "scaling/corrosion screen", source)
+        return
+    status = ev.scaling.status
+    if status != "insufficient data":
+        out.add(
+            "PD-07",
+            name,
+            CheckStatus.PASS if status == "pass" else CheckStatus.FAIL,
+            detail=f"screen {status}. {ev.scaling.detail}".strip(),
+            source=source,
+        )
+        return
+    required = {Mitigation.TITANIUM_PLATES, Mitigation.OXYGEN_EXCLUSION, Mitigation.NO_COPPER}
+    if candidate.gas_handling == GasHandling.DEGAS_USE:
+        required.add(Mitigation.CALCITE_INHIBITOR)  # degassing raises pH: dose downhole
+    else:
+        required.add(Mitigation.PRESSURISED_LOOP)  # keep pressure above CO₂ release
+    lacking = sorted(m.value for m in required - set(ev.scaling.mitigations))
+    out.add(
+        "PD-07",
+        name,
+        CheckStatus.FAIL if lacking else CheckStatus.PASS,
+        detail=(
+            f"brine chemistry missing and mitigations {lacking} not in the design"
+            if lacking
+            else "brine chemistry missing; required mitigations are in the design"
+        ),
+        value=len(lacking),
+        limit=0.0,
+        margin=-len(lacking),
+        unit="count",
+        source=source,
+        warnings=["MISSING INPUT: brine chemistry (Ca, alkalinity, pH, Cl, SO4, TDS)"],
+    )
+
+
+def _materials(out: _Checks, ev: VerificationEvidence) -> None:
+    """PD-08: no copper alloy in brine contact; titanium plates for saline brine (RC-12)."""
+    name = "materials compatible (no Cu in brine; Ti plates for saline brine)"
+    source = "RC-12; RC-03; spec §10.1"
+    if ev.candidate.doublets == 0:
+        out.not_applicable("PD-08", name, "no brine loop (C0)", source)
+        return
+    brine_hex = [p for p in ev.hex_points if p.brine_side]
+    materials = dict(ev.brine_contact_materials)
+    unknown = [p.name for p in brine_hex if p.plate_material is None]
+    materials.update({p.name: p.plate_material for p in brine_hex if p.plate_material})
+    if unknown or not materials:
+        what = f"plate material of {unknown}" if unknown else "brine-contact materials"
+        out.missing("PD-08", name, what, source)
+        return
+    problems = [
+        f"{part}: copper alloy '{material}'"
+        for part, material in materials.items()
+        if is_copper_alloy(material)
+    ]
+    if ev.saline_brine:
+        problems += [
+            f"{p.name}: plates '{p.plate_material}' not titanium"
+            for p in brine_hex
+            if p.plate_material and not is_titanium(p.plate_material)
+        ]
+    out.add(
+        "PD-08",
+        name,
+        CheckStatus.FAIL if problems else CheckStatus.PASS,
+        detail="; ".join(problems) or f"{len(materials)} brine-contact materials compatible",
+        value=len(problems),
+        limit=0.0,
+        margin=-len(problems),
+        unit="count",
+        source=source,
+    )
 
 
 def _summary(
@@ -1684,7 +1888,7 @@ def _summary(
 
 # --------------------------------------------------------------------------- GEMINI helpers
 def _build_error(project: dict[str, Any]) -> str:
-    """'' if ``build_project`` instantiates the project, else the error text."""
+    """Return '' if ``build_project`` instantiates the project, else the error text."""
     from gemini_simulator.project_loader import build_project
 
     try:
@@ -1722,7 +1926,7 @@ def _reference_problems(
     return problems
 
 
-def _solve_problems(project: dict[str, Any], connections: list[Any]) -> list[str]:
+def _solve_problems(project: dict[str, Any]) -> list[str]:
     """Solve one steady-state step; every connection's output key must exist."""
     from gemini_simulator.project_loader import build_project
 
@@ -1732,12 +1936,12 @@ def _solve_problems(project: dict[str, Any], connections: list[Any]) -> list[str
     except KeyError as exc:
         return [f"steady-state step: missing key {exc}"]
     except Exception as exc:  # noqa: BLE001 - a project that does not solve is not valid
-        return [f"steady-state step failed: {type(exc).__name__}: {exc}"[:200]]
-    problems = []
-    for pred, _, out_key, _ in solver.connections:
-        if out_key not in solver.components[pred].output:
-            problems.append(f"'{pred}' has no output '{out_key}'")
-    return problems
+        return [f"steady-state step failed (not a key error): {type(exc).__name__}: {exc}"[:200]]
+    return [
+        f"'{pred}' has no output '{out_key}'"
+        for pred, _, out_key, _ in solver.connections
+        if out_key not in solver.components[pred].output
+    ]
 
 
 def _reaches(graph: dict[str, set[str]], start: str, targets: set[str]) -> bool:
@@ -1805,7 +2009,7 @@ class VerifyDesignTool:
             summary=report.summary,
             warnings=warnings,
             assumption_ids=report.assumption_ids,
-            sources=["spec §10.1", "RC-01", "RC-03", "RC-12", "limits.yaml"],
+            sources=["spec §10.1", "RC-01", "RC-03", "RC-04", "RC-12", "limits.yaml"],
         )
 
 
@@ -1815,8 +2019,8 @@ def verify_design_spec(
 ) -> ToolSpec:
     """``ToolSpec`` binding the real verifier (``stub=False``) under the name ``verify_design``.
 
-    Register it with ``Toolbox.register`` (WP-14 integration); the runner then lets an ACCEPTED
-    verdict stand (AG-11), while the same verdict from a ``stub=True`` binding is downgraded.
+    Register it with ``Toolbox.register`` (WP-14 integration). The runner lets an ACCEPTED verdict
+    stand only from a ``stub=False`` binding in a run without stub tool results (AG-11).
     """
     return ToolSpec(
         "verify_design",

@@ -137,3 +137,29 @@ def test_ingest_from_event_store(tmp_path):
     assert [f.assumption_id for f in stored] == ["DB-32"]
     assert store.answers() == {"DB-32": 24.0}
     events.close()
+
+
+def test_runner_answers_flow_into_project_knowledge(tmp_path):
+    """MEM-01 end to end: a paused run answered A/60/25/yes yields DB-30/31/32, not the approval."""
+    from gemini_agent.agents.engine import PolicyEngine
+    from gemini_agent.runner.design_runner import DesignRunner
+    from gemini_agent.schemas.decision import RunStatus
+
+    runner = DesignRunner(PolicyEngine(), runs_root=tmp_path)
+    result = runner.start("", run_id="mem01", input_mode="pause")
+    for answer in ("A", "60", "25", "yes"):
+        assert result.status == RunStatus.PAUSED
+        result = runner.resume("mem01", answer)
+    assert result.status == RunStatus.COMPLETED
+
+    store = runner.store("mem01")
+    trace = store.replay("mem01")
+    assert trace.status == result.status.value and trace.last_verdict == result.verdict
+    assert trace.missing_seq == []
+
+    knowledge = JsonProjectKnowledgeStore(tmp_path / "kb")
+    stored = knowledge.ingest_events(store.list_events("mem01"))
+    assert sorted(f.assumption_id for f in stored) == ["DB-30", "DB-31", "DB-32"]
+    answers = knowledge.answers()
+    assert answers["DB-31"] == 60.0 and answers["DB-32"] == 25.0
+    assert all(f.source == "user_answer" and f.learned_in_run == "mem01" for f in stored)

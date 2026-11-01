@@ -148,6 +148,8 @@ def retries_and_tool_calls(messages: Sequence[Any]) -> tuple[int, list[dict[str,
 
 def token_counts(messages: Sequence[Any], usage: Any = None) -> tuple[int, int, int, TokenSource]:
     """Return ``(input, output, requests, source)`` from ``RunUsage`` or the responses' usage."""
+    if callable(usage) and not hasattr(usage, "input_tokens"):  # a bound ``result.usage``
+        usage = usage()
     if usage is not None:
         return (
             int(getattr(usage, "input_tokens", 0) or 0),
@@ -212,10 +214,11 @@ def _add(bucket: dict[str, dict[str, float]], key: str, record: LLMCallRecord) -
 class LLMLogger:
     """Appends ``LLMCallRecord`` lines to ``<run_dir>/llm_calls.jsonl``."""
 
-    def __init__(self, run_dir: str | Path) -> None:
-        """Create the run directory if needed; calls go to ``llm_calls.jsonl``."""
+    def __init__(self, run_dir: str | Path, *, create: bool = True) -> None:
+        """Log to ``<run_dir>/llm_calls.jsonl``; ``create=False`` only reads (no mkdir)."""
         self.run_dir = Path(run_dir)
-        self.run_dir.mkdir(parents=True, exist_ok=True)
+        if create:
+            self.run_dir.mkdir(parents=True, exist_ok=True)
         self.path = self.run_dir / LLM_CALLS_FILE
         self._lock = threading.Lock()
         self.corrupt_lines = 0
@@ -319,7 +322,8 @@ def write_token_comparison(
 ) -> Path:
     """Compare two runs' call logs and write ``token_comparison.json``-style output."""
     comparison = compare_token_summaries(
-        LLMLogger(naive_run_dir).token_summary(), LLMLogger(optimised_run_dir).token_summary()
+        LLMLogger(naive_run_dir, create=False).token_summary(),
+        LLMLogger(optimised_run_dir, create=False).token_summary(),
     )
     path = Path(out_path)
     path.parent.mkdir(parents=True, exist_ok=True)

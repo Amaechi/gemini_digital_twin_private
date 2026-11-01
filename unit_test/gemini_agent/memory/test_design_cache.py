@@ -88,3 +88,13 @@ def test_get_or_compute_runs_once(tmp_path):
     assert second.result == {"days": 365} and second.kpis.candidate_id == "C9"
     assert first.config_hash == second.config_hash
     cache.close()
+
+
+def test_stub_results_are_refused_and_dotted_directories_work(tmp_path):
+    """A stub result is never cached; 'runs/v1.0' is a directory, not a cache file."""
+    cache = DesignCache(tmp_path / "v1.0")
+    assert cache.path == tmp_path / "v1.0" / CACHE_FILE
+    with pytest.raises(ValueError, match="stub"):
+        cache.put({"q": 1}, namespace="ns", stub=True)
+    assert cache.stats() == {"entries": 0, "hits": 0}
+    cache.close()

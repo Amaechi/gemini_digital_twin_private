@@ -543,8 +543,12 @@ class DesignRunner:
             return list(state.shortlist)
         if tool == "verify_design":
             verdict = DesignVerdict(data.verdict)
-            if verdict == DesignVerdict.ACCEPTED and self.toolbox.spec(tool).stub:
-                verdict = DesignVerdict.UNVERIFIED  # AG-11: a stub can never accept a design
+            stub_evidence = any(record.stub for record in state.tool_results)
+            if verdict == DesignVerdict.ACCEPTED and (
+                self.toolbox.spec(tool).stub or stub_evidence
+            ):
+                # AG-11: neither a stub verifier nor evidence from stub tools accepts a design
+                verdict = DesignVerdict.UNVERIFIED
             state.verifications.append(
                 Verification(
                     candidate_id=data.candidate_id,
