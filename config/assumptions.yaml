@@ -720,6 +720,243 @@ assumptions:
     status: default
     added_by: WP-02
 
+  - id: ECO-CO2-GAS
+    title: Grid natural-gas CO2 emission factor
+    value: 56.6
+    unit: kg CO2/GJ (LHV)
+    justification: >-
+      ECO-05 asks to choose between 56.6 kg/GJ (GEMINI example, the boiler model's gas_emission_factor; GEMINI is
+      a Dutch geothermal tool and the site is in the Netherlands) and 51.53 kg CO2-e/GJ (Gippsland paper, an
+      Australian scope-1 factor for Australian pipeline gas). 56.6 is chosen for consistency with the digital
+      twin we simulate with. 51.53 is the sensitivity case: it lowers C0's emissions and therefore the
+      reported CO2 reduction of the geothermal candidates (the conservative side for that claim).
+      VERIFY: RC-08 does not state the energy basis of 51.53; if it is gross (HHV), as Australian NGA factors
+      usually are, it is ≈ 57 kg/GJ on LHV — then the two values agree and the sensitivity only shows the basis.
+    source: GEOAGENT_DESIGN_SPEC §9.2 ECO-05; RC-08 Emission factors (GEMINI example; Gippsland) [L]
+    sensitivity: [51.53]
+    tag: A
+    status: default
+    added_by: WP-08
+
+  - id: ECO-CO2-AG
+    title: Associated-gas CO2 accounting
+    value:
+      factor_kg_per_gj_lhv: 68.6
+      burners_use_associated_gas_first: true
+      surplus: flared
+    unit: null
+    justification: >-
+      With degassing (DB-36 a) every Nm3 of separated gas ends as CO2: burned in CHP/boiler or flared, never vented
+      (DB-36). Factor 68.6 kg/GJ_LHV incl. the inherent 20 mol % CO2 is DB-28, derived in code from the DB-09
+      composition (tools.design_basis.gas_mix_properties). Burners take the associated gas first (it is free),
+      grid gas makes up the rest; gas beyond the burners' daily need is flared (CO2 counted, no energy credit).
+      With the pressurised loop (DB-36 b) dissolved gas is reinjected: zero emission.
+    source: RC-08 Associated gas [D]; GEOAGENT_DESIGN_SPEC §2.2 DB-28, §2.4 DB-36
+    sensitivity: "Pressurised-reinjection variant (C7) is the zero-emission case."
+    tag: D
+    status: default
+    added_by: WP-08
+
+  - id: ECO-CO2-SCOPE
+    title: CO2 price applies to direct emissions only
+    value: direct_emissions
+    unit: null
+    justification: >-
+      The CO2 price (EUA reference 79.42 EUR/t) is charged on gas burned or flared on site. Indirect CO2 of
+      purchased electricity (DB-37) is reported but not priced again: the electricity price already carries the
+      ETS cost. The price is applied to all on-site combustion although small boilers (< 20 MW thermal input)
+      fall under ETS2 only from 2028 (RC-10) — a conservative simplification.
+    source: RC-10 Sourced values (CO2 price, ETS1/ETS2 scope) [L]; our interpretation [A]
+    sensitivity: "CO2 price 63–117 USD/t in the tornado (DB-35 rule)."
+    tag: A
+    status: default
+    added_by: WP-08
+
+  - id: ECO-ELEC-NET
+    title: Own electricity generation offsets purchases daily; surplus not credited
+    value:
+      netting: daily
+      surplus_export_credit: 0.0
+    unit: null
+    justification: >-
+      CHP electricity first covers the plant's own consumption on the same day (valued at the purchase price);
+      any surplus is reported but not credited because no export/feed-in price is sourced on RC-10.
+    source: our assumption [A]; RC-10 (no export price)
+    sensitivity: "Follow-up: an export price would lower LCOH for CHP-heavy candidates."
+    tag: A
+    status: default
+    added_by: WP-08
+
+  - id: ECO-REAL
+    title: Levelised cost in real terms with real energy-price escalation
+    value:
+      energy_escalation_real_frac: "(1 + energy_escalation_frac)/(1 + inflation_general_frac) − 1 = 0.0244"
+      discount_rate_basis: real
+    unit: null
+    justification: >-
+      ECO-01 (Gippsland Eq. 1) with r = 8 % treated as a real rate; capex and O&M constant in real terms;
+      electricity, gas and CO2 prices escalate at the real rate implied by the configured RC-10 defaults (energy
+      5 % nominal, midpoint of 3–7 %, and 2.5 % general inflation) = 2.44 %/yr. 0 % (constant prices) is a
+      request option; the RC-10 range 0.49–4.39 %/yr real is one tornado bar around the base.
+    source: RC-10 Levelised cost and defaults [L]; config/cost_assumptions.yaml; our interpretation [A]
+    sensitivity: "energy_escalation_real_frac 0.0049–0.0439 (tornado)."
+    tag: A
+    status: default
+    added_by: WP-08
+
+  - id: ECO-ALLOC
+    title: Shared costs split between heat and cooling by delivered energy
+    value: delivered_energy_share
+    unit: null
+    justification: >-
+      Wells, pumps and flaring serve both products: their capex, O&M, energy and CO2 cost are split by the brine
+      heat each service draws (DayResult.brine_heat_drawn_mw; absorption drive = cooling, every other user =
+      heat), an energy share as RC-10 asks; without brine-heat data by delivered heat/(heat + cooling) MWh. Free
+      cooling and electric chillers draw no brine, so they carry no well cost. An allocation-free combined cost
+      per MWh (heat + cooling) is reported too (spec ECO-01, RC-10). Heat-only equipment (HEX to the DH network, HTHP,
+      CHP, boilers) goes to LCOH, cooling-only equipment (chillers, tower, free cooling) to LCOC; electricity
+      and fuel follow each consumer's service (explicit map, else keyword rules, else shared).
+    source: GEOAGENT_DESIGN_SPEC §9.2 ECO-01; RC-10 Levelised cost
+    sensitivity: "Delivered-energy split as the fallback; exergy-based allocation not implemented."
+    tag: A
+    status: default
+    added_by: WP-08
+
+  - id: ECO-OM
+    title: O&M as a fraction of capex for every item; replacements
+    value:
+      om_frac_of_capex_per_yr: 0.015
+      pump_replacement_interval_yr: 7
+      heat_pump_replacement_interval_yr: 15
+    unit: null
+    justification: >-
+      ECO-01: O&M 1–2 % of capex per year (midpoint 1.5 %), applied to the total capex; the DEA item-specific
+      fixed/variable O&M (HTHP, CHP, e-boiler) is not used, to keep one rule for all candidates. Replacements at
+      multiples of the interval (rounded half up) strictly before the end of the analysis period; no salvage
+      value, so the 20-yr case pays a full HTHP replacement at year 15 (≈ +2 $/MWh vs a straight-line residual).
+    source: RC-10 Opex [L]; config/cost_assumptions.yaml
+    sensitivity: "om_frac_of_capex_per_yr 1–2 % (the stated range is wider than ±30 %, DB-35)."
+    tag: A
+    status: default
+    added_by: WP-08
+
+  - id: ECO-PUMP-CAPEX
+    title: ESP and injection-pump capex not on the reference cards
+    value: null
+    unit: USD per doublet
+    justification: >-
+      RC-10 has no ESP or injection-pump price, so pumps and their 7-yr replacement are not costed unless the
+      caller supplies pump_capex_usd_per_doublet; the economics tool warns "MISSING INPUT". The NREL well costs
+      include the completion, not the ESP.
+    source: RC-10 (gap)
+    sensitivity: "Supply a vendor quote when available."
+    tag: A
+    status: default
+    added_by: WP-08
+
+  - id: ECO-CHILLER
+    title: RC-05 chiller cost functions applied per unit of at most 1000 nominal tons
+    value:
+      max_nominal_tons_per_unit: 1000
+      escalation: cepci_1986_to_2023
+    unit: null
+    justification: >-
+      The Guidebook p.269 cost functions (decoded, VERIFY) are valid for 100–1000 ton; larger plants are split
+      into equal units (absorption by nominal tons = duty/F), smaller ones are extrapolated with a warning.
+      Escalated with CEPCI 797.9/318.4 = 2.51 (spec ×≈2.5). The absorption plant function includes tower, pumps
+      and piping; the electric plant function is assumed to include its heat rejection too (VERIFY), so chiller
+      heat rejection is not costed again. The 100-ton lower bound is checked on nominal tons per unit.
+    source: RC-05 Cost [L, VERIFY]; RC-10 CEPCI [L]
+    sensitivity: "±30 % (DB-35)."
+    tag: A
+    status: default
+    added_by: WP-08
+
+  - id: EXG-FUEL
+    title: Fuel chemical exergy factor
+    value: 1.04
+    unit: exergy / LHV
+    justification: RC-11 — fuel exergy ≈ LHV × 1.04 [A] (or LHV).
+    source: RC-11 Equations [A]
+    sensitivity: [1.0]
+    tag: A
+    status: default
+    added_by: WP-08
+
+  - id: EXG-KPI
+    title: Exergy KPI definition
+    value: functional_efficiency
+    unit: null
+    justification: >-
+      KPISet.exergy_efficiency_frac = functional efficiency (E_heat + E_cold + W_generated) / (brine exergy at the
+      production temperature + electricity consumed + fuel exergy), with T0 = daily dry-bulb (DB-34d). It is
+      defined for every candidate (C0 has no brine) and charges every exergy input. The spec §10.1 utilisation
+      (W_net + E_heat + E_cold)/(m e_res) is reported as exergy_utilisation_frac; it credits heat from gas and
+      heat pumps to the brine and can exceed 1 for hybrid plants.
+    source: RC-11; GEOAGENT_DESIGN_SPEC §10.1 exergy row
+    sensitivity: null
+    tag: A
+    status: default
+    added_by: WP-08
+
+  - id: NET-LOSS-FRAC
+    title: Default distribution heat loss when the network is not described
+    value: 0.10
+    unit: fraction of heat demand
+    justification: >-
+      Network length and pipe data are not given (missing input): losses = 10 % of demand [A], just below the
+      Danfoss/Thisted benchmark 10.9–17 % (optimistic side; the benchmark is the sensitivity).
+    source: RC-09 Pipe heat loss [A]; Danfoss/Thisted [L]
+    sensitivity: [0.109, 0.17]
+    tag: A
+    status: default
+    added_by: WP-08
+
+  - id: NET-TRUNK-M
+    title: Nominal trunk length when the network is not described
+    value: 5000.0
+    unit: m
+    justification: Network length not given (missing input); nominal 5 km trunk [A] for the layered-resistance case.
+    source: RC-09 Pipe heat loss [A]
+    sensitivity: null
+    tag: A
+    status: default
+    added_by: WP-08
+
+  - id: SCL-RULES
+    title: Scaling-screen pass/fail thresholds
+    value:
+      ryznar_fail_below: 5.5
+      ryznar_inhibitor_below: 6.2
+      gypsum_rs_fail_above: 1.2
+      gypsum_rs_inhibitor_from: 0.8
+    unit: null
+    justification: >-
+      RC-12 gives the Ryznar classes (< 4 extreme, 4–5.5 heavy, 5.5–6.2 slight, 6.2–7 little/none, > 7 none) and
+      the gypsum ambiguous band 0.8–1.2 but no pass/fail rule. Fail on heavy/extreme calcite (RI < 5.5) or
+      gypsum supersaturation (RS > 1.2), require the calcite inhibitor for slight scaling or ambiguous gypsum,
+      fail a pressurised loop below the CO2-release pressure, and fail when a required mitigation is missing.
+      K_c(T) and log K_gyp(T) (Guidebook p.160–163) are inputs with the brine analysis (not on RC-12).
+    source: RC-12 Scaling [L]; our pass/fail interpretation [A]
+    sensitivity: null
+    tag: A
+    status: default
+    added_by: WP-08
+
+  - id: ECO-SENS-MULT
+    title: Sensitivity of cost multipliers applies to the premium
+    value: premium_only
+    unit: null
+    justification: >-
+      For items named *_multiplier (titanium plates 1.5, titanium generator tubes 1.125, deviated wells 1.125, dry
+      cooler 3.0) the DB-35 ±30 % applies to the premium (x − 1), so a multiplier never drops below 1 (a deviated
+      well never cheaper than a vertical one); the stated range still widens the bounds.
+    source: GEOAGENT_DESIGN_SPEC §2.4 DB-35, §9.2 ECO-04; our interpretation [A]
+    sensitivity: null
+    tag: A
+    status: default
+    added_by: WP-08
+
   - id: HP-ETA-L
     title: Heat-pump Lorenz efficiency η_L on water temperatures
     value: 0.5
