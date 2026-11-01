@@ -850,7 +850,8 @@ class DesignRunner:
         )
         if scope.in_scope:
             limits = load_config("limits", self.config_dir)
-            for conflict in constraint_conflicts(state.user_prompt, limits):
+            basis = load_config("design_basis", self.config_dir)
+            for conflict in constraint_conflicts(state.user_prompt, limits, basis):
                 state.conflicts.append(conflict)
                 self._event(state, "CONFLICT", {"message": conflict})
 

@@ -1,0 +1,170 @@
+# GeoAgent evaluation scenarios S1–S11 (GEOAGENT_DESIGN_SPEC §12 EV-01). Schema:
+# gemini_agent.eval.scenarios.ScenarioSuite. Run: PYTHONPATH=src python scripts/run_eval.py --engine policy
+#
+# checks:  asserted on every run; any failure makes the scenario FAIL.
+# pending: expected behaviour that needs a later work package. Each item names the WPs and the reason; an item
+#          with a `check` is evaluated for information only ("currently: ...") and is promoted to `checks` by the
+#          WP that delivers it. A scenario whose checks pass but has pending items is reported as PENDING.
+# engines: policy (deterministic), testmodel (Pydantic AI TestModel, CI), llm (local Ollama, runs/eval/<model>/).
+schema_version: 1
+source: "GEOAGENT_DESIGN_SPEC §12 EV-01 table S1–S11; expected behaviour copied verbatim into `expected`"
+
+scenarios:
+  - id: S1
+    situation: "Full brief + all files"
+    expected: "Complete design, ACCEPTED"
+    prompt: ""   # default challenge brief; config/ and data/demand/ supply every file
+    checks:
+      - {type: status, equals: completed, expect: "runs P0–P10 to completion"}
+      - {type: phase, equals: P10, expect: "ends in P10 (report and approval)"}
+      - {type: phases_started, words: [P0, P1, P2, P3, P4, P5, P6, P7, P8, P9, P10], expect: "every phase runs once (no loop-back)"}
+      - {type: selected_candidate, expect: "a candidate is selected that was neither guard-failed nor REJECTED"}
+      - {type: decision_records, expect: "DR-01…DR-10 are written"}
+      - {type: files, files: [run_summary.json, events.jsonl, token_summary.json, report_draft.md], expect: "run artefacts are written"}
+    pending:
+      - expect: "the verifier ACCEPTs the selected design"
+        needs: [WP-07, WP-14]
+        reason: "the runner still uses stub tools (annual simulation WP-07; real tools bound in WP-14); a stub verdict is UNVERIFIED by design (golden rule 3)"
+        check: {type: verdict, equals: ACCEPTED, expect: "verdict ACCEPTED"}
+      - expect: "no stub tool call in the run"
+        needs: [WP-07, WP-14]
+        reason: "WP-14 binds the real tools under the same names with stub=False"
+        check: {type: stub_tool_calls_max, value: 0, expect: "0 stub tool calls"}
+
+  - id: S2
+    situation: "\"Design a geothermal heating system for 30 MW\" (no CSVs/cooling/reservoir)"
+    expected: "Lists missing inputs, asks, does not invent"
+    prompt: "Design a geothermal heating system for 30 MW"
+    input_mode: pause
+    checks:
+      - {type: status, equals: paused, expect: "stops and asks instead of designing"}
+      - {type: phase, equals: P1, expect: "asks during P1 (design basis and missing inputs)"}
+      - {type: pending_question, expect: "a missing-input question is pending"}
+      - {type: no_assumptions, expect: "nothing is assumed before the answer (does not invent)"}
+    pending:
+      - expect: "the question lists the inputs the request lacks (demand CSVs, cooling, reservoir)"
+        needs: [WP-14]
+        reason: "P1 gaps come from the assumptions register (DB-30/31/32); the runner always loads config/ and data/demand/, so inputs missing from the request itself are not detected yet"
+        check: {type: question_mentions, words: [demand, cooling, reservoir], expect: "question names demand, cooling and reservoir"}
+
+  - id: S3
+    situation: "\"What's the best pizza in Delft?\""
+    expected: "Polite refusal/redirect"
+    prompt: "What's the best pizza in Delft?"
+    checks:
+      - {type: status, equals: refused, expect: "the request is refused"}
+      - {type: phases_started, words: [P0], expect: "stops in P0 intake"}
+      - {type: summary_contains, contains: "please ask about the design", expect: "the refusal redirects to the design task"}
+      - {type: tool_calls_max, value: 0, expect: "no tool is called"}
+
+  - id: S4
+    situation: "\"Use 5 doublets at 500 m³/h\""
+    expected: "Flags DB-10/11 violation, proposes compliant option"
+    prompt: "Use 5 doublets at 500 m³/h"
+    checks:
+      - {type: conflict_contains, contains: "(DB-10)", expect: "flags the doublet-count limit DB-10"}
+      - {type: conflict_contains, contains: "(DB-11)", expect: "flags the per-doublet flow limit DB-11"}
+      - {type: status, equals: completed, expect: "continues within the limits"}
+      - {type: max_doublets, value: 3, expect: "every candidate has at most 3 doublets"}
+      - {type: selected_candidate, expect: "proposes a compliant candidate"}
+
+  - id: S5
+    situation: "\"Supply heating at 120 °C\""
+    expected: "Notes conflict with DB-16, asks to confirm change of basis"
+    prompt: "Supply heating at 120 °C"
+    checks:
+      - {type: conflict_contains, contains: "(DB-16)", expect: "notes the conflict with the 100 °C heating supply DB-16"}
+      - {type: conflict_contains, contains: "until a change of basis is confirmed", expect: "keeps the basis until the change is confirmed"}
+    pending:
+      - expect: "asks the user to confirm the change of basis"
+        needs: [WP-14]
+        reason: "the runner records the conflict (CONFLICT event) but has no confirm-basis InputRequest yet; it needs an assumptions-register id for the question"
+        check: {type: pending_question, expect: "a confirm-basis question is pending"}
+
+  - id: S6
+    situation: "Return temperature not given"
+    expected: "Asks or records DB-31 assumption + sensitivity"
+    prompt: "Design the geothermal district heating and cooling system for the new neighbourhood"
+    checks:
+      - {type: assumption_or_question, id: DB-31, expect: "asks for, or records, the DB-31 heating return temperature"}
+      - {type: status, equals: completed, expect: "continues on the labelled assumption"}
+    pending:
+      - expect: "runs a sensitivity on DB-31"
+        needs: [WP-11, WP-14]
+        reason: "sensitivity runs arrive with WP-11 (optimisation and uncertainty) and are bound to the runner in WP-14"
+
+  - id: S7
+    situation: "Cooling model removed from registry"
+    expected: "Gap detected; Model Builder writes model + passes reference-example test"
+    prompt: "Design the geothermal district heating and cooling system"
+    setup:
+      remove_components: [absorption_chiller]
+    checks:
+      - {type: tool_called, tool: model_gap_analysis, phase: P4, expect: "runs the model-gap analysis in P4"}
+      - {type: status, equals: completed, expect: "the run completes"}
+    pending:
+      - expect: "the missing absorption chiller is reported as a gap"
+        needs: [WP-12, WP-14]
+        reason: "model_gap_analysis is a stub until WP-12; WP-14 binds it"
+        check: {type: gap_reported, contains: absorption_chiller, expect: "gap absorption_chiller reported"}
+      - expect: "the Model Builder writes the model from its reference card and it passes the reference-example test"
+        needs: [WP-12]
+        reason: "the Model Builder agent and its tools are WP-12"
+
+  - id: S8
+    situation: "Permeability 50 mD"
+    expected: "Re-sizes and explains"
+    prompt: "Design the geothermal heating and cooling system; the reservoir permeability is only 50 mD"
+    setup:
+      config_overrides:
+        design_basis: {reservoir: {permeability_md: 50.0}}
+    checks:
+      - {type: design_basis_value, path: reservoir.permeability_md, value: 50.0, expect: "the design basis carries 50 mD"}
+      - {type: status, equals: completed, expect: "the run completes on the changed basis"}
+    pending:
+      - expect: "re-sizes the doublets for the lower productivity"
+        needs: [WP-07, WP-14]
+        reason: "doublet sizing (TL-03…08, WP-05) and the annual simulation are not bound to the runner yet; the stub candidates do not depend on permeability"
+      - expect: "explains the change in the Decision Records"
+        needs: [WP-14]
+        reason: "DR evidence quotes stub tool results until WP-14"
+        check: {type: dr_mentions, id: DR-01, words: [permeability], expect: "DR-01 mentions permeability"}
+
+  - id: S9
+    situation: "Gradient 30 °C/km but \"reservoir 150 °C at 2.5 km\""
+    expected: "Detects inconsistency"
+    prompt: "Design the geothermal heating and cooling system. The geothermal gradient is 30 °C/km but the reservoir is 150 °C at 2.5 km."
+    checks:
+      - {type: conflict_contains, contains: "is inconsistent with a 30 K/km gradient (DB-03)", expect: "detects that 150 °C at 2.5 km contradicts the 30 °C/km gradient"}
+      - {type: status, equals: completed, expect: "continues on the design basis"}
+
+  - id: S10
+    situation: "Same task, naive vs optimised token settings"
+    expected: "Token comparison chart"
+    prompt: ""
+    engines: [testmodel, llm]
+    skip_reason: "needs an LLM engine: the policy engine uses no tokens"
+    setup:
+      token_profiles: [naive, optimised]
+    checks:
+      - {type: status, equals: completed, expect: "the optimised run completes"}
+      - {type: token_saving, expect: "the optimised settings use no more tokens than the naive ones"}
+      - {type: llm_metrics, expect: "LLM calls and tokens are logged"}
+    pending:
+      - expect: "token comparison chart (figure)"
+        needs: [WP-14]
+        reason: "the report tables the comparison (S10-token_comparison.json); WP-14 draws the figures"
+
+  - id: S11
+    situation: "Same task on 16 GB-class vs 36 GB-class model"
+    expected: "Tool-call validity, retries, fallbacks, tokens, quality"
+    prompt: ""
+    engines: [testmodel, llm]
+    skip_reason: "needs an LLM engine: the comparison is between models"
+    checks:
+      - {type: status, equals: completed, expect: "the run completes"}
+      - {type: llm_metrics, expect: "tool-call validity, retries, fallbacks and tokens are recorded"}
+    pending:
+      - expect: "the 16 GB-class and 36 GB-class models are compared"
+        needs: [L-1]
+        reason: "needs two local Ollama runs (run_eval.py --engine llm --model <tag> for each), then run_eval.py --compare"

@@ -2,6 +2,10 @@
 
 Deterministic keyword rules run before any agent sees the request; the Lead Engineer agent may
 additionally refuse in P0, but it can never pull an off-topic request back into scope.
+
+WP-13 (2026-11-01) added two conflict rules for the spec §12 scenarios: a requested supply
+temperature that differs from DB-16/DB-17 (S5) and a stated reservoir temperature at a depth (or a
+stated gradient) that disagrees with DB-01/03/04 (S9). The design always keeps the design basis.
 """
 
 from __future__ import annotations
@@ -9,7 +13,8 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 
-from gemini_agent.schemas.config import HardLimits
+from gemini_agent.schemas.config import DesignBasis, HardLimits
+from gemini_agent.tools.design_basis import temperature_at_depth_degc
 
 DEFAULT_BRIEF = (
     "Select, size and validate a deep-geothermal district heating (100 degC) and cooling "
@@ -38,6 +43,27 @@ _DESIGN_WORDS = re.compile(
 )
 _DOUBLETS = re.compile(r"\b(\d+)\s*(?:x\s*)?doublets?\b", re.IGNORECASE)
 _FLOW = re.compile(r"\b(\d+(?:\.\d+)?)\s*m(?:3|³)\s*/\s*h\b", re.IGNORECASE)
+_DEG_C = r"(?:°\s?C|deg\s?C)"
+_TEMPERATURE = re.compile(
+    rf"(?<![\d.])(\d+(?:\.\d+)?)\s*{_DEG_C}\b(?!\s*(?:/|per\b))", re.IGNORECASE
+)
+"""A temperature such as '120 °C' or '20 degC' (not a gradient such as '30 °C/km')."""
+_GRADIENT = re.compile(
+    rf"(?<![\d.])(\d+(?:\.\d+)?)\s*(?:{_DEG_C}|K)\s*(?:/|per\s+)\s*km\b", re.IGNORECASE
+)
+_TEMP_AT_DEPTH = re.compile(
+    rf"(?<![\d.])(\d+(?:\.\d+)?)\s*{_DEG_C}\s*(?:at|@)\s*(?:a\s+depth\s+of\s+)?"
+    r"(\d+(?:\.\d+)?)\s*(km|m)\b",
+    re.IGNORECASE,
+)
+_HEAT_WORD = re.compile(r"\bheat\w*", re.IGNORECASE)
+_COOL_WORD = re.compile(r"\b(?:cool\w*|chill\w*)", re.IGNORECASE)
+_NOT_SUPPLY = re.compile(
+    r"\b(return\w*|reservoirs?|formations?|aquifers?|brine|wellheads?|wells?|ambient|outdoor|air|"
+    r"wet[- ]bulb|dry[- ]bulb|surface|inject\w*|produc\w*|bottom\w*|source|sink|depth)\b",
+    re.IGNORECASE,
+)
+_SENTENCE_END = re.compile(r"[.;!?](?:\s|$)")
 
 REFUSAL_TEMPLATE = (
     "GeoAgent only designs deep-geothermal district heating (100 degC) and cooling (20 degC) "
@@ -82,8 +108,14 @@ def refusal_message(prompt: str) -> str:
     return REFUSAL_TEMPLATE.format(excerpt=excerpt)
 
 
-def constraint_conflicts(prompt: str, limits: HardLimits) -> list[str]:
-    """Explain requests that conflict with the hard limits (the design stays within them)."""
+def constraint_conflicts(
+    prompt: str, limits: HardLimits, basis: DesignBasis | None = None
+) -> list[str]:
+    """Explain requests that conflict with the hard limits or the design basis.
+
+    The design stays within the limits and on the basis; ``basis`` enables the reservoir
+    consistency rule (S9).
+    """
     conflicts: list[str] = []
     for match in _DOUBLETS.finditer(prompt):
         count = int(match.group(1))
@@ -100,5 +132,83 @@ def constraint_conflicts(prompt: str, limits: HardLimits) -> list[str]:
                 f"Requested {flow:g} m3/h conflicts with the per-doublet flow limit "
                 f"{limits.flow_min_active_m3h:g}–{limits.flow_max_m3h:g} m3/h (DB-11); "
                 "flows stay within the limit."
+            )
+    conflicts += _supply_temperature_conflicts(prompt, limits)
+    if basis is not None:
+        conflicts += _reservoir_conflicts(prompt, basis)
+    return conflicts
+
+
+def _differs(stated: str, expected: float) -> bool:
+    """Return True if ``expected`` does not round to the number as written (its precision)."""
+    decimals = len(stated.split(".", 1)[1]) if "." in stated else 0
+    return abs(float(stated) - expected) > 0.5 * 10.0**-decimals
+
+
+def _supply_temperature_conflicts(prompt: str, limits: HardLimits) -> list[str]:
+    """S5: a requested heating/cooling supply temperature that is not DB-16/DB-17.
+
+    A temperature counts as a supply temperature when the words before it (same sentence, after
+    the previous temperature) name heating or cooling and not a return, reservoir, well or
+    ambient temperature; the last service word wins ('heating at 100 degC and cooling at 20 degC').
+    """
+    depth_spans = [m.span() for m in _TEMP_AT_DEPTH.finditer(prompt)]
+    conflicts: list[str] = []
+    previous_end = 0
+    for match in _TEMPERATURE.finditer(prompt):
+        window = prompt[previous_end : match.start()]
+        previous_end = match.end()
+        if any(start <= match.start() < end for start, end in depth_spans):
+            continue
+        ends = list(_SENTENCE_END.finditer(window))
+        if ends:
+            window = window[ends[-1].end() :]
+        if _NOT_SUPPLY.search(window):
+            continue
+        heat = [m.start() for m in _HEAT_WORD.finditer(window)]
+        cool = [m.start() for m in _COOL_WORD.finditer(window)]
+        if not heat and not cool:
+            continue
+        stated = match.group(1)
+        if max(heat, default=-1) > max(cool, default=-1):
+            service, basis_degc, basis_id = "heating", limits.heating_supply_degc, "DB-16"
+        else:
+            service, basis_degc, basis_id = "cooling", limits.cooling_supply_degc, "DB-17"
+        if _differs(stated, basis_degc):
+            conflicts.append(
+                f"Requested {service} supply {float(stated):g} degC conflicts with the design "
+                f"basis {basis_degc:g} degC ({basis_id}); the design keeps {basis_degc:g} degC "
+                "until a change of basis is confirmed."
+            )
+    return conflicts
+
+
+def _reservoir_conflicts(prompt: str, basis: DesignBasis) -> list[str]:
+    """S9: a stated gradient or reservoir temperature at a depth that disagrees with the basis.
+
+    The implied temperature is RC-01 eq 1 via ``temperature_at_depth_degc`` (DB-04 surface
+    temperature, the stated gradient if any, else DB-03).
+    """
+    reservoir = basis.reservoir
+    conflicts: list[str] = []
+    gradients = list(_GRADIENT.finditer(prompt))
+    for match in gradients:
+        if _differs(match.group(1), reservoir.geothermal_gradient_k_per_km):
+            conflicts.append(
+                f"Stated gradient {float(match.group(1)):g} K/km differs from the design basis "
+                f"{reservoir.geothermal_gradient_k_per_km:g} K/km (DB-03); the design uses DB-03."
+            )
+    gradient = (
+        float(gradients[-1].group(1)) if gradients else reservoir.geothermal_gradient_k_per_km
+    )
+    for match in _TEMP_AT_DEPTH.finditer(prompt):
+        depth_m = float(match.group(2)) * (1000.0 if match.group(3).lower() == "km" else 1.0)
+        implied = temperature_at_depth_degc(depth_m, reservoir.surface_temperature_degc, gradient)
+        if _differs(match.group(1), implied):
+            conflicts.append(
+                f"Stated {float(match.group(1)):g} degC at {depth_m:g} m is inconsistent with a "
+                f"{gradient:g} K/km gradient (DB-03) and {reservoir.surface_temperature_degc:g} "
+                f"degC surface temperature (DB-04), which give {implied:.1f} degC there (RC-01); "
+                "the design uses the design basis until the data are confirmed."
             )
     return conflicts
