@@ -150,7 +150,11 @@ water are extrapolated and flagged in <code class="docutils literal notranslate"
 (≈ 2.2 % of <span class="math notranslate nohighlight">\(Q_E\)</span>, extra tower fan and pump). Each external circuit (drive, cooling water,
 chilled water) has its own density and heat capacity; with a given flow its outlet temperature
 follows from <span class="math notranslate nohighlight">\(\rho c_p V \Delta T = Q\)</span>, otherwise a fixed ΔT is used (generator 7.2 K,
-cooling-water range 5 K) and the required flow is reported.</p>
+cooling-water range 5 K) and the required flow is reported. With a given drive flow, Method B
+needs <span class="math notranslate nohighlight">\(\rho c_p V_G \ge s_G/2\)</span> (output <code class="docutils literal notranslate"><span class="pre">minimum_drive_flow_rate_m3s</span></code>; otherwise the drive
+outlet would fall below the minimum generator temperature and the machine is treated as off), and
+Method A keeps the drive outlet at or above its 71.4 °C zero-capacity temperature. At part load
+Method B lowers <span class="math notranslate nohighlight">\(\Delta\Delta t\)</span>, so the COP falls at low load.</p>
 <table class="docutils align-default">
 <colgroup>
 <col style="width: 35.0%" />
@@ -193,7 +197,9 @@ Q_{reject} = Q + P_{el}\]</div>
 <p>with <span class="math notranslate nohighlight">\(\eta = 0.40\)</span>, <span class="math notranslate nohighlight">\(T_{evap} = T_{supply} - 4\)</span> K, <span class="math notranslate nohighlight">\(T_{cond} = T_{wb} + 4.5 + 5 + 3\)</span>
 (cooling tower) or <span class="math notranslate nohighlight">\(T_{db} + 8\)</span> (dry cooler), COP between 3 and 8. Inputs: <code class="docutils literal notranslate"><span class="pre">cooling_load_w</span></code>
 or <code class="docutils literal notranslate"><span class="pre">chilled_water_flow_rate_m3s</span></code>; <code class="docutils literal notranslate"><span class="pre">ambient_wet_bulb_degc</span></code> or <code class="docutils literal notranslate"><span class="pre">ambient_dry_bulb_degc</span></code>; optional
-<code class="docutils literal notranslate"><span class="pre">cooling_water_temperature_in_degc</span></code> (then <span class="math notranslate nohighlight">\(T_{cond} = T_{cw,in} + 5 + 3\)</span>).</p>
+<code class="docutils literal notranslate"><span class="pre">cooling_water_temperature_in_degc</span></code> (then <span class="math notranslate nohighlight">\(T_{cond} = T_{cw,in} + 5 + 3\)</span>). Note: the card’s
+η was implied with water temperatures as cycle temperatures; with the approach chain the Guidebook
+point needs η ≈ 0.44, so η = 0.40 understates the COP by ≈ 9–11 % (sensitivity case).</p>
 </section>
 <section id="heat-rejection">
 <h2><span class="section-number">5.8.4. </span>Heat rejection<a class="headerlink" href="#heat-rejection" title="Link to this heading"></a></h2>

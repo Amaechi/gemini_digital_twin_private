@@ -87,18 +87,25 @@
 <span class="sd">1989) p.257-258, 262, 266; spec §3.3 and §7.2 GM-05.</span>
 
 <span class="sd">- ``COP = η T_evap / (T_cond - T_evap)`` (K), η ≈ 0.40 (implied 0.39-0.40 by the Guidebook</span>
-<span class="sd">  COP 4.39 at 45/90 °F and 4.07 at 45/95 °F, p.257-258) [L].</span>
+<span class="sd">  COP 4.39 at 45/90 °F and 4.07 at 45/95 °F, p.257-258) [L]. Known bias (COOL-ELC): that η</span>
+<span class="sd">  was implied with the *water* temperatures as cycle temperatures, while the chain below</span>
+<span class="sd">  adds -4 K / +3 K approaches; through the chain the Guidebook point needs η ≈ 0.44, so</span>
+<span class="sd">  η = 0.40 (card and spec GM-05) understates the COP by ≈ 9-11 % -- it overstates electric</span>
+<span class="sd">  power and so favours absorption in comparisons. Sensitivity case: η 0.44.</span>
 <span class="sd">- ``T_evap = T_chilled,supply - 4 K`` [A] (20 °C supply -&gt; 16 °C).</span>
 <span class="sd">- ``T_cond = T_cw,leaving + 3 K`` with a cooling tower, ``T_cw,leaving = T_wb + approach</span>
 <span class="sd">  (4-5 K, default 4.5) + range (~5 K)`` [A]; or ``T_cond = T_db + 8 K`` with a dry cooler [A].</span>
 <span class="sd">  If ``cooling_water_temperature_in_degc`` (water from a tower or dry cooler) is given,</span>
-<span class="sd">  ``T_cond = T_cw,in + range + 3 K`` (water-cooled condenser) for either option.</span>
+<span class="sd">  ``T_cond = T_cw,in + range + 3 K`` (water-cooled condenser) for either option. The</span>
+<span class="sd">  ``dry_cooler`` option is RC-06's air-cooled condensing (T_db + 8 K); a water-loop dry</span>
+<span class="sd">  cooler (``heat_rejection`` dry cooler, T_db + 5 K) feeding the condenser gives T_db + 13 K</span>
+<span class="sd">  (COP 5.26 vs 6.80 at 25 °C) -- a warning says which formula was used.</span>
 <span class="sd">- COP capped at 8 and floored at 3 [A]; ``P_el = Q_cool / COP``; ``Q_reject = Q_cool + P_el``.</span>
 
 <span class="sd">Condenser sensitivity: the model gives ``d ln COP / dT_cond = -1/(T_cond - T_evap)``</span>
 <span class="sd">(output ``condenser_sensitivity_per_k``), -4.0 %/K at the Guidebook point (7.2/32.2 °C),</span>
 <span class="sd">steeper than the Guidebook data (≈ -2.6 %/K of condenser-water temperature, p.257-258):</span>
-<span class="sd">the model is conservative in hot weather (documented check in the unit tests).</span>
+<span class="sd">the model's COP falls faster in hot weather (documented check in the unit tests).</span>
 
 <span class="sd">Capacity is the nominal capacity (no temperature derating); unmet load is reported.</span>
 <span class="sd">At 20 °C chilled supply and Dutch summer conditions the model gives COP ≈ 6-8 (RC-06).</span>
@@ -191,15 +198,13 @@
 <div class="viewcode-block" id="ElectricChiller.initialize_state">
 <a class="viewcode-back" href="../../../codedocumentation/gemini_model.electric_chiller.electric_chiller.html#gemini_model.electric_chiller.electric_chiller.ElectricChiller.initialize_state">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">initialize_state</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">"""Not applicable: static model."""</span>
-        <span class="k">pass</span></div>
+<span class="w">        </span><span class="sd">"""Not applicable: static model."""</span></div>
 
 
 <div class="viewcode-block" id="ElectricChiller.update_state">
 <a class="viewcode-back" href="../../../codedocumentation/gemini_model.electric_chiller.electric_chiller.html#gemini_model.electric_chiller.electric_chiller.ElectricChiller.update_state">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">update_state</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">u</span><span class="p">,</span> <span class="n">x</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">"""Not applicable: static model."""</span>
-        <span class="k">pass</span></div>
+<span class="w">        </span><span class="sd">"""Not applicable: static model."""</span></div>
 
 
     <span class="k">def</span><span class="w"> </span><span class="nf">_rho_cp</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
@@ -211,8 +216,12 @@
 
 <div class="viewcode-block" id="ElectricChiller.condenser_temperature_degc">
 <a class="viewcode-back" href="../../../codedocumentation/gemini_model.electric_chiller.electric_chiller.html#gemini_model.electric_chiller.electric_chiller.ElectricChiller.condenser_temperature_degc">[docs]</a>
-    <span class="k">def</span><span class="w"> </span><span class="nf">condenser_temperature_degc</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">u</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">"""Return the condensing temperature (°C) from the inputs (RC-06)."""</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">condenser_temperature_degc</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">u</span><span class="p">,</span> <span class="n">warnings</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">"""Return the condensing temperature (°C) from the inputs (RC-06).</span>
+
+<span class="sd">        Appends a note to ``warnings`` (a list) when a dry cooler is configured but the</span>
+<span class="sd">        water-cooled formula is used because condenser water is given.</span>
+<span class="sd">        """</span>
         <span class="n">p</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span>
         <span class="k">if</span> <span class="n">u</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"condenser_temperature_degc"</span><span class="p">)</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
             <span class="k">return</span> <span class="n">_finite</span><span class="p">(</span><span class="n">u</span><span class="p">[</span><span class="s2">"condenser_temperature_degc"</span><span class="p">],</span> <span class="s2">"condenser_temperature_degc"</span><span class="p">)</span>
@@ -222,6 +231,11 @@
             <span class="n">t_cw_in</span> <span class="o">=</span> <span class="n">_finite</span><span class="p">(</span>
                 <span class="n">u</span><span class="p">[</span><span class="s2">"cooling_water_temperature_in_degc"</span><span class="p">],</span> <span class="s2">"cooling_water_temperature_in_degc"</span>
             <span class="p">)</span>
+            <span class="k">if</span> <span class="n">p</span><span class="p">[</span><span class="s2">"heat_rejection"</span><span class="p">]</span> <span class="o">==</span> <span class="s2">"dry_cooler"</span> <span class="ow">and</span> <span class="n">warnings</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">warnings</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                    <span class="s2">"dry_cooler with condenser water given: water-cooled formula "</span>
+                    <span class="s2">"T_cw,in + range + 3 K used, not the RC-06 air-cooled T_db + 8 K"</span>
+                <span class="p">)</span>
             <span class="k">return</span> <span class="n">t_cw_in</span> <span class="o">+</span> <span class="n">cw_range</span> <span class="o">+</span> <span class="n">approach</span>
         <span class="n">option</span> <span class="o">=</span> <span class="n">p</span><span class="p">[</span><span class="s2">"heat_rejection"</span><span class="p">]</span>
         <span class="k">if</span> <span class="n">option</span> <span class="o">==</span> <span class="s2">"cooling_tower"</span><span class="p">:</span>
@@ -284,9 +298,8 @@
             <span class="n">t_evap</span> <span class="o">=</span> <span class="n">_finite</span><span class="p">(</span><span class="n">u</span><span class="p">[</span><span class="s2">"evaporator_temperature_degc"</span><span class="p">],</span> <span class="s2">"evaporator_temperature_degc"</span><span class="p">)</span>
         <span class="k">else</span><span class="p">:</span>
             <span class="n">t_evap</span> <span class="o">=</span> <span class="n">t_set</span> <span class="o">-</span> <span class="n">_non_negative</span><span class="p">(</span><span class="n">p</span><span class="p">[</span><span class="s2">"evaporator_approach_k"</span><span class="p">],</span> <span class="s2">"evaporator_approach_k"</span><span class="p">)</span>
-        <span class="n">t_cond</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">condenser_temperature_degc</span><span class="p">(</span><span class="n">u</span><span class="p">)</span>
-
         <span class="n">warnings</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">t_cond</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">condenser_temperature_degc</span><span class="p">(</span><span class="n">u</span><span class="p">,</span> <span class="n">warnings</span><span class="p">)</span>
         <span class="n">cop_carnot</span> <span class="o">=</span> <span class="n">carnot_cop</span><span class="p">(</span><span class="n">t_evap</span><span class="p">,</span> <span class="n">t_cond</span><span class="p">,</span> <span class="n">eta</span><span class="p">)</span>
         <span class="n">cop</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="nb">max</span><span class="p">(</span><span class="n">cop_carnot</span><span class="p">,</span> <span class="n">cop_min</span><span class="p">),</span> <span class="n">cop_max</span><span class="p">)</span>
         <span class="k">if</span> <span class="n">cop_carnot</span> <span class="o">&gt;</span> <span class="n">cop_max</span><span class="p">:</span>
@@ -311,7 +324,7 @@
             <span class="s2">"unmet_cooling_w"</span><span class="p">:</span> <span class="nb">max</span><span class="p">(</span><span class="n">load</span> <span class="o">-</span> <span class="n">q_cool</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">),</span>
             <span class="s2">"load_ratio"</span><span class="p">:</span> <span class="n">q_cool</span> <span class="o">/</span> <span class="n">q_nom</span><span class="p">,</span>
             <span class="s2">"cop"</span><span class="p">:</span> <span class="n">cop</span><span class="p">,</span>
-            <span class="s2">"cop_carnot_efficiency"</span><span class="p">:</span> <span class="n">cop_carnot</span><span class="p">,</span>
+            <span class="s2">"cop_uncapped"</span><span class="p">:</span> <span class="n">cop_carnot</span><span class="p">,</span>
             <span class="s2">"evaporator_temperature_degc"</span><span class="p">:</span> <span class="n">t_evap</span><span class="p">,</span>
             <span class="s2">"condenser_temperature_degc"</span><span class="p">:</span> <span class="n">t_cond</span><span class="p">,</span>
             <span class="s2">"condenser_sensitivity_per_k"</span><span class="p">:</span> <span class="n">sensitivity</span><span class="p">,</span>

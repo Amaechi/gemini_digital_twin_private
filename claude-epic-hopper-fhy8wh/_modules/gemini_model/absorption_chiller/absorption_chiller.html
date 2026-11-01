@@ -103,6 +103,13 @@
 <span class="sd">  extrapolated from the 6.7 °C calibration and are uncertain (RC-05 screening [D]: 85 °C</span>
 <span class="sd">  drive at 20 °C chilled ≈ capacity fraction 0.6-0.7, COP 0.63-0.70).</span>
 
+<span class="sd">Drive-side consistency (COOL-ABS-DRV): with a given drive flow, Method B needs a drive</span>
+<span class="sd">capacity rate of at least s_G/2 (output ``minimum_drive_flow_rate_m3s``), otherwise the drive</span>
+<span class="sd">outlet would fall below the machine's minimum generator temperature and the machine is treated</span>
+<span class="sd">as off; Method A limits the drive heat so that the outlet stays at or above its zero-capacity</span>
+<span class="sd">temperature (71.4 °C). Part load (COOL-ABS-PL): Method B's COP falls at low load (≈ 0.47 at</span>
+<span class="sd">10 % load at 85 °C drive) and the drive heat drops to 0 only when the machine stops.</span>
+
 <span class="sd">External circuits: each circuit either has a given flow (its outlet temperature follows</span>
 <span class="sd">from the energy balance and, for Method B, its mean temperature is solved together with</span>
 <span class="sd">the duty -- the equations are linear, so the solution is closed-form) or no flow (fixed</span>
@@ -217,15 +224,13 @@
 <div class="viewcode-block" id="AbsorptionChiller.initialize_state">
 <a class="viewcode-back" href="../../../codedocumentation/gemini_model.absorption_chiller.absorption_chiller.html#gemini_model.absorption_chiller.absorption_chiller.AbsorptionChiller.initialize_state">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">initialize_state</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">"""Not applicable: static model."""</span>
-        <span class="k">pass</span></div>
+<span class="w">        </span><span class="sd">"""Not applicable: static model."""</span></div>
 
 
 <div class="viewcode-block" id="AbsorptionChiller.update_state">
 <a class="viewcode-back" href="../../../codedocumentation/gemini_model.absorption_chiller.absorption_chiller.html#gemini_model.absorption_chiller.absorption_chiller.AbsorptionChiller.update_state">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">update_state</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">u</span><span class="p">,</span> <span class="n">x</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">"""Not applicable: static model."""</span>
-        <span class="k">pass</span></div>
+<span class="w">        </span><span class="sd">"""Not applicable: static model."""</span></div>
 
 
 <div class="viewcode-block" id="AbsorptionChiller.characteristic_coefficients">
@@ -316,10 +321,15 @@
         <span class="n">c_ac</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_capacity_rate</span><span class="p">(</span><span class="n">u</span><span class="p">,</span> <span class="s2">"cooling_water_flow_rate_m3s"</span><span class="p">,</span> <span class="s2">"cooling_water"</span><span class="p">)</span>
 
         <span class="n">warnings</span> <span class="o">=</span> <span class="p">[]</span>
-        <span class="n">details</span> <span class="o">=</span> <span class="p">{</span><span class="s2">"capacity_factor_ft"</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span> <span class="s2">"capacity_factor_fc"</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span> <span class="s2">"delta_delta_t_k"</span><span class="p">:</span> <span class="kc">None</span><span class="p">}</span>
+        <span class="n">details</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s2">"capacity_factor_ft"</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
+            <span class="s2">"capacity_factor_fc"</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
+            <span class="s2">"delta_delta_t_k"</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
+            <span class="s2">"minimum_drive_flow_rate_m3s"</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="p">}</span>
         <span class="k">if</span> <span class="n">method</span> <span class="o">==</span> <span class="s2">"ghc1989"</span><span class="p">:</span>
             <span class="n">q_avail</span><span class="p">,</span> <span class="n">q_e</span><span class="p">,</span> <span class="n">q_g</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_method_a</span><span class="p">(</span>
-                <span class="n">t_g_in</span><span class="p">,</span> <span class="n">t_e_set</span><span class="p">,</span> <span class="n">t_ac_in</span><span class="p">,</span> <span class="n">q_nom</span><span class="p">,</span> <span class="n">q_cap</span><span class="p">,</span> <span class="n">load</span><span class="p">,</span> <span class="n">details</span><span class="p">,</span> <span class="n">warnings</span>
+                <span class="n">t_g_in</span><span class="p">,</span> <span class="n">t_e_set</span><span class="p">,</span> <span class="n">t_ac_in</span><span class="p">,</span> <span class="n">c_g</span><span class="p">,</span> <span class="n">q_nom</span><span class="p">,</span> <span class="n">q_cap</span><span class="p">,</span> <span class="n">load</span><span class="p">,</span> <span class="n">details</span><span class="p">,</span> <span class="n">warnings</span>
             <span class="p">)</span>
         <span class="k">else</span><span class="p">:</span>
             <span class="n">q_avail</span><span class="p">,</span> <span class="n">q_e</span><span class="p">,</span> <span class="n">q_g</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_method_b</span><span class="p">(</span>
@@ -343,11 +353,6 @@
         <span class="k">else</span><span class="p">:</span>
             <span class="n">t_e_out</span> <span class="o">=</span> <span class="n">t_e_in</span> <span class="o">-</span> <span class="n">q_e</span> <span class="o">/</span> <span class="n">c_e</span> <span class="k">if</span> <span class="n">c_e</span> <span class="o">&gt;</span> <span class="mf">0.0</span> <span class="k">else</span> <span class="n">t_e_in</span>
             <span class="n">v_e</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">u</span><span class="p">[</span><span class="s2">"chilled_water_flow_rate_m3s"</span><span class="p">])</span>
-        <span class="k">if</span> <span class="n">q_g</span> <span class="o">&gt;</span> <span class="mf">0.0</span> <span class="ow">and</span> <span class="n">t_g_out</span> <span class="o">&lt;</span> <span class="n">t_ac_in</span><span class="p">:</span>
-            <span class="n">warnings</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
-                <span class="sa">f</span><span class="s2">"drive outlet </span><span class="si">{</span><span class="n">t_g_out</span><span class="si">:</span><span class="s2">.1f</span><span class="si">}</span><span class="s2"> °C is below the cooling-water inlet "</span>
-                <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">t_ac_in</span><span class="si">:</span><span class="s2">.1f</span><span class="si">}</span><span class="s2"> °C: drive flow too small for this duty"</span>
-            <span class="p">)</span>
 
         <span class="bp">self</span><span class="o">.</span><span class="n">output</span> <span class="o">=</span> <span class="p">{</span>
             <span class="s2">"method"</span><span class="p">:</span> <span class="n">method</span><span class="p">,</span>
@@ -365,6 +370,7 @@
             <span class="s2">"drive_temperature_in_degc"</span><span class="p">:</span> <span class="n">t_g_in</span><span class="p">,</span>
             <span class="s2">"drive_temperature_out_degc"</span><span class="p">:</span> <span class="n">t_g_out</span><span class="p">,</span>
             <span class="s2">"drive_flow_rate_m3s"</span><span class="p">:</span> <span class="n">v_g</span><span class="p">,</span>
+            <span class="s2">"drive_delta_t_k"</span><span class="p">:</span> <span class="n">t_g_in</span> <span class="o">-</span> <span class="n">t_g_out</span><span class="p">,</span>
             <span class="s2">"cooling_water_temperature_in_degc"</span><span class="p">:</span> <span class="n">t_ac_in</span><span class="p">,</span>
             <span class="s2">"cooling_water_temperature_out_degc"</span><span class="p">:</span> <span class="n">t_ac_out</span><span class="p">,</span>
             <span class="s2">"cooling_water_flow_rate_m3s"</span><span class="p">:</span> <span class="n">v_ac</span><span class="p">,</span>
@@ -389,8 +395,14 @@
             <span class="k">return</span> <span class="n">t_in</span><span class="p">,</span> <span class="mf">0.0</span>
         <span class="k">return</span> <span class="n">t_in</span> <span class="o">+</span> <span class="n">sign</span> <span class="o">*</span> <span class="n">fixed_delta_t</span><span class="p">,</span> <span class="n">heat_w</span> <span class="o">/</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_rho_cp</span><span class="p">(</span><span class="n">prefix</span><span class="p">)</span> <span class="o">*</span> <span class="n">fixed_delta_t</span><span class="p">)</span>
 
-    <span class="k">def</span><span class="w"> </span><span class="nf">_method_a</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">t_g_in</span><span class="p">,</span> <span class="n">t_e_set</span><span class="p">,</span> <span class="n">t_ac_in</span><span class="p">,</span> <span class="n">q_nom</span><span class="p">,</span> <span class="n">q_cap</span><span class="p">,</span> <span class="n">load</span><span class="p">,</span> <span class="n">details</span><span class="p">,</span> <span class="n">warnings</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">"""Apply Method A (Guidebook 1989) and return (Q_available, Q_E, Q_G) in W."""</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_method_a</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">t_g_in</span><span class="p">,</span> <span class="n">t_e_set</span><span class="p">,</span> <span class="n">t_ac_in</span><span class="p">,</span> <span class="n">c_g</span><span class="p">,</span> <span class="n">q_nom</span><span class="p">,</span> <span class="n">q_cap</span><span class="p">,</span> <span class="n">load</span><span class="p">,</span> <span class="n">details</span><span class="p">,</span> <span class="n">warnings</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">"""Apply Method A (Guidebook 1989) and return (Q_available, Q_E, Q_G) in W.</span>
+
+<span class="sd">        Method A has no drive-flow term (it assumes the rating generator ΔT). With a given</span>
+<span class="sd">        drive flow (capacity rate ``c_g``, W/K) the drive heat is limited so that the drive</span>
+<span class="sd">        outlet does not fall below the zero-capacity temperature (71.4 °C): hot water colder</span>
+<span class="sd">        than that cannot drive the machine (COOL-ABS-DRV).</span>
+<span class="sd">        """</span>
         <span class="n">t_hw</span> <span class="o">=</span> <span class="n">ghc1989</span><span class="o">.</span><span class="n">degc_to_degf</span><span class="p">(</span><span class="n">t_g_in</span><span class="p">)</span>
         <span class="n">t_chw</span> <span class="o">=</span> <span class="n">ghc1989</span><span class="o">.</span><span class="n">degc_to_degf</span><span class="p">(</span><span class="n">t_e_set</span><span class="p">)</span>
         <span class="n">t_cw</span> <span class="o">=</span> <span class="n">ghc1989</span><span class="o">.</span><span class="n">degc_to_degf</span><span class="p">(</span><span class="n">t_ac_in</span><span class="p">)</span>
@@ -415,10 +427,17 @@
             <span class="p">)</span>
             <span class="k">if</span> <span class="n">clamp</span> <span class="ow">and</span> <span class="n">t_cw</span> <span class="o">&lt;</span> <span class="n">cw_lo</span><span class="p">:</span>
                 <span class="n">t_cw</span> <span class="o">=</span> <span class="n">cw_lo</span>
-        <span class="k">if</span> <span class="n">t_hw</span> <span class="o">&gt;</span> <span class="n">ghc1989</span><span class="o">.</span><span class="n">RATING_HOT_WATER_RANGE_DEGF</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">+</span> <span class="n">_TOLERANCE</span><span class="p">:</span>
+        <span class="n">hw_lo</span><span class="p">,</span> <span class="n">hw_hi</span> <span class="o">=</span> <span class="n">ghc1989</span><span class="o">.</span><span class="n">RATING_HOT_WATER_RANGE_DEGF</span>
+        <span class="n">t_zero_degf</span> <span class="o">=</span> <span class="n">ghc1989</span><span class="o">.</span><span class="n">zero_capacity_temperature_degf</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">t_hw</span> <span class="o">&gt;</span> <span class="n">hw_hi</span> <span class="o">+</span> <span class="n">_TOLERANCE</span><span class="p">:</span>
             <span class="n">warnings</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
                 <span class="sa">f</span><span class="s2">"ghc1989: hot water </span><span class="si">{</span><span class="n">t_hw</span><span class="si">:</span><span class="s2">.1f</span><span class="si">}</span><span class="s2"> °F above the rating range "</span>
-                <span class="sa">f</span><span class="s2">"(&lt;= </span><span class="si">{</span><span class="n">ghc1989</span><span class="o">.</span><span class="n">RATING_HOT_WATER_RANGE_DEGF</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="si">:</span><span class="s2">.0f</span><span class="si">}</span><span class="s2"> °F)"</span>
+                <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">hw_lo</span><span class="si">:</span><span class="s2">.0f</span><span class="si">}</span><span class="s2">-</span><span class="si">{</span><span class="n">hw_hi</span><span class="si">:</span><span class="s2">.0f</span><span class="si">}</span><span class="s2"> °F (extrapolated)"</span>
+            <span class="p">)</span>
+        <span class="k">elif</span> <span class="n">t_zero_degf</span> <span class="o">&lt;</span> <span class="n">t_hw</span> <span class="o">&lt;</span> <span class="n">hw_lo</span> <span class="o">-</span> <span class="n">_TOLERANCE</span><span class="p">:</span>
+            <span class="n">warnings</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">"ghc1989: hot water </span><span class="si">{</span><span class="n">t_hw</span><span class="si">:</span><span class="s2">.1f</span><span class="si">}</span><span class="s2"> °F below the rating range "</span>
+                <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">hw_lo</span><span class="si">:</span><span class="s2">.0f</span><span class="si">}</span><span class="s2">-</span><span class="si">{</span><span class="n">hw_hi</span><span class="si">:</span><span class="s2">.0f</span><span class="si">}</span><span class="s2"> °F (extrapolated towards zero capacity)"</span>
             <span class="p">)</span>
         <span class="n">f_t</span> <span class="o">=</span> <span class="n">ghc1989</span><span class="o">.</span><span class="n">hot_water_factor</span><span class="p">(</span><span class="n">t_hw</span><span class="p">)</span>
         <span class="n">f_c</span> <span class="o">=</span> <span class="n">ghc1989</span><span class="o">.</span><span class="n">condition_factor</span><span class="p">(</span><span class="n">t_chw</span><span class="p">,</span> <span class="n">t_cw</span><span class="p">)</span>
@@ -430,8 +449,18 @@
                 <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">ghc1989</span><span class="o">.</span><span class="n">degf_to_degc</span><span class="p">(</span><span class="n">ghc1989</span><span class="o">.</span><span class="n">zero_capacity_temperature_degf</span><span class="p">())</span><span class="si">:</span><span class="s2">.1f</span><span class="si">}</span><span class="s2"> °C"</span>
             <span class="p">)</span>
         <span class="n">q_avail</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="nb">max</span><span class="p">(</span><span class="n">f_t</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">)</span> <span class="o">*</span> <span class="nb">max</span><span class="p">(</span><span class="n">f_c</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">)</span> <span class="o">*</span> <span class="n">q_nom</span><span class="p">,</span> <span class="n">q_cap</span><span class="p">)</span>
+        <span class="n">cop</span> <span class="o">=</span> <span class="n">ghc1989</span><span class="o">.</span><span class="n">cop</span><span class="p">(</span><span class="n">t_hw</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">c_g</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">t_zero</span> <span class="o">=</span> <span class="n">ghc1989</span><span class="o">.</span><span class="n">degf_to_degc</span><span class="p">(</span><span class="n">t_zero_degf</span><span class="p">)</span>
+            <span class="n">q_flow_limit</span> <span class="o">=</span> <span class="n">c_g</span> <span class="o">*</span> <span class="nb">max</span><span class="p">(</span><span class="n">t_g_in</span> <span class="o">-</span> <span class="n">t_zero</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">)</span> <span class="o">*</span> <span class="n">cop</span>
+            <span class="k">if</span> <span class="n">q_flow_limit</span> <span class="o">&lt;</span> <span class="n">q_avail</span><span class="p">:</span>
+                <span class="n">warnings</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">"ghc1989: capacity limited by the drive flow (outlet kept at the "</span>
+                    <span class="sa">f</span><span class="s2">"zero-capacity temperature </span><span class="si">{</span><span class="n">t_zero</span><span class="si">:</span><span class="s2">.1f</span><span class="si">}</span><span class="s2"> °C)"</span>
+                <span class="p">)</span>
+                <span class="n">q_avail</span> <span class="o">=</span> <span class="n">q_flow_limit</span>
         <span class="n">q_e</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="n">load</span><span class="p">,</span> <span class="n">q_avail</span><span class="p">)</span>
-        <span class="n">q_g</span> <span class="o">=</span> <span class="n">q_e</span> <span class="o">/</span> <span class="n">ghc1989</span><span class="o">.</span><span class="n">cop</span><span class="p">(</span><span class="n">t_hw</span><span class="p">)</span> <span class="k">if</span> <span class="n">q_e</span> <span class="o">&gt;</span> <span class="mf">0.0</span> <span class="k">else</span> <span class="mf">0.0</span>
+        <span class="n">q_g</span> <span class="o">=</span> <span class="n">q_e</span> <span class="o">/</span> <span class="n">cop</span> <span class="k">if</span> <span class="n">q_e</span> <span class="o">&gt;</span> <span class="mf">0.0</span> <span class="k">else</span> <span class="mf">0.0</span>
         <span class="k">return</span> <span class="n">q_avail</span><span class="p">,</span> <span class="n">q_e</span><span class="p">,</span> <span class="n">q_g</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">_method_b</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">temperatures</span><span class="p">,</span> <span class="n">capacity_rates</span><span class="p">,</span> <span class="n">fixed_deltas</span><span class="p">,</span> <span class="n">duties</span><span class="p">,</span> <span class="n">details</span><span class="p">,</span> <span class="n">warnings</span><span class="p">):</span>
@@ -457,11 +486,24 @@
         <span class="n">m_e</span> <span class="o">=</span> <span class="n">coefficients</span><span class="p">[</span><span class="s2">"ddt_min_k"</span><span class="p">]</span>
         <span class="n">m_g</span> <span class="o">=</span> <span class="n">coefficients</span><span class="p">[</span><span class="s2">"ddt_min_g_k"</span><span class="p">]</span>
 
+        <span class="c1"># Drive outlet &gt;= minimum generator temperature t_G,min = ΔΔt_min,G + (1+B) t̄_AC - B t̄_E</span>
+        <span class="c1"># &lt;=&gt; (t̄_G - t_G,out) &lt;= ΔΔt - ΔΔt_min,G &lt;=&gt; Q_G/(2 C_G) &lt;= Q_G/s_G &lt;=&gt; C_G &gt;= s_G/2,</span>
+        <span class="c1"># independent of the operating point (COOL-ABS-DRV).</span>
+        <span class="n">details</span><span class="p">[</span><span class="s2">"minimum_drive_flow_rate_m3s"</span><span class="p">]</span> <span class="o">=</span> <span class="mf">0.5</span> <span class="o">*</span> <span class="n">s_g</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">_rho_cp</span><span class="p">(</span><span class="s2">"drive"</span><span class="p">)</span>
+        <span class="n">infeasible_drive</span> <span class="o">=</span> <span class="n">c_g</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="mf">0.0</span> <span class="o">&lt;</span> <span class="n">c_g</span> <span class="o">&lt;</span> <span class="mf">0.5</span> <span class="o">*</span> <span class="n">s_g</span>
+        <span class="k">if</span> <span class="n">infeasible_drive</span><span class="p">:</span>
+            <span class="n">warnings</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">"characteristic: drive flow </span><span class="si">{</span><span class="n">c_g</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="bp">self</span><span class="o">.</span><span class="n">_rho_cp</span><span class="p">(</span><span class="s1">'drive'</span><span class="p">)</span><span class="si">:</span><span class="s2">.4g</span><span class="si">}</span><span class="s2"> m³/s below the "</span>
+                <span class="sa">f</span><span class="s2">"minimum </span><span class="si">{</span><span class="n">details</span><span class="p">[</span><span class="s1">'minimum_drive_flow_rate_m3s'</span><span class="p">]</span><span class="si">:</span><span class="s2">.4g</span><span class="si">}</span><span class="s2"> m³/s (s_G/(2 ρ c_p)): the "</span>
+                <span class="s2">"drive outlet would fall below the minimum generator temperature; machine off"</span>
+            <span class="p">)</span>
         <span class="n">g</span><span class="p">,</span> <span class="n">offset_g</span> <span class="o">=</span> <span class="p">(</span><span class="mf">0.5</span> <span class="o">/</span> <span class="n">c_g</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">)</span> <span class="k">if</span> <span class="n">c_g</span> <span class="k">else</span> <span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="n">dt_generator</span> <span class="o">/</span> <span class="mf">2.0</span><span class="p">)</span>
         <span class="n">a</span><span class="p">,</span> <span class="n">offset_ac</span> <span class="o">=</span> <span class="p">(</span><span class="mf">0.5</span> <span class="o">/</span> <span class="n">c_ac</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">)</span> <span class="k">if</span> <span class="n">c_ac</span> <span class="k">else</span> <span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="n">cw_range</span> <span class="o">/</span> <span class="mf">2.0</span><span class="p">)</span>
         <span class="n">e</span><span class="p">,</span> <span class="n">offset_e</span> <span class="o">=</span> <span class="p">(</span><span class="mf">0.5</span> <span class="o">/</span> <span class="n">c_e</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">)</span> <span class="k">if</span> <span class="n">c_e</span> <span class="k">else</span> <span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="nb">max</span><span class="p">(</span><span class="n">t_e_in</span> <span class="o">-</span> <span class="n">t_e_set</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">)</span> <span class="o">/</span> <span class="mf">2.0</span><span class="p">)</span>
         <span class="k">if</span> <span class="p">(</span><span class="n">c_g</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">c_g</span> <span class="o">&lt;=</span> <span class="mf">0.0</span><span class="p">)</span> <span class="ow">or</span> <span class="p">(</span><span class="n">c_ac</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">c_ac</span> <span class="o">&lt;=</span> <span class="mf">0.0</span><span class="p">):</span>
             <span class="n">q_avail</span><span class="p">,</span> <span class="n">ddt</span> <span class="o">=</span> <span class="mf">0.0</span><span class="p">,</span> <span class="kc">None</span>  <span class="c1"># no drive or no cooling-water flow: machine off</span>
+        <span class="k">elif</span> <span class="n">infeasible_drive</span><span class="p">:</span>
+            <span class="n">q_avail</span><span class="p">,</span> <span class="n">ddt</span> <span class="o">=</span> <span class="mf">0.0</span><span class="p">,</span> <span class="kc">None</span>
         <span class="k">else</span><span class="p">:</span>
             <span class="n">x0</span> <span class="o">=</span> <span class="p">(</span><span class="n">t_g_in</span> <span class="o">-</span> <span class="n">offset_g</span><span class="p">)</span> <span class="o">-</span> <span class="p">(</span><span class="mf">1.0</span> <span class="o">+</span> <span class="n">b</span><span class="p">)</span> <span class="o">*</span> <span class="p">(</span><span class="n">t_ac_in</span> <span class="o">+</span> <span class="n">offset_ac</span><span class="p">)</span> <span class="o">+</span> <span class="n">b</span> <span class="o">*</span> <span class="p">(</span><span class="n">t_e_in</span> <span class="o">-</span> <span class="n">offset_e</span><span class="p">)</span>
             <span class="n">k_g</span> <span class="o">=</span> <span class="p">(</span><span class="n">g</span> <span class="o">+</span> <span class="p">(</span><span class="mf">1.0</span> <span class="o">+</span> <span class="n">b</span><span class="p">)</span> <span class="o">*</span> <span class="n">a</span><span class="p">)</span> <span class="o">*</span> <span class="n">s_g</span>

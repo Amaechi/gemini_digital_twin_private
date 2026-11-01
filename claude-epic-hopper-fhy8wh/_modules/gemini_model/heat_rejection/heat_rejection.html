@@ -89,7 +89,10 @@
 
 <span class="sd">- Heat to reject from a chiller ``Q_reject = Q_cool (1 + 1/COP)`` (Guidebook p.262):</span>
 <span class="sd">  2.43 Q_cool at COP 0.7, 1.33 Q_cool at COP 3 (:func:`chiller_heat_rejection_w`). The</span>
-<span class="sd">  chiller models already output ``heat_rejected_w``; wire that to ``heat_load_w``.</span>
+<span class="sd">  chiller models already output ``heat_rejected_w``; wire that to ``heat_load_w``. For the</span>
+<span class="sd">  absorption chiller set its ``aux_power_fraction`` to 0 (or wire</span>
+<span class="sd">  ``absorber_condenser_heat_w``): its default 2.2 % aux is the extra tower fan and pump,</span>
+<span class="sd">  which this unit already counts (COOL-ABS-AUX).</span>
 <span class="sd">- Cooling tower: leaving (cold) water ``T_out = T_wb + approach``, approach 4-5 K</span>
 <span class="sd">  (default 4.5) [A]; range ≈ 5 K [A]; fan + cooling-water pump ≈ 2 % of heat rejected [A]</span>
 <span class="sd">  (Guidebook 0.077 kW/ton incremental, p.269).</span>
@@ -103,6 +106,8 @@
 <span class="sd">balance ``Q = ρ c_p V (T_in - T_out)``; without it the range is fixed and the flow is</span>
 <span class="sd">reported. All energy taken in leaves as heat: ``heat_to_ambient_w = heat_load_w +</span>
 <span class="sd">power_el``. There is no capacity limit: size the unit at the summer design point (DB-34b).</span>
+<span class="sd">A wet tower whose fixed-approach leaving water would be at or below 0 °C is flagged in</span>
+<span class="sd">``validity_warnings`` (freeze protection -- fan control, bypass -- is not modelled).</span>
 <span class="sd">"""</span>
 
 <span class="kn">import</span><span class="w"> </span><span class="nn">math</span>
@@ -180,15 +185,13 @@
 <div class="viewcode-block" id="HeatRejection.initialize_state">
 <a class="viewcode-back" href="../../../codedocumentation/gemini_model.heat_rejection.heat_rejection.html#gemini_model.heat_rejection.heat_rejection.HeatRejection.initialize_state">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">initialize_state</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">"""Not applicable: static model."""</span>
-        <span class="k">pass</span></div>
+<span class="w">        </span><span class="sd">"""Not applicable: static model."""</span></div>
 
 
 <div class="viewcode-block" id="HeatRejection.update_state">
 <a class="viewcode-back" href="../../../codedocumentation/gemini_model.heat_rejection.heat_rejection.html#gemini_model.heat_rejection.heat_rejection.HeatRejection.update_state">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">update_state</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">u</span><span class="p">,</span> <span class="n">x</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">"""Not applicable: static model."""</span>
-        <span class="k">pass</span></div>
+<span class="w">        </span><span class="sd">"""Not applicable: static model."""</span></div>
 
 
 <div class="viewcode-block" id="HeatRejection.calculate_output">
@@ -227,6 +230,11 @@
             <span class="n">water_range</span> <span class="o">=</span> <span class="n">_positive</span><span class="p">(</span><span class="n">p</span><span class="p">[</span><span class="s2">"range_k"</span><span class="p">],</span> <span class="s2">"range_k"</span><span class="p">)</span> <span class="k">if</span> <span class="n">q_load</span> <span class="o">&gt;</span> <span class="mf">0.0</span> <span class="k">else</span> <span class="mf">0.0</span>
             <span class="n">flow</span> <span class="o">=</span> <span class="n">q_load</span> <span class="o">/</span> <span class="p">(</span><span class="n">rho_cp</span> <span class="o">*</span> <span class="n">water_range</span><span class="p">)</span> <span class="k">if</span> <span class="n">q_load</span> <span class="o">&gt;</span> <span class="mf">0.0</span> <span class="k">else</span> <span class="mf">0.0</span>
 
+        <span class="n">warnings</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">if</span> <span class="n">technology</span> <span class="o">==</span> <span class="s2">"cooling_tower"</span> <span class="ow">and</span> <span class="n">t_out</span> <span class="o">&lt;=</span> <span class="mf">0.0</span><span class="p">:</span>
+            <span class="n">warnings</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">"tower leaving water </span><span class="si">{</span><span class="n">t_out</span><span class="si">:</span><span class="s2">.1f</span><span class="si">}</span><span class="s2"> °C &lt;= 0 °C: freeze protection not modelled"</span>
+            <span class="p">)</span>
         <span class="n">power_el</span> <span class="o">=</span> <span class="n">aux_fraction</span> <span class="o">*</span> <span class="n">q_load</span>
         <span class="k">if</span> <span class="n">technology</span> <span class="o">==</span> <span class="s2">"cooling_tower"</span><span class="p">:</span>
             <span class="n">evaporation</span> <span class="o">=</span> <span class="n">q_load</span> <span class="o">/</span> <span class="n">_positive</span><span class="p">(</span><span class="n">p</span><span class="p">[</span><span class="s2">"latent_heat_j_kg"</span><span class="p">],</span> <span class="s2">"latent_heat_j_kg"</span><span class="p">)</span>
@@ -243,6 +251,7 @@
             <span class="s2">"range_k"</span><span class="p">:</span> <span class="n">water_range</span><span class="p">,</span>
             <span class="s2">"approach_k"</span><span class="p">:</span> <span class="n">approach</span><span class="p">,</span>
             <span class="s2">"water_evaporation_kg_s"</span><span class="p">:</span> <span class="n">evaporation</span><span class="p">,</span>
+            <span class="s2">"validity_warnings"</span><span class="p">:</span> <span class="n">warnings</span><span class="p">,</span>
             <span class="s2">"power_el"</span><span class="p">:</span> <span class="n">power_el</span><span class="p">,</span>
             <span class="s2">"power_th"</span><span class="p">:</span> <span class="mf">0.0</span><span class="p">,</span>
             <span class="s2">"emission"</span><span class="p">:</span> <span class="mf">0.0</span><span class="p">,</span>

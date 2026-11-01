@@ -129,7 +129,10 @@ Ch23 p.11-12; spec §7.2 GM-06.</p>
 <ul class="simple">
 <li><p>Heat to reject from a chiller <code class="docutils literal notranslate"><span class="pre">Q_reject</span> <span class="pre">=</span> <span class="pre">Q_cool</span> <span class="pre">(1</span> <span class="pre">+</span> <span class="pre">1/COP)</span></code> (Guidebook p.262):
 2.43 Q_cool at COP 0.7, 1.33 Q_cool at COP 3 (<a class="reference internal" href="#gemini_model.heat_rejection.heat_rejection.chiller_heat_rejection_w" title="gemini_model.heat_rejection.heat_rejection.chiller_heat_rejection_w"><code class="xref py py-func docutils literal notranslate"><span class="pre">chiller_heat_rejection_w()</span></code></a>). The
-chiller models already output <code class="docutils literal notranslate"><span class="pre">heat_rejected_w</span></code>; wire that to <code class="docutils literal notranslate"><span class="pre">heat_load_w</span></code>.</p></li>
+chiller models already output <code class="docutils literal notranslate"><span class="pre">heat_rejected_w</span></code>; wire that to <code class="docutils literal notranslate"><span class="pre">heat_load_w</span></code>. For the
+absorption chiller set its <code class="docutils literal notranslate"><span class="pre">aux_power_fraction</span></code> to 0 (or wire
+<code class="docutils literal notranslate"><span class="pre">absorber_condenser_heat_w</span></code>): its default 2.2 % aux is the extra tower fan and pump,
+which this unit already counts (COOL-ABS-AUX).</p></li>
 <li><p>Cooling tower: leaving (cold) water <code class="docutils literal notranslate"><span class="pre">T_out</span> <span class="pre">=</span> <span class="pre">T_wb</span> <span class="pre">+</span> <span class="pre">approach</span></code>, approach 4-5 K
 (default 4.5) [A]; range ≈ 5 K [A]; fan + cooling-water pump ≈ 2 % of heat rejected [A]
 (Guidebook 0.077 kW/ton incremental, p.269).</p></li>
@@ -142,7 +145,9 @@ steam tables) [A] – an upper bound (all heat by evaporation); 0 for a dry cool
 <p>With <code class="docutils literal notranslate"><span class="pre">water_flow_rate_m3s</span></code> the entering (hot) water temperature follows from the energy
 balance <code class="docutils literal notranslate"><span class="pre">Q</span> <span class="pre">=</span> <span class="pre">ρ</span> <span class="pre">c_p</span> <span class="pre">V</span> <span class="pre">(T_in</span> <span class="pre">-</span> <span class="pre">T_out)</span></code>; without it the range is fixed and the flow is
 reported. All energy taken in leaves as heat: <code class="docutils literal notranslate"><span class="pre">heat_to_ambient_w</span> <span class="pre">=</span> <span class="pre">heat_load_w</span> <span class="pre">+</span>
-<span class="pre">power_el</span></code>. There is no capacity limit: size the unit at the summer design point (DB-34b).</p>
+<span class="pre">power_el</span></code>. There is no capacity limit: size the unit at the summer design point (DB-34b).
+A wet tower whose fixed-approach leaving water would be at or below 0 °C is flagged in
+<code class="docutils literal notranslate"><span class="pre">validity_warnings</span></code> (freeze protection – fan control, bypass – is not modelled).</p>
 <p class="rubric">Functions</p>
 <table class="autosummary longtable docutils align-default">
 <tbody>

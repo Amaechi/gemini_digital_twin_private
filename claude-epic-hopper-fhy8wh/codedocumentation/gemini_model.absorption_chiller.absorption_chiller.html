@@ -144,6 +144,12 @@ to Method A at its rating points by <a class="reference internal" href="gemini_m
 extrapolated from the 6.7 °C calibration and are uncertain (RC-05 screening [D]: 85 °C
 drive at 20 °C chilled ≈ capacity fraction 0.6-0.7, COP 0.63-0.70).</p></li>
 </ul>
+<p>Drive-side consistency (COOL-ABS-DRV): with a given drive flow, Method B needs a drive
+capacity rate of at least s_G/2 (output <code class="docutils literal notranslate"><span class="pre">minimum_drive_flow_rate_m3s</span></code>), otherwise the drive
+outlet would fall below the machine’s minimum generator temperature and the machine is treated
+as off; Method A limits the drive heat so that the outlet stays at or above its zero-capacity
+temperature (71.4 °C). Part load (COOL-ABS-PL): Method B’s COP falls at low load (≈ 0.47 at
+10 % load at 85 °C drive) and the drive heat drops to 0 only when the machine stops.</p>
 <p>External circuits: each circuit either has a given flow (its outlet temperature follows
 from the energy balance and, for Method B, its mean temperature is solved together with
 the duty – the equations are linear, so the solution is closed-form) or no flow (fixed

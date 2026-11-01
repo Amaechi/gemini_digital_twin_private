@@ -140,7 +140,10 @@ pre-cools the chiller return from T_return to T_fc, i.e. the fraction
 <p>Power = tower fan + pumps ≈ <code class="docutils literal notranslate"><span class="pre">aux_power_fraction</span></code> (2 % [A]) of the heat moved, i.e. an
 instantaneous performance factor of 50 (inside the 24-53 seasonal range).
 <code class="docutils literal notranslate"><span class="pre">heat_rejected_w</span></code> = free cooling + power_el (all energy leaves at the tower).
-Ambient wet-bulb is an input (the agent side computes it with Stull, TL-02b).</p>
+Ambient wet-bulb is an input (the agent side computes it with Stull, TL-02b). If the tower
+water (T_wb + approach_tower) would be at or below 0 °C a validity warning is returned
+(freeze protection is not modelled). If <code class="docutils literal notranslate"><span class="pre">heat_rejected_w</span></code> is wired to a separate
+<code class="docutils literal notranslate"><span class="pre">heat_rejection</span></code> unit, set this model’s <code class="docutils literal notranslate"><span class="pre">aux_power_fraction</span></code> to 0 to count the fan once.</p>
 <p class="rubric">Functions</p>
 <table class="autosummary longtable docutils align-default">
 <tbody>

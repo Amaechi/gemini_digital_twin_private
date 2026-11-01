@@ -127,18 +127,25 @@
 1989) p.257-258, 262, 266; spec §3.3 and §7.2 GM-05.</p>
 <ul class="simple">
 <li><p><code class="docutils literal notranslate"><span class="pre">COP</span> <span class="pre">=</span> <span class="pre">η</span> <span class="pre">T_evap</span> <span class="pre">/</span> <span class="pre">(T_cond</span> <span class="pre">-</span> <span class="pre">T_evap)</span></code> (K), η ≈ 0.40 (implied 0.39-0.40 by the Guidebook
-COP 4.39 at 45/90 °F and 4.07 at 45/95 °F, p.257-258) [L].</p></li>
+COP 4.39 at 45/90 °F and 4.07 at 45/95 °F, p.257-258) [L]. Known bias (COOL-ELC): that η
+was implied with the <em>water</em> temperatures as cycle temperatures, while the chain below
+adds -4 K / +3 K approaches; through the chain the Guidebook point needs η ≈ 0.44, so
+η = 0.40 (card and spec GM-05) understates the COP by ≈ 9-11 % – it overstates electric
+power and so favours absorption in comparisons. Sensitivity case: η 0.44.</p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">T_evap</span> <span class="pre">=</span> <span class="pre">T_chilled,supply</span> <span class="pre">-</span> <span class="pre">4</span> <span class="pre">K</span></code> [A] (20 °C supply -&gt; 16 °C).</p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">T_cond</span> <span class="pre">=</span> <span class="pre">T_cw,leaving</span> <span class="pre">+</span> <span class="pre">3</span> <span class="pre">K</span></code> with a cooling tower, <code class="docutils literal notranslate"><span class="pre">T_cw,leaving</span> <span class="pre">=</span> <span class="pre">T_wb</span> <span class="pre">+</span> <span class="pre">approach</span>
 <span class="pre">(4-5</span> <span class="pre">K,</span> <span class="pre">default</span> <span class="pre">4.5)</span> <span class="pre">+</span> <span class="pre">range</span> <span class="pre">(~5</span> <span class="pre">K)</span></code> [A]; or <code class="docutils literal notranslate"><span class="pre">T_cond</span> <span class="pre">=</span> <span class="pre">T_db</span> <span class="pre">+</span> <span class="pre">8</span> <span class="pre">K</span></code> with a dry cooler [A].
 If <code class="docutils literal notranslate"><span class="pre">cooling_water_temperature_in_degc</span></code> (water from a tower or dry cooler) is given,
-<code class="docutils literal notranslate"><span class="pre">T_cond</span> <span class="pre">=</span> <span class="pre">T_cw,in</span> <span class="pre">+</span> <span class="pre">range</span> <span class="pre">+</span> <span class="pre">3</span> <span class="pre">K</span></code> (water-cooled condenser) for either option.</p></li>
+<code class="docutils literal notranslate"><span class="pre">T_cond</span> <span class="pre">=</span> <span class="pre">T_cw,in</span> <span class="pre">+</span> <span class="pre">range</span> <span class="pre">+</span> <span class="pre">3</span> <span class="pre">K</span></code> (water-cooled condenser) for either option. The
+<code class="docutils literal notranslate"><span class="pre">dry_cooler</span></code> option is RC-06’s air-cooled condensing (T_db + 8 K); a water-loop dry
+cooler (<code class="docutils literal notranslate"><span class="pre">heat_rejection</span></code> dry cooler, T_db + 5 K) feeding the condenser gives T_db + 13 K
+(COP 5.26 vs 6.80 at 25 °C) – a warning says which formula was used.</p></li>
 <li><p>COP capped at 8 and floored at 3 [A]; <code class="docutils literal notranslate"><span class="pre">P_el</span> <span class="pre">=</span> <span class="pre">Q_cool</span> <span class="pre">/</span> <span class="pre">COP</span></code>; <code class="docutils literal notranslate"><span class="pre">Q_reject</span> <span class="pre">=</span> <span class="pre">Q_cool</span> <span class="pre">+</span> <span class="pre">P_el</span></code>.</p></li>
 </ul>
 <p>Condenser sensitivity: the model gives <code class="docutils literal notranslate"><span class="pre">d</span> <span class="pre">ln</span> <span class="pre">COP</span> <span class="pre">/</span> <span class="pre">dT_cond</span> <span class="pre">=</span> <span class="pre">-1/(T_cond</span> <span class="pre">-</span> <span class="pre">T_evap)</span></code>
 (output <code class="docutils literal notranslate"><span class="pre">condenser_sensitivity_per_k</span></code>), -4.0 %/K at the Guidebook point (7.2/32.2 °C),
 steeper than the Guidebook data (≈ -2.6 %/K of condenser-water temperature, p.257-258):
-the model is conservative in hot weather (documented check in the unit tests).</p>
+the model’s COP falls faster in hot weather (documented check in the unit tests).</p>
 <p>Capacity is the nominal capacity (no temperature derating); unmet load is reported.
 At 20 °C chilled supply and Dutch summer conditions the model gives COP ≈ 6-8 (RC-06).</p>
 <p class="rubric">Functions</p>
@@ -177,8 +184,10 @@ and direct overrides <code class="docutils literal notranslate"><span class="pre
 
 <dl class="py method">
 <dt class="sig sig-object py" id="gemini_model.electric_chiller.electric_chiller.ElectricChiller.condenser_temperature_degc">
-<span class="sig-name descname"><span class="pre">condenser_temperature_degc</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">u</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/gemini_model/electric_chiller/electric_chiller.html#ElectricChiller.condenser_temperature_degc"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#gemini_model.electric_chiller.electric_chiller.ElectricChiller.condenser_temperature_degc" title="Link to this definition"></a></dt>
+<span class="sig-name descname"><span class="pre">condenser_temperature_degc</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">u</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">warnings</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/gemini_model/electric_chiller/electric_chiller.html#ElectricChiller.condenser_temperature_degc"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#gemini_model.electric_chiller.electric_chiller.ElectricChiller.condenser_temperature_degc" title="Link to this definition"></a></dt>
 <dd><p>Return the condensing temperature (°C) from the inputs (RC-06).</p>
+<p>Appends a note to <code class="docutils literal notranslate"><span class="pre">warnings</span></code> (a list) when a dry cooler is configured but the
+water-cooled formula is used because condenser water is given.</p>
 </dd></dl>
 
 <dl class="py method">
