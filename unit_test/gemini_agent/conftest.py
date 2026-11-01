@@ -4,9 +4,30 @@
 engine's ``build_ollama_model`` raises unless a test replaces it on purpose, and the error
 propagates (``EngineFailure`` fallback does not catch it), so the test fails loudly instead of
 silently falling back to the policy.
+
+Second net (WP-12): the git working tree is snapshotted when pytest starts and
+``test_working_tree.py::test_git_working_tree_unchanged`` runs last and compares it.
 """
 
 import importlib.util
+
+import pytest as _pytest
+
+from gemini_agent.schemas.config import REPO_ROOT as _REPO_ROOT
+from unit_test.gemini_agent.working_tree import SNAPSHOT_KEY, TEST_NAME, git_snapshot
+
+
+def pytest_configure(config):
+    """Snapshot the git working tree before any test runs."""
+    config.stash[SNAPSHOT_KEY] = git_snapshot(_REPO_ROOT)
+
+
+@_pytest.hookimpl(trylast=True)
+def pytest_collection_modifyitems(config, items):
+    """Run the working-tree check after every other collected test."""
+    last = [item for item in items if item.name == TEST_NAME]
+    items[:] = [item for item in items if item.name != TEST_NAME] + last
+
 
 if importlib.util.find_spec("pydantic_ai") is None:
     # Agent tests run in the "Hackathon tests" workflow, which installs
