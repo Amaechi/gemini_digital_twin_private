@@ -77,6 +77,9 @@ class RunState(StrictModel):
     status: RunStatus = RunStatus.RUNNING
     phase: Phase = Phase.P0
     loop_count: int = 0
+    earlier_pass_fallbacks: int = Field(
+        default=0, description="Policy fallbacks of P6–P10 passes discarded by a loop-back."
+    )
     in_scope: bool = True
     scope_reason: str = ""
     conflicts: list[str] = Field(default_factory=list)
@@ -118,7 +121,7 @@ class RunState(StrictModel):
         """LLM decisions and Decision Records that fell back to the policy (AG-03)."""
         steps = sum(progress.fallbacks for progress in self.progress.values())
         records = sum(1 for r in self.decision_records if r.decision_source == "policy_fallback")
-        return steps + records
+        return steps + records + self.earlier_pass_fallbacks
 
     def latest_verification(self, candidate_id: str | None) -> Verification | None:
         """Most recent verification of a candidate."""

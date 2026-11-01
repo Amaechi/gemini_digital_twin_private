@@ -135,22 +135,33 @@ def _word_count(text: str) -> int:
     return len(text.split())
 
 
-_NUMBER_WITH_UNIT = re.compile(
-    r"(?<![\w.\-])\d+(?:[.,]\d+)?\s*(?:°C|degC|K|kW|MW|GW|kWh|MWh|GWh|m3/h|m³/h|m3|m³|bar|barg|"
-    r"kPa|Pa|%|USD|EUR|€|km|m|t/yr|kg|yr|years?)(?![\w/])"
+_UNIT = (
+    r"(?:°C|degC|K|W|kW|MW|GW|Wh|kWh|MWh|GWh|J|kJ|MJ|GJ|TJ|m3|m³|bar|barg|bara|Pa|kPa|MPa|%|"
+    r"USD|EUR|mm|m|km|t|kt|Mt|kg|s|h|hours?|days?|yrs?|years?|k|M|bn)"
 )
-"""A quantity with a unit, e.g. '55 degC', '300 m3/h', '12 %'."""
+_LLM_NUMBER = re.compile(
+    # a number that is not part of an identifier (DR-01, TR-003, C1-3d, depth-2500m, §10.1, P10)
+    r"(?<![\w.§\-])-?\d+(?:[.,]\d+)*(?:[eE][+-]?\d+)?"
+    # ... followed by a unit, also compound or suffixed ('55degC', '45 USD/MWh', '1.5 MW_th')
+    rf"(?:\s*{_UNIT}(?:_?(?:th|el|e))?(?:/[\w³]+)*(?![\w/])"
+    # ... or standing alone ('COP 4.2', 'LCOH 45', '-5', '$45'); '3-doublets' is an option id
+    r"|(?!\w|-[^\W\d_]))"
+)
+"""A number an LLM wrote in free text: with or without a unit, but not inside an identifier."""
 
 
 def reject_llm_quantities(text: str) -> str:
-    """Refuse quantities in free text that ends up in Decision Records (AG-02).
+    """Refuse numbers in LLM free text that ends up in run artefacts (AG-02, golden rule 1).
 
-    Numbers in reports come from tool outputs only; rationales cite option or evidence ids.
+    Numbers in Decision Records and run summaries come from tool outputs only; LLM text cites
+    option, evidence, DR or assumption ids instead. Digits inside such ids are allowed; numbers
+    spelled out in words are not detected (the prompts forbid them).
     """
-    match = _NUMBER_WITH_UNIT.search(text)
+    match = _LLM_NUMBER.search(text)
     if match:
         raise ValueError(
-            f"do not state quantities ('{match.group(0)}'); cite option or evidence ids instead"
+            f"do not state numbers or quantities ('{match.group(0).strip()}'); "
+            "cite option or evidence ids instead"
         )
     return text
 
@@ -174,6 +185,17 @@ class NextStep(StrictModel):
         if _word_count(text) > RATIONALE_MAX_WORDS:
             raise ValueError(f"rationale must be <= {RATIONALE_MAX_WORDS} words")
         return text
+
+    @model_validator(mode="after")
+    def _no_quantities_in_reported_text(self) -> NextStep:
+        # An escalate rationale becomes the run summary's escalation reason; a request_input
+        # question becomes the pending question (AG-02: no LLM-authored numbers there).
+        if self.kind == "escalate":
+            reject_llm_quantities(self.rationale)
+        question = self.args.get("question")
+        if self.kind == "request_input" and isinstance(question, str):
+            reject_llm_quantities(question)
+        return self
 
     @model_validator(mode="after")
     def _check_kind_tool(self) -> NextStep:

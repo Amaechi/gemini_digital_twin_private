@@ -24,7 +24,8 @@ Rules:
 6. Choose finalise when the phase objective is met; escalate if no safe path remains.
 7. Hard limits are fixed: 1–3 doublets; 50–300 m3/h per active doublet; brine cooling <= 40 K;
    pump efficiency 70 %; injection = production; heating supply 100 degC; cooling supply 20 degC.
-8. Keep each rationale under 60 words. Return only data matching the output schema.
+8. Keep each rationale under 60 words and write no numbers in it (nor in reasons or questions);
+   cite option, evidence or assumption ids instead. Return only data matching the output schema.
 """.strip()
 
 FEW_SHOT = (

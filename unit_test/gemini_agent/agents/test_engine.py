@@ -304,10 +304,17 @@ def test_llm_settings_carry_ollama_context(tmp_path):
     assert body["keep_alive"] == LLM_CONFIG.ollama.keep_alive
 
 
-def test_dr_rationale_must_not_state_quantities(tmp_path):
+@pytest.mark.parametrize(
+    "rationale",
+    [
+        "ATES saves 12 % and stores 40 MWh",
+        "LCOH 45 EUR/MWh and -5 degC margin; 3 doublets at 5 MWth beat the rest",
+    ],
+)
+def test_dr_rationale_must_not_state_quantities(tmp_path, rationale):
     """AG-02: an LLM rationale quoting a quantity is retried, then the policy decides."""
     bad = OptionChoice(dr_id="DR-05", option_id="ates", rationale="ok").model_dump()
-    bad["rationale"] = "ATES saves 12 % and stores 40 MWh"
+    bad["rationale"] = rationale
     payload = json.dumps(bad)
     engine, _ = _llm(lambda m, i: ModelResponse(parts=[TextPart(payload)]), tmp_path)
     result = ResilientEngine(engine).choose(_question(), _context())

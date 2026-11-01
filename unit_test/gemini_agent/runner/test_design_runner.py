@@ -321,3 +321,88 @@ def test_llm_token_budget_exceeded_escalates(tmp_path):
     result = _runner(tmp_path, engine=engine, budgets=budgets).start("", run_id="t1")
     assert result.status == RunStatus.ESCALATED and result.phase == Phase.P0
     assert "usage limit" in result.summary
+
+
+def test_db30_interpretation_b_answer_is_consistent(tmp_path):
+    """DB-30 'B' = simulate the available days with no outage (spec §2.4), not A's outage."""
+    runner = _runner(tmp_path)
+    runner.start("", run_id="db30", input_mode="pause")
+    runner.resume("db30", "B")
+    value = runner.load_state("db30").answer_values()["DB-30"]
+    register = load_config("assumptions").get("DB-30").value
+    days = register["doublet_available_days_per_yr"]
+    assert value["interpretation"] == "B"
+    assert value["planned_outage_days_per_doublet"] == 0
+    assert value["demand_met_days_per_yr"] == value["doublet_available_days_per_yr"] == days
+
+    runner.start("", run_id="db30a", input_mode="pause")
+    runner.resume("db30a", "a")
+    assert runner.load_state("db30a").answer_values()["DB-30"] == register
+
+
+def test_llm_fallbacks_survive_verification_loop_backs(tmp_path):
+    """run_summary counts the fallbacks of P6–P10 passes that a loop-back discarded (AG-03)."""
+    engine, logger = _llm_engine(tmp_path, "fl", always_invalid)
+    toolbox = default_toolbox()
+    toolbox.register(_verifier(DesignVerdict.REJECTED))
+    runner = _runner(tmp_path, engine=engine, toolbox=toolbox)
+    result = runner.start("", run_id="fl")
+    assert result.status == RunStatus.ESCALATED and runner.load_state("fl").loop_count == 4
+    fallbacks = [r for r in logger.records() if r.decision_source == "policy_fallback"]
+    summary = json.loads((tmp_path / "fl" / "run_summary.json").read_text())
+    assert summary["llm_fallbacks"] == len(fallbacks) > 0
+
+
+def test_a_rejected_design_never_gets_a_final_selection_record(tmp_path):
+    """DR-10 is not written for a design the P9 verifier REJECTED, even when the run escalates."""
+    verdicts = iter([DesignVerdict.ACCEPTED, DesignVerdict.REJECTED] * 4)
+
+    def func(args, context):
+        verdict = next(verdicts)
+        return ToolResult[VerificationOutput](
+            data=VerificationOutput(
+                candidate_id=context.selected_id,
+                verdict=verdict,
+                violations=["review failed"] if verdict == "REJECTED" else [],
+                verifier="fake",
+            ),
+            summary=f"fake verifier: {verdict}",
+        )
+
+    toolbox = default_toolbox()
+    toolbox.register(ToolSpec("verify_design", "fake", CandidateArgs, func, owner="test"))
+    runner = _runner(tmp_path, toolbox=toolbox)
+    result = runner.start("", run_id="dr10")
+    assert result.status == RunStatus.ESCALATED and "after 3 loops" in result.summary
+    state = runner.load_state("dr10")
+    assert "DR-10" not in {r.dr_id for r in state.decision_records}
+    assert not (tmp_path / "dr10" / "decision_records" / "DR-10.json").exists()
+    skipped = [e for e in runner.store("dr10").list_events("dr10") if e.type == "DR_SKIPPED"]
+    assert len(skipped) == 4 and all("DR-10" in e.payload["message"] for e in skipped)
+
+
+def test_llm_escalation_reason_with_numbers_never_reaches_the_summary(tmp_path):
+    """AG-02: an LLM escalate step that states numbers is refused (retry, then policy)."""
+
+    def escalate_in_p5(text):
+        def func(messages, info):
+            if output_name(info) == "Decision":
+                context = json.loads(user_prompt(messages).split("CONTEXT:\n", 1)[1])
+                if context["phase"] == "P5":
+                    step = NextStep.model_construct(kind="escalate", rationale=text, args={})
+                    body = {"phase": "P5", "steps": [step.model_dump()], "open_questions": []}
+                    return ModelResponse(parts=[TextPart(json.dumps(body))])
+            return policy_like(messages, info)
+
+        return func
+
+    leak = "Plant needs 4 doublets and LCOH 99 EUR/MWh"
+    engine, _ = _llm_engine(tmp_path, "e1", escalate_in_p5(leak))
+    result = _runner(tmp_path, engine=engine).start("", run_id="e1")
+    assert result.status == RunStatus.COMPLETED
+    summary = (tmp_path / "e1" / "run_summary.json").read_text()
+    assert "99" not in summary and "EUR/MWh" not in summary
+
+    engine, _ = _llm_engine(tmp_path, "e2", escalate_in_p5("No safe option; see TR-004."))
+    result = _runner(tmp_path, engine=engine).start("", run_id="e2")
+    assert result.status == RunStatus.ESCALATED and "see TR-004" in result.summary

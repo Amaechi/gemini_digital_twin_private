@@ -13,6 +13,12 @@ from gemini_agent.schemas.config import load_config
         "Design the geothermal district heating and cooling plant",
         "Compare heat pump and absorption chiller options for the doublets",
         "What LCOH does the GEMINI digital twin give?",
+        "Supply heating at 120 °C",  # spec §12 S5
+        "Use 5 doublets at 500 m³/h",  # S4
+        "Permeability 50 mD",  # S8
+        "Design a geothermal heating system for 30 MW",  # S2
+        "Explain the cooling technology choice",
+        "How much heat does the plant deliver?",
     ],
 )
 def test_in_scope(prompt):
@@ -21,7 +27,17 @@ def test_in_scope(prompt):
 
 
 @pytest.mark.parametrize(
-    "prompt", ["What is the best pizza in Rome?", "Write me a poem about cats", "Is it well?"]
+    "prompt",
+    [
+        "What is the best pizza in Rome?",
+        "Write me a poem about cats",
+        "Is it well?",
+        "What's the best pizza in Delft?",  # spec §12 S3
+        # everyday uses of domain words are not design requests
+        "Write a poem about the summer heat",
+        "Which district of Paris has the best food?",
+        "Recommend a heat-resistant phone case",
+    ],
 )
 def test_off_topic_is_refused_with_redirect(prompt):
     """Off-topic requests are out of scope; the refusal redirects to the design task."""

@@ -74,6 +74,8 @@ MAX_VERIFICATION_LOOPS = 3
 HISTORY_EVENTS = 12
 """Working memory: last 12–14 compacted events (spec §10.2)."""
 APPROVAL_ID = "APPROVAL"
+LOOP_BACK_PHASES = (Phase.P6, Phase.P7, Phase.P8, Phase.P9, Phase.P10)
+"""Phases re-run after a REJECTED verification."""
 _HISTORY_TYPES = frozenset(
     {
         "DECISION",
@@ -93,6 +95,24 @@ _NO = frozenset({"n", "no", "reject", "rejected"})
 
 Outcome = Literal["continue", "finalise", "paused", "stopped", "done"]
 AskFn = Callable[[InputRequest], str | None]
+
+
+def _db30_interpretation_b(default: dict[str, Any]) -> dict[str, Any]:
+    """DB-30 interpretation B (spec §2.4): simulate only the available days, with no outage.
+
+    Derived from the register's interpretation-A entry so no number is invented: the simulated
+    year is ``doublet_available_days_per_yr`` days long and no doublet has a planned outage.
+    """
+    days = default["doublet_available_days_per_yr"]
+    return {
+        **default,
+        "interpretation": "B",
+        "doublet_available_days_per_yr": days,
+        "planned_outage_days_per_doublet": 0,
+        "outages_may_overlap": False,
+        "outage_schedule": "none (interpretation B: no planned outage)",
+        "demand_met_days_per_yr": days,
+    }
 
 
 class InvalidAnswer(ValueError):
@@ -617,9 +637,16 @@ class DesignRunner:
                 )
             return value
         if isinstance(default, dict) and "interpretation" in default:
-            if text.upper() not in {"A", "B"}:
+            choice = text.upper()
+            if choice not in {"A", "B"}:
                 raise InvalidAnswer(f"{request.assumption_id} answer must be A or B")
-            return {**default, "interpretation": text.upper()}
+            if choice == default["interpretation"]:
+                return dict(default)
+            if request.assumption_id == "DB-30" and choice == "B":
+                return _db30_interpretation_b(default)
+            raise InvalidAnswer(
+                f"{request.assumption_id}: the register has no values for interpretation {choice}"
+            )
         return text
 
     def _apply_answer(self, state: RunState, request: InputRequest, raw: str) -> None:
@@ -770,11 +797,14 @@ class DesignRunner:
             )
             return None
         state.violations = list(verification.violations)
-        for phase in (Phase.P6, Phase.P7, Phase.P8, Phase.P9, Phase.P10):
-            state.progress.pop(phase.value, None)
-        state.decision_records = [
-            r for r in state.decision_records if r.dr_id not in {"DR-06", "DR-10"}
-        ]
+        redo = {"DR-06", "DR-10"}
+        dropped = [state.progress.pop(phase.value, None) for phase in LOOP_BACK_PHASES]
+        state.earlier_pass_fallbacks += sum(p.fallbacks for p in dropped if p is not None) + sum(
+            1
+            for r in state.decision_records
+            if r.dr_id in redo and r.decision_source == "policy_fallback"
+        )
+        state.decision_records = [r for r in state.decision_records if r.dr_id not in redo]
         return Phase.P6
 
     # ------------------------------------------------------------------ terminal states
