@@ -39,6 +39,8 @@ Closed-form path (GM-03, RC-04; see ``closed_form.py`` and ``REFERENCE.md``):
 # solver behind the "solver" parameter (default "nelder_mead" keeps GEMINI behaviour), HTHP limit
 # parameters (MISSING until a datasheet is cited) and heat-pump evidence outputs (GM-03, WP-03).
 
+import math
+
 import numpy as np
 from scipy.optimize import minimize
 
@@ -79,7 +81,9 @@ class HeatpumpBasic(StaticModel):
             "evaporator_approach_k": closed_form.DEFAULT_APPROACH_K,  # HP-APPROACH [A]
             "datasheet": None,  # citation of an HTHP datasheet (needed for the limits below)
             "max_lift_k": None,  # MISSING until a datasheet -> RC-04 60 K (VER-HP-LIFT)
-            "max_sink_temperature_degc": None,  # MISSING until a datasheet (no default)
+            # condenser leaving water = sink outlet (RC-04 "max condenser leaving T"); MISSING
+            # until a datasheet (no default). Convert a refrigerant condensing limit first.
+            "max_sink_temperature_degc": None,
             "max_carnot_fraction": None,  # MISSING until a datasheet -> RC-04 0.6 (VER-HP-ETA)
         }
         self.output = {}
@@ -256,7 +260,18 @@ class HeatpumpBasic(StaticModel):
         warnings = list(point["warnings"])
         if limits["missing_inputs"]:
             warnings.append(limits["limits_source"])
-        checks = [running, cop >= 1.0, cop <= cop_cap, lift <= limits["max_lift_k"]]
+        low, high = closed_form.RC04_APPROACH_RANGE_K
+        for name, value in (("condenser", condenser_approach), ("evaporator", evaporator_approach)):
+            if not low <= value <= high:
+                warnings.append(f"{name} approach {value:g} K outside RC-04 {low:g}-{high:g} K")
+        converged = running
+        if running and solver == "nelder_mead" and not self._nelder_mead_converged(u, point):
+            converged = False
+            warnings.append(
+                "Nelder-Mead did not converge to a physical point (equation residual > 0.1 % "
+                "or an outlet outside its bounds): no evidence emitted; use solver 'closed_form'"
+            )
+        checks = [converged, cop >= 1.0, cop <= cop_cap, lift <= limits["max_lift_k"]]
         if running:
             if cop > cop_cap:
                 warnings.append(
@@ -295,7 +310,7 @@ class HeatpumpBasic(StaticModel):
         ):
             assumption_ids.append(closed_form.LORENZ_EFFICIENCY_ID)
         heat_pump_point = None
-        if running and cop >= 1.0:
+        if converged and cop >= 1.0:
             heat_pump_point = {
                 "cop": cop,
                 "condensing_degc": condensing,
@@ -308,6 +323,7 @@ class HeatpumpBasic(StaticModel):
         return {
             "solver": solver,
             "running": running,
+            "converged": converged,
             "operating_branch": point["branch"],
             "cop_uncapped": point["cop_uncapped"],
             "cop_cap": cop_cap,
@@ -331,6 +347,33 @@ class HeatpumpBasic(StaticModel):
             "validity_warnings": warnings,
             "heat_pump_point": heat_pump_point,
         }
+
+    def _nelder_mead_converged(self, u, point, tolerance=1e-3):
+        """Return True if the Nelder-Mead point satisfies both GEMINI equations and its bounds.
+
+        Bounds: Th_in < Th_out <= Th_out_target and Ts_in_minimum <= Ts_out <= Ts_in; COP > 1;
+        relative residuals of the COP equation and of COP = Qh/(Qh - Qs) below ``tolerance``.
+        """
+        p = self.parameters
+        th_in, ts_in = u["Th_in"], u["Ts_in"]
+        th_out, ts_out, cop = point["sink_out_degc"], point["source_out_degc"], point["cop"]
+        eps = 1e-6
+        if not (
+            th_in < th_out <= p["Th_out_target"] + eps
+            and p["Ts_in_minimum"] - eps <= ts_out <= ts_in
+            and cop > 1.0
+        ):
+            return False
+        if p["mode"] == "lorenz":
+            model = closed_form.lorenz_cop(th_in, th_out, ts_in, ts_out, p["eta_lorenz"])
+        else:
+            model = closed_form.carnot_cop(th_out, ts_in, p["eta_carnot"])
+        q_h = point["sink_heat_w"]
+        q_s = p["Cp_s"] * (ts_in - ts_out) * u["source_flow_rate"] * p["rho_s"]
+        if not (math.isfinite(model) and q_h > q_s):
+            return False
+        balance = q_h / (q_h - q_s)
+        return abs(cop - model) / cop < tolerance and abs(cop - balance) / cop < tolerance
 
     def _calculate(self, Th_out, Th_in, Ts_in, mh, ms):
         """Solve for the heat pump operating point.

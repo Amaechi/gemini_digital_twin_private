@@ -369,3 +369,36 @@ def test_model_defaults_match_the_assumptions_register():
     verifier = DesignVerifier.from_config()
     assert verifier.hp_carnot_fraction_default == cf.RC04_DEFAULT_CARNOT_FRACTION
     assert verifier.hp_max_lift_default_k == cf.RC04_DEFAULT_MAX_LIFT_K
+
+
+def test_no_lift_goes_idle_even_with_the_cap():
+    """Source hotter than the sink mean: the finite cap must not make the pump run."""
+    parameters = {**GEMINI_PARAMS, "mode": "lorenz", "Th_out_target": 60.0, "Ts_in_minimum": 10.0}
+    inputs = {"Th_in": 40.0, "Ts_in": 62.0, "hot_flow_rate": 1 / 36, "source_flow_rate": 1 / 12}
+    for cap in (True, False):
+        out = run({**parameters, "solver": "closed_form", "apply_cop_cap": cap}, inputs)
+        assert not out["running"] and out["heat_pump_point"] is None
+        assert any("no lift" in w for w in out["validity_warnings"])
+
+
+def test_non_physical_nelder_mead_point_emits_no_evidence():
+    """NM can 'converge' to a sink outlet of ≈ 800 °C here: flagged, no HeatPumpPoint."""
+    parameters = {**RC04_PARAMS, "Ts_in_minimum": 46.0}
+    inputs = {**RC04_INPUTS, "hot_flow_rate": 300 / 3600, "source_flow_rate": 50 / 3600}
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", RuntimeWarning)
+        nelder = run(parameters, inputs)
+    assert nelder["Th_out"] > 100.0  # GEMINI's result, unchanged
+    assert not nelder["converged"] and not nelder["within_limits"]
+    assert nelder["heat_pump_point"] is None
+    assert any("did not converge" in w for w in nelder["validity_warnings"])
+    closed = run({**parameters, "solver": "closed_form"}, inputs)
+    assert closed["converged"] and closed["Th_out"] <= 100.0
+    assert closed["operating_branch"] == "source_floor"
+
+
+def test_approach_outside_rc04_range_warns():
+    """RC-04 eq. 4: approach 3–5 K; other values are allowed but flagged."""
+    out = run({**RC04_PARAMS, "solver": "closed_form", "condenser_approach_k": 2.0}, RC04_INPUTS)
+    assert any("condenser approach 2 K outside" in w for w in out["validity_warnings"])
+    assert "HP-APPROACH" not in out["assumption_ids"]

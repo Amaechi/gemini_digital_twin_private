@@ -15,6 +15,9 @@ storage.md``, copied in ``REFERENCE.md``); spec §7.2 GM-09 and candidate C6 (se
 
 Daily storage adds little at daily resolution (RC-09); seasonal ATES needs an annual heat/cold
 balance (regulators): the cumulative charged and discharged energy are outputs for that check.
+The stored energy counts heat before the recovery loss: at most ``η_d`` × capacity can be
+delivered, so size ``capacity_mwh`` as injected energy. Outlet temperature is not modelled (an
+HT-ATES returns below the 100 °C supply: a booster or temperature check is needed).
 Units: powers in W, energies in MWh at the boundary, J internally; time step in s (default 1 day).
 """
 
@@ -178,6 +181,7 @@ class ThermalStorage(DynamicModel):
             "recovery_efficiency": eta_c * eta_d,
             "storage_type": p["storage_type"],
             "time_step_s": dt,
+            "net_heat_to_plant_w": discharge - charge,
             "power_el": 0.0,
             "power_th": discharge,
             "emission": 0.0,
@@ -190,7 +194,9 @@ class ThermalStorage(DynamicModel):
         Inputs ``u``: ``charge_power_w`` or ``discharge_power_w`` (requested, W, ≥ 0; not both),
         optional ``time_step_s``. ``x`` is the state from :meth:`initialize_state` /
         :meth:`update_state` (None → initial state). ``power_th`` is the heat (or cold)
-        delivered by discharging; charging draws ``charge_power_w`` from the plant.
+        delivered by discharging; charging draws ``charge_power_w`` from the plant. Do not add
+        ``power_th`` to the plant's production totals (the stored heat was produced upstream and
+        would be counted twice): use ``net_heat_to_plant_w`` = discharge - charge.
         """
         self.output, _ = self._step(u, x)
 

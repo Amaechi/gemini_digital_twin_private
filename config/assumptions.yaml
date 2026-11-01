@@ -488,7 +488,7 @@ assumptions:
       it (check PH-14) unless the heat-pump operating point carries a datasheet value. gemini_model.heatpump
       reuses it (closed-form path caps COP here; WP-03).
     source: RC-04 parameter table, HTHP at 100 °C supply [A]
-    sensitivity: "0.50 / 0.55 (RC-04 η_L default 0.50, range 0.40–0.55)"
+    sensitivity: "0.50 / 0.55 / 0.65 (capped design-case COP 3.14 / 3.43 / 4.00; WP-03)"
     tag: A
     status: default
     added_by: WP-09
@@ -729,8 +729,11 @@ assumptions:
       the RC-04 default and GEMINI's eta_lorenz default (the Guidebook point implies η_Carnot ≈ 0.46 on the
       Carnot basis). Used by gemini_model.heatpump in both solvers. At the large glides of the design case
       (sink 82→100 °C, brine 60→46 °C, mean lift 38 K) η_L 0.5 gives COP 4.79, above the RC-04 default cap
-      0.6 × Carnot at the refrigerant temperatures (VER-HP-ETA): the closed-form path applies that cap
-      (COP 3.71 there; RC-04 expects 3.5–4.5; DEA 3.57 at the same 53 K lift, plausibility only).
+      0.6 × Carnot at the refrigerant temperatures (VER-HP-ETA): the closed-form path applies that cap. The
+      capped pump draws less brine heat, so the brine leaves at 47.1 °C (not 46) and COP = 3.71 (RC-04
+      expects 3.5–4.5; DEA 3.57 at the same 52.9 K lift, plausibility only). While the cap binds (here for
+      η_L ≥ ≈ 0.39) η_L has no effect: the COP is set by VER-HP-ETA and HP-APPROACH, so run the sensitivity
+      on those; η_L matters only on the Nelder-Mead path or with apply_cop_cap false.
     source: RC-04 parameter table (η_L default 0.50 [A]); GEMINI heatpump_basic default
     sensitivity: [0.40, 0.55]
     tag: A

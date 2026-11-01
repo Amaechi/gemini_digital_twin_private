@@ -32,7 +32,9 @@ p.250, 258, 260, Table 13.2; RC-10 (DEA COP-by-lift, plausibility only). Spec §
   (citation, required with any limit), `max_lift_k`, `max_sink_temperature_degc`,
   `max_carnot_fraction` all default to None. Without them: lift ≤ 60 K (**VER-HP-LIFT**, reused)
   and the 0.6 cap apply; the maximum sink temperature has no default and is not checked
-  (Table 13.2's 82–104 °C are outdated). Outputs `missing_inputs`, `limits_source`,
+  (Table 13.2's 82–104 °C are outdated). `max_sink_temperature_degc` is RC-04's "max condenser
+  leaving T", i.e. compared with the sink water outlet; convert a refrigerant condensing limit
+  (subtract the condenser approach) before passing it. Outputs `missing_inputs`, `limits_source`,
   `assumption_ids`, `within_limits`, `validity_warnings`.
 - **Evidence:** `heat_pump_point` = the fields of the verifier's `HeatPumpPoint` except `name`
   (COP, condensing/evaporating, sink/source outlet, datasheet lift/fraction or None); None when
@@ -40,7 +42,14 @@ p.250, 258, 260, Table 13.2; RC-10 (DEA COP-by-lift, plausibility only). Spec §
   `source_heat_w` (heat drawn from the source = brine heat for PH-22), `lift_k` (outlet to
   outlet), `mean_lift_k` (Lorenz), `dea_reference_cop` (RC-10, 40–100 K only).
 - **Idle, not an exception** (dispatch-friendly): no flow, sink inlet ≥ target, source inlet ≤
-  `Ts_in_minimum`, COP ≤ 1, or no lift; `running` False and the reason in `validity_warnings`.
+  `Ts_in_minimum`, COP ≤ 1, or no lift (uncapped water-side COP infinite — the finite cap never
+  makes a pump run without lift); `running` False and the reason in `validity_warnings`.
+- **Nelder-Mead plausibility:** on the default path `converged` is False (no `heat_pump_point`,
+  `within_limits` False, a warning) when either GEMINI equation misses by > 0.1 % or an outlet
+  leaves its bounds (e.g. a sink outlet of ≈ 800 °C). GEMINI's own outputs are unchanged. Plant
+  builders should use `solver: "closed_form"`: the uncapped Nelder-Mead COP fails PH-14 at the
+  design case.
+- Approaches outside RC-04's 3–5 K are accepted (> 0) but warned.
 - **Water ΔT > 11 K** on either side warns (4/8-pass evaporator/condenser, Guidebook p.250).
   Fouling 0.088 m²K/kW is not modelled (no HEX sizing in this model).
 

@@ -21,7 +21,14 @@ Source card: `data/knowledge/reference_cards/RC-09_district_network_storage.md`,
 - Outputs: `charge_power_w`, `discharge_power_w`, `energy_mwh`, `soc`, `losses_w`,
   `energy_balance_residual_j` (first law, ≈ 0), cumulative `charged_total_mwh` /
   `discharged_total_mwh` (for the ATES annual-balance check), `power_th` = discharge delivered,
-  `power_el` 0 (circulation pumps not modelled), `emission` 0.
+  `power_el` 0 (circulation pumps not modelled), `emission` 0, `net_heat_to_plant_w` =
+  discharge − charge. **Do not sum `power_th` into plant production** (the stored heat was
+  produced upstream; it would be counted twice) — use `net_heat_to_plant_w`.
+- Energy is counted before the recovery loss: at most η_d × capacity can be delivered, so size
+  `capacity_mwh` as injected energy. The recovery is independent of holding time (sound for a
+  yearly cycle).
+- **Not modelled:** outlet temperature. An HT-ATES returns below the 100 °C supply, so candidate
+  C6 needs a booster (heat pump / e-boiler) or a temperature check downstream.
 
 ## Validation tests
 `unit_test/gemini_model/thermal_storage/test_thermal_storage.py`: energy balance closes exactly

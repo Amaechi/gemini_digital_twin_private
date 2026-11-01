@@ -42,6 +42,8 @@ RC04_DEFAULT_CARNOT_FRACTION = 0.6
 """COP ≤ 0.6 × Carnot without a datasheet (RC-04 [A]), register VER-HP-ETA."""
 RC04_DEFAULT_MAX_LIFT_K = 60.0
 """Lift ≤ 60 K without a datasheet (RC-04 [A]), register VER-HP-LIFT."""
+RC04_APPROACH_RANGE_K = (3.0, 5.0)
+"""RC-04 eq. 4 approach range [A]; outside it the model warns."""
 CARNOT_FRACTION_ID = "VER-HP-ETA"
 MAX_LIFT_ID = "VER-HP-LIFT"
 LORENZ_EFFICIENCY_ID = "HP-ETA-L"
@@ -246,7 +248,7 @@ def solve_operating_point(
     branch = "target"
     available = (source_in_degc - t_min) * c_s / q_h_target  # = 1 - 1/COP at the source floor
     if available >= 1.0:
-        if not math.isfinite(model(target, source_in_degc - q_h_target / c_s)):
+        if not math.isfinite(model.uncapped(target, source_in_degc - q_h_target / c_s)):
             return _idle(sink_in_degc, source_in_degc, "no lift: a heat exchanger suffices")
         cop_hi = 2.0
         while residual(cop_hi) < 0.0:
@@ -277,7 +279,7 @@ def solve_operating_point(
         for k in range(1, steps + 1):
             fraction = 1.0 - k / steps if k < steps else 1e-9
             candidate = sink_low + (target - sink_low) * fraction
-            if not math.isfinite(model(candidate, t_min)):
+            if not math.isfinite(model.uncapped(candidate, t_min)):
                 break  # no lift below this sink outlet
             if floor_residual(candidate) >= 0.0:
                 lower = candidate
@@ -289,7 +291,8 @@ def solve_operating_point(
         source_out = t_min
 
     cop = model(sink_out, source_out)
-    if not cop < _COP_CLIP:
+    # No lift on the water side (uncapped COP infinite): the cap must not make the pump run.
+    if not cop < _COP_CLIP or not math.isfinite(model.uncapped(sink_out, source_out)):
         return _idle(sink_in_degc, source_in_degc, "no lift: a heat exchanger suffices")
     sink_heat = c_h * (sink_out - sink_in_degc)
     power_el = sink_heat / cop

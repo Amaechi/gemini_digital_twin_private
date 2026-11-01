@@ -64,6 +64,7 @@ def test_ht_ates_cycle_recovers_63_percent():
     assert out["losses_w"] * DAY_S / J_PER_MWH == pytest.approx(0.37 * 240.0)
     assert out["recovery_efficiency"] == 0.63
     assert out["power_th"] == out["discharge_power_w"] and out["power_el"] == 0.0
+    assert out["net_heat_to_plant_w"] == out["discharge_power_w"]
 
 
 def test_cold_storage_recovery():
