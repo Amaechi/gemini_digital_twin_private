@@ -10,16 +10,23 @@ gives a single place to extend when new gemini_model components are added.
 
 # Modified by the GeoAgent team for SPE GeoHackathon 2026, 2026-11-01: registered the existing
 # "heatpump" (HeatpumpBasic), "compressor" and "co2_corrosion" models (GM-02).
+# Modified by the GeoAgent team for SPE GeoHackathon 2026, 2026-11-01: registered the WP-02
+# cooling models "absorption_chiller", "electric_chiller", "heat_rejection", "free_cooling"
+# (GM-04...GM-07).
 
+from gemini_model.absorption_chiller.absorption_chiller import AbsorptionChiller
 from gemini_model.adder.adder import Adder
 from gemini_model.boiler.boiler import Boiler
 from gemini_model.booster_pump.booster_pump import BoosterPump
 from gemini_model.chp.chp import CHP
 from gemini_model.compressor.compressor import Compressor
 from gemini_model.corrosion.co2_corrosion import CO2Corrosion
+from gemini_model.electric_chiller.electric_chiller import ElectricChiller
 from gemini_model.filter.filter import Filter
 from gemini_model.fluid.pvt_water_stp import PVTConstantSTP
+from gemini_model.free_cooling.free_cooling import FreeCooling
 from gemini_model.heat_exchanger.heat_exchanger import HeatExchanger
+from gemini_model.heat_rejection.heat_rejection import HeatRejection
 from gemini_model.heatpump.heatpump_basic import HeatpumpBasic
 from gemini_model.injector_pump.injector_pump import InjectorPump
 from gemini_model.mixer.mixer import Mixer
@@ -54,6 +61,11 @@ COMPONENT_REGISTRY = {
     "heatpump": HeatpumpBasic,
     "compressor": Compressor,
     "co2_corrosion": CO2Corrosion,
+    # GM-04...GM-07 (WP-02): cooling models. Ambient dry-/wet-bulb temperatures are inputs.
+    "absorption_chiller": AbsorptionChiller,
+    "electric_chiller": ElectricChiller,
+    "heat_rejection": HeatRejection,
+    "free_cooling": FreeCooling,
 }
 
 # Component types that need extra, non-`parameters` setup after
