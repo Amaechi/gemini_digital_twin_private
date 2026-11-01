@@ -29,6 +29,8 @@ STULL_T_RANGE_DEGC = (-20.0, 50.0)
 """Validity of the Stull (2011) fit. Source: RC-07."""
 WET_BULB_TABLE_TOL_K = 0.1
 """RC-07 validation: the monthly T_wb table is reproduced from T_db and RH to ±0.1 °C."""
+ANNUAL_MEAN_TOL_K = 0.1
+"""RC-07 validation: the daily series mean ≈ the configured annual mean (DB-34c), quoted to 0.1."""
 
 
 # --------------------------------------------------------------------------- physics
@@ -145,6 +147,11 @@ def build_climate_profile(climate: ClimateConfig, year: int) -> tuple[ClimatePro
         warnings.append(
             f"Configured monthly T_wb differs from Stull by {deviation:.2f} K "
             f"(> {WET_BULB_TABLE_TOL_K} K)"
+        )
+    if abs(float(t_db.mean()) - climate.annual_mean_degc) > ANNUAL_MEAN_TOL_K:
+        warnings.append(
+            f"Daily T_db mean {float(t_db.mean()):.2f} °C differs from the configured annual mean "
+            f"{climate.annual_mean_degc} °C (> {ANNUAL_MEAN_TOL_K} K)"
         )
     profile = ClimateProfile(
         year=year,

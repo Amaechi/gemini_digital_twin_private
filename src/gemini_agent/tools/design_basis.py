@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import math
 from pathlib import Path
+from typing import Annotated
 
 from pydantic import Field
 
@@ -46,6 +47,10 @@ ASSUMPTION_BRINE_CP = "DB-33"
 ASSUMPTION_WELL_GEOMETRY = "DB-38"
 ASSUMPTION_AQUIFER_RHOC = "SUB-RHOC"
 ASSUMPTION_INJECTIVITY = "SUB-II"
+
+MAX_REPORT_POINTS = 10
+"""Upper bound on the number of spacings / depths a request may ask for."""
+PositiveFloat = Annotated[float, Field(gt=0)]
 
 
 # --------------------------------------------------------------------------- physics helpers
@@ -148,14 +153,16 @@ def gas_mix_properties(ch4_mol_frac: float, co2_mol_frac: float) -> GasMixProper
 class DesignBasisRequest(StrictModel):
     """Inputs of ``load_design_basis``: the points at which DB-26 and DB-29 are reported."""
 
-    breakthrough_spacings_m: list[float] = Field(
+    breakthrough_spacings_m: list[PositiveFloat] = Field(
         default=[1000.0, 1200.0],
         min_length=1,
+        max_length=MAX_REPORT_POINTS,
         description="Well spacings at reservoir depth for DB-26 (spec: 1.0 and 1.2 km).",
     )
-    report_depths_m: list[float] = Field(
+    report_depths_m: list[PositiveFloat] = Field(
         default=[1500.0, 2000.0, 3000.0, 3200.0, 3500.0],
         min_length=1,
+        max_length=MAX_REPORT_POINTS,
         description="Depths for the DB-29 temperature table.",
     )
 
@@ -186,8 +193,14 @@ class DerivedDesignQuantities(StrictModel):
     static_wellhead_pressure_barg: float = Field(
         description="P_res − ρgz: shut-in wellhead pressure of a full brine column."
     )
+    production_wellhead_pressure_at_max_flow_barg: float = Field(
+        description="P_res − Q_max/PI − ρgz: flowing wellhead pressure (friction neglected)."
+    )
     esp_required: bool = Field(
-        description="Static wellhead pressure ≤ 0 ⇒ the producer does not flow unaided (DB-21)."
+        description=(
+            "Flowing wellhead pressure at Q_max ≤ 0 ⇒ the producer cannot deliver max flow "
+            "unaided ⇒ ESP needed (DB-21)."
+        )
     )
     injection_wellhead_pressure_at_min_flow_barg: float = Field(
         description="P_res + Q_min/II − ρgz (friction neglected; II = PI, SUB-II)."
@@ -202,8 +215,11 @@ class DerivedDesignQuantities(StrictModel):
     max_heat_per_doublet_mw: float = Field(description="DB-23 at max flow and max brine ΔT.")
     min_heat_per_active_doublet_mw: float = Field(description="DB-24 at min flow, max ΔT.")
     max_geothermal_heat_all_doublets_mw: float = Field(description="count_max × DB-23.")
-    min_doublets_for_peak_heat: int = Field(
-        description="ceil(heating peak / DB-23): doublets needed without top-up (spec §3.1 fact 2)."
+    min_doublets_for_peak_brine_heat: int = Field(
+        description=(
+            "ceil(DB-18 peak / DB-23): doublets whose brine-side heat alone covers the configured "
+            "heating peak (spec §3.1 fact 2); a temperature top-up is still needed (fact 1)."
+        )
     )
     productivity_index_m3h_per_bar: float = Field(description="DB-25 (DB-38 skin, r_w, r_e).")
     drawdown_at_max_flow_bar: float = Field(description="DB-25: Q_max / PI.")
@@ -266,6 +282,7 @@ def derive_quantities(
         res.permeability_md, res.gross_thickness_m, brine.viscosity_pa_s, r_e, r_w, skin
     )
     injectivity = pi  # SUB-II: II = PI (RC-01 item 4)
+    p_prod_max = p_static_wh - dbl.flow_max_m3h / pi
     p_inj_min = p_static_wh + dbl.flow_min_active_m3h / injectivity
     p_inj_max = p_static_wh + dbl.flow_max_m3h / injectivity
 
@@ -281,7 +298,8 @@ def derive_quantities(
         heating_supply_above_reservoir_k=basis.heating.supply_temperature_degc - t_res,
         hydrostatic_pressure_barg=p_hydro,
         static_wellhead_pressure_barg=p_static_wh,
-        esp_required=p_static_wh <= 0.0,
+        production_wellhead_pressure_at_max_flow_barg=p_prod_max,
+        esp_required=p_prod_max <= 0.0,
         injection_wellhead_pressure_at_min_flow_barg=p_inj_min,
         injection_wellhead_pressure_at_max_flow_barg=p_inj_max,
         injection_pump_required=p_inj_min > 0.0,
@@ -289,7 +307,7 @@ def derive_quantities(
         max_heat_per_doublet_mw=q_max,
         min_heat_per_active_doublet_mw=q_min,
         max_geothermal_heat_all_doublets_mw=dbl.count_max * q_max,
-        min_doublets_for_peak_heat=math.ceil(basis.heating.peak_mw / q_max),
+        min_doublets_for_peak_brine_heat=math.ceil(basis.heating.peak_mw / q_max),
         productivity_index_m3h_per_bar=pi,
         drawdown_at_max_flow_bar=dbl.flow_max_m3h / pi,
         breakthrough=[
@@ -336,9 +354,12 @@ def derive_quantities(
 
 def _summary(report: DesignBasisReport) -> str:
     d, dbl = report.derived, report.fixed.doublets
-    tb = ", ".join(
-        f"{b.breakthrough_time_yr:.1f} yr@{b.spacing_m / 1000:.1f} km" for b in d.breakthrough
-    )
+    # Fixed-size t_b part (range over the requested spacings) keeps the summary ≤ 300 chars.
+    shortest = min(d.breakthrough, key=lambda b: b.spacing_m)
+    longest = max(d.breakthrough, key=lambda b: b.spacing_m)
+    tb = f"{shortest.breakthrough_time_yr:.3g} yr@{shortest.spacing_m / 1000:.3g} km"
+    if longest is not shortest:
+        tb += f"…{longest.breakthrough_time_yr:.3g} yr@{longest.spacing_m / 1000:.3g} km"
     return (
         f"T_res {d.reservoir_temperature_degc:.1f}°C (supply "
         f"{report.fixed.heating.supply_temperature_degc:.0f}°C); P_hyd "

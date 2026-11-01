@@ -1,6 +1,7 @@
 """Tests for TL-01 ``load_design_basis`` (spec §2.2 DB-20…29; RC-01, RC-02, RC-08 checks)."""
 
 import pytest
+from pydantic import ValidationError
 
 from gemini_agent.schemas.common import SUMMARY_MAX_CHARS, ToolResult
 from gemini_agent.schemas.config import load_config
@@ -56,6 +57,9 @@ def test_db21_hydrostatic_pressure_and_pumps(result, derived):
     """DB-21 / RC-01 validation: 2500 m, 1030 kg/m³ → 252.6 bar ±0.1 ⇒ ESP + injection pump."""
     assert derived.hydrostatic_pressure_barg == pytest.approx(252.6, abs=0.1)
     assert derived.static_wellhead_pressure_barg == pytest.approx(250.0 - 252.6075, abs=1e-6)
+    assert derived.production_wellhead_pressure_at_max_flow_barg == pytest.approx(
+        derived.static_wellhead_pressure_barg - derived.drawdown_at_max_flow_bar
+    )
     assert derived.esp_required is True
     assert derived.injection_pump_required is True
     assert derived.injection_wellhead_pressure_at_max_flow_barg > (
@@ -76,7 +80,7 @@ def test_db22_to_db24_flow_and_heat(derived):
     assert derived.max_heat_per_doublet_mw == pytest.approx(14.1, abs=0.05)
     assert derived.min_heat_per_active_doublet_mw == pytest.approx(2.35, abs=0.01)
     assert derived.max_geothermal_heat_all_doublets_mw == pytest.approx(3 * 14.0767, abs=0.01)
-    assert derived.min_doublets_for_peak_heat == 3
+    assert derived.min_doublets_for_peak_brine_heat == 3
 
 
 def test_db25_productivity_index(derived):
@@ -177,6 +181,55 @@ def test_values_follow_the_config_files(config_copy, edit_yaml):
     assert derived.reservoir_temperature_degc == pytest.approx(102.0)
     assert derived.heating_supply_above_reservoir_k == pytest.approx(-2.0)
     assert derived.max_heat_per_doublet_mw == pytest.approx(14.0767 * 4190 / 4100, rel=1e-4)
+
+
+def test_esp_required_when_drawdown_exceeds_static_head(config_copy, edit_yaml):
+    """Mild overpressure: static WHP > 0, but drawdown at Q_max still needs an ESP."""
+
+    def overpressure(data):
+        data["reservoir"]["pressure_barg"] = 255.0
+
+    edit_yaml(config_copy / "design_basis.yaml", overpressure)
+    derived = load_design_basis(config_dir=config_copy).data.derived
+    assert derived.static_wellhead_pressure_barg > 0.0
+    assert derived.production_wellhead_pressure_at_max_flow_barg < 0.0
+    assert derived.esp_required is True
+
+
+def test_esp_not_required_for_strong_overpressure(config_copy, edit_yaml):
+    def overpressure(data):
+        data["reservoir"]["pressure_barg"] = 300.0
+
+    edit_yaml(config_copy / "design_basis.yaml", overpressure)
+    derived = load_design_basis(config_dir=config_copy).data.derived
+    assert derived.production_wellhead_pressure_at_max_flow_barg > 0.0
+    assert derived.esp_required is False
+
+
+def test_summary_stays_short_for_largest_request():
+    """Any valid request keeps the summary ≤ 300 chars (t_b reported as a range)."""
+    request = DesignBasisRequest(
+        breakthrough_spacings_m=[123.456 * (i + 1) ** 3 for i in range(10)],
+        report_depths_m=[500.0 * (i + 1) for i in range(10)],
+    )
+    result = load_design_basis(request)
+    assert len(result.summary) <= SUMMARY_MAX_CHARS
+    assert len(result.data.derived.breakthrough) == 10
+
+
+@pytest.mark.parametrize(
+    "kwargs",
+    [
+        {"breakthrough_spacings_m": [1000.0] * 11},
+        {"report_depths_m": [1000.0] * 11},
+        {"breakthrough_spacings_m": [-1000.0]},
+        {"report_depths_m": [0.0]},
+        {"breakthrough_spacings_m": []},
+    ],
+)
+def test_request_rejects_invalid_points(kwargs):
+    with pytest.raises(ValidationError):
+        DesignBasisRequest(**kwargs)
 
 
 def test_unsupported_injectivity_rule_raises(config_copy, edit_yaml):

@@ -1,9 +1,11 @@
 """Tests for TL-02 ``profile_demand`` (spec §3.2, DB-18/19, WP-04 acceptance)."""
 
 import datetime as dt
+import shutil
 
 import pandas as pd
 import pytest
+from pydantic import ValidationError
 
 from gemini_agent.schemas.common import SUMMARY_MAX_CHARS, ToolResult
 from gemini_agent.schemas.config import load_config
@@ -137,6 +139,29 @@ def test_request_overrides_defaults():
     assert result.data.heat_driven_cooling_cop == 0.6
     assert result.data.heating.lowest_window.length_days == 7
     assert result.assumption_ids == ["DB-33"]
+
+
+def test_request_validation():
+    with pytest.raises(ValidationError):
+        DemandRequest(thresholds_mw=[-1.0])
+    with pytest.raises(ValidationError):
+        DemandRequest(thresholds_mw=[1.0] * 11)
+    with pytest.raises(ValidationError):
+        DemandRequest(window_days=0)
+    with pytest.raises(ValidationError):
+        DemandRequest(heat_driven_cooling_cop=0.0)
+
+
+def test_csvs_resolve_against_data_root(tmp_path, result):
+    """``data_root`` relocates the CSVs; a root without them fails loudly."""
+    with pytest.raises(FileNotFoundError):
+        profile_demand(data_root=tmp_path)
+    basis = load_config("design_basis")
+    for side in (basis.heating, basis.cooling):
+        target = tmp_path / side.demand_csv
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy(side.csv_path(), target)
+    assert profile_demand(data_root=tmp_path) == result
 
 
 def test_lowest_window_synthetic():

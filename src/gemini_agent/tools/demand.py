@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import datetime as dt
 from pathlib import Path
+from typing import Annotated
 
 import numpy as np
 import pandas as pd
@@ -53,8 +54,9 @@ class DemandRequest(StrictModel):
         gt=0,
         description="COP for the combined profile heat + cooling/COP; default DEM-COP-HD (0.75).",
     )
-    thresholds_mw: list[float] | None = Field(
+    thresholds_mw: list[Annotated[float, Field(ge=0)]] | None = Field(
         default=None,
+        max_length=10,
         description=(
             "Report the number of days with demand above each threshold; default k × DB-23 "
             "(max heat per doublet) for k = 1…count_max."
@@ -293,16 +295,19 @@ def profile_demand(
     request: DemandRequest | None = None,
     *,
     config_dir: Path | str | None = None,
+    data_root: Path | str | None = None,
 ) -> ToolResult[DemandProfile]:
     """TL-02: profile the daily heating and cooling demand (spec §3.2, DB-18/19).
 
-    Reads ``design_basis`` and ``assumptions`` via ``load_config``; CSV paths from the design
-    basis.
+    Reads ``design_basis`` and ``assumptions`` via ``load_config``. The CSV paths in the design
+    basis are relative to ``data_root`` (default: the repository root), independent of
+    ``config_dir``.
     """
     basis = load_config("design_basis", config_dir)
     assumptions = load_config("assumptions", config_dir)
     request = request or DemandRequest()
-    profile, warnings = build_demand_profile(basis, assumptions, request)
+    root = Path(data_root) if data_root is not None else None
+    profile, warnings = build_demand_profile(basis, assumptions, request, root)
     defaults_used = {
         ASSUMPTION_OUTAGE: request.window_days is None,
         ASSUMPTION_COOLING_COP: request.heat_driven_cooling_cop is None,

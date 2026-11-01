@@ -144,6 +144,16 @@ def test_warns_when_wet_bulb_table_is_inconsistent(config_copy, edit_yaml):
     assert result.data.monthly_wet_bulb_max_deviation_k > 0.1
 
 
+def test_warns_when_annual_mean_disagrees(config_copy, edit_yaml):
+    def change(data):
+        data["annual_mean_degc"] = 11.0
+
+    edit_yaml(config_copy / "climate_nl.yaml", change)
+    warnings = profile_climate(config_dir=config_copy).warnings
+    assert len(warnings) == 1
+    assert "annual mean" in warnings[0]
+
+
 def test_year_follows_design_basis(config_copy, edit_yaml):
     def change(data):
         data["year"] = 2028
