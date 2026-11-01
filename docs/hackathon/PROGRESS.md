@@ -8,7 +8,7 @@ Keep it ≤ 20 KB; it is the hand-off between sessions. Old detail: merged PRs a
 | WP-00 | Bootstrap, env, CI, skeleton | merged (529bc4b) | [#1](https://github.com/Amaechi/gemini_digital_twin_private/pull/1) | doublet example Q = 129.02 m³/h |
 | WP-01 | GEMINI core fixes, registry | merged (ac57442; review cac5889) | [#3](https://github.com/Amaechi/gemini_digital_twin_private/pull/3), [#5](https://github.com/Amaechi/gemini_digital_twin_private/pull/5) | pvt blocks, separator gas, registry |
 | WP-02 | Cooling models | merged (6eedd33) | [#7](https://github.com/Amaechi/gemini_digital_twin_private/pull/7) | 4 cooling models; HEX per-side ρ/c_p |
-| WP-03 | Heat pump, e-boiler, storage | todo | | Batch 4 |
+| WP-03 | Heat pump, e-boiler, storage | in review | PR pending | closed-form HP (capped 3.71 @ design); e-boiler; storage |
 | WP-04 | Design basis, demand, climate | merged (f7acb2a) | [#2](https://github.com/Amaechi/gemini_digital_twin_private/pull/2) | TL-01/02/02b |
 | WP-05 | Subsurface & doublet tools | merged (bc8baab) | [#8](https://github.com/Amaechi/gemini_digital_twin_private/pull/8) | TL-03…08; 7 SUB-* |
 | WP-06 | Config generator, guard, day sim | todo | | Batch 4 |
@@ -29,6 +29,9 @@ Latest full suite (`main` @ bc8baab, 2026-11-01): `PYTHONPATH=src python -m pyte
 Next: Batch 4 (WP-03, WP-06, WP-08).
 
 ## Decisions log (newest first)
+- 11-01 WP-03: heat pump `solver: "closed_form"` behind a parameter (default `nelder_mead` unchanged: 1920 cases vs `main`, 0 new errors, 0 output diffs). Same problem as NM (sink at target; else source held at `Ts_in_minimum`), RC-04 COP + bracketed `brentq`; ≤ 1.5e-5 from NM wherever NM converges physically (NM gives COP < 0 or 800 °C outlets in some valid cases). Idle (not raise) on zero flow / no need / source ≤ min / COP ≤ 1 / no lift; negative or NaN inputs raise; `within_limits` None when off.
+- 11-01 WP-03: closed form caps COP at VER-HP-ETA × Carnot(sink out + 4 K, source out − 4 K; HP-APPROACH) by default: η_L 0.5 Lorenz exceeds it at our glides (design 82→100 / brine 60: 4.79 → 3.71, brine out 47.1 °C; RC-04 3.5–4.5; DEA 3.57 @ 52.9 K). While capped η_L is inactive: vary VER-HP-ETA (0.50/0.55/0.65 → 3.14/3.43/4.00) and HP-APPROACH (3/5 K → 3.82/3.61). Evidence passes PH-14 at margin 0. NM evidence is uncapped (fails PH-14 at design) and withheld if NM did not converge.
+- 11-01 WP-03: HTHP limits `datasheet`, `max_lift_k`, `max_sink_temperature_degc` (condenser leaving water = sink outlet), `max_carnot_fraction` default None = MISSING; limits without a citation raise; else VER-HP-LIFT 60 K (outlet to outlet) screens, no max-T check. `heat_pump_point` = `HeatPumpPoint` fields minus `name`. DEA table only as `dea_reference_cop` (40–100 K). E-boiler η 0.99 (EB-ETA). Storage: recovery on discharge (η_d 0.63 HT-ATES / 0.96 cold), capacity = injected energy, use `net_heat_to_plant_w` not `power_th`. CHP-EL-FRAC: GEMINI 1/3 kept (chp.py unchanged), DEA 0.50 = sensitivity. Cross-WP: edited WP-09's VER-HP-ETA (sensitivity, text) and VER-HP-LIFT (text); values unchanged.
 - 11-01 WP-05: TL-05 → verifier passes a **bare p_b in bar(g)**; `OperatingPoint.esp_evidence` = `EspPoint` field for field (tested); the verifier's VER-ESP-MARGIN limit equals TL-05 `intake_setpoint_barg`; SUB-PBUB margin must equal VER-ESP-MARGIN (`load_subsurface_basis` refuses otherwise).
 - 11-01 WP-05: brine bubble point by Henry's law (RC-01 item 9, Sander 2023) at T_res: p_b = Σ c_i/H_i(T); sea-water basis 46.05 bar(a), pure-water bound 52.17 bar(a) at 87 °C; ESP intake setpoint = computed 1.2·p_b = 55.26 bar(a) (not the card's 60); ESP setting depth 840 m (was 510 m).
 - 11-01 WP-05: injector friction sign (RC-01 eq 12) behind `friction_opposes_flow=False` in `nodal_solver`/`well_flow` (`InjectorWell` JSON key; single-phase only); default unchanged; hand case 76.26 vs legacy 13.24 bar. WP-05 tools always pass `True`.
@@ -142,4 +145,7 @@ Next: Batch 4 (WP-03, WP-06, WP-08).
 See spec §17. Answers: —
 
 ## Hand-off notes (latest session writes here, replace previous)
-2026-11-01: PROGRESS.md condensed after batch 3 (no code changes); next is Batch 4 (see above).
+2026-11-01 WP-03 (branch `claude/elegant-gauss-btr6ry`): `heatpump` closed form + HTHP screening + evidence, new `electric_boiler`, `thermal_storage` (registered; `model_heating.rst`; REFERENCE.md each). Tests `PYTHONPATH=src python -m pytest -q unit_test/gemini_model unit_test/gemini_simulator unit_test/gemini_agent -x` → **827 passed**. wp-reviewer + physics-checker findings fixed. Register added: HP-ETA-L, HP-APPROACH, EB-ETA, STO-REC-HT, STO-REC-COLD, CHP-EL-FRAC. The three WP-03 follow-ups above are done (entries left for the next condense; file now > 20 KB). New follow-ups:
+- WP-06/07: HP JSON `solver: "closed_form"`, `mode: "lorenz"`, brine side `Cp_s` 4100 / `rho_s` 1030, district `Cp_h` 4217.4 / `rho_h` 1000; `source_heat_w` = brine heat drawn (PH-22); evidence `HeatPumpPoint(name=…, **out["heat_pump_point"])`, skip None. Storage: ATES outlet temperature not modelled (C6 needs a booster); annual balance from `charged/discharged_total_mwh`.
+- WP-09/14: `HeatPumpPoint` has no max sink temperature, so a datasheet max T is only in the model's `within_limits`.
+- WP-08: cost/credit CHP from simulated P_el/P_th (CHP-EL-FRAC); reuse that entry. WP-11: sensitivities above; CHP 0.50 needs a chp.py fraction parameter. WP-12 gaps: HP fouling, storage outlet temperature.

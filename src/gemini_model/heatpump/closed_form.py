@@ -167,6 +167,13 @@ class _CopModel:
         return min(self.uncapped(sink_out, source_out), self.cap(sink_out, source_out))
 
 
+def _finite(value, name):
+    value = float(value)
+    if not math.isfinite(value):
+        raise ValueError(f"{name} must be finite, got {value}")
+    return value
+
+
 def _idle(sink_in_degc, source_in_degc, reason):
     return {
         "running": False,
@@ -208,9 +215,29 @@ def solve_operating_point(
     Returns a dict: ``running``, ``cop``, ``cop_uncapped``, ``sink_out_degc``, ``source_out_degc``,
     ``sink_heat_w``, ``source_heat_w``, ``power_el_w``, ``branch`` ("target", "source_floor" or
     "idle") and ``warnings``. ``sink_heat_w = source_heat_w + power_el_w`` exactly. The heat pump
-    is idle (no exception) when there is no flow, no heating need, a source at or below its
-    minimum, COP ≤ 1, or no lift (a heat exchanger suffices).
+    is idle (no exception) when a flow is zero, there is no heating need, the source is at or
+    below its minimum, COP ≤ 1, or there is no lift (a heat exchanger suffices). Negative flows
+    and non-finite inputs raise ValueError.
     """
+    for name, value in (
+        ("sink_in_degc", sink_in_degc),
+        ("sink_out_target_degc", sink_out_target_degc),
+        ("source_in_degc", source_in_degc),
+        ("source_out_min_degc", source_out_min_degc),
+    ):
+        _finite(value, name)
+    for name, value in (
+        ("sink_capacity_rate_w_k", sink_capacity_rate_w_k),
+        ("source_capacity_rate_w_k", source_capacity_rate_w_k),
+    ):
+        if _finite(value, name) < 0.0:
+            raise ValueError(
+                f"{name} must be >= 0 (a negative flow is a wiring error), got {value}"
+            )
+    if not _finite(efficiency, "efficiency") > 0.0:
+        raise ValueError(f"efficiency must be > 0, got {efficiency}")
+    if carnot_cap_fraction is not None and not 0.0 < _finite(carnot_cap_fraction, "fraction") <= 1:
+        raise ValueError(f"carnot_cap_fraction must be in (0, 1], got {carnot_cap_fraction}")
     sink_in_degc, source_in_degc = float(sink_in_degc), float(source_in_degc)
     model = _CopModel(
         mode,

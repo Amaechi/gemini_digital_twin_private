@@ -317,7 +317,7 @@ def test_idle_cases_report_reason_without_raising(inputs, parameters, reason):
     out = run({**RC04_PARAMS, "solver": "closed_form", **parameters}, {**RC04_INPUTS, **inputs})
     assert not out["running"]
     assert out["power_el"] == 0.0 and out["power_th"] == 0.0 and out["source_heat_w"] == 0.0
-    assert out["heat_pump_point"] is None and not out["within_limits"]
+    assert out["heat_pump_point"] is None and out["within_limits"] is None  # off ≠ violation
     assert any(reason in w for w in out["validity_warnings"])
 
 
@@ -402,3 +402,40 @@ def test_approach_outside_rc04_range_warns():
     out = run({**RC04_PARAMS, "solver": "closed_form", "condenser_approach_k": 2.0}, RC04_INPUTS)
     assert any("condenser approach 2 K outside" in w for w in out["validity_warnings"])
     assert "HP-APPROACH" not in out["assumption_ids"]
+
+
+def test_default_path_never_raises_where_gemini_returned():
+    """Regression: the evidence code must not raise on a garbage Nelder-Mead point (rule 6)."""
+    parameters = {**GEMINI_PARAMS, "mode": "carnot", "Th_out_target": 80, "Ts_in_minimum": 5}
+    cases = [
+        {"Th_in": 82.0, "Ts_in": 90.0},  # sink inlet above the target (reviewer repro)
+        {"Th_in": 95.0, "Ts_in": 20.0},
+        {"Th_in": 30.0, "Ts_in": 40.0},
+    ]
+    for mode in ("carnot", "lorenz"):
+        for case in cases:
+            inputs = {**case, "hot_flow_rate": 1 / 3600, "source_flow_rate": 1 / 3600}
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore", RuntimeWarning)
+                out = run({**parameters, "mode": mode}, inputs)
+            assert {"COP", "Th_out", "Ts_out", "power_th", "power_el"} <= set(out)
+            if not out["converged"]:
+                assert out["mean_lift_k"] is None and out["heat_pump_point"] is None
+
+
+def test_bad_inputs_raise_and_zero_flow_idles():
+    """Negative or non-finite inputs are wiring errors (raise); zero flow is just off."""
+    with pytest.raises(ValueError, match="negative flow"):
+        run({**RC04_PARAMS, "solver": "closed_form"}, {**RC04_INPUTS, "hot_flow_rate": -0.01})
+    with pytest.raises(ValueError, match="finite"):
+        run({**RC04_PARAMS, "solver": "closed_form"}, {**RC04_INPUTS, "Ts_in": float("nan")})
+    out = run({**RC04_PARAMS, "solver": "closed_form"}, {**RC04_INPUTS, "source_flow_rate": 0.0})
+    assert not out["running"]
+
+
+def test_closed_form_in_carnot_mode_warns():
+    """Warn: GEMINI's default mode is Carnot (η_C 0.5, unregistered); RC-04 prefers Lorenz."""
+    out = run({**RC04_PARAMS, "mode": "carnot", "solver": "closed_form"}, RC04_INPUTS)
+    assert any("mode 'carnot'" in w for w in out["validity_warnings"])
+    out = run({**RC04_PARAMS, "solver": "closed_form"}, RC04_INPUTS)
+    assert not any("mode 'carnot'" in w for w in out["validity_warnings"])

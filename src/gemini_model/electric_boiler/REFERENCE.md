@@ -3,7 +3,7 @@
 Model: `electric_boiler.ElectricBoiler` (registry type `electric_boiler`).
 Sources: spec §7.2 GM-08 (η 0.99); RC-10 "Sourced values" — DEA Electricity & DH catalogue,
 ch. 41 "Electric boilers" (η 0.99, life 20 yr, capex in `config/cost_assumptions.yaml`); RC-04
-peaking practice (boiler in series on the heat-pump outlet, Guidebook p.260).
+peaking practice ("boiler in series on return", Guidebook p.260).
 
 ## Equations
 - `P_el = Q_th / η`, η = 0.99 (register EB-ETA); losses `P_el − Q_th`; `emission` 0 (grid CO₂

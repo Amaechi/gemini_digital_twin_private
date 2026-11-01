@@ -264,6 +264,12 @@ class HeatpumpBasic(StaticModel):
         for name, value in (("condenser", condenser_approach), ("evaporator", evaporator_approach)):
             if not low <= value <= high:
                 warnings.append(f"{name} approach {value:g} K outside RC-04 {low:g}-{high:g} K")
+        if solver == "closed_form" and self.parameters["mode"] != "lorenz":
+            warnings.append(
+                "closed_form with mode 'carnot': GEMINI's Carnot form at (Th_out, Ts_in) with "
+                f"eta_carnot {self.parameters['eta_carnot']:g} (GEMINI default, not registered); "
+                "RC-04 prefers mode 'lorenz'"
+            )
         converged = running
         if running and solver == "nelder_mead" and not self._nelder_mead_converged(u, point):
             converged = False
@@ -334,7 +340,7 @@ class HeatpumpBasic(StaticModel):
             "source_temperature_out_degc": source_out,
             "source_heat_w": point["source_heat_w"],
             "lift_k": lift,
-            "mean_lift_k": closed_form.mean_lift_k(u["Th_in"], sink_out, u["Ts_in"], source_out),
+            "mean_lift_k": self._mean_lift(u, sink_out, source_out) if converged else None,
             "max_lift_k": limits["max_lift_k"],
             "max_carnot_fraction": limits["max_carnot_fraction"],
             "max_sink_temperature_degc": limits["max_sink_temperature_degc"],
@@ -342,11 +348,19 @@ class HeatpumpBasic(StaticModel):
             "limits_source": limits["limits_source"],
             "missing_inputs": limits["missing_inputs"],
             "assumption_ids": assumption_ids,
-            "within_limits": all(checks),
+            "within_limits": all(checks) if running else None,  # None: off, not a violation
             "dea_reference_cop": closed_form.dea_reference_cop(lift) if running else None,
             "validity_warnings": warnings,
             "heat_pump_point": heat_pump_point,
         }
+
+    @staticmethod
+    def _mean_lift(u, sink_out, source_out):
+        """Return the Lorenz mean lift (K), or None if it is undefined (never raises)."""
+        try:
+            return closed_form.mean_lift_k(u["Th_in"], sink_out, u["Ts_in"], source_out)
+        except (ValueError, ZeroDivisionError, OverflowError):
+            return None
 
     def _nelder_mead_converged(self, u, point, tolerance=1e-3):
         """Return True if the Nelder-Mead point satisfies both GEMINI equations and its bounds.
@@ -364,10 +378,13 @@ class HeatpumpBasic(StaticModel):
             and cop > 1.0
         ):
             return False
-        if p["mode"] == "lorenz":
-            model = closed_form.lorenz_cop(th_in, th_out, ts_in, ts_out, p["eta_lorenz"])
-        else:
-            model = closed_form.carnot_cop(th_out, ts_in, p["eta_carnot"])
+        try:
+            if p["mode"] == "lorenz":
+                model = closed_form.lorenz_cop(th_in, th_out, ts_in, ts_out, p["eta_lorenz"])
+            else:
+                model = closed_form.carnot_cop(th_out, ts_in, p["eta_carnot"])
+        except (ValueError, ZeroDivisionError, OverflowError):
+            return False
         q_h = point["sink_heat_w"]
         q_s = p["Cp_s"] * (ts_in - ts_out) * u["source_flow_rate"] * p["rho_s"]
         if not (math.isfinite(model) and q_h > q_s):

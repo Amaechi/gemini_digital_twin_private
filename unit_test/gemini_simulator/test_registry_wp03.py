@@ -1,7 +1,10 @@
 """GM-03/08/09 (WP-03): new types are registered and the heat pump + e-boiler run in a project."""
 
+from pathlib import Path
+
 import pytest
 
+from gemini_model.chp.chp import CHP
 from gemini_model.electric_boiler.electric_boiler import ElectricBoiler
 from gemini_model.heatpump.heatpump_basic import HeatpumpBasic
 from gemini_model.thermal_storage.thermal_storage import ThermalStorage
@@ -87,3 +90,12 @@ def test_heat_pump_and_electric_boiler_project(source_min_degc, topped_up):
     for output in (hthp, eboiler):
         assert {"power_el", "power_th", "emission"} <= set(output)
         assert output["emission"] == 0.0
+
+
+def test_chp_register_entry_matches_gemini():
+    """CHP-EL-FRAC states GEMINI's fixed 1/3 electrical share (chp.py unchanged)."""
+    yaml = pytest.importorskip("yaml")
+    path = Path(__file__).resolve().parents[2] / "config" / "assumptions.yaml"
+    with open(path, encoding="utf-8") as file:
+        register = {item["id"]: item for item in yaml.safe_load(file)["assumptions"]}
+    assert register["CHP-EL-FRAC"]["value"] == pytest.approx(CHP.ELECTRICAL_POWER_FRACTION, 1e-4)
