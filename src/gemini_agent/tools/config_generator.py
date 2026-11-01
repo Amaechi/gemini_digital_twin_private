@@ -73,6 +73,8 @@ GENERATOR_VERSION = 1
 
 JOULE_PER_GJ = 1.0e9
 CHP_FRACTION_ID = "CHP-EL-FRAC"
+HP_EFFICIENCY_ID = "HP-ETA-L"
+"""Register id of the heat-pump Lorenz efficiency η_L (owned by WP-03)."""
 """Register id of the CHP electrical share (owned by WP-03; WP-08 reads the same entry)."""
 CHP_FRACTION_TOL = 5e-5
 """CHP-EL-FRAC is stored to 4 decimals (0.3333) while chp.py uses exactly 1/3."""
@@ -100,6 +102,9 @@ GENERATOR_ASSUMPTION_IDS: tuple[str, ...] = (
     "VER-HP-LIFT",
     "CHP-EL-FRAC",
     "ECO-CO2-GAS",
+    "HP-ETA-L",
+    "HP-APPROACH",
+    "VER-HP-ETA",
 )
 
 ComponentRole = Literal[
@@ -784,8 +789,9 @@ class GeneratorBasis(StrictModel):
     hex_dp_per_ntu_pa: float
     hex_construction: Literal["gasketed", "welded"]
     hex_plate_material: str
+    hp_solver: Literal["closed_form", "nelder_mead"] = Field(description="CFG-HP (WP-03 GM-03).")
     hp_mode: Literal["carnot", "lorenz"]
-    hp_eta: float
+    hp_eta: float = Field(description="HP-ETA-L (Lorenz) — WP-03's register entry.")
     hp_max_lift_k: float = Field(description="VER-HP-LIFT: sink outlet − source outlet.")
     chp_total_efficiency_frac: float
     chp_electrical_fraction: float = Field(description="CHP-EL-FRAC (WP-03) = chp.py 1/3.")
@@ -867,8 +873,9 @@ def load_generator_basis(config_dir: Path | str | None = None) -> GeneratorBasis
         hex_dp_per_ntu_pa=float(hex_cfg["dp_per_ntu_psi"]) * PA_PER_PSI,
         hex_construction=hex_cfg["construction"],
         hex_plate_material=str(hex_cfg["plate_material"]),
+        hp_solver=hp_cfg["solver"],
         hp_mode=hp_cfg["mode"],
-        hp_eta=float(hp_cfg["eta"]),
+        hp_eta=_number(register, HP_EFFICIENCY_ID),
         hp_max_lift_k=float(register.get("VER-HP-LIFT").value),  # type: ignore[arg-type]
         chp_total_efficiency_frac=float(chp_cfg["total_efficiency_frac"]),
         chp_electrical_fraction=electrical_fraction,
@@ -1518,10 +1525,14 @@ def _train(
         }
     hp_params = None
     if layout.heat_pump:
-        eta_key = "eta_lorenz" if gb.hp_mode == "lorenz" else "eta_carnot"
+        if gb.hp_mode != "lorenz":
+            raise ConfigError(f"CFG-HP mode {gb.hp_mode!r}: {HP_EFFICIENCY_ID} is a Lorenz η")
         hp_params = {
+            # WP-03 closed form (RC-04 eq 1–3, bracketed root; COP ≤ VER-HP-ETA × Carnot at the
+            # refrigerant temperatures with HP-APPROACH) — GEMINI's default Nelder–Mead untouched.
+            "solver": gb.hp_solver,
             "mode": gb.hp_mode,
-            eta_key: gb.hp_eta,
+            "eta_lorenz": gb.hp_eta,
             "Th_out_target": gb.heating_supply_degc,
             # DB-12 brine floor, and VER-HP-LIFT: sink outlet − source outlet ≤ 60 K.
             "Ts_in_minimum": max(

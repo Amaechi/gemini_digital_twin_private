@@ -79,6 +79,13 @@ class DayResult(StrictModel):
         default_factory=dict,
         description="Constraint id -> margin in the unit of its suffix; >= 0 means satisfied.",
     )
+    flags: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Conditions a reader must see that are not unit-suffixed margins, e.g. a heat-pump "
+            "point outside its RC-04 limits or HTHP datasheet values MISSING (WP-06)."
+        ),
+    )
 
     @model_validator(mode="after")
     def _check_per_doublet_lengths(self) -> DayResult:

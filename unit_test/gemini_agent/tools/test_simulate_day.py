@@ -21,6 +21,7 @@ from gemini_agent.tools.simulate_day import (
     SimulateDayRequest,
     brine_cooling_failures,
     day_conditions,
+    simulate_config_day,
     simulate_day,
     simulate_plant_day,
     verification_evidence,
@@ -175,19 +176,86 @@ def test_peak_boiler_fires_to_100c_and_reports_unmet_above_nameplate():
     assert limited.day.margins["heating_supply_margin_k"] < 0
 
 
-def test_heat_pumps_are_bypassed_when_the_brine_cannot_supply_them():
-    """Source-limited heat pumps get a reduced district share instead of a diverged solve."""
+def test_closed_form_heat_pumps_run_a_c2_day_without_the_workaround():
+    """C2 design case: WP-03 closed form (Lorenz, HP-ETA-L), no bypass, COP in RC-04's 3.5–4.5."""
+    _, sim = simulated("C2", 2, 2500.0, None)
+    assert sim.valid and sim.hp_flow_frac == 1.0 and not sim.controls
+    assert not any("bypass" in w for w in sim.warnings)
+    for name in ("hthp_1", "hthp_2"):
+        out = sim.outputs[name]
+        assert (out["solver"], out["running"], out["within_limits"]) == ("closed_form", True, True)
+        assert 3.5 <= out["COP"] <= 4.5  # RC-04 typical HTHP band at the design lift
+        assert out["Th_out"] == pytest.approx(100.0)
+        assert sim.day.brine_heat_drawn_mw[name] == pytest.approx(out["source_heat_w"] / 1e6)
+        params = sim.config.project["components"][name]["parameters"]
+        assert (params["solver"], params["mode"], params["eta_lorenz"]) == (
+            "closed_form",
+            "lorenz",
+            0.5,
+        )
+    assert [p.name for p in sim.heat_pumps] == ["hthp_1", "hthp_2"]
+    assert sim.heat_pumps[0].cop == pytest.approx(sim.outputs["hthp_1"]["COP"])
+
+
+def test_source_limited_heat_pump_holds_the_brine_floor_without_bypass():
+    """One doublet at the 30 MW peak: the HP is source-limited (DB-12 floor), the boiler trims."""
     gb, sub = bases()
     peak, _ = days()
-    candidate = make_candidate("C2", 1)
-    sim = simulate_plant_day(candidate, peak, gb=gb, sub=sub)
-    assert sim.valid and 0.0 < sim.hp_flow_frac < 1.0
-    assert any("bypassed" in w for w in sim.warnings)
+    sim = simulate_plant_day(make_candidate("C2", 1), peak, gb=gb, sub=sub)
+    assert sim.valid and sim.hp_flow_frac == 1.0 and not sim.controls
+    out = sim.outputs["hthp_1"]
+    assert out["operating_branch"] == "source_floor" and out["Th_out"] < 100.0
     brine_dt = sim.day.production_temperature_degc[0] - sim.day.injection_temperature_degc[0]
-    assert brine_dt == pytest.approx(40.0, abs=0.05)  # source floor (DB-12) binds
+    assert brine_dt == pytest.approx(40.0, abs=1e-6)
     assert sim.day.heating_supply_degc == pytest.approx(100.0, abs=1e-6)
-    raw = simulate_plant_day(candidate, peak, gb=gb, sub=sub, control_heat_pumps=False)
-    assert not raw.valid and raw.day is None and "hthp_1" in raw.failures[0]
+    assert sim.day.heat_by_source_mw["peak_boiler"] > 0
+
+
+def test_missing_hthp_datasheet_is_flagged_every_heat_pump_day():
+    """No HTHP datasheet is cited: the MISSING values are flagged in the day result."""
+    _, sim = simulated("C2", 2, 2500.0, None)
+    assert len(sim.day.flags) == 2
+    assert all("HTHP datasheet MISSING" in flag for flag in sim.day.flags)
+    assert all(f.within_limits is True and f.missing_inputs for f in sim.heat_pump_flags)
+
+
+def test_out_of_limits_heat_pump_point_is_flagged_not_hidden():
+    """A point outside its limits stays in the day result: flag, negative margin, PH-14 fails."""
+    gb, sub = bases()
+    peak, _ = days()
+    candidate = make_candidate("C2", 2)
+    config = generate_plant(candidate, peak.loads(), gb=gb, sub=sub)
+    params = config.project["components"]["hthp_1"]["parameters"]
+    # Test fixture only (no real datasheet): a 30 K lift limit the design point exceeds.
+    params.update({"datasheet": "test fixture: hypothetical HTHP datasheet", "max_lift_k": 30.0})
+    sim = simulate_config_day(candidate, peak, config, gb=gb, sub=sub)
+    assert sim.valid and sim.day is not None
+    flag = next(f for f in sim.heat_pump_flags if f.name == "hthp_1")
+    assert flag.within_limits is False and any("lift" in r for r in flag.reasons)
+    text = next(f for f in sim.day.flags if f.startswith("hthp_1"))
+    assert "OUTSIDE RC-04 limits" in text
+    assert sim.day.margins["hthp_1_lift_margin_k"] < 0
+    point = next(p for p in sim.heat_pumps if p.name == "hthp_1")
+    assert point.max_lift_k == 30.0
+    report = DesignVerifier.from_config().verify(verification_evidence(candidate, [sim]))
+    status = {c.check_id: c.status for c in report.checks}
+    assert status["PH-14"] == CheckStatus.FAIL and status["PH-21"] == CheckStatus.FAIL
+
+
+def test_heat_pump_bypass_is_only_a_capacity_control():
+    """With an HP nameplate the share through the HPs is cut to it; the reason is recorded."""
+    gb, sub = bases()
+    peak, _ = days()
+    small = make_candidate("C2", 2, equipment_sizes={"hthp_heating_mw": 6.0})
+    sim = simulate_plant_day(small, peak, gb=gb, sub=sub)
+    assert sim.valid and sim.hp_flow_frac < 1.0
+    assert any("capacity control" in c for c in sim.controls)
+    hp_heat = sim.day.heat_by_source_mw["hthp_1"] + sim.day.heat_by_source_mw["hthp_2"]
+    assert hp_heat <= 6.0 + 1e-6 and hp_heat > 5.9
+    assert sim.day.margins["hthp_capacity_margin_mw"] >= -1e-6
+    assert sim.day.heating_supply_degc == pytest.approx(100.0, abs=1e-6)
+    free = simulate_plant_day(small, peak, gb=gb, sub=sub, control_heat_pump_capacity=False)
+    assert free.hp_flow_frac == 1.0 and free.day.margins["hthp_capacity_margin_mw"] < 0
 
 
 def test_doublet_off_reports_zero_flow():
@@ -234,7 +302,7 @@ def test_verification_evidence_from_simulate_day_results():
     for check_id in (
         "SY-01", "SY-02", "SY-03", "SE-01", "SE-02", "SE-03", "SE-04",
         "PH-01", "PH-02", "PH-03", "PH-04", "PH-05", "PH-06", "PH-07", "PH-08", "PH-09",
-        "PH-17", "PH-18", "PH-22", "PH-24", "PD-08",
+        "PH-13", "PH-14", "PH-17", "PH-18", "PH-22", "PH-24", "PD-08",
     ):  # fmt: skip
         assert status[check_id] == CheckStatus.PASS, (check_id, report.summary)
     assert status["PD-10"] == CheckStatus.NOT_APPLICABLE  # degassed loop
@@ -255,8 +323,9 @@ def test_verification_evidence_refuses_invalid_or_foreign_days():
     """Evidence is refused for invalid days, another candidate's days or no days."""
     gb, sub = bases()
     peak, _ = days()
-    candidate = make_candidate("C2", 1)
-    raw = simulate_plant_day(candidate, peak, gb=gb, sub=sub, control_heat_pumps=False)
+    candidate = make_candidate("C4", 2, depth_m=3200.0)
+    raw = simulate_plant_day(candidate, peak, gb=gb, sub=sub, control_plate_hex=False)
+    assert not raw.valid and raw.day is None and "DB-12" in raw.failures[0]
     with pytest.raises(ValueError, match="invalid"):
         verification_evidence(candidate, [raw])
     other, sim = simulated("C1", 1, 2500.0, None)
@@ -280,7 +349,7 @@ def test_hot_brine_plate_hex_is_held_to_db12_and_100c():
         assert tp - ti <= 40.0 + 1e-6
     assert sim.day.heating_supply_degc == pytest.approx(100.0, abs=1e-5)
     assert sim.heat_surplus_mw == 0.0
-    assert any("plate-HEX share reduced" in w for w in sim.warnings)
+    assert any("plate-HEX share reduced" in c for c in sim.controls)
     assert any("flashing is not checked" in w for w in sim.warnings)  # 105 °C let down to 0 bar(g)
     off_design = simulate_plant_day(
         make_candidate("C1", 1, depth_m=3200.0),

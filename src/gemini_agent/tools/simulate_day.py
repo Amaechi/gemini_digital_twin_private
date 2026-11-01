@@ -10,10 +10,15 @@ and the day's ambient dry/wet bulb. Procedure:
    water after the plate HEXs and CHP would exceed DB-16 (100 °C), the share of district water
    through the plate HEXs is bisected down (the rest bypasses them). A doublet still cooled more
    than 40 K at the end makes the day invalid (hard limit, never only a warning).
-4. Heat-pump guard (CFG-HP): if a ``HeatpumpBasic`` output is not physical (Th_out outside
-   [Th_in, target], COP < 1, source outlet below its DB-12 floor — the source-limited re-solve
-   diverges in GEMINI today), the share of district water sent through the heat pumps is
-   bisected down until every heat pump is valid; the rest bypasses them to the peak boiler.
+4. Heat pumps run WP-03's closed-form solver (CFG-HP): a source-limited point holds the brine at
+   its floor and delivers less than 100 °C; an idle one passes both streams unchanged. Their
+   only bypass is a genuine capacity control: with a heat-pump nameplate
+   (``equipment_sizes["hthp_heating_mw"]``) the share of district water through the heat pumps
+   is bisected down until their heat fits it (the reason is recorded in ``controls``). Every
+   heat-pump point reported outside its RC-04 limits (``within_limits`` False) or with HTHP
+   datasheet values MISSING is flagged in ``DayResult.flags`` and ``heat_pump_flags`` (never
+   hidden); its ``heat_pump_point`` is the verifier evidence. An unphysical output (non-finite,
+   outlets outside their bounds) makes the day invalid.
 5. Supply control: the peak boiler (grid gas) is fired so the district supply reaches DB-16
    (100 °C), up to its nameplate; the remainder is unmet heat.
 
@@ -63,6 +68,7 @@ from gemini_agent.tools.doublet import DoubletDesign
 from gemini_agent.tools.resource import SubsurfaceBasis, load_subsurface_basis
 from gemini_agent.verify.design_verifier import (
     EspPoint,
+    HeatPumpPoint,
     HexPoint,
     PumpPoint,
     VerificationEvidence,
@@ -80,6 +86,7 @@ HEAT_TOL_MW = 1e-6
 """Heat-balance noise below which no unmet/surplus heat is reported."""
 HP_OFF_FLOW_M3S = 1e-12
 """Sink flow below which a heat pump is treated as off (its Th_out has no weight)."""
+HP_CAPACITY_TOL_MW = 1e-6
 SHARE_BISECTION_STEPS = 12
 """Plate-HEX / heat-pump share resolution: 1/4096 of the district flow."""
 BOILER_CONTROL_PASSES = 2
@@ -145,9 +152,21 @@ class SimulateDayRequest(StrictModel):
     control_supply_temperature: bool = Field(
         default=True, description="Fire the peak boiler to hold DB-16 (else use dispatch gas)."
     )
-    control_heat_pumps: bool = Field(
-        default=True, description="Bypass district water around invalid heat pumps (CFG-HP)."
+    control_heat_pump_capacity: bool = Field(
+        default=True, description="Hold heat-pump heat to the hthp_heating_mw nameplate (bypass)."
     )
+
+
+class HeatPumpFlag(StrictModel):
+    """A closed-form heat-pump point a reader must see (RC-04 screening of WP-03's model)."""
+
+    name: str
+    running: bool
+    within_limits: bool | None = Field(description="None: idle (not a violation).")
+    missing_inputs: list[str] = Field(default_factory=list, description="HTHP datasheet values.")
+    cop: float
+    lift_k: float
+    reasons: list[str] = Field(default_factory=list, description="The model's warnings.")
 
 
 class SimulatedDay(StrictModel):
@@ -163,12 +182,19 @@ class SimulatedDay(StrictModel):
     )
     hex_flow_frac: float | None = None
     hp_flow_frac: float | None = None
+    controls: list[str] = Field(
+        default_factory=list, description="Why a control moved a set-point (bypass shares)."
+    )
     boiler_gas_kg_s: float = 0.0
     supplied_heat_mw: float = 0.0
     heat_surplus_mw: float = 0.0
     hex_points: list[HexPoint] = Field(default_factory=list)
     pumps: list[PumpPoint] = Field(default_factory=list)
     esps: list[EspPoint] = Field(default_factory=list)
+    heat_pumps: list[HeatPumpPoint] = Field(
+        default_factory=list, description="WP-03 ``heat_pump_point`` evidence of running HPs."
+    )
+    heat_pump_flags: list[HeatPumpFlag] = Field(default_factory=list)
     brine_contact_materials: dict[str, str] = Field(default_factory=dict)
     warnings: list[str] = Field(default_factory=list)
 
@@ -207,7 +233,12 @@ def _inp(solver: Solver, name: str, key: str, default: float = 0.0) -> float:
 
 
 def heat_pump_failures(solver: Solver, config: GeneratedConfig) -> list[str]:
-    """Return why each ``HeatpumpBasic`` output is not physical (empty if all valid)."""
+    """Return why each ``HeatpumpBasic`` output is not physical (empty if all valid).
+
+    Physical = finite, Th_in ≤ Th_out ≤ max(target, Th_in), floor ≤ Ts_out ≤ Ts_in, no negative
+    power, brine
+    unchanged at zero sink flow. RC-04 envelope violations are flags, not failures.
+    """
     problems = []
     for name, role in config.roles.items():
         if role != "heat_pump":
@@ -217,7 +248,7 @@ def heat_pump_failures(solver: Solver, config: GeneratedConfig) -> list[str]:
         floor = float(params["Ts_in_minimum"])  # type: ignore[index, arg-type]
         out = solver.get_output(name)
         values = [float(out[k]) for k in ("Th_out", "Ts_out", "COP", "power_th", "power_el")]
-        th_out, ts_out, cop, power_th, power_el = values
+        th_out, ts_out, _cop, power_th, power_el = values
         th_in, ts_in = _inp(solver, name, "Th_in"), _inp(solver, name, "Ts_in")
         reasons = []
         if _inp(solver, name, "hot_flow_rate") <= HP_OFF_FLOW_M3S:
@@ -228,12 +259,13 @@ def heat_pump_failures(solver: Solver, config: GeneratedConfig) -> list[str]:
         if not all(math.isfinite(v) for v in values):
             reasons.append("non-finite output")
         else:
-            if not th_in - TEMPERATURE_TOL_K <= th_out <= target + TEMPERATURE_TOL_K:
+            # A COP < 1 is physical but outside RC-04: flagged (heat_pump_flags), not failed.
+            # An idle heat pump passes water already above its target unchanged.
+            upper = max(target, th_in) + TEMPERATURE_TOL_K
+            if not th_in - TEMPERATURE_TOL_K <= th_out <= upper:
                 reasons.append(f"Th_out {th_out:.2f} °C outside [{th_in:.2f}, {target:g}]")
             if not floor - TEMPERATURE_TOL_K <= ts_out <= ts_in + TEMPERATURE_TOL_K:
                 reasons.append(f"Ts_out {ts_out:.2f} °C outside [{floor:.2f}, {ts_in:.2f}]")
-            if power_th > 0 and cop < 1.0 - 1e-9:
-                reasons.append(f"COP {cop:.3f} < 1")
             if power_el < 0 or power_th < 0:
                 reasons.append("negative power")
         if reasons:
@@ -281,6 +313,14 @@ def brine_cooling_failures(
     return problems
 
 
+def _heat_pump_heat_mw(solver: Solver, config: GeneratedConfig) -> float:
+    return sum(
+        _out(solver, name, "power_th") / 1e6
+        for name, role in config.roles.items()
+        if role == "heat_pump"
+    )
+
+
 def _set_split(project: dict[str, Any], name: str, share: float) -> None:
     project["components"][name]["parameters"]["split_fractions"] = [share, 1.0 - share]
 
@@ -302,7 +342,8 @@ def simulate_plant_day(
     design: DoubletDesign | None = None,
     parent_concept: str | None = None,
     control_supply_temperature: bool = True,
-    control_heat_pumps: bool = True,
+    control_plate_hex: bool = True,
+    control_heat_pump_capacity: bool = True,
     gb: GeneratorBasis | None = None,
     sub: SubsurfaceBasis | None = None,
     config_dir: Path | str | None = None,
@@ -320,7 +361,42 @@ def simulate_plant_day(
         gb=gb,
         sub=sub,
     )
+    return simulate_config_day(
+        candidate,
+        day,
+        config,
+        dispatch,
+        control_supply_temperature=control_supply_temperature,
+        control_plate_hex=control_plate_hex,
+        control_heat_pump_capacity=control_heat_pump_capacity,
+        gb=gb,
+        sub=sub,
+    )
+
+
+def simulate_config_day(
+    candidate: Candidate,
+    day: DayConditions,
+    config: GeneratedConfig,
+    dispatch: PlantDispatch | None = None,
+    *,
+    control_supply_temperature: bool = True,
+    control_plate_hex: bool = True,
+    control_heat_pump_capacity: bool = True,
+    gb: GeneratorBasis | None = None,
+    sub: SubsurfaceBasis | None = None,
+    config_dir: Path | str | None = None,
+) -> SimulatedDay:
+    """Run a TL-09 config for one day with the module's controls (no regeneration).
+
+    ``config`` must be :func:`generate_plant`'s output for this candidate and day (it may carry
+    edited component parameters, e.g. a cited HTHP datasheet).
+    """
+    gb = gb or load_generator_basis(config_dir)
+    sub = sub or load_subsurface_basis(config_dir)
+    dispatch = dispatch or PlantDispatch()
     project = copy.deepcopy(config.project)
+    controls: list[str] = []
     warnings = list(config.flags) + list(config.notes)
     failures: list[str] = []
     solver = _run(project)
@@ -329,8 +405,8 @@ def simulate_plant_day(
     if "district_split_hex_bypass" in config.roles:
         hex_share = dispatch.hex_flow_frac
         problems = hex_problems(solver, config, gb)
-        if problems:
-            warnings.append(
+        if problems and control_plate_hex:
+            controls.append(
                 f"plate-HEX share reduced from {hex_share:g} ({problems[0]}); district water "
                 "bypasses the plate HEXs (DB-12/DB-16 control)"
             )
@@ -355,46 +431,30 @@ def simulate_plant_day(
     hp_share: float | None = None
     if "district_split_hp_bypass" in config.roles:
         hp_share = dispatch.hp_flow_frac
-        problems = heat_pump_failures(solver, config)
-        if problems and control_heat_pumps:
-            warnings.append(
-                "heat-pump model invalid at the full district share "
-                f"({problems[0]}); district water bypassed to the peak boiler (CFG-HP, WP-03)"
+        nameplate = candidate.equipment_sizes.get("hthp_heating_mw")
+        heat = _heat_pump_heat_mw(solver, config)
+        if (
+            control_heat_pump_capacity
+            and nameplate is not None
+            and heat > nameplate + HP_CAPACITY_TOL_MW
+        ):
+            # Genuine capacity control: the heat pumps cannot deliver more than their nameplate;
+            # the rest of the district water bypasses them to the peak boiler.
+            low, high = 0.0, hp_share
+            for _ in range(SHARE_BISECTION_STEPS):
+                mid = 0.5 * (low + high)
+                _set_split(project, "district_split_hp_bypass", mid)
+                if _heat_pump_heat_mw(_run(project), config) > nameplate + HP_CAPACITY_TOL_MW:
+                    high = mid
+                else:
+                    low = mid
+            controls.append(
+                f"heat-pump share reduced from {hp_share:g} to {low:.4f}: heat {heat:.2f} MW > "
+                f"nameplate hthp_heating_mw {nameplate:g} MW (capacity control)"
             )
-            low, high = 0.5**SHARE_BISECTION_STEPS * hp_share, hp_share
-            _set_split(project, "district_split_hp_bypass", low)
-            if heat_pump_failures(_run(project), config):
-                # No positive share is valid (e.g. the water is already above 100 °C): the day's
-                # plant runs without heat pumps.
-                warnings.append("heat pumps switched off today: no valid operating point")
-                update: dict[str, Any] = {"heat_pumps_on": False}
-                if hex_share is not None:
-                    update["hex_flow_frac"] = hex_share  # keep the plate-HEX control result
-                dispatch = dispatch.model_copy(update=update)
-                config = generate_plant(
-                    candidate,
-                    day.loads(),
-                    dispatch,
-                    design=design,
-                    parent_concept=parent_concept,
-                    gb=gb,
-                    sub=sub,
-                )
-                project = copy.deepcopy(config.project)
-                hp_share = 0.0
-            else:
-                for _ in range(SHARE_BISECTION_STEPS):
-                    mid = 0.5 * (low + high)
-                    _set_split(project, "district_split_hp_bypass", mid)
-                    if heat_pump_failures(_run(project), config):
-                        high = mid
-                    else:
-                        low = mid
-                hp_share = low
-                _set_split(project, "district_split_hp_bypass", hp_share)
+            hp_share = low
+            _set_split(project, "district_split_hp_bypass", hp_share)
             solver = _run(project)
-        elif problems:
-            failures += problems
 
     boiler_gas = dispatch.boiler_gas_kg_s
     boiler = next((n for n, r in config.roles.items() if r == "boiler"), None)
@@ -422,8 +482,7 @@ def simulate_plant_day(
             boiler_gas = gas
             _set_boundary(project, boiler, "gas_flow_rate", boiler_gas)
             solver = _run(project)
-        if failures == [] and heat_pump_failures(solver, config):
-            failures += heat_pump_failures(solver, config)
+    failures += heat_pump_failures(solver, config)
     if not failures:
         failures += brine_cooling_failures(solver, config, gb)
 
@@ -437,6 +496,7 @@ def simulate_plant_day(
         outputs=outputs,
         hex_flow_frac=hex_share,
         hp_flow_frac=hp_share,
+        controls=controls,
         boiler_gas_kg_s=boiler_gas,
         warnings=warnings,
     )
@@ -530,12 +590,25 @@ def _assemble(
         duty = _out(solver, name, "heat_duty") / 1e6
         heat[name] = duty
         drawn[name] = duty
+    hp_flags: list[HeatPumpFlag] = []
+    hp_points: list[HeatPumpPoint] = []
     for name in names.get("heat_pump", []):
-        power_th = _out(solver, name, "power_th") / 1e6
-        power_el = _out(solver, name, "power_el") / 1e6
-        heat[name] = power_th
-        drawn[name] = power_th - power_el
-        electricity[name] = power_el
+        out = solver.get_output(name)
+        heat[name] = float(out["power_th"]) / 1e6
+        electricity[name] = float(out["power_el"]) / 1e6
+        # WP-03: source_heat_w is the heat taken from the brine (PH-22); NM: Q_h − W.
+        drawn[name] = float(out.get("source_heat_w", out["power_th"] - out["power_el"])) / 1e6
+        flag, point = _heat_pump_screening(name, out)
+        if flag is not None:
+            hp_flags.append(flag)
+        if point is not None:
+            hp_points.append(point)
+            if out.get("max_lift_k") is not None:
+                margins[f"{name}_lift_margin_k"] = float(out["max_lift_k"]) - float(out["lift_k"])
+            if out.get("cop_cap"):
+                margins[f"{name}_cop_cap_margin_frac"] = 1.0 - float(out["COP"]) / float(
+                    out["cop_cap"]
+                )
     gas_fuel: dict[str, float] = {}
     co2: dict[str, float] = {}
     generated = 0.0
@@ -641,6 +714,7 @@ def _assemble(
         unmet_heating_mwh=unmet_heating_mw * HOURS_PER_DAY,
         unmet_cooling_mwh=unmet_cooling_mw * HOURS_PER_DAY,
         margins=margins,
+        flags=[_flag_text(f) for f in hp_flags],
     )
     warnings += [
         f"margin {key} = {value:.3g} < 0"
@@ -662,10 +736,55 @@ def _assemble(
             "hex_points": hex_points,
             "pumps": pumps,
             "esps": esps,
+            "heat_pumps": hp_points,
+            "heat_pump_flags": hp_flags,
             "brine_contact_materials": materials,
             "warnings": warnings,
         }
     )
+
+
+def _heat_pump_screening(
+    name: str, out: dict[str, Any]
+) -> tuple[HeatPumpFlag | None, HeatPumpPoint | None]:
+    """Flag and evidence of one heat pump from WP-03's RC-04 screening outputs.
+
+    Flagged (never hidden): a running point with ``within_limits`` False, and any heat pump whose
+    HTHP datasheet values are MISSING. ``heat_pump_point`` (None when idle or unconverged) is the
+    DesignVerifier's ``HeatPumpPoint`` (PH-13/PH-14).
+    """
+    running = bool(out.get("running", True))
+    within = out.get("within_limits")
+    missing = list(out.get("missing_inputs") or [])
+    flag = None
+    if within is False or missing:
+        flag = HeatPumpFlag(
+            name=name,
+            running=running,
+            within_limits=within,
+            missing_inputs=missing,
+            cop=float(out["COP"]),
+            lift_k=float(out.get("lift_k", 0.0)),
+            reasons=[str(w) for w in out.get("validity_warnings") or []],
+        )
+    raw = out.get("heat_pump_point")
+    point = HeatPumpPoint(name=name, **raw) if isinstance(raw, dict) else None
+    return flag, point
+
+
+def _flag_text(flag: HeatPumpFlag) -> str:
+    parts = []
+    if flag.within_limits is False:
+        detail = "; ".join(flag.reasons[:3]) or "see the model warnings"
+        parts.append(
+            f"OUTSIDE RC-04 limits (COP {flag.cop:.2f}, lift {flag.lift_k:.1f} K): {detail}"
+        )
+    if flag.missing_inputs:
+        parts.append(
+            f"HTHP datasheet MISSING {flag.missing_inputs}: RC-04 defaults VER-HP-ETA/VER-HP-LIFT"
+        )
+    state = "running" if flag.running else "idle"
+    return f"{flag.name} ({state}): " + " | ".join(parts)
 
 
 def _hex_points(solver: Solver, config: GeneratedConfig) -> list[HexPoint]:
@@ -750,6 +869,7 @@ def verification_evidence(
         project=project if project is not None else ordered[0].config.project,
         annual=annual,
         hex_points=ordered[0].config.hex_points(),
+        heat_pumps=[p for s in ordered for p in s.heat_pumps],
         pumps=[p for s in ordered for p in s.pumps],
         esps=[p for s in ordered for p in s.esps],
         co2_release_pressure_barg=ordered[0].config.release_pressure_barg,
@@ -791,13 +911,13 @@ def simulate_day(
         design=request.design,
         parent_concept=request.parent_concept,
         control_supply_temperature=request.control_supply_temperature,
-        control_heat_pumps=request.control_heat_pumps,
+        control_heat_pump_capacity=request.control_heat_pump_capacity,
         config_dir=config_dir,
     )
     return ToolResult[SimulatedDay](
         data=sim,
         summary=_summary(sim, day),
-        warnings=sim.failures + sim.warnings,
+        warnings=sim.failures + sim.controls + (sim.day.flags if sim.day else []) + sim.warnings,
         assumption_ids=sorted(set(GENERATOR_ASSUMPTION_IDS) | {"DB-37"}),
         sources=["spec §6 TL-11", "GEMINI project_loader/solver", "RC-01", "RC-03", "RC-08"],
     )
@@ -806,12 +926,14 @@ def simulate_day(
 __all__ = [
     "TOOL_ID",
     "DayConditions",
+    "HeatPumpFlag",
     "SimulateDayRequest",
     "SimulatedDay",
     "brine_cooling_failures",
     "day_conditions",
     "heat_pump_failures",
     "hex_problems",
+    "simulate_config_day",
     "simulate_day",
     "simulate_plant_day",
     "verification_evidence",

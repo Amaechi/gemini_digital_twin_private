@@ -725,7 +725,7 @@ assumptions:
     value:
       brine_train: "producer → [degasser] → filter A → [brine split → absorption drive] → [plate HEX-1] → [brine mix] → [HP evaporator] → filter B → injector"
       district_chain: "return → [bypass] plate HEXs (per doublet, flow shares ∝ doublet flow) → [CHP on associated gas] → [bypass] heat pumps (100 °C target) → [peak boiler, grid gas]"
-      controls: "simulate_day cuts the plate-HEX share to hold brine ΔT ≤ DB-12 and ≤ 100 °C before the heat pumps, cuts the heat-pump share while HeatpumpBasic is unphysical, and fires the peak boiler to 100 °C"
+      controls: "simulate_day cuts the plate-HEX share to hold brine ΔT ≤ DB-12 and ≤ 100 °C before the heat pumps, cuts the heat-pump share only to an hthp_heating_mw nameplate (capacity control), and fires the peak boiler to 100 °C"
       cooling_chain: "[free cooling] → [absorption, residual] → electric chiller (unmet); one cooling tower for all"
       absorption_drive: "brine of the first active doublet through titanium generator tubes, taken before HEX-1"
       derived_concepts: "C6 = parent plant (no storage model in GEMINI); C7 = parent without degasser, WHP = SUB-PBUB setpoint, no CHP; C8 = parent"
@@ -788,23 +788,22 @@ assumptions:
   - id: CFG-HP
     title: Heat-pump model settings used in generated configs (TL-09)
     value:
-      mode: carnot
-      eta: 0.46
+      solver: closed_form
+      mode: lorenz
+      efficiency: "HP-ETA-L (η_L, WP-03)"
       source_outlet_min: "max(T_wh − DB-12, 100 °C − VER-HP-LIFT) (Ts_in_minimum)"
       sink_target: "DB-16 (Th_out_target)"
     unit: null
     justification: >-
-      GEMINI HeatpumpBasic in Carnot mode with η_C = 0.46, the Guidebook-implied Carnot efficiency of RC-04 (COP_h
-      4.41 at 15.6/48.9 °C), on GEMINI's water-temperature basis (sink outlet, source inlet): COP ≈ 4.1 for 58 → 100
-      °C. Evaporator on brine (ρ 1030, c_p 4100), condenser on district water; the source-outlet floor enforces DB-12
-      and the VER-HP-LIFT 60 K lift limit (C5: brine 56 °C may only be cooled to 40 °C).
-      Lorenz mode (RC-04's preferred method, η_L 0.50) is not used because GEMINI's Nelder–Mead Lorenz solve diverges
-      at part load (416 of 504 scanned operating points invalid, log of a negative temperature) while the Carnot
-      solve is valid at every point whose duty the brine can supply (0 of 446). When the brine cannot supply the
-      duty, HeatpumpBasic's source-floor re-solve diverges in both modes; simulate_day then bypasses district water
-      around the heat pumps until their outputs are physical (Th_in ≤ Th_out ≤ target, COP ≥ 1, Ts_out ≥ floor).
-    source: RC-04 parameter table (η Carnot implied ≈ 0.46, Guidebook p.258) [L]; WP-06 robustness scan
-    sensitivity: "η_C 0.40–0.55; Lorenz η_L 0.50 once WP-03 makes HeatpumpBasic robust; datasheet COP map."
+      Generated heat pumps use WP-03's closed-form HeatpumpBasic path (GM-03: RC-04 eq. 1–3 with a bracketed root, no
+      Nelder–Mead starting guess) in Lorenz mode, RC-04's preferred method, with η_L from HP-ETA-L; the COP is capped
+      at VER-HP-ETA × Carnot at the refrigerant temperatures (HP-APPROACH 4 K) and the model reports its RC-04
+      screening (within_limits, missing_inputs, heat_pump_point). GEMINI's default Nelder–Mead solver is unchanged
+      for every other user. Evaporator on brine (ρ 1030, c_p 4100), condenser on district water; the source-outlet
+      floor enforces DB-12 and the VER-HP-LIFT 60 K lift (C5: 56 °C brine is cooled to 40 °C at most). No HTHP
+      datasheet is cited, so every heat-pump day is flagged with the MISSING datasheet values.
+    source: RC-04 (Lorenz preferred; η_L default 0.50); WP-03 GM-03 closed form; HP-ETA-L, HP-APPROACH, VER-HP-ETA
+    sensitivity: "η_L per HP-ETA-L (0.40–0.55); a cited HTHP datasheet replaces the RC-04 defaults."
     tag: A
     status: default
     added_by: WP-06
