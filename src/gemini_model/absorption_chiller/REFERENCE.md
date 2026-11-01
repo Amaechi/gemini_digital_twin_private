@@ -22,7 +22,10 @@ COOL-ABS-CAL).
 - Outside validity (our 20 °C chilled water) a **lower bound** only. Implementation
   (`ghc1989_conservative_clamp`, default true, assumption COOL-ABS-LB): chilled water > 50 °F is
   evaluated at 50 °F and cooling water < 75 °F at 75 °F (F rises with T_chw, falls with T_cw);
-  a validity warning is returned. Hot water > 240 °F is extrapolated with a warning.
+  a validity warning is returned. Hot water > 240 °F or between the zero-capacity temperature
+  and 180 °F is extrapolated with a warning.
+- With a given drive flow, the drive heat is limited so that the outlet stays at or above the
+  zero-capacity temperature 71.4 °C (Method A has no flow term; COOL-ABS-DRV).
 - Part load: COP(T_hw) unchanged; `Q_drive = Q_cool / COP`. The chilled-water term uses the
   supply set point.
 
@@ -42,8 +45,13 @@ COOL-ABS-CAL).
 
 - A datasheet fit can replace it: `characteristic.fit_coefficients(ΔΔt, capacity_fraction, COP)`
   → parameter `characteristic_coefficients`.
-- Part load: ΔΔt reduced to `ΔΔt_min + Q_E/s_E` (drive-temperature control); `Q_G = s_G (ΔΔt −
-  ΔΔt_min,G)`, so COP falls slightly at part load.
+- Part load (COOL-ABS-PL): ΔΔt reduced to `ΔΔt_min + Q_E/s_E` (drive-temperature control);
+  `Q_G = s_G (ΔΔt − ΔΔt_min,G)` keeps an offset ≈ 0.067 Q_nom, so the COP falls at low load
+  (85 °C drive, 25 °C cooling water: 0.65 full, 0.60 at 30 %, 0.47 at 10 %, 0.21 at 2 %).
+- Drive-side consistency (COOL-ABS-DRV): with a given drive flow the outlet stays above the
+  minimum generator temperature `t_G,min = ΔΔt_min,G + (1+B) t̄_AC − B t̄_E` exactly when
+  `ρ c_p V_G ≥ s_G/2` (independent of the operating point; ≈ 13.9 m³/h of water per MW nominal;
+  output `minimum_drive_flow_rate_m3s`). Below it the machine is treated as off (warning).
 - Circuits with a given flow: outlet T from `ρ c_p V ΔT = Q`, and the mean temperatures are
   solved together with the duty (linear → closed form). Without a flow: fixed ΔT (generator 7.2 K,
   cooling-water range 5 K) and the required flow is reported. Load given (`cooling_load_w`):
@@ -64,7 +72,8 @@ validity box the methods differ by up to 0.27 of nominal capacity (180 °F, 50 �
 `cooling_power_w` Q_E, `available_cooling_w`, `unmet_cooling_w`, `capacity_fraction`, `load_ratio`,
 `cop`, `drive_heat_w` Q_G = Q_E/COP, `absorber_condenser_heat_w` Q_E + Q_G,
 `heat_rejected_w` = Q_E + Q_G + P_aux (exact), drive/cooling-water/chilled-water inlet/outlet
-temperatures and flows, `delta_delta_t_k` (Method B, full-load ΔΔt), `capacity_factor_ft`/`_fc`
+temperatures and flows, `drive_delta_t_k`, `minimum_drive_flow_rate_m3s` (Method B),
+`delta_delta_t_k` (Method B, full-load ΔΔt), `capacity_factor_ft`/`_fc`
 (Method A), `validity_warnings`, `power_el` = P_aux, `power_th` = Q_E (useful cooling), `emission` 0.
 
 ## Auxiliaries and materials
@@ -90,4 +99,5 @@ Absorption plant `83,000 + 252 (Q_t − 100)/F + 41,000 + 170 (Q_t − 100)`; el
   0.416 at 48 °F chilled water — Method A is conservative.
 - Method B calibrated at the rating points reproduces Method A within ± 5 % (capacity and COP).
 - Energy balance Q_reject = Q_cool + Q_drive + P_aux exactly; each circuit's ρ c_p V ΔT equals
-  its heat flow; the closed-form flow solution satisfies the characteristic equation.
+  its heat flow; the closed-form flow solution satisfies the characteristic equation; drive
+  outlet ≥ t_G,min above the minimum drive flow, machine off below it; Method A drive-flow limit.

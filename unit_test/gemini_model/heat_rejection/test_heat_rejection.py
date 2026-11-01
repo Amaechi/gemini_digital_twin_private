@@ -2,14 +2,14 @@
 
 import pytest
 
-from gemini_model.heat_rejection.heat_rejection import HeatRejection, chiller_heat_rejection_w
+from gemini_model.heat_rejection import heat_rejection
 
 RHO_CP = 1000.0 * 4217.4  # J/(m3 K), GEMINI water PVT defaults
 
 
 def run(technology="cooling_tower", parameters=None, **inputs):
     """Run a heat-rejection unit once and return its output dict."""
-    unit = HeatRejection()
+    unit = heat_rejection.HeatRejection()
     unit.update_parameters({"technology": technology, **(parameters or {})})
     unit.calculate_output(inputs)
     return unit.get_output()
@@ -18,7 +18,9 @@ def run(technology="cooling_tower", parameters=None, **inputs):
 @pytest.mark.parametrize("cop, factor", [(0.7, 2.43), (3.0, 1.33)])
 def test_chiller_heat_rejection_factor(cop, factor):
     """RC-07 (Guidebook p.262): Q_reject = Q_cool (1 + 1/COP) = 2.43 / 1.33 × Q_cool."""
-    assert chiller_heat_rejection_w(1.0e6, cop) == pytest.approx(factor * 1.0e6, abs=0.005e6)
+    assert heat_rejection.chiller_heat_rejection_w(1.0e6, cop) == pytest.approx(
+        factor * 1.0e6, abs=0.005e6
+    )
 
 
 def test_cooling_tower_defaults():
@@ -59,6 +61,17 @@ def test_explicit_approach_and_zero_load():
     assert out["water_flow_rate_m3s"] == 0.0
     assert out["power_el"] == 0.0
     assert out["range_k"] == 0.0
+    assert out["validity_warnings"] == []
+
+
+def test_freezing_tower_water_is_flagged():
+    """Tower leaving water at or below 0 °C (fixed approach) returns a freeze warning."""
+    cold = run(heat_load_w=1.0e6, ambient_wet_bulb_degc=-5.0)
+    assert cold["water_temperature_out_degc"] == pytest.approx(-0.5)
+    assert "freeze" in cold["validity_warnings"][0]
+    assert (
+        run("dry_cooler", heat_load_w=1.0e6, ambient_dry_bulb_degc=-5.0)["validity_warnings"] == []
+    )
 
 
 @pytest.mark.parametrize(

@@ -6,12 +6,18 @@ Citations: Geothermal Direct Use Engineering & Design Guidebook (Geo-Heat Center
 p.257–258, 262, 266, 267; RTES data-centre cooling paper. Spec §3.3, §7.2 GM-05.
 
 ## Equations
-- `COP = η · T_evap / (T_cond − T_evap)` (K); η = 0.40 (implied 0.39–0.40) [L]
+- `COP = η · T_evap / (T_cond − T_evap)` (K); η = 0.40 (implied 0.39–0.40) [L].
+  **Known bias (COOL-ELC):** η was implied with the water temperatures as cycle temperatures,
+  but the chain below adds −4 K/+3 K approaches; through the chain the Guidebook point (4.39)
+  needs η ≈ 0.44 (η 0.39 gives 3.90). η 0.40 (card, spec GM-05) therefore understates the COP by
+  ≈ 9–11 % and favours absorption in comparisons; sensitivity case η 0.44. Card-level issue.
 - `T_evap = T_chilled,supply − 4 K` [A] (20 °C supply ⇒ 16 °C)
 - `T_cond = T_cw,leaving + 3 K` with a cooling tower, `T_cw,leaving = T_wb + approach (4–5 K,
   default 4.5) + range (~5 K)` [A]; or `T_cond = T_db + 8 K` with a dry cooler [A]
 - Implementation: if `cooling_water_temperature_in_degc` (water from a `heat_rejection` unit) is
-  given, `T_cond = T_cw,in + range + 3 K` for either option; `evaporator_temperature_degc` /
+  given, `T_cond = T_cw,in + range + 3 K` for either option (with `dry_cooler` a warning says so:
+  a water-loop dry cooler at T_db + 5 K gives T_db + 13 K vs the air-cooled T_db + 8 K, COP 5.26
+  vs 6.80 at 25 °C); `evaporator_temperature_degc` /
   `condenser_temperature_degc` inputs override the derived values.
 - `P_el = Q_cool / COP`; `Q_reject = Q_cool + P_el` (exact)
 - COP capped at 8, floored at 3 [A] (a warning is returned when either binds)
@@ -30,11 +36,12 @@ At 20 °C chilled supply and Dutch summer conditions expect COP ≈ 6–8: the m
 
 **Condenser sensitivity (documented check):** the constant-η model gives
 `d ln COP / dT_cond = −1/(T_cond − T_evap)` = −4.0 %/K at 7.2/32.2 °C, steeper than the Guidebook
-data (≈ −2.6 %/K): conservative in hot weather; output `condenser_sensitivity_per_k`.
+data (≈ −2.6 %/K): the COP falls faster in hot weather; output `condenser_sensitivity_per_k`.
+The spec GM-05 row omits the 5 K range (`T_cond = T_wb + approach + 3 K`); the card is followed.
 
 ## Outputs (W, °C, m³/s)
 `cooling_power_w`, `cooling_load_w`, `unmet_cooling_w`, `load_ratio`, `cop`,
-`cop_carnot_efficiency` (uncapped), `evaporator_temperature_degc`, `condenser_temperature_degc`,
+`cop_uncapped`, `evaporator_temperature_degc`, `condenser_temperature_degc`,
 `condenser_sensitivity_per_k`, `heat_rejected_w`, chilled-water inlet/outlet temperature and flow,
 `validity_warnings`, `power_el`, `power_th` = Q_cool (useful cooling), `emission` 0.
 

@@ -85,6 +85,14 @@ def test_off_and_zero_load():
     assert off["chilled_water_temperature_out_degc"] == 26.0
     idle = run(ambient_wet_bulb_degc=5.0, cooling_load_w=0.0)
     assert idle["free_cooling_w"] == idle["power_el"] == idle["free_cooling_fraction"] == 0.0
+    assert idle["validity_warnings"] == []
+
+
+def test_freezing_tower_water_is_flagged():
+    """At T_wb -5 °C the tower water (T_wb + 4.5 K) is below 0 °C: freeze warning."""
+    out = run(ambient_wet_bulb_degc=-5.0, cooling_load_w=LOAD)
+    assert out["mode"] == "full"
+    assert "freeze" in out["validity_warnings"][0]
 
 
 def test_mode_function():

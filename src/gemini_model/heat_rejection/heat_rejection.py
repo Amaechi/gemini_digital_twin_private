@@ -7,7 +7,10 @@ Ch23 p.11-12; spec §7.2 GM-06.
 
 - Heat to reject from a chiller ``Q_reject = Q_cool (1 + 1/COP)`` (Guidebook p.262):
   2.43 Q_cool at COP 0.7, 1.33 Q_cool at COP 3 (:func:`chiller_heat_rejection_w`). The
-  chiller models already output ``heat_rejected_w``; wire that to ``heat_load_w``.
+  chiller models already output ``heat_rejected_w``; wire that to ``heat_load_w``. For the
+  absorption chiller set its ``aux_power_fraction`` to 0 (or wire
+  ``absorber_condenser_heat_w``): its default 2.2 % aux is the extra tower fan and pump,
+  which this unit already counts (COOL-ABS-AUX).
 - Cooling tower: leaving (cold) water ``T_out = T_wb + approach``, approach 4-5 K
   (default 4.5) [A]; range ≈ 5 K [A]; fan + cooling-water pump ≈ 2 % of heat rejected [A]
   (Guidebook 0.077 kW/ton incremental, p.269).
@@ -21,6 +24,8 @@ With ``water_flow_rate_m3s`` the entering (hot) water temperature follows from t
 balance ``Q = ρ c_p V (T_in - T_out)``; without it the range is fixed and the flow is
 reported. All energy taken in leaves as heat: ``heat_to_ambient_w = heat_load_w +
 power_el``. There is no capacity limit: size the unit at the summer design point (DB-34b).
+A wet tower whose fixed-approach leaving water would be at or below 0 °C is flagged in
+``validity_warnings`` (freeze protection -- fan control, bypass -- is not modelled).
 """
 
 import math
@@ -89,11 +94,9 @@ class HeatRejection(StaticModel):
 
     def initialize_state(self, x):
         """Not applicable: static model."""
-        pass
 
     def update_state(self, u, x):
         """Not applicable: static model."""
-        pass
 
     def calculate_output(self, u, x=None):
         """Calculate leaving-water temperature, flow, fan/pump power and water use.
@@ -129,6 +132,11 @@ class HeatRejection(StaticModel):
             water_range = _positive(p["range_k"], "range_k") if q_load > 0.0 else 0.0
             flow = q_load / (rho_cp * water_range) if q_load > 0.0 else 0.0
 
+        warnings = []
+        if technology == "cooling_tower" and t_out <= 0.0:
+            warnings.append(
+                f"tower leaving water {t_out:.1f} °C <= 0 °C: freeze protection not modelled"
+            )
         power_el = aux_fraction * q_load
         if technology == "cooling_tower":
             evaporation = q_load / _positive(p["latent_heat_j_kg"], "latent_heat_j_kg")
@@ -145,6 +153,7 @@ class HeatRejection(StaticModel):
             "range_k": water_range,
             "approach_k": approach,
             "water_evaporation_kg_s": evaporation,
+            "validity_warnings": warnings,
             "power_el": power_el,
             "power_th": 0.0,
             "emission": 0.0,

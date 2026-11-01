@@ -16,7 +16,8 @@ Source card: `data/knowledge/reference_cards/RC-07_heat_rejection_free_cooling_c
 - Optional `nominal_capacity_w` caps the free cooling; the chilled-water balance then gives the
   economiser outlet `T_return − Q_fc/(ρ c_p V)`.
 - Power = fan + pumps ≈ 2 % of heat moved [A] ⇒ performance factor 50 (seasonal 24–53, papers).
-  `heat_rejected_w = Q_fc + power_el`.
+  `heat_rejected_w = Q_fc + power_el` (if wired to a separate `heat_rejection` unit, set this
+  model's `aux_power_fraction` to 0). Tower water (T_wb + 4.5 K) ≤ 0 °C returns a freeze warning.
 - Ambient wet-bulb is an input; the agent side computes it with Stull (2011) in
   `gemini_agent.tools.climate` (TL-02b): `T_wb = T·atan(0.151977·(RH + 8.313659)^0.5) + atan(T + RH)
   − atan(RH − 1.676331) + 0.00391838·RH^1.5·atan(0.023101·RH) − 4.686035` (RH 5–99 %, T −20…50 °C).
@@ -33,6 +34,7 @@ Monthly means make Apr, May, Jun (marginal), Sep, Oct fully eligible (Jul/Aug pa
 ## Outputs (W, °C, m³/s)
 `mode`, `economiser_temperature_degc`, `cooling_load_w`, `free_cooling_w`, `residual_cooling_w`,
 `free_cooling_fraction`, chilled-water inlet/outlet temperature and flow, `performance_factor`,
+`validity_warnings`,
 `heat_rejected_w`, `power_el`, `power_th` = free cooling (useful cooling), `emission` 0.
 
 ## Validation (unit tests, `unit_test/gemini_model/free_cooling/`)

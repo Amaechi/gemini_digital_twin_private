@@ -19,7 +19,10 @@ approach_HEX`` (defaults 4.5 K [A] and 2 K [A]).
 Power = tower fan + pumps ≈ ``aux_power_fraction`` (2 % [A]) of the heat moved, i.e. an
 instantaneous performance factor of 50 (inside the 24-53 seasonal range).
 ``heat_rejected_w`` = free cooling + power_el (all energy leaves at the tower).
-Ambient wet-bulb is an input (the agent side computes it with Stull, TL-02b).
+Ambient wet-bulb is an input (the agent side computes it with Stull, TL-02b). If the tower
+water (T_wb + approach_tower) would be at or below 0 °C a validity warning is returned
+(freeze protection is not modelled). If ``heat_rejected_w`` is wired to a separate
+``heat_rejection`` unit, set this model's ``aux_power_fraction`` to 0 to count the fan once.
 """
 
 import math
@@ -89,11 +92,9 @@ class FreeCooling(StaticModel):
 
     def initialize_state(self, x):
         """Not applicable: static model."""
-        pass
 
     def update_state(self, u, x):
         """Not applicable: static model."""
-        pass
 
     def calculate_output(self, u, x=None):
         """Calculate free cooling, residual chiller load and fan/pump power.
@@ -135,6 +136,10 @@ class FreeCooling(StaticModel):
             + _non_negative(p["tower_approach_k"], "tower_approach_k")
             + _non_negative(p["hex_approach_k"], "hex_approach_k")
         )
+        warnings = []
+        t_tower = t_wb + _non_negative(p["tower_approach_k"], "tower_approach_k")
+        if t_tower <= 0.0:
+            warnings.append(f"tower water {t_tower:.1f} °C <= 0 °C: freeze protection not modelled")
         mode = free_cooling_mode(t_fc, t_supply, t_return)
         if mode == "full":
             fraction = 1.0
@@ -160,6 +165,7 @@ class FreeCooling(StaticModel):
             "chilled_water_temperature_out_degc": t_chiller_in,
             "chilled_water_flow_rate_m3s": flow,
             "performance_factor": q_fc / power_el if power_el > 0.0 else 0.0,
+            "validity_warnings": warnings,
             "heat_rejected_w": q_fc + power_el,
             "power_el": power_el,
             "power_th": q_fc,

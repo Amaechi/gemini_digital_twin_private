@@ -5,18 +5,25 @@ Source: RC-06 (``data/knowledge/reference_cards/RC-06_electric_chiller.md``, cop
 1989) p.257-258, 262, 266; spec §3.3 and §7.2 GM-05.
 
 - ``COP = η T_evap / (T_cond - T_evap)`` (K), η ≈ 0.40 (implied 0.39-0.40 by the Guidebook
-  COP 4.39 at 45/90 °F and 4.07 at 45/95 °F, p.257-258) [L].
+  COP 4.39 at 45/90 °F and 4.07 at 45/95 °F, p.257-258) [L]. Known bias (COOL-ELC): that η
+  was implied with the *water* temperatures as cycle temperatures, while the chain below
+  adds -4 K / +3 K approaches; through the chain the Guidebook point needs η ≈ 0.44, so
+  η = 0.40 (card and spec GM-05) understates the COP by ≈ 9-11 % -- it overstates electric
+  power and so favours absorption in comparisons. Sensitivity case: η 0.44.
 - ``T_evap = T_chilled,supply - 4 K`` [A] (20 °C supply -> 16 °C).
 - ``T_cond = T_cw,leaving + 3 K`` with a cooling tower, ``T_cw,leaving = T_wb + approach
   (4-5 K, default 4.5) + range (~5 K)`` [A]; or ``T_cond = T_db + 8 K`` with a dry cooler [A].
   If ``cooling_water_temperature_in_degc`` (water from a tower or dry cooler) is given,
-  ``T_cond = T_cw,in + range + 3 K`` (water-cooled condenser) for either option.
+  ``T_cond = T_cw,in + range + 3 K`` (water-cooled condenser) for either option. The
+  ``dry_cooler`` option is RC-06's air-cooled condensing (T_db + 8 K); a water-loop dry
+  cooler (``heat_rejection`` dry cooler, T_db + 5 K) feeding the condenser gives T_db + 13 K
+  (COP 5.26 vs 6.80 at 25 °C) -- a warning says which formula was used.
 - COP capped at 8 and floored at 3 [A]; ``P_el = Q_cool / COP``; ``Q_reject = Q_cool + P_el``.
 
 Condenser sensitivity: the model gives ``d ln COP / dT_cond = -1/(T_cond - T_evap)``
 (output ``condenser_sensitivity_per_k``), -4.0 %/K at the Guidebook point (7.2/32.2 °C),
 steeper than the Guidebook data (≈ -2.6 %/K of condenser-water temperature, p.257-258):
-the model is conservative in hot weather (documented check in the unit tests).
+the model's COP falls faster in hot weather (documented check in the unit tests).
 
 Capacity is the nominal capacity (no temperature derating); unmet load is reported.
 At 20 °C chilled supply and Dutch summer conditions the model gives COP ≈ 6-8 (RC-06).
@@ -100,11 +107,9 @@ class ElectricChiller(StaticModel):
 
     def initialize_state(self, x):
         """Not applicable: static model."""
-        pass
 
     def update_state(self, u, x):
         """Not applicable: static model."""
-        pass
 
     def _rho_cp(self):
         """Return ρ c_p (J/(m³ K)) of the chilled water."""
@@ -113,8 +118,12 @@ class ElectricChiller(StaticModel):
             _positive(p["chilled_water_specific_heat_j_kgk"], "chilled_water_specific_heat_j_kgk")
         )
 
-    def condenser_temperature_degc(self, u):
-        """Return the condensing temperature (°C) from the inputs (RC-06)."""
+    def condenser_temperature_degc(self, u, warnings=None):
+        """Return the condensing temperature (°C) from the inputs (RC-06).
+
+        Appends a note to ``warnings`` (a list) when a dry cooler is configured but the
+        water-cooled formula is used because condenser water is given.
+        """
         p = self.parameters
         if u.get("condenser_temperature_degc") is not None:
             return _finite(u["condenser_temperature_degc"], "condenser_temperature_degc")
@@ -124,6 +133,11 @@ class ElectricChiller(StaticModel):
             t_cw_in = _finite(
                 u["cooling_water_temperature_in_degc"], "cooling_water_temperature_in_degc"
             )
+            if p["heat_rejection"] == "dry_cooler" and warnings is not None:
+                warnings.append(
+                    "dry_cooler with condenser water given: water-cooled formula "
+                    "T_cw,in + range + 3 K used, not the RC-06 air-cooled T_db + 8 K"
+                )
             return t_cw_in + cw_range + approach
         option = p["heat_rejection"]
         if option == "cooling_tower":
@@ -183,9 +197,8 @@ class ElectricChiller(StaticModel):
             t_evap = _finite(u["evaporator_temperature_degc"], "evaporator_temperature_degc")
         else:
             t_evap = t_set - _non_negative(p["evaporator_approach_k"], "evaporator_approach_k")
-        t_cond = self.condenser_temperature_degc(u)
-
         warnings = []
+        t_cond = self.condenser_temperature_degc(u, warnings)
         cop_carnot = carnot_cop(t_evap, t_cond, eta)
         cop = min(max(cop_carnot, cop_min), cop_max)
         if cop_carnot > cop_max:
@@ -210,7 +223,7 @@ class ElectricChiller(StaticModel):
             "unmet_cooling_w": max(load - q_cool, 0.0),
             "load_ratio": q_cool / q_nom,
             "cop": cop,
-            "cop_carnot_efficiency": cop_carnot,
+            "cop_uncapped": cop_carnot,
             "evaporator_temperature_degc": t_evap,
             "condenser_temperature_degc": t_cond,
             "condenser_sensitivity_per_k": sensitivity,

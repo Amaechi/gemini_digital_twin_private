@@ -361,6 +361,44 @@ assumptions:
     status: default
     added_by: WP-02
 
+  - id: COOL-ABS-PL
+    title: Absorption-chiller part-load behaviour
+    value:
+      characteristic: "ΔΔt reduced to ΔΔt_min + Q_E/s_E; Q_G = s_G (ΔΔt − ΔΔt_min,G)"
+      ghc1989: "COP(T_hw) unchanged; Q_G = Q_E / COP"
+    unit: null
+    justification: >-
+      RC-05 gives no part-load rule. Method B: part load is a reduction of the characteristic temperature
+      difference (drive-temperature control, Ziegler/Hellmann), so the drive heat keeps an offset s_G (ΔΔt_min −
+      ΔΔt_min,G) ≈ 0.067 Q_nom and the COP falls at low load (≈ 0.47 at 10 % and 0.21 at 2 % load at 85 °C
+      drive); it drops to 0 only when the machine stops (Q_E = 0). Method A has no part-load information, so
+      its COP is kept. Dispatch (WP-07) should avoid very low absorption loads.
+    source: RC-05 Method B form [A interpretation]; Method A [A]
+    sensitivity: "Constant COP at part load (Method A rule) as an optimistic bound."
+    tag: A
+    status: default
+    added_by: WP-02
+
+  - id: COOL-ABS-DRV
+    title: Absorption-chiller drive-side consistency with a given drive flow
+    value:
+      characteristic_min_drive_capacity_rate: "C_G >= s_G / 2 (minimum_drive_flow_rate_m3s), else machine off"
+      ghc1989_drive_outlet_floor_degc: 71.4
+    unit: null
+    justification: >-
+      With arithmetic-mean circuit temperatures, the drive outlet stays above the machine's minimum generator
+      temperature t_G,min = ΔΔt_min,G + (1+B) t̄_AC − B t̄_E exactly when the drive capacity rate C_G = ρ c_p V
+      ≥ s_G/2 (independent of the operating point; ≈ 13.9 m³/h of water per MW of nominal capacity). Below that
+      the characteristic equation over-credits capacity with an outlet that violates the model (and can fall
+      below the cooling water), so the machine is treated as off and a warning is returned. Method A has no
+      flow term: the drive heat is limited so the outlet stays at or above its zero-capacity temperature
+      (160.5 °F = 71.4 °C), and Q_E = Q_G · COP. Without a given flow the fixed 7.2 K generator ΔT is used.
+    source: derived from RC-05 Method B / Method A [A interpretation]; WP-02 reviews
+    sensitivity: null
+    tag: A
+    status: default
+    added_by: WP-02
+
   - id: COOL-ELC
     title: Electric-chiller COP model defaults
     value:
@@ -376,10 +414,15 @@ assumptions:
     justification: >-
       COP = η T_evap/(T_cond − T_evap); η 0.39–0.40 implied by the Guidebook (COP 4.39 at 45/90 °F, 4.07 at
       45/95 °F) [L]; T_evap = supply − 4 K, T_cond = tower leaving water (T_wb + 4–5 K approach + 5 K range)
-      + 3 K, or T_db + 8 K with a dry cooler; COP capped at 8 and floored at 3 [A]. The constant-η model is
-      steeper (−4.0 %/K at 7.2/32.2 °C) than the Guidebook data (≈ −2.6 %/K): conservative in hot weather.
+      + 3 K, or T_db + 8 K with an air-cooled (dry) condenser; COP capped at 8 and floored at 3 [A]. Known
+      bias: the card's η was implied with the water temperatures as cycle temperatures; through the −4 K/+3 K
+      chain the Guidebook point (COP 4.39) needs η ≈ 0.44, so η 0.40 understates the COP by ≈ 9–11 %
+      (overstates electric power, favouring absorption in comparisons). The constant-η model is also steeper
+      (−4.0 %/K at 7.2/32.2 °C) than the Guidebook data (≈ −2.6 %/K). A water-loop dry cooler (heat_rejection,
+      T_db + 5 K) feeding the condenser gives T_db + 13 K instead of T_db + 8 K (COP 5.26 vs 6.80 at 25 °C).
+      The spec GM-05 row omits the 5 K range; the card (with range) is followed.
     source: RC-06 [L Guidebook p.257–258] and [A]; spec GM-05
-    sensitivity: "η 0.39; tower approach 4–5 K."
+    sensitivity: "η 0.44 (consistent with the approach chain) and 0.39; tower approach 4–5 K; dry cooler T_db + 13 K (water loop)."
     tag: A
     status: default
     added_by: WP-02

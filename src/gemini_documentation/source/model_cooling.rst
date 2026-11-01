@@ -63,7 +63,11 @@ Energy balance: :math:`Q_{reject} = Q_E + Q_G + P_{aux}` with :math:`P_{aux}` = 
 (≈ 2.2 % of :math:`Q_E`, extra tower fan and pump). Each external circuit (drive, cooling water,
 chilled water) has its own density and heat capacity; with a given flow its outlet temperature
 follows from :math:`\rho c_p V \Delta T = Q`, otherwise a fixed ΔT is used (generator 7.2 K,
-cooling-water range 5 K) and the required flow is reported.
+cooling-water range 5 K) and the required flow is reported. With a given drive flow, Method B
+needs :math:`\rho c_p V_G \ge s_G/2` (output ``minimum_drive_flow_rate_m3s``; otherwise the drive
+outlet would fall below the minimum generator temperature and the machine is treated as off), and
+Method A keeps the drive outlet at or above its 71.4 °C zero-capacity temperature. At part load
+Method B lowers :math:`\Delta\Delta t`, so the COP falls at low load.
 
 .. list-table::
    :header-rows: 1
@@ -100,7 +104,9 @@ Electric chiller
 with :math:`\eta = 0.40`, :math:`T_{evap} = T_{supply} - 4` K, :math:`T_{cond} = T_{wb} + 4.5 + 5 + 3`
 (cooling tower) or :math:`T_{db} + 8` (dry cooler), COP between 3 and 8. Inputs: ``cooling_load_w``
 or ``chilled_water_flow_rate_m3s``; ``ambient_wet_bulb_degc`` or ``ambient_dry_bulb_degc``; optional
-``cooling_water_temperature_in_degc`` (then :math:`T_{cond} = T_{cw,in} + 5 + 3`).
+``cooling_water_temperature_in_degc`` (then :math:`T_{cond} = T_{cw,in} + 5 + 3`). Note: the card's
+η was implied with water temperatures as cycle temperatures; with the approach chain the Guidebook
+point needs η ≈ 0.44, so η = 0.40 understates the COP by ≈ 9–11 % (sensitivity case).
 
 Heat rejection
 ---------------------------

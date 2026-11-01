@@ -21,6 +21,13 @@ Two methods (parameter ``method``):
   extrapolated from the 6.7 °C calibration and are uncertain (RC-05 screening [D]: 85 °C
   drive at 20 °C chilled ≈ capacity fraction 0.6-0.7, COP 0.63-0.70).
 
+Drive-side consistency (COOL-ABS-DRV): with a given drive flow, Method B needs a drive
+capacity rate of at least s_G/2 (output ``minimum_drive_flow_rate_m3s``), otherwise the drive
+outlet would fall below the machine's minimum generator temperature and the machine is treated
+as off; Method A limits the drive heat so that the outlet stays at or above its zero-capacity
+temperature (71.4 °C). Part load (COOL-ABS-PL): Method B's COP falls at low load (≈ 0.47 at
+10 % load at 85 °C drive) and the drive heat drops to 0 only when the machine stops.
+
 External circuits: each circuit either has a given flow (its outlet temperature follows
 from the energy balance and, for Method B, its mean temperature is solved together with
 the duty -- the equations are linear, so the solution is closed-form) or no flow (fixed
@@ -129,11 +136,9 @@ class AbsorptionChiller(StaticModel):
 
     def initialize_state(self, x):
         """Not applicable: static model."""
-        pass
 
     def update_state(self, u, x):
         """Not applicable: static model."""
-        pass
 
     def characteristic_coefficients(self):
         """Return the Method B coefficients in use (datasheet values or the Method A fit)."""
@@ -218,10 +223,15 @@ class AbsorptionChiller(StaticModel):
         c_ac = self._capacity_rate(u, "cooling_water_flow_rate_m3s", "cooling_water")
 
         warnings = []
-        details = {"capacity_factor_ft": None, "capacity_factor_fc": None, "delta_delta_t_k": None}
+        details = {
+            "capacity_factor_ft": None,
+            "capacity_factor_fc": None,
+            "delta_delta_t_k": None,
+            "minimum_drive_flow_rate_m3s": None,
+        }
         if method == "ghc1989":
             q_avail, q_e, q_g = self._method_a(
-                t_g_in, t_e_set, t_ac_in, q_nom, q_cap, load, details, warnings
+                t_g_in, t_e_set, t_ac_in, c_g, q_nom, q_cap, load, details, warnings
             )
         else:
             q_avail, q_e, q_g = self._method_b(
@@ -245,11 +255,6 @@ class AbsorptionChiller(StaticModel):
         else:
             t_e_out = t_e_in - q_e / c_e if c_e > 0.0 else t_e_in
             v_e = float(u["chilled_water_flow_rate_m3s"])
-        if q_g > 0.0 and t_g_out < t_ac_in:
-            warnings.append(
-                f"drive outlet {t_g_out:.1f} °C is below the cooling-water inlet "
-                f"{t_ac_in:.1f} °C: drive flow too small for this duty"
-            )
 
         self.output = {
             "method": method,
@@ -267,6 +272,7 @@ class AbsorptionChiller(StaticModel):
             "drive_temperature_in_degc": t_g_in,
             "drive_temperature_out_degc": t_g_out,
             "drive_flow_rate_m3s": v_g,
+            "drive_delta_t_k": t_g_in - t_g_out,
             "cooling_water_temperature_in_degc": t_ac_in,
             "cooling_water_temperature_out_degc": t_ac_out,
             "cooling_water_flow_rate_m3s": v_ac,
@@ -290,8 +296,14 @@ class AbsorptionChiller(StaticModel):
             return t_in, 0.0
         return t_in + sign * fixed_delta_t, heat_w / (self._rho_cp(prefix) * fixed_delta_t)
 
-    def _method_a(self, t_g_in, t_e_set, t_ac_in, q_nom, q_cap, load, details, warnings):
-        """Apply Method A (Guidebook 1989) and return (Q_available, Q_E, Q_G) in W."""
+    def _method_a(self, t_g_in, t_e_set, t_ac_in, c_g, q_nom, q_cap, load, details, warnings):
+        """Apply Method A (Guidebook 1989) and return (Q_available, Q_E, Q_G) in W.
+
+        Method A has no drive-flow term (it assumes the rating generator ΔT). With a given
+        drive flow (capacity rate ``c_g``, W/K) the drive heat is limited so that the drive
+        outlet does not fall below the zero-capacity temperature (71.4 °C): hot water colder
+        than that cannot drive the machine (COOL-ABS-DRV).
+        """
         t_hw = ghc1989.degc_to_degf(t_g_in)
         t_chw = ghc1989.degc_to_degf(t_e_set)
         t_cw = ghc1989.degc_to_degf(t_ac_in)
@@ -316,10 +328,17 @@ class AbsorptionChiller(StaticModel):
             )
             if clamp and t_cw < cw_lo:
                 t_cw = cw_lo
-        if t_hw > ghc1989.RATING_HOT_WATER_RANGE_DEGF[1] + _TOLERANCE:
+        hw_lo, hw_hi = ghc1989.RATING_HOT_WATER_RANGE_DEGF
+        t_zero_degf = ghc1989.zero_capacity_temperature_degf()
+        if t_hw > hw_hi + _TOLERANCE:
             warnings.append(
                 f"ghc1989: hot water {t_hw:.1f} °F above the rating range "
-                f"(<= {ghc1989.RATING_HOT_WATER_RANGE_DEGF[1]:.0f} °F)"
+                f"{hw_lo:.0f}-{hw_hi:.0f} °F (extrapolated)"
+            )
+        elif t_zero_degf < t_hw < hw_lo - _TOLERANCE:
+            warnings.append(
+                f"ghc1989: hot water {t_hw:.1f} °F below the rating range "
+                f"{hw_lo:.0f}-{hw_hi:.0f} °F (extrapolated towards zero capacity)"
             )
         f_t = ghc1989.hot_water_factor(t_hw)
         f_c = ghc1989.condition_factor(t_chw, t_cw)
@@ -331,8 +350,18 @@ class AbsorptionChiller(StaticModel):
                 f"{ghc1989.degf_to_degc(ghc1989.zero_capacity_temperature_degf()):.1f} °C"
             )
         q_avail = min(max(f_t, 0.0) * max(f_c, 0.0) * q_nom, q_cap)
+        cop = ghc1989.cop(t_hw)
+        if c_g is not None:
+            t_zero = ghc1989.degf_to_degc(t_zero_degf)
+            q_flow_limit = c_g * max(t_g_in - t_zero, 0.0) * cop
+            if q_flow_limit < q_avail:
+                warnings.append(
+                    f"ghc1989: capacity limited by the drive flow (outlet kept at the "
+                    f"zero-capacity temperature {t_zero:.1f} °C)"
+                )
+                q_avail = q_flow_limit
         q_e = min(load, q_avail)
-        q_g = q_e / ghc1989.cop(t_hw) if q_e > 0.0 else 0.0
+        q_g = q_e / cop if q_e > 0.0 else 0.0
         return q_avail, q_e, q_g
 
     def _method_b(self, temperatures, capacity_rates, fixed_deltas, duties, details, warnings):
@@ -358,11 +387,24 @@ class AbsorptionChiller(StaticModel):
         m_e = coefficients["ddt_min_k"]
         m_g = coefficients["ddt_min_g_k"]
 
+        # Drive outlet >= minimum generator temperature t_G,min = ΔΔt_min,G + (1+B) t̄_AC - B t̄_E
+        # <=> (t̄_G - t_G,out) <= ΔΔt - ΔΔt_min,G <=> Q_G/(2 C_G) <= Q_G/s_G <=> C_G >= s_G/2,
+        # independent of the operating point (COOL-ABS-DRV).
+        details["minimum_drive_flow_rate_m3s"] = 0.5 * s_g / self._rho_cp("drive")
+        infeasible_drive = c_g is not None and 0.0 < c_g < 0.5 * s_g
+        if infeasible_drive:
+            warnings.append(
+                f"characteristic: drive flow {c_g / self._rho_cp('drive'):.4g} m³/s below the "
+                f"minimum {details['minimum_drive_flow_rate_m3s']:.4g} m³/s (s_G/(2 ρ c_p)): the "
+                "drive outlet would fall below the minimum generator temperature; machine off"
+            )
         g, offset_g = (0.5 / c_g, 0.0) if c_g else (0.0, dt_generator / 2.0)
         a, offset_ac = (0.5 / c_ac, 0.0) if c_ac else (0.0, cw_range / 2.0)
         e, offset_e = (0.5 / c_e, 0.0) if c_e else (0.0, max(t_e_in - t_e_set, 0.0) / 2.0)
         if (c_g is not None and c_g <= 0.0) or (c_ac is not None and c_ac <= 0.0):
             q_avail, ddt = 0.0, None  # no drive or no cooling-water flow: machine off
+        elif infeasible_drive:
+            q_avail, ddt = 0.0, None
         else:
             x0 = (t_g_in - offset_g) - (1.0 + b) * (t_ac_in + offset_ac) + b * (t_e_in - offset_e)
             k_g = (g + (1.0 + b) * a) * s_g

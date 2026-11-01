@@ -33,8 +33,12 @@ def test_guidebook_cop_439_with_eta_039():
     assert out["cop"] == pytest.approx(4.39, rel=0.02)
 
 
-def test_guidebook_point_through_the_tower_temperature_chain():
-    """T_evap = supply - 4 K and T_cond = T_wb + 4.5 + 5 + 3 K give the same 7.2/32.2 point."""
+def test_temperature_chain_reaches_the_7_2_32_2_refrigerant_point():
+    """T_evap = supply - 4 K and T_cond = T_wb + 4.5 + 5 + 3 K reach 7.2/32.2 °C.
+
+    This checks the temperature chain only: here 32.2 °C is the condensing temperature,
+    whereas the Guidebook's 90 °F is condenser leaving water (see the η-bias test).
+    """
     out = run(
         make_chiller(carnot_efficiency=0.39),
         cooling_load_w=1.0e6,
@@ -84,13 +88,13 @@ def test_cop_cap_and_floor():
     """COP is capped at 8 on cold days and floored at 3 in extreme heat [A]."""
     cold = run(make_chiller(), cooling_load_w=1e6, ambient_wet_bulb_degc=2.0)
     assert cold["cop"] == 8.0
-    assert cold["cop_carnot_efficiency"] > 8.0
+    assert cold["cop_uncapped"] > 8.0
     assert cold["condenser_sensitivity_per_k"] == 0.0
     assert "capped" in cold["validity_warnings"][0]
     hot = run(
         make_chiller(heat_rejection="dry_cooler"), cooling_load_w=1e6, ambient_dry_bulb_degc=50
     )
-    assert hot["cop_carnot_efficiency"] < 3.0
+    assert hot["cop_uncapped"] < 3.0
     assert hot["cop"] == 3.0
     assert "floored" in hot["validity_warnings"][0]
     reversed_lift = run(
@@ -121,6 +125,42 @@ def test_chilled_flow_input_closes_the_water_balance():
     assert out["cooling_power_w"] == 0.5e6
     delivered = rho_cp * 0.04 * (26.0 - out["chilled_water_temperature_out_degc"])
     assert delivered == pytest.approx(0.5e6, rel=1e-12)
+
+
+def test_eta_bias_through_the_card_chain_is_documented():
+    """Documented bias (COOL-ELC): with T_cond = 32.2 °C leaving water + 3 K, η 0.39 gives 3.90.
+
+    The η consistent with the -4/+3 K chain at the Guidebook point is 4.39 × 28 / 280.35 ≈ 0.44.
+    """
+    out = run(
+        make_chiller(carnot_efficiency=0.39),
+        cooling_load_w=1.0e6,
+        evaporator_temperature_degc=7.2,
+        cooling_water_temperature_in_degc=32.2 - 5.0,
+    )
+    assert out["condenser_temperature_degc"] == pytest.approx(35.2)
+    assert out["cop"] == pytest.approx(3.90, abs=0.01)
+    assert 4.39 * 28.0 / (7.2 + 273.15) == pytest.approx(0.44, abs=0.005)
+
+
+def test_dry_cooler_with_condenser_water_warns_about_the_formula():
+    """dry_cooler + condenser water from a water-loop dry cooler: T_db + 13 K, with a warning."""
+    direct = run(
+        make_chiller(heat_rejection="dry_cooler"), cooling_load_w=1e6, ambient_dry_bulb_degc=25
+    )
+    looped = run(
+        make_chiller(heat_rejection="dry_cooler"),
+        cooling_load_w=1e6,
+        cooling_water_temperature_in_degc=25.0 + 5.0,
+    )
+    assert direct["condenser_temperature_degc"] == pytest.approx(33.0)
+    assert looped["condenser_temperature_degc"] == pytest.approx(38.0)
+    assert (direct["cop"], looped["cop"]) == (
+        pytest.approx(6.80, abs=0.01),
+        pytest.approx(5.26, abs=0.01),
+    )
+    assert direct["validity_warnings"] == []
+    assert "water-cooled formula" in looped["validity_warnings"][0]
 
 
 def test_cooling_water_input_overrides_the_ambient_estimate():

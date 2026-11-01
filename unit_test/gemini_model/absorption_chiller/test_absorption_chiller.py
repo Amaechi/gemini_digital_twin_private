@@ -76,7 +76,8 @@ def test_twenty_degree_chilled_water_is_worth_about_fifteen_k_of_drive():
         chilled_water_temperature_in_degc=RATING_CHILLED_DEGC + 20.0,
         cooling_load_w=10 * Q_NOM,
     )
-    hot = run(make_chiller(), **{**rating_inputs(0.0), "drive_temperature_in_degc": 85 + 14 * b})
+    hot_drive_degf = ghc1989.degc_to_degf(85.0 + 14.0 * b)
+    hot = run(make_chiller(), **rating_inputs(hot_drive_degf))
     assert warm["capacity_fraction"] == pytest.approx(hot["capacity_fraction"], rel=1e-12)
     assert 15.0 <= 14 * b <= 17.0
 
@@ -306,8 +307,8 @@ def test_brine_drive_needs_less_flow_than_water_for_the_same_heat():
     assert brine["drive_flow_rate_m3s"] == pytest.approx(water["drive_flow_rate_m3s"] * ratio)
 
 
-def test_small_drive_flow_is_flagged():
-    """Method A with a tiny drive flow: outlet below the cooling-water inlet is flagged."""
+def test_method_a_drive_heat_is_limited_by_a_small_drive_flow():
+    """Method A: the drive outlet never falls below the zero-capacity temperature (71.4 °C)."""
     out = run(
         make_chiller(method="ghc1989"),
         drive_temperature_in_degc=95.0,
@@ -315,7 +316,81 @@ def test_small_drive_flow_is_flagged():
         cooling_water_temperature_in_degc=27.0,
         cooling_load_w=Q_NOM,
     )
-    assert any("drive flow too small" in w for w in out["validity_warnings"])
+    t_zero = ghc1989.degf_to_degc(ghc1989.zero_capacity_temperature_degf())
+    assert out["drive_temperature_out_degc"] == pytest.approx(t_zero, rel=1e-12)
+    rho_cp = 1000.0 * 4217.4
+    assert out["drive_heat_w"] == pytest.approx(rho_cp * 0.001 * (95.0 - t_zero), rel=1e-12)
+    assert out["cooling_power_w"] == pytest.approx(out["drive_heat_w"] * out["cop"], rel=1e-12)
+    assert out["cop"] == pytest.approx(ghc1989.cop(ghc1989.degc_to_degf(95.0)), rel=1e-12)
+    assert any("limited by the drive flow" in w for w in out["validity_warnings"])
+
+
+def drive_case(flow_m3h):
+    """Run the physics-check case: 5 MW machine, 85 °C drive, 29.4 °C cooling water flow."""
+    chiller = AbsorptionChiller()
+    chiller.update_parameters({"nominal_capacity_w": 5.0e6})
+    out = run(
+        chiller,
+        drive_temperature_in_degc=85.0,
+        drive_flow_rate_m3s=flow_m3h / 3600.0,
+        cooling_water_temperature_in_degc=RATING_COOLING_DEGC,
+        cooling_water_flow_rate_m3s=0.30,
+        cooling_load_w=5.0e6,
+    )
+    return chiller, out
+
+
+def test_method_b_drive_flow_below_the_minimum_is_infeasible():
+    """C_G < s_G/2: the outlet would be below the minimum generator temperature -> off.
+
+    Physics-check case: 50 m³/h on a 5 MW machine gave 1.51 MW cooling with a 43 K drive
+    drop to 41.6 °C, below t_G,min ≈ 47.7 °C. Minimum = s_G Q_nom / (2 ρ c_p) ≈ 69 m³/h.
+    """
+    chiller, out = drive_case(50.0)
+    s_g = chiller.characteristic_coefficients()["s_g_per_k"] * 5.0e6
+    minimum = 0.5 * s_g / (1000.0 * 4217.4)
+    assert out["minimum_drive_flow_rate_m3s"] == pytest.approx(minimum, rel=1e-12)
+    assert minimum * 3600.0 == pytest.approx(69.3, abs=0.1)
+    assert out["cooling_power_w"] == out["drive_heat_w"] == out["available_cooling_w"] == 0.0
+    assert out["drive_temperature_out_degc"] == 85.0
+    assert any("below the minimum" in w for w in out["validity_warnings"])
+
+
+@pytest.mark.parametrize("flow_m3h", [70.0, 100.0, 400.0])
+def test_method_b_drive_outlet_stays_above_the_minimum_generator_temperature(flow_m3h):
+    """C_G >= s_G/2: drive outlet >= t_G,min = ΔΔt_min,G + (1+B) t̄_AC - B t̄_E."""
+    chiller, out = drive_case(flow_m3h)
+    c = chiller.characteristic_coefficients()
+    t_ac = 0.5 * (
+        out["cooling_water_temperature_in_degc"] + out["cooling_water_temperature_out_degc"]
+    )
+    t_e = 0.5 * (
+        out["chilled_water_temperature_in_degc"] + out["chilled_water_temperature_out_degc"]
+    )
+    t_g_min = c["ddt_min_g_k"] + 2.15 * t_ac - 1.15 * t_e
+    assert out["cooling_power_w"] > 0.0
+    assert out["drive_temperature_out_degc"] >= t_g_min
+    assert out["drive_delta_t_k"] == pytest.approx(
+        out["drive_heat_w"] / (1000.0 * 4217.4 * flow_m3h / 3600.0), rel=1e-12
+    )
+
+
+def test_method_a_warns_below_the_rating_hot_water_range():
+    """Method A between the zero-capacity temperature and 180 °F is flagged as extrapolated."""
+    out = run(
+        make_chiller(method="ghc1989"),
+        drive_temperature_in_degc=78.0,
+        cooling_water_temperature_in_degc=RATING_COOLING_DEGC,
+        chilled_water_temperature_out_degc=RATING_CHILLED_DEGC,
+        chilled_water_temperature_in_degc=RATING_CHILLED_DEGC + 6.0,
+        cooling_load_w=Q_NOM,
+    )
+    assert out["cooling_power_w"] > 0.0
+    expected = (
+        "ghc1989: hot water 172.4 °F below the rating range 180-240 °F "
+        "(extrapolated towards zero capacity)"
+    )
+    assert out["validity_warnings"] == [expected]
 
 
 def test_zero_load_downstream_of_full_free_cooling_is_allowed():

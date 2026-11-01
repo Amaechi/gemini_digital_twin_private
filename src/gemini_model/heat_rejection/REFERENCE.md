@@ -20,12 +20,16 @@ Plants* 3e, Ch23 p.11–12 (Miravalles comparison). Spec §7.2 GM-06.
   without it the range is fixed (5 K) and the flow is reported.
 - `heat_to_ambient_w = heat_load_w + power_el` (all energy leaves as heat). No capacity limit:
   size the unit at the summer design point (DB-34b: 25.0 °C DB / 18.4 °C WB; warm case 30/21 °C).
+- Wiring: for an absorption chiller set its `aux_power_fraction` to 0 (or wire
+  `absorber_condenser_heat_w`), else the tower fan/pump is counted twice (COOL-ABS-AUX).
+- A wet tower whose fixed-approach leaving water is ≤ 0 °C returns a freeze warning
+  (freeze protection not modelled).
 - Assumption entry COOL-HR.
 
 ## Outputs (W, °C, m³/s, kg/s)
 `heat_rejected_w`, `heat_to_ambient_w`, `water_temperature_out_degc` (cold, to the chiller),
 `water_temperature_in_degc` (hot, from the chiller), `water_flow_rate_m3s`, `range_k`,
-`approach_k`, `water_evaporation_kg_s`, `power_el` (fan + pump), `power_th` 0 (no useful heat),
+`approach_k`, `water_evaporation_kg_s`, `validity_warnings`, `power_el` (fan + pump), `power_th` 0 (no useful heat),
 `emission` 0.
 
 ## Validation (unit tests, `unit_test/gemini_model/heat_rejection/`)
