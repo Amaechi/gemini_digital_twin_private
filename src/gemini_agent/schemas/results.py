@@ -53,9 +53,19 @@ class DayResult(StrictModel):
     cooling_supply_degc: float | None = None
     cooling_return_degc: float | None = None
     # Energy balances (keys are equipment/source names, unit in the field name)
-    heat_by_source_mw: dict[str, float] = Field(default_factory=dict)
+    heat_by_source_mw: dict[str, float] = Field(
+        default_factory=dict,
+        description="Heat delivered to the district-heating network only (not absorption drive).",
+    )
     cool_by_source_mw: dict[str, float] = Field(default_factory=dict)
     electricity_by_consumer_mw: dict[str, float] = Field(default_factory=dict)
+    brine_heat_drawn_mw: dict[str, float] = Field(
+        default_factory=dict,
+        description=(
+            "Heat taken from the geothermal brine per user (direct HEX, heat-pump evaporator, "
+            "absorption drive); the DesignVerifier balances it against rho*Q*c_p*dT (WP-09)."
+        ),
+    )
     electricity_generated_mw: float = Field(default=0.0, ge=0, description="e.g. CHP output.")
     gas_fuel_by_consumer_mw: dict[str, float] = Field(
         default_factory=dict, description="Fuel input (LHV) per burner: boiler, CHP, …"
