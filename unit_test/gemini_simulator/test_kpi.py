@@ -2,10 +2,12 @@
 
 import copy
 import json
+import warnings
 from pathlib import Path
 
 import pytest
 
+from gemini_model.fluid.pvt_config import heat_exchanger_fluid_parameters
 from gemini_simulator import kpi
 from gemini_simulator.project_loader import build_project
 
@@ -33,12 +35,16 @@ class _FakeSolver:
         return snapshot if key is None else snapshot[key]
 
 
-def _plant_solver(pvt=None):
+def _plant_solver(pvt=None, hex_gets_pvt=False):
     with open(PROJECT_PATH, "r", encoding="utf-8") as file:
         project = json.load(file)
     if pvt is not None:
         project = copy.deepcopy(project)
         project["components"]["producer_well"]["parameters"]["pvt"] = pvt
+        if hex_gets_pvt:
+            project["components"]["heat_exchanger"]["parameters"].update(
+                heat_exchanger_fluid_parameters(pvt)
+            )
     solver = build_project(project)
     solver.run()
     return solver
@@ -71,18 +77,46 @@ def test_defaults_reproduce_the_legacy_formulas():
 
 def test_primary_fluid_properties_come_from_the_producer_pvt():
     """GM-01: the producer well's 'pvt' block is the single source of rho and c_p."""
-    solver = _plant_solver(BRINE_PVT)
+    solver = _plant_solver(BRINE_PVT, hex_gets_pvt=True)
     assert kpi.fluid_properties(solver) == (1030.0, 4100.0)
+    assert kpi.fluid_consistency_issues(solver) == []
     flow_m3s = solver.get_output("producer_well", "flow_rate_m3s")
     t_in = solver.get_output("filter_a", "temperature_out")
     t_out = solver.get_output("heat_exchanger", "primary_temperature_out")
-    assert kpi.doublet_thermal_power_w(solver, flow_m3s) == pytest.approx(
-        flow_m3s * 1030.0 * 4100.0 * (t_in - t_out)
-    )
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")  # consistent PVT -> no warning
+        power_w = kpi.doublet_thermal_power_w(solver, flow_m3s)
+    assert power_w == pytest.approx(flow_m3s * 1030.0 * 4100.0 * (t_in - t_out))
+    # Energy balance closes: the KPI equals the duty the heat exchanger computed.
+    assert power_w == pytest.approx(solver.get_output("heat_exchanger", "heat_duty"), rel=1e-9)
     # Explicit values still win.
     assert kpi.doublet_thermal_power_w(
         solver, flow_m3s, fluid_density=1000.0, specific_heat=4000.0
     ) == pytest.approx(flow_m3s * 1000.0 * 4000.0 * (t_in - t_out))
+
+
+def test_mismatched_heat_exchanger_fluid_is_flagged():
+    """Brine PVT on the well but default HEX rho/c_p -> reported, and the KPI warns."""
+    solver = _plant_solver(BRINE_PVT)  # HEX keeps its 1050 kg/m3, 4200 J/kg.K defaults
+    issues = kpi.fluid_consistency_issues(solver)
+    assert len(issues) == 1 and "heat_exchanger" in issues[0]
+    flow_m3s = solver.get_output("producer_well", "flow_rate_m3s")
+    with pytest.warns(UserWarning, match="energy balance will not close"):
+        power_w = kpi.doublet_thermal_power_w(solver, flow_m3s)
+    hex_duty_w = solver.get_output("heat_exchanger", "heat_duty")
+    assert power_w / hex_duty_w == pytest.approx(1030.0 * 4100.0 / (1050.0 * 4200.0), rel=1e-9)
+    # Several components and a missing name are reported too.
+    issues = kpi.fluid_consistency_issues(solver, components=("heat_exchanger", "boiler", "nope"))
+    assert len(issues) == 3
+
+
+def test_no_consistency_issues_for_legacy_projects():
+    """Without a 'pvt' block nothing is compared, so the defaults never warn."""
+    solver = _plant_solver()
+    assert kpi.fluid_consistency_issues(solver) == []
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        kpi.doublet_thermal_power_w(solver, solver.get_output("producer_well", "flow_rate_m3s"))
 
 
 def test_fluid_properties_fall_back_to_legacy_defaults():

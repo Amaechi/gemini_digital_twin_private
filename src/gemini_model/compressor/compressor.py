@@ -50,8 +50,15 @@ class Compressor(StaticModel):
         the flow or pressures, it only reports the power required to
         achieve them) so a downstream component can chain off them.
         ``power_el`` (W) equals ``compressor_power`` (electric drive assumed;
-        the efficiencies are already applied); ``power_th`` and
-        ``emission`` are 0.
+        the efficiencies are already applied, so ``mechanical_efficiency``
+        must include motor/VFD losses for a wire-to-gas figure);
+        ``power_th`` and ``emission`` are 0.
+
+        Known limitation (GEMINI formula, unchanged): the per-stage work is
+        ``m R T1/(k-1) (r^((k-1)/k) - 1)``, without the factor ``k`` of the
+        steady-flow isentropic work ``m k/(k-1) R T1 (r^((k-1)/k) - 1)``, so
+        the power is low by a factor ``k`` (about 1.3). Flagged for follow-up
+        in docs/hackathon/PROGRESS.md.
         """
         mass_flow = u["mass_flow"]  # kg/s
         pressure_in = u["pressure_in"]  # bar

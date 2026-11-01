@@ -26,7 +26,12 @@ producer well (or the component named by ``pvt_component``) has a
 ``"pvt"`` parameter block, :func:`doublet_thermal_power_w` uses that
 block's liquid density and heat capacity -- the same values the well
 model uses. Without a ``"pvt"`` block it keeps the legacy defaults
-:data:`FLUID_DENSITY` and :data:`SPECIFIC_HEAT`.
+:data:`FLUID_DENSITY` and :data:`SPECIFIC_HEAT`. The heat exchanger that sets
+the primary outlet temperature must use the same values (give it
+``gemini_model.fluid.pvt_config.heat_exchanger_fluid_parameters(pvt)``),
+otherwise the energy balance does not close;
+:func:`fluid_consistency_issues` finds such mismatches and
+:func:`doublet_thermal_power_w` warns about them.
 
 Units at the KPI layer follow the project file's own convention (bar,
 degC, m3/h were used for parameters; here power/emission outputs are SI:
@@ -37,7 +42,10 @@ needed.
 # Modified by the GeoAgent team for SPE GeoHackathon 2026, 2026-11-01: generalised (GM-10) --
 # component names, density and specific heat are keyword parameters with backward-compatible
 # defaults; primary-loop density/heat capacity come from the producer well's "pvt" block
-# (GM-01); added fluid_properties and sum_component_outputs.
+# (GM-01); added fluid_properties, fluid_consistency_issues and sum_component_outputs.
+
+import math
+import warnings
 
 from gemini_model.fluid.pvt_config import liquid_properties
 
@@ -75,6 +83,54 @@ def fluid_properties(
     if pvt is None:
         return default_density, default_specific_heat
     return liquid_properties(pvt)
+
+
+def fluid_consistency_issues(
+    solver,
+    pvt_component=DEFAULT_PVT_COMPONENT,
+    components=(DEFAULT_PRIMARY_OUTLET[0],),
+    rel_tol=1e-9,
+):
+    """Return messages for components whose fluid rho/c_p differ from the PVT block.
+
+    Compares the ``fluid_density``/``specific_heat`` parameters (or the class
+    ``DEFAULT_FLUID_DENSITY``/``DEFAULT_SPECIFIC_HEAT``) of each named
+    component -- e.g. the GEMINI ``HeatExchanger``, ``Boiler`` or ``CHP`` --
+    with the liquid properties of ``pvt_component``'s ``"pvt"`` block. If
+    they differ, a KPI computed with the PVT values does not match the duty
+    the component computed (GM-01 single source of truth). Returns an empty
+    list if ``pvt_component`` has no ``"pvt"`` block (legacy projects) or a
+    component has no such parameters. A missing component is reported.
+    """
+    model_by_name = getattr(solver, "components", None) or {}
+    pvt_model = model_by_name.get(pvt_component)
+    if pvt_model is None or getattr(pvt_model, "parameters", {}).get("pvt") is None:
+        return []
+    pvt_density, pvt_specific_heat = fluid_properties(solver, pvt_component)
+
+    issues = []
+    for name in components:
+        model = model_by_name.get(name)
+        if model is None:
+            issues.append(f"component '{name}' not found")
+            continue
+        parameters = getattr(model, "parameters", {})
+        density = parameters.get("fluid_density", getattr(model, "DEFAULT_FLUID_DENSITY", None))
+        specific_heat = parameters.get(
+            "specific_heat", getattr(model, "DEFAULT_SPECIFIC_HEAT", None)
+        )
+        if density is None or specific_heat is None:
+            continue
+        if not (
+            math.isclose(density, pvt_density, rel_tol=rel_tol)
+            and math.isclose(specific_heat, pvt_specific_heat, rel_tol=rel_tol)
+        ):
+            issues.append(
+                f"'{name}' uses fluid_density={density}, specific_heat={specific_heat} but "
+                f"'{pvt_component}' pvt gives {pvt_density}, {pvt_specific_heat}; set them with "
+                "gemini_model.fluid.pvt_config.heat_exchanger_fluid_parameters"
+            )
+    return issues
 
 
 def sum_component_outputs(solver, key, components):
@@ -154,8 +210,16 @@ def doublet_thermal_power_w(
     outlet). ``fluid_density``/``specific_heat`` default to
     :func:`fluid_properties` of ``pvt_component`` (the brine PVT of the
     producer well, or the legacy constants if it has no ``"pvt"`` block).
+    In that case a ``UserWarning`` is issued if the ``outlet`` component
+    uses other values (see :func:`fluid_consistency_issues`).
     """
     if fluid_density is None or specific_heat is None:
+        for issue in fluid_consistency_issues(solver, pvt_component, (outlet[0],)):
+            warnings.warn(
+                f"doublet_thermal_power_w: energy balance will not close: {issue}",
+                UserWarning,
+                stacklevel=2,
+            )
         pvt_density, pvt_specific_heat = fluid_properties(solver, pvt_component)
         fluid_density = pvt_density if fluid_density is None else fluid_density
         specific_heat = pvt_specific_heat if specific_heat is None else specific_heat

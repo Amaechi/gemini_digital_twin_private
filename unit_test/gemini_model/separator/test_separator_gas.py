@@ -43,7 +43,12 @@ def test_fuel_power_at_300_m3h_matches_rc08():
 
 
 def test_species_mass_flows_match_rc08_per_m3_brine():
-    """RC-08: per m3 brine 0.46 kg CH4 and 0.32 kg CO2 (inherent)."""
+    """RC-08: per m3 brine 0.46 kg CH4 and 0.32 kg CO2 (inherent).
+
+    The card's 0.32 kg uses the real-gas CO2 density (1.977 kg/Nm3); the ideal-gas
+    basis the card uses for 0.965 kg/Nm3 and 68.6 kg/GJ gives 0.314 kg, which is
+    what the model reproduces.
+    """
     y = _run(DESIGN_GAS, flow_m3s=1.0)  # 1 m3/s -> values are per m3 of brine
     assert y["ch4_mass_flow_kg_s"] == pytest.approx(0.46, abs=0.005)
     assert y["inherent_co2_kg_s"] == pytest.approx(0.314, abs=0.005)
