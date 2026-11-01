@@ -1091,6 +1091,56 @@ def operating_point(doublet: ResolvedDoublet, flow_m3h: float) -> OperatingPoint
     return OperatingPoint(**base, feasible=True, notes=notes)
 
 
+def producer_well_parameters(
+    doublet: ResolvedDoublet, frequency_hz: float, target_m3h: float
+) -> dict:
+    """GEMINI ``producer_well`` parameters of a resolved doublet at one ESP frequency.
+
+    Brine ``pvt`` (GM-01), explicit SUB-WELL roughness (never GEMINI's 0.01 m default), the
+    flow-scaled ESP (SUB-ESP) at its setting depth, the formation temperature at mid-depth as the
+    wellbore ambient, and a flow bracket of 0.5–1.5 × target (capped at the curve run-out).
+    Shared by TL-05 and the TL-09 config generator so both run identical GEMINI wells.
+    """
+    esp = doublet.esp
+    return {
+        "reservoir_pressure_bar": doublet.reservoir_pressure_barg,
+        "productivity_index_m3h_per_bar": doublet.productivity_index_m3h_per_bar,
+        "trajectory_table": _trajectory_table(doublet),
+        "roughness_m": doublet.well_roughness_m,
+        "esp_depth_m": esp.setting_depth_m,
+        "esp": {
+            "no_stages": esp.stages,
+            "head_coeff": esp.head_coeff,
+            "power_coeff": esp.power_coeff,
+        },
+        "esp_freq_hz": frequency_hz,
+        "pvt": doublet.pvt,
+        "ambient_temperature_c": _formation_temperature_degc(doublet, 0.5 * doublet.depth_m),
+        "flow_bracket_m3h": (0.5 * target_m3h, min(1.5 * target_m3h, esp.runout_flow_m3h)),
+    }
+
+
+def injector_well_parameters(doublet: ResolvedDoublet) -> dict:
+    """GEMINI ``injector_well`` parameters of a resolved doublet (RC-01 eq 12; DB-14, DB-40).
+
+    Same reservoir pressure as the producer, injectivity index (SUB-II), brine ``pvt``, SUB-WELL
+    roughness, friction as a loss for the downward flow, and the injection pump at the
+    wire-to-water efficiency 0.70 × η_motor × η_VFD. Shared by TL-05 and TL-09.
+    """
+    return {
+        # Same reservoir as the producer (DB-14; spec §7.2: injector at the reservoir pressure).
+        "reservoir_pressure_bar": doublet.reservoir_pressure_barg,
+        "productivity_index_m3h_per_bar": doublet.injectivity_index_m3h_per_bar,
+        "trajectory_table": _trajectory_table(doublet),
+        "roughness_m": doublet.well_roughness_m,
+        "pvt": doublet.pvt,
+        "friction_opposes_flow": True,
+        "pressure_bracket_bar": INJECTION_PRESSURE_BRACKET_BAR,
+        # Power only; CO₂ of the electricity is WP-08's (GEMINI's emission factor default 0).
+        "injector_pump": {"efficiency_factor": doublet.wire_to_water_efficiency_frac},
+    }
+
+
 def _producer_well_flow_m3h(
     doublet: ResolvedDoublet,
     frequency_hz: float,
@@ -1099,26 +1149,8 @@ def _producer_well_flow_m3h(
     target_m3h: float,
 ) -> float:
     """Run GEMINI ``ProducerWell`` (nodal solve) at the solved ESP frequency; return its flow."""
-    esp = doublet.esp
     well = ProducerWell()
-    well.update_parameters(
-        {
-            "reservoir_pressure_bar": doublet.reservoir_pressure_barg,
-            "productivity_index_m3h_per_bar": doublet.productivity_index_m3h_per_bar,
-            "trajectory_table": _trajectory_table(doublet),
-            "roughness_m": doublet.well_roughness_m,
-            "esp_depth_m": esp.setting_depth_m,
-            "esp": {
-                "no_stages": esp.stages,
-                "head_coeff": esp.head_coeff,
-                "power_coeff": esp.power_coeff,
-            },
-            "esp_freq_hz": frequency_hz,
-            "pvt": doublet.pvt,
-            "ambient_temperature_c": _formation_temperature_degc(doublet, 0.5 * doublet.depth_m),
-            "flow_bracket_m3h": (0.5 * target_m3h, min(1.5 * target_m3h, esp.runout_flow_m3h)),
-        }
-    )
+    well.update_parameters(producer_well_parameters(doublet, frequency_hz, target_m3h))
     well.calculate_output(
         {
             "wellhead_pressure": wellhead_pressure_barg,
@@ -1131,20 +1163,7 @@ def _producer_well_flow_m3h(
 def _injector(doublet: ResolvedDoublet, flow_m3h: float, injection_temperature_degc: float) -> dict:
     """Injector WHP and pump power from GEMINI ``InjectorWell`` (brine PVT, RC-01 eq 12)."""
     well = InjectorWell()
-    well.update_parameters(
-        {
-            # Same reservoir as the producer (DB-14; spec §7.2: injector at the reservoir pressure).
-            "reservoir_pressure_bar": doublet.reservoir_pressure_barg,
-            "productivity_index_m3h_per_bar": doublet.injectivity_index_m3h_per_bar,
-            "trajectory_table": _trajectory_table(doublet),
-            "roughness_m": doublet.well_roughness_m,
-            "pvt": doublet.pvt,
-            "friction_opposes_flow": True,
-            "pressure_bracket_bar": INJECTION_PRESSURE_BRACKET_BAR,
-            # Power only; CO₂ of the electricity is WP-08's (GEMINI's emission factor default 0).
-            "injector_pump": {"efficiency_factor": doublet.wire_to_water_efficiency_frac},
-        }
-    )
+    well.update_parameters(injector_well_parameters(doublet))
     suction = doublet.injection_pump_suction_barg
     well.calculate_output(
         {
@@ -1369,9 +1388,11 @@ __all__ = [
     "doublet_operating_point",
     "doublet_performance_map",
     "henry_constant_mol_m3_pa",
+    "injector_well_parameters",
     "map_cache_key",
     "map_flows",
     "operating_point",
+    "producer_well_parameters",
     "resolve_doublet",
     "wellhead_temperature_degc",
 ]

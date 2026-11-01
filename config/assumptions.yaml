@@ -717,3 +717,175 @@ assumptions:
     tag: A
     status: default
     added_by: WP-02
+
+  - id: CFG-LAYOUT
+    title: Plant topology generated for each concept (TL-09)
+    value:
+      brine_train: "producer → [degasser] → filter A → [brine split → absorption drive] → [plate HEX-1] → [brine mix] → [HP evaporator] → filter B → injector"
+      district_chain: "return → plate HEXs (per doublet, flow shares ∝ doublet flow) → [CHP on associated gas] → [heat pumps, 100 °C target] → [peak boiler, grid gas]"
+      cooling_chain: "[free cooling] → [absorption, residual] → electric chiller (unmet); one cooling tower for all"
+      absorption_drive: "brine of the first active doublet through titanium generator tubes, taken before HEX-1"
+      derived_concepts: "C6 = parent plant (no storage model in GEMINI); C7 = parent without degasser, WHP = SUB-PBUB setpoint, no CHP; C8 = parent"
+    unit: null
+    justification: >-
+      Spec §3.5 reference process. The CHP is placed before the heat pumps so that the associated gas, which must
+      be burned anyway (DB-36, no venting), displaces heat-pump electricity and the heat pumps (fixed 100 °C target)
+      self-regulate; the peak boiler is last and is fired by simulate_day only to hold 100 °C. The absorption drive
+      uses brine directly through titanium generator tubes (RC-05 p.266–267: Cu/CuNi incompatible) because a clean
+      isolation loop is a recycle the forward GEMINI solver cannot run.
+    source: GEOAGENT_DESIGN_SPEC §3.4, §3.5; RC-05; RC-07; RC-08 [A]
+    sensitivity: "Spec order (HP before CHP trim); isolation HEX + clean loop for the absorption drive (WP-11)."
+    tag: A
+    status: default
+    added_by: WP-06
+
+  - id: CFG-SURFACE
+    title: Surface brine train hydraulics and heat losses (TL-09)
+    value:
+      separator_letdown: "WHP − SUB-PSUC lumped in the degasser at the operating flow"
+      filter_and_hex_resistance: 0.0
+      surface_temperature_drop_k: 0.0
+    unit: null
+    justification: >-
+      No card gives surface pressure drops or heat losses. The whole wellhead-to-pump-suction drop (SUB-PWH 3 bar(g)
+      → SUB-PSUC 0 bar(g)) is put into the degasser (gas separates at the lowest pressure), so the injection pump
+      sees the same suction as TL-05; filters and plate HEX have zero resistance, and every surface component is
+      adiabatic, so the brine-side balance (verifier PH-22) closes exactly. In the pressurised loop (C7) there is
+      no letdown and the brine reaches the injector at the producer WHP.
+    source: SUB-PWH, SUB-PSUC (WP-05); RC-03 control valve at the HEX outlet (Guidebook p.234) [A]
+    sensitivity: "Filter/HEX Δp 24 kPa/NTU (RC-03 eq 4) moved from the letdown to the HEX; 1 K surface heat loss."
+    tag: A
+    status: default
+    added_by: WP-06
+
+  - id: CFG-HEX
+    title: Plate heat exchanger HEX-1 design rule (TL-09)
+    value:
+      approach_k: 3.0
+      u_w_per_m2k: 4000.0
+      ntu_per_pass_max: 4.0
+      dp_per_ntu_psi: 3.5
+      construction: gasketed
+      plate_material: titanium
+    unit: null
+    justification: >-
+      Counter-flow, sized at the candidate's design flow: UA from the ε-NTU relation of GEMINI's HeatExchanger
+      inverted (RC-03 eq 1 and 3; exact at balanced flows, where GEMINI's C_r < 1 branch loses precision).
+      Design outlets: district min(T_wh − approach, 100 °C), brine max(T_wh − 40 K, 55 °C + approach); the district
+      flow closes the balance (balanced flows at 85 °C brine: 82.2/58 °C). Approach 3 K and U 4.0 kW/m²K are the
+      card's [A] defaults; NTU per pass ≤ 4 and 3.5 psi (24 kPa) per NTU from Guidebook p.221; titanium plates for
+      saline brine (RC-03, RC-12).
+    source: RC-03 parameter table and eq 3–4 (GNS; Guidebook p.217–223) [A]/[L]
+    sensitivity: "approach 2–5.6 K; U 3.0–6.2 kW/m²K."
+    tag: A
+    status: default
+    added_by: WP-06
+
+  - id: CFG-HP
+    title: Heat-pump model settings used in generated configs (TL-09)
+    value:
+      mode: carnot
+      eta: 0.46
+      source_outlet_min: "T_wh − DB-12 (Ts_in_minimum)"
+      sink_target: "DB-16 (Th_out_target)"
+    unit: null
+    justification: >-
+      GEMINI HeatpumpBasic in Carnot mode with η_C = 0.46, the Guidebook-implied Carnot efficiency of RC-04 (COP_h
+      4.41 at 15.6/48.9 °C), on GEMINI's water-temperature basis (sink outlet, source inlet): COP ≈ 4.1 for 58 → 100
+      °C. Evaporator on brine (ρ 1030, c_p 4100), condenser on district water; the source-outlet floor enforces DB-12.
+      Lorenz mode (RC-04's preferred method, η_L 0.50) is not used because GEMINI's Nelder–Mead Lorenz solve diverges
+      at part load (416 of 504 scanned operating points invalid, log of a negative temperature) while the Carnot
+      solve is valid at every point whose duty the brine can supply (0 of 446). When the brine cannot supply the
+      duty, HeatpumpBasic's source-floor re-solve diverges in both modes; simulate_day then bypasses district water
+      around the heat pumps until their outputs are physical (Th_in ≤ Th_out ≤ target, COP ≥ 1, Ts_out ≥ floor).
+    source: RC-04 parameter table (η Carnot implied ≈ 0.46, Guidebook p.258) [L]; WP-06 robustness scan
+    sensitivity: "η_C 0.40–0.55; Lorenz η_L 0.50 once WP-03 makes HeatpumpBasic robust; datasheet COP map."
+    tag: A
+    status: default
+    added_by: WP-06
+
+  - id: CFG-CHP
+    title: CHP electrical fraction and total efficiency (GEMINI 1/3 vs DEA ≈ 0.50)
+    value:
+      electrical_fraction: 0.3333333333333333
+      total_efficiency_frac: 0.96
+    unit: "-"
+    justification: >-
+      GEMINI chp.py hard-codes 1/3 of the useful fuel power as electricity; the DEA gas-engine datasheet (RC-10)
+      gives η_e 0.48 and total ≈ 0.96 (C_b 0.99 at DH 50/100 °C), i.e. ≈ 0.50 electrical. Choice: keep GEMINI's 1/3
+      (no change to GEMINI default behaviour, CLAUDE.md rule 6) with the DEA total efficiency 0.96 as
+      efficiency_factor, so η_e = 0.32 and η_th = 0.64 of fuel LHV: electricity understated and heat overstated by
+      0.16 of the fuel versus DEA. The CHP burns only the associated gas (≈ 1.9 MW fuel per doublet at 300 m³/h),
+      so the effect is ≈ 0.3 MW_e per doublet.
+    source: GEMINI src/gemini_model/chp/chp.py line 19; RC-10 'CHP capex' row (DEA ch. 06 gas engines); RC-08
+    sensitivity: "DEA split η_e 0.48 / η_th 0.48 needs an electrical_fraction parameter in chp.py (default 1/3)."
+    tag: A
+    status: default
+    added_by: WP-06
+
+  - id: CFG-BOILER
+    title: Peak (grid-gas) boiler efficiency
+    value:
+      efficiency_frac: 0.90
+    unit: "-"
+    justification: >-
+      RC-08 gives η = 0.80 (GEMINI example) / 0.90 modern [A]; a new peak boiler is modern. Nameplate = DB-18 peak
+      unless the candidate sizes it (CFG-SIZING); simulate_day fires it only to hold the 100 °C supply.
+    source: RC-08 Boiler [A]; NREL benchmark 80 % (RC-08 emission table)
+    sensitivity: "0.80 (GEMINI example, NREL benchmark)."
+    tag: A
+    status: default
+    added_by: WP-06
+
+  - id: CFG-GRID-GAS
+    title: Grid natural gas as burner fuel (peak boiler, C0)
+    value:
+      ch4_mol_frac: 1.0
+      emission_kg_per_gj: 56.6
+    unit: null
+    justification: >-
+      Grid gas is modelled as methane: LHV 35.8 MJ/Nm³ / (16.04/22.414 kg/Nm³) = 50.03 MJ/kg (RC-08 constants, same
+      as GEMINI's 50 MJ/kg example). CO₂ factor 56.6 kg/GJ (RC-08 'grid natural gas', GEMINI example) — the card
+      asks to choose between 56.6 and 51.53 (Gippsland) and state it; ECO-05 (WP-08) may supersede it.
+    source: RC-08 associated gas constants and emission-factor table [D]/[A]
+    sensitivity: "51.53 kgCO₂e/GJ (Gippsland); Groningen L-gas LHV 31.65 MJ/m³ (RC-10)."
+    tag: A
+    status: default
+    added_by: WP-06
+
+  - id: CFG-ASSOC-GAS
+    title: Associated-gas burner fuel properties (CHP on separated gas)
+    value:
+      lhv_j_kg: 29.67e6
+      emission_kg_per_gj: 68.56
+      density_kg_nm3: 0.965
+    unit: null
+    justification: >-
+      From the separator composition (DB-09: 80/20 mol % CH₄/CO₂) via separator.associated_gas_properties: LHV 28.64
+      MJ/Nm³ = 29.67 MJ/kg; CO₂ when burned 1.964 kg/Nm³ (combustion + inherent) = 68.56 kg/GJ_LHV. The CHP gets
+      caloric_value = the separator's fuel_lhv_j_kg and this factor, replacing GEMINI's 50 MJ/kg / 56.6 kg/GJ (which
+      would overstate the fuel ×1.69 and understate CO₂ ×1.39). Values are computed in code, listed here for audit.
+    source: RC-08 Associated gas [D]; DB-09
+    sensitivity: "Gas-liquid ratio and composition (DB-09)."
+    tag: D
+    status: default
+    added_by: WP-06
+
+  - id: CFG-SIZING
+    title: Default equipment nameplates and dispatch defaults in generated configs
+    value:
+      peak_boiler_mw: "DB-18 peak (30 MW) unless equipment_sizes.peak_boiler_mw"
+      electric_chiller_mw: "DB-19 peak (10 MW) unless equipment_sizes.electric_chiller_mw"
+      absorption_chiller_mw: "DB-19 peak (10 MW) unless equipment_sizes.absorption_chiller_mw"
+      doublet_flow: "candidate design_flow_m3h on every doublet unless the dispatch gives flows"
+      absorption_drive_frac: "drive flow the absorption model needs for the residual load (fixed 7.2 K drive ΔT), capped at the doublet flow"
+      district_flow: "heating demand / (ρ c_p (100 − 55 K)) with GEMINI water properties"
+    unit: null
+    justification: >-
+      The generator must produce a runnable plant before WP-11 sizes it; every unit that can carry its load alone
+      is given the design peak, which never under-sizes. Dispatch defaults are placeholders until WP-07.
+    source: DB-18, DB-19, DB-31; RC-05 (generator ΔT 7.2 K, Guidebook p.267) [A]
+    sensitivity: "Sizes come from WP-11 optimisation; dispatch from WP-07."
+    tag: A
+    status: default
+    added_by: WP-06
