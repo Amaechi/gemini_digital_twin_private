@@ -19,6 +19,8 @@ Keep it ≤ 20 KB; it is the hand-off between sessions. Old detail: merged PRs a
 | WP-11 | Optimisation & uncertainty | todo | | Batch 6 |
 | WP-12 | Model gap & Model Builder | todo | | Batch 5 |
 | WP-13 | Eval suite & submission checks | in review | [#16](https://github.com/Amaechi/gemini_digital_twin_private/pull/16) | S1–S11 policy + TestModel; SUB-01…24 (stub run NOT READY, expected) |
+| WP-12 | Model gap & Model Builder | in review | [#15](https://github.com/Amaechi/gemini_digital_twin_private/pull/15) | TL-17/18 real; S7 FunctionModel demo; 1093 passed |
+| WP-13 | Eval suite & submission checks | todo | | Batch 5 |
 | WP-14 | Integration run & figures | todo | | Batch 7 |
 | L-1 | Local: pick LLM via S11 eval | todo | | user, local Ollama |
 | L-2 | Local: final LLM run + eval transcripts | todo | | user, local Ollama |
@@ -40,6 +42,11 @@ One line per decision, grouped by WP; dated 11-01 (WP-00: 10-31). Why: the `conf
 - today (policy): pass S3, S4, S9; pending S1 (UNVERIFIED, 19/20 stubs), S2, S5–S8; skipped S10/S11. TestModel: same, S10/S11 pending.
 - WP-10 touch: `constraint_conflicts(prompt, limits, basis=None)` adds S5 supply T ≠ DB-16/17 (skips negative, return/ambient/indoor/driving/approach) and S9 reservoir T at depth vs RC-01 (DB-03/04; tolerance = precision as written, depth × gradient); `_intake` passes the basis.
 - `validate_submission`: SUB-01…24 = §18 + follow-ups; only FAIL blocks; SUB-08 needs `DesignVerifier` via `verify_design`; SUB-14 VERIFY items WARN; SUB-07 unmet > 0 ⇒ MANUAL; SUB-21 fork base from NOTICE (d86e8bb), MANUAL without git; eval root `runs/final/eval` (tracked).
+**WP-12**
+- TL-17 needs = WP-06 `concept_layout` types (= `generate_plant` C0–C8 × 1–3 doublets, tested); C6 `thermal_storage` `in_generated_plant: false`; 15 LIM-* entries with `affects`.
+- Sandbox outside the repo or `runs/<id>/` (runner `<run_dir>/model_builder`); 5 files of a NEW `gemini_model/<name>/`; `screen_python` allow-list (defence in depth).
+- `run_pytest`: `python -P -s` child, minimal env, group killed (120 s); pass = rc 0, ≥ 1 test, files unchanged. `register_model`: passing run on same SHA-256, RC-xx cited, power/emission outputs; in-memory only, never replaces.
+- Coder `ModelDraft`, ≤ 3 drafts + failure feedback, T 0, 40 k tokens, logged. Policy P4 = gap analysis (`no_coder`); 5 tools `stub=False`. S7: registry copy, `free_cooling_rc07` in `tmp_path`; git-tree test runs last.
 
 **WP-06**
 - generated HPs = WP-03 closed form, Lorenz, η_L = HP-ETA-L (GEMINI NM default kept); no validity bypass / "HPs off" rebuild.
@@ -151,6 +158,7 @@ One line per decision, grouped by WP; dated 11-01 (WP-00: 10-31). Why: the `conf
 - WP-08: ECO-CO2-GAS, ECO-CO2-AG, ECO-CO2-SCOPE, ECO-ELEC-NET, ECO-REAL, ECO-ALLOC, ECO-OM, ECO-PUMP-CAPEX, ECO-CHILLER, ECO-SENS-MULT, EXG-FUEL, EXG-KPI, NET-LOSS-FRAC, NET-TRUNK-M, SCL-RULES.
 - WP-06: CFG-LAYOUT, CFG-SURFACE, CFG-HEX, CFG-HP, CFG-CHP, CFG-BOILER, CFG-GRID-GAS, CFG-ASSOC-GAS, CFG-SIZING.
 - WP-13: none.
+- WP-12: none (limitations are gap-analysis entries, not register values).
 
 ## Open follow-ups (grouped by the WP that must act)
 **WP-07**
@@ -168,10 +176,9 @@ One line per decision, grouped by WP; dated 11-01 (WP-00: 10-31). Why: the `conf
 - `ToolContext` has `guard_failed`, `rejected_ids`, `violations`; outages with WP-07.
 
 **WP-12**
-- Yours: `agents/model_builder.py`; role + 5 tools in `agents/roles.py`, stubs in `runner/tool_stubs.py`; P4 only calls `model_gap_analysis`. `tools/doublet.py` uses private `well_flow._build_dpdt`/`_build_esp`: treat as API.
-- Subsurface gaps: `ESP` no flow affinity; constant PVT (no μ(T), cold-injection II); steady U = 10 W/m²K (T_wh 77.1 vs ≈ 81–83 °C transient, 50 m³/h); ESP heating ≈ 0.4 K; no fracture limit; no flashing check > 100 °C; Q/Q_BEP 0.33 at 50 m³/h; `esp` water-only.
-- Plant gaps: no storage component (C6; ATES outlet T unmodelled, needs a booster); HP fouling; HEX imprecise at C_r → 1, uses `abs(T_s,in − T_p,in)` (colder primary ⇒ wrong-way heat); no absorption isolation loop.
-- GEMINI `Compressor` (unused) omits k (≈ 1.3 low) and 0.93 × 0.97: if used, fix behind a parameter, add `REFERENCE.md`.
+- Done: PROGRESS gaps → LIM-SUB-01…08, LIM-PLT-01…05, LIM-GEM-01, LIM-TOOL-01.
+- WP-14: report `limitations` from `TR-*_model_gap_analysis.json`; LLM P4 calls the tools directly (no `check_draft`) and `register_model` mutates the live registry; use `ModelBuilder.close_gaps` if a gap appears.
+- L-2: `python -m gemini_agent.agents.model_builder --sandbox runs/s7_demo [--model TAG]` runs generated tests locally (review first). WP-15: promotion = copy folders + registry + `.rst` via PR.
 
 **WP-13**
 - Done: SUB-03 (verdict), SUB-04 (stub calls), SUB-05 (DR stub evidence), SUB-13 (placeholders) fail; SUB-14 flags `cost_items[].verify` (RC-05).
