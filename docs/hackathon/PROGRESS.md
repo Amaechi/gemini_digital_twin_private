@@ -10,7 +10,7 @@ Keep this file short and current. It is the hand-off between sessions (chat hist
 | WP-02 | Cooling models | todo | | | |
 | WP-03 | Heat pump, e-boiler, storage | todo | | | |
 | WP-04 | Design basis, demand, climate | merged (f7acb2a) | `claude/peaceful-mayer-9onzgj` / [PR #2](https://github.com/Amaechi/gemini_digital_twin_private/pull/2) | full suite → 208 passed (143 + 65 tool tests); ruff, black 25.11.0, isort 7.0.0, flake8 clean | TL-01/02/02b; 3 assumptions added |
-| WP-05 | Subsurface & doublet tools | in review | `claude/keen-sagan-cg4uuq` / PR (see hand-off) | full suite → 486 passed (408 before + 78 new: 10 GEMINI-side, 68 tool tests); ruff, black 25.11.0, isort 7.0.0, flake8 7.3.0 + docstrings clean on changed files; wp-reviewer + physics-checker findings fixed | TL-03…08; injector friction fixed behind `friction_opposes_flow`; 7 SUB-* assumptions; FlowArgs 50–300 |
+| WP-05 | Subsurface & doublet tools | in review | `claude/keen-sagan-cg4uuq` / [PR #8](https://github.com/Amaechi/gemini_digital_twin_private/pull/8) | full suite → 486 passed (408 before + 78 new: 10 GEMINI-side, 68 tool tests); ruff, black 25.11.0, isort 7.0.0, flake8 7.3.0 + docstrings clean on changed files; wp-reviewer + physics-checker findings fixed | TL-03…08; injector friction fixed behind `friction_opposes_flow`; 7 SUB-* assumptions; FlowArgs 50–300 |
 | WP-06 | Config generator, guard, day sim | todo | | | |
 | WP-07 | Annual simulation & dispatch | todo | | | |
 | WP-08 | Economics, CO₂, exergy, scaling | todo | | | |
