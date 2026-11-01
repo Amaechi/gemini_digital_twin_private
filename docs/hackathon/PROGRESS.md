@@ -15,7 +15,7 @@ Keep this file short and current. It is the hand-off between sessions (chat hist
 | WP-07 | Annual simulation & dispatch | todo | | | |
 | WP-08 | Economics, CO₂, exergy, scaling | todo | | | |
 | WP-09 | Verifier, memory, logging | todo | | | |
-| WP-10 | Agents, runner, CLI | in review | `claude/confident-einstein-k55a00` / PR (see below) | full suite → 216 passed (91 GEMINI + 125 agent); ruff, black, isort, flake8(+docstrings) clean; wp-reviewer findings fixed | `cli run --engine policy` completes P0–P10 on stubs |
+| WP-10 | Agents, runner, CLI | in review | `claude/confident-einstein-k55a00` / [PR #4](https://github.com/Amaechi/gemini_digital_twin_private/pull/4) | full suite → 216 passed (91 GEMINI + 125 agent); ruff, black, isort, flake8(+docstrings) clean; wp-reviewer findings fixed | `cli run --engine policy` completes P0–P10 on stubs |
 | WP-11 | Optimisation & uncertainty | todo | | | |
 | WP-12 | Model gap & Model Builder | todo | | | |
 | WP-13 | Eval suite & submission checks | todo | | | |
