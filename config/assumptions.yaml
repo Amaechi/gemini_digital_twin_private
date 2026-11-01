@@ -728,6 +728,8 @@ assumptions:
       Australian scope-1 factor for Australian pipeline gas). 56.6 is chosen for consistency with the digital
       twin we simulate with. 51.53 is the sensitivity case: it lowers C0's emissions and therefore the
       reported CO2 reduction of the geothermal candidates (the conservative side for that claim).
+      VERIFY: RC-08 does not state the energy basis of 51.53; if it is gross (HHV), as Australian NGA factors
+      usually are, it is ≈ 57 kg/GJ on LHV — then the two values agree and the sensitivity only shows the basis.
     source: GEOAGENT_DESIGN_SPEC §9.2 ECO-05; RC-08 Emission factors (GEMINI example; Gippsland) [L]
     sensitivity: [51.53]
     tag: A
@@ -784,16 +786,17 @@ assumptions:
     added_by: WP-08
 
   - id: ECO-REAL
-    title: Levelised cost in real terms (constant prices)
+    title: Levelised cost in real terms with real energy-price escalation
     value:
-      energy_escalation_real_frac: 0.0
+      energy_escalation_real_frac: "(1 + energy_escalation_frac)/(1 + inflation_general_frac) − 1 = 0.0244"
       discount_rate_basis: real
     unit: null
     justification: >-
-      ECO-01 (Gippsland Eq. 1) with r = 8 % treated as a real rate and constant real energy/CO2 prices. RC-10's
-      energy escalation 3–7 % nominal with 2.5 % general inflation is a real escalation of 0.5–4.4 %/yr; it is
-      shown as one tornado bar (energy_escalation_real_frac) instead of entering the base case.
-    source: RC-10 Levelised cost and defaults [L]; our interpretation [A]
+      ECO-01 (Gippsland Eq. 1) with r = 8 % treated as a real rate; capex and O&M constant in real terms;
+      electricity, gas and CO2 prices escalate at the real rate implied by the configured RC-10 defaults (energy
+      5 % nominal, midpoint of 3–7 %, and 2.5 % general inflation) = 2.44 %/yr. 0 % (constant prices) is a
+      request option; the RC-10 range 0.49–4.39 %/yr real is one tornado bar around the base.
+    source: RC-10 Levelised cost and defaults [L]; config/cost_assumptions.yaml; our interpretation [A]
     sensitivity: "energy_escalation_real_frac 0.0049–0.0439 (tornado)."
     tag: A
     status: default
@@ -804,12 +807,15 @@ assumptions:
     value: delivered_energy_share
     unit: null
     justification: >-
-      Wells, pumps and flaring serve both products: their capex, O&M, energy and CO2 cost are split by
-      heat/(heat + cooling) delivered MWh (spec ECO-01, RC-10). Heat-only equipment (HEX to the DH network, HTHP,
+      Wells, pumps and flaring serve both products: their capex, O&M, energy and CO2 cost are split by the brine
+      heat each service draws (DayResult.brine_heat_drawn_mw; absorption drive = cooling, every other user =
+      heat), an energy share as RC-10 asks; without brine-heat data by delivered heat/(heat + cooling) MWh. Free
+      cooling and electric chillers draw no brine, so they carry no well cost. An allocation-free combined cost
+      per MWh (heat + cooling) is reported too (spec ECO-01, RC-10). Heat-only equipment (HEX to the DH network, HTHP,
       CHP, boilers) goes to LCOH, cooling-only equipment (chillers, tower, free cooling) to LCOC; electricity
       and fuel follow each consumer's service (explicit map, else keyword rules, else shared).
     source: GEOAGENT_DESIGN_SPEC §9.2 ECO-01; RC-10 Levelised cost
-    sensitivity: "Exergy-based allocation not implemented."
+    sensitivity: "Delivered-energy split as the fallback; exergy-based allocation not implemented."
     tag: A
     status: default
     added_by: WP-08
@@ -824,7 +830,8 @@ assumptions:
     justification: >-
       ECO-01: O&M 1–2 % of capex per year (midpoint 1.5 %), applied to the total capex; the DEA item-specific
       fixed/variable O&M (HTHP, CHP, e-boiler) is not used, to keep one rule for all candidates. Replacements at
-      multiples of the interval strictly before the end of the analysis period; no salvage value.
+      multiples of the interval (rounded half up) strictly before the end of the analysis period; no salvage
+      value, so the 20-yr case pays a full HTHP replacement at year 15 (≈ +2 $/MWh vs a straight-line residual).
     source: RC-10 Opex [L]; config/cost_assumptions.yaml
     sensitivity: "om_frac_of_capex_per_yr 1–2 % (the stated range is wider than ±30 %, DB-35)."
     tag: A
@@ -854,8 +861,9 @@ assumptions:
     justification: >-
       The Guidebook p.269 cost functions (decoded, VERIFY) are valid for 100–1000 ton; larger plants are split
       into equal units (absorption by nominal tons = duty/F), smaller ones are extrapolated with a warning.
-      Escalated with CEPCI 797.9/318.4 = 2.51 (spec ×≈2.5). The plant functions include tower, pumps and
-      piping for absorption, so chiller heat rejection is not costed again.
+      Escalated with CEPCI 797.9/318.4 = 2.51 (spec ×≈2.5). The absorption plant function includes tower, pumps
+      and piping; the electric plant function is assumed to include its heat rejection too (VERIFY), so chiller
+      heat rejection is not costed again. The 100-ton lower bound is checked on nominal tons per unit.
     source: RC-05 Cost [L, VERIFY]; RC-10 CEPCI [L]
     sensitivity: "±30 % (DB-35)."
     tag: A
@@ -894,8 +902,8 @@ assumptions:
     value: 0.10
     unit: fraction of heat demand
     justification: >-
-      Network length and pipe data are not given (missing input): losses = 10 % of demand [A], inside the
-      Danfoss/Thisted benchmark 10.9–17 % lower end.
+      Network length and pipe data are not given (missing input): losses = 10 % of demand [A], just below the
+      Danfoss/Thisted benchmark 10.9–17 % (optimistic side; the benchmark is the sensitivity).
     source: RC-09 Pipe heat loss [A]; Danfoss/Thisted [L]
     sensitivity: [0.109, 0.17]
     tag: A
@@ -928,6 +936,20 @@ assumptions:
       fail a pressurised loop below the CO2-release pressure, and fail when a required mitigation is missing.
       K_c(T) and log K_gyp(T) (Guidebook p.160–163) are inputs with the brine analysis (not on RC-12).
     source: RC-12 Scaling [L]; our pass/fail interpretation [A]
+    sensitivity: null
+    tag: A
+    status: default
+    added_by: WP-08
+
+  - id: ECO-SENS-MULT
+    title: Sensitivity of cost multipliers applies to the premium
+    value: premium_only
+    unit: null
+    justification: >-
+      For items named *_multiplier (titanium plates 1.5, titanium generator tubes 1.125, deviated wells 1.125, dry
+      cooler 3.0) the DB-35 ±30 % applies to the premium (x − 1), so a multiplier never drops below 1 (a deviated
+      well never cheaper than a vertical one); the stated range still widens the bounds.
+    source: GEOAGENT_DESIGN_SPEC §2.4 DB-35, §9.2 ECO-04; our interpretation [A]
     sensitivity: null
     tag: A
     status: default

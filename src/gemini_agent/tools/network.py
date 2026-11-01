@@ -9,14 +9,16 @@
       R_soil = arccosh(H / r_ins) / (2π k_soil)           (cylinder buried at centre depth H)
 
   PUR k_ins ≈ 0.026 W/(m·K) (RC-09). Soil conductivity, burial depth and insulation thickness
-  are not on RC-09: the caller must supply them (no defaults are invented).
+  are not on RC-09: the caller must supply them (no defaults are invented). The arccosh form
+  holds the ground surface at T_ground: default the DB-34c annual-mean air temperature (the
+  surface boundary), not the shallow-ground value.
 * Network length is not given by the organisers ⇒ without a pipe description the tool falls
   back to the RC-09 default losses = 10 % of demand [A] (NET-LOSS-FRAC) and flags the missing
   input; the nominal trunk length 5 km [A] (NET-TRUNK-M) is reported for costing.
 
 The RC-09 example "0.55 K/km buried for a pre-insulated 6″ pipe at 300 gpm, 150 °F" states only
-the result; the unit tests check the ΔT relation against it (implied q' ≈ 43 W/m) — see the
-test module for the consistency note.
+the result and cannot be reproduced from the card's own insulation data (documented discrepancy,
+see the test module); the p.213 example (≈ 32 W/m) is bracketed by plausible inputs.
 """
 
 from __future__ import annotations
@@ -36,6 +38,8 @@ PUR_CONDUCTIVITY_W_PER_M_K = 0.026
 ASSUMPTION_LOSS_FRAC = "NET-LOSS-FRAC"
 ASSUMPTION_TRUNK_LENGTH = "NET-TRUNK-M"
 ASSUMPTION_GROUND = "DB-34c"
+WATER_CP_J_PER_KG_K = 4190.0
+"""Fresh network water, 4.19 kJ/(kg K) (the fresh-water value cited in the DB-33 justification)."""
 J_PER_MWH = 3.6e9
 
 
@@ -106,11 +110,12 @@ class PipeHeatLossRequest(StrictModel):
     annual_heat_demand_mwh: float = Field(ge=0, description="For the loss fraction / fallback.")
     design_mass_flow_kg_s: float | None = Field(default=None, gt=0)
     min_mass_flow_kg_s: float | None = Field(default=None, gt=0)
-    cp_j_per_kg_k: float = Field(default=4190.0, gt=0, description="Network water.")
+    cp_j_per_kg_k: float = Field(default=WATER_CP_J_PER_KG_K, gt=0, description="Network water.")
     length_m: float | None = Field(default=None, gt=0, description="None ⇒ missing input.")
     geometry: PipeGeometry | None = None
     ground_temperature_degc: float | None = Field(
-        default=None, description="None ⇒ DB-34c shallow-ground temperature."
+        default=None,
+        description="Surface boundary of the buried-pipe model; None ⇒ DB-34c annual mean air.",
     )
 
     @model_validator(mode="after")
@@ -154,11 +159,10 @@ def pipe_heat_loss(
     assumption_ids: list[str] = []
     if ground is None:
         db34c = register.get(ASSUMPTION_GROUND).value
-        if not isinstance(db34c, dict) or not isinstance(
-            db34c.get("shallow_ground_degc"), int | float
-        ):
-            raise TypeError("DB-34c must hold a numeric shallow_ground_degc")
-        ground = float(db34c["shallow_ground_degc"])  # type: ignore[arg-type]
+        mean_air = db34c.get("annual_mean_air_degc") if isinstance(db34c, dict) else None
+        if not isinstance(mean_air, int | float):
+            raise TypeError("DB-34c must hold a numeric annual_mean_air_degc")
+        ground = float(mean_air)
         assumption_ids.append(ASSUMPTION_GROUND)
     missing = []
     if request.length_m is None:

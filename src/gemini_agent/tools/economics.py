@@ -13,9 +13,11 @@ Levelised cost (ECO-01, Gippsland Eq. 1)::
     LCOH = Σ_t (C_t + M_t + F_t)/(1+r)^t  ÷  Σ_t H_t/(1+r)^t,   t = 0 … N (H_0 = 0)
 
 with C capex (year 0 plus replacements), M O&M = ``om_frac_of_capex_per_yr`` × capex, F energy
-(purchased electricity, grid gas, CO₂ on direct emissions), constant real prices (ECO-REAL); LCOC
-is analogous. Shared costs (wells, pumps, flaring) are split between heat and cooling by
-delivered energy (ECO-ALLOC). Both a 30-yr and a 20-yr analysis period are reported (ECO-01).
+(purchased electricity, grid gas, CO₂ on direct emissions) in real terms, escalating at
+``(1 + energy_escalation_frac)/(1 + inflation_general_frac) − 1`` = 2.44 %/yr (ECO-REAL); LCOC
+is analogous. Shared costs (wells, pumps, flaring) are split between heat and cooling by the
+brine heat each service draws, else by delivered energy (ECO-ALLOC); an allocation-free combined
+cost per MWh is reported too. Both a 30-yr and a 20-yr analysis period are reported (ECO-01).
 ECO-06 fixed-charge-rate form ``(FCR·TCC + FOC)/AEP + VOC`` is reported alongside.
 
 CO₂ (ECO-05): grid gas 56.6 kg/GJ (ECO-CO2-GAS), associated gas 68.6 kg/GJ_LHV incl. inherent CO₂
@@ -71,6 +73,10 @@ CHILLER_MIN_TONS = 100.0
 CHILLER_MAX_TONS = 1000.0
 """RC-05 Cost validity 100–1000 ton; larger plants are split into equal units (ECO-CHILLER)."""
 WELLS_PER_DOUBLET = 2
+MAX_DOUBLETS = 3
+"""DB-10 hard limit; costing more only warns (DesignGuard enforces it)."""
+SHORT_PERIOD_YR = 20
+"""ECO-01: report a 20-yr case besides the base analysis period (Guidebook advises ≤ 20 yr)."""
 WELL_COST_STEPS_M: tuple[tuple[float, float], ...] = ((2500.0, 3000.0), (4500.0, 5000.0))
 """RC-10: casing-program steps — interpolating across them is flagged as uncertain."""
 SMALL_ELECTRIC_BOILER_MAX_MW = 10.0
@@ -126,7 +132,7 @@ UNIT_RULES: dict[str, tuple[str, float]] = {
 
 Service = Literal["heat", "cool", "shared"]
 SERVICES: tuple[Service, ...] = ("heat", "cool", "shared")
-_COOL_WORDS = ("chiller", "cool", "tower", "absorption", "dry_cooler", "free")
+_COOL_WORDS = ("chiller", "cool", "tower", "absorption", "dry_cooler", "free", "rejection")
 _HEAT_WORDS = ("heat_pump", "heatpump", "hthp", "boiler", "chp", "heating", "hp")
 _SHARED_WORDS = ("esp", "pump", "injection", "producer", "injector", "well", "separator")
 
@@ -214,6 +220,10 @@ class CostBook:
         """All item names."""
         return sorted(self._costs.items)
 
+    def fresh(self) -> CostBook:
+        """Return a copy with the same costs and scale and an empty ``used`` record."""
+        return CostBook(self._costs, self._scale)
+
     def scaled(self, name: str, factor: float) -> CostBook:
         """Return a new book with item ``name`` multiplied by ``factor`` (after conversion)."""
         if name in CONVERSION_ITEMS:
@@ -241,7 +251,7 @@ class CostBook:
             low = high = None
         elif isinstance(item.value, int | float):
             value = float(item.value) * factor * scale
-            low, high = self._bounds(item, value, factor * scale)
+            low, high = self._bounds(name, item, value, factor * scale)
         else:
             raise TypeError(f"cost item {name} has no numeric value")
         if scale != 1.0:
@@ -272,10 +282,11 @@ class CostBook:
         """Stated (low, high) of ``name`` in the returned unit (``usd_range`` as is), else None."""
         cost = self.usd(name)
         item = self._costs.items[name]
+        factor = cost.factor * self._scale.get(name, 1.0)
         if item.usd_range is not None:
-            return item.usd_range
+            return item.usd_range  # already USD: never converted again
         if isinstance(item.range, tuple):
-            return (item.range[0] * cost.factor, item.range[1] * cost.factor)
+            return (item.range[0] * factor, item.range[1] * factor)
         return None
 
     def used_items(self) -> list[CostItemUsed]:
@@ -340,9 +351,14 @@ class CostBook:
             return UNIT_RULES[item.unit]
         return re.sub(r"\b(EUR|AUD)\b", "USD", item.unit), 1.0
 
-    def _bounds(self, item: CostItem, value: float, factor: float) -> tuple[float, float]:
+    def _bounds(
+        self, name: str, item: CostItem, value: float, factor: float
+    ) -> tuple[float, float]:
         frac = self._costs.min_sensitivity_frac
         low, high = value * (1.0 - frac), value * (1.0 + frac)
+        if name.endswith("_multiplier") and value > 1.0:
+            premium = value - 1.0  # ±30 % on the premium, never below 1 (ECO-SENS-MULT)
+            low, high = 1.0 + premium * (1.0 - frac), 1.0 + premium * (1.0 + frac)
         stated: tuple[float, float] | None = None
         if item.usd_range is not None:
             stated = item.usd_range  # already USD: never converted again
@@ -478,8 +494,10 @@ def chiller_plant_cost_usd(
     units = max(1, math.ceil(nominal / CHILLER_MAX_TONS - 1e-12))
     q_t = tons / units
     warnings = [f"RC-05 {kind} chiller cost function is VERIFY (decoded, 1986 $ × CEPCI)"]
-    if q_t < CHILLER_MIN_TONS:
-        warnings.append(f"{q_t:.0f} ton below the RC-05 validity 100–1000 ton: extrapolated")
+    if nominal / units < CHILLER_MIN_TONS:
+        warnings.append(
+            f"{nominal / units:.0f} nominal ton below the RC-05 validity 100–1000 ton: extrapolated"
+        )
     if kind == "absorption":
         p = book.usd("absorption_chiller_plant_cost_function_usd").value
         assert isinstance(p, dict)
@@ -593,26 +611,34 @@ class CapexBreakdown(StrictModel):
 
 def chp_electric_capacity_mw(
     thermal_mw: float, fraction: float | None, register: AssumptionsRegister | None
-) -> tuple[float, float]:
+) -> tuple[float, float, list[str]]:
     """CHP electrical capacity from its thermal output: ``P_el = P_th · f/(1 − f)``.
 
     ``f`` = electricity share of useful output — GEMINI ``chp.py`` 1/3 vs DEA gas engine ≈ 0.50
-    (RC-08, RC-10); decided by WP-06 in register ``CHP-EL-FRAC`` (read if present), else the
-    explicit parameter. Returns ``(P_el, f)``.
+    (RC-08, RC-10); decided by WP-06 in register ``CHP-EL-FRAC`` (a plain number in (0, 1); it
+    wins when present), else the explicit parameter. Returns ``(P_el, f, warnings)``.
     """
+    warnings: list[str] = []
+    value = None
     if register is not None:
         try:
             value = register.get(ASSUMPTION_CHP_EL_FRAC).value
         except KeyError:
             value = None
-        if isinstance(value, int | float) and not isinstance(value, bool):
-            fraction = float(value)
+    if value is not None:
+        if isinstance(value, bool) or not isinstance(value, int | float) or not 0 < value < 1:
+            raise ValueError(f"register CHP-EL-FRAC must be a number in (0, 1), got {value!r}")
+        if fraction is not None and not math.isclose(fraction, float(value)):
+            warnings.append(
+                f"chp_electrical_fraction {fraction} ignored: register CHP-EL-FRAC = {value}"
+            )
+        fraction = float(value)
     if fraction is None:
         raise ValueError(
             "CHP electrical fraction unknown: register CHP-EL-FRAC (WP-06) missing and no "
             "chp_electrical_fraction given"
         )
-    return thermal_mw * fraction / (1.0 - fraction), fraction
+    return thermal_mw * fraction / (1.0 - fraction), fraction, warnings
 
 
 def capex_breakdown(
@@ -633,6 +659,8 @@ def capex_breakdown(
             book, request.depth_m, diameter=request.well_diameter, deviated=request.deviated_wells
         )
         n_wells = WELLS_PER_DOUBLET * request.doublets
+        if request.doublets > MAX_DOUBLETS:
+            warnings.append(f"{request.doublets} doublets exceed the DB-10 limit of 3")
         if well.across_casing_step:
             warnings.append(
                 f"well cost at {request.depth_m:.0f} m interpolated across a casing step "
@@ -641,7 +669,8 @@ def capex_breakdown(
         add(
             CapexLine(
                 name="wells",
-                items=[f"well_cost_{request.well_diameter}_diameter_musd"],
+                items=[f"well_cost_{request.well_diameter}_diameter_musd"]
+                + (["well_deviated_multiplier"] if request.deviated_wells else []),
                 service="shared",
                 cost_usd=n_wells * well.cost_musd * 1e6,
                 note=f"{n_wells} wells × {well.cost_musd:.3f} M$ at {request.depth_m:.0f} m",
@@ -687,9 +716,10 @@ def capex_breakdown(
         )
     chp_el = request.chp_electric_mw
     if request.chp_thermal_mw:
-        chp_el, frac = chp_electric_capacity_mw(
+        chp_el, frac, chp_warnings = chp_electric_capacity_mw(
             request.chp_thermal_mw, request.chp_electrical_fraction, register
         )
+        warnings.extend(chp_warnings)
         warnings.append(f"CHP {chp_el:.2f} MW_e from {request.chp_thermal_mw} MW_th at f = {frac}")
     if chp_el:
         add(
@@ -838,6 +868,10 @@ class CarrierBalance(StrictModel):
     associated_gas_burned_mwh: float
     associated_gas_burned_by_service_mwh: dict[str, float]
     associated_gas_flared_mwh: float
+    brine_heat_drawn_by_service_mwh: dict[str, float] = Field(
+        description="DayResult.brine_heat_drawn_mw per service: cooling users (absorption drive) "
+        "vs heat (everything else); allocates shared costs (ECO-ALLOC)."
+    )
     warnings: list[str] = Field(default_factory=list)
 
 
@@ -857,6 +891,7 @@ def carrier_balance(
     purchased_by: dict[str, float] = defaultdict(float)
     grid_by: dict[str, float] = defaultdict(float)
     assoc_by: dict[str, float] = defaultdict(float)
+    brine_by: dict[str, float] = defaultdict(float)
     unknown: set[str] = set()
     totals: dict[str, float] = defaultdict(float)
 
@@ -867,9 +902,17 @@ def carrier_balance(
             return "shared"
         return found
 
+    if gas_handling is None and any(day.associated_gas_produced_nm3 > 0 for day in annual.days):
+        raise ValueError(
+            "associated gas is produced but gas_handling is not set: say degas_use or "
+            "pressurised_reinject (DB-36)"
+        )
     for day in annual.days:
         totals["heat"] += day.heat_supplied_mw * HOURS_PER_DAY
         totals["cool"] += day.cool_supplied_mw * HOURS_PER_DAY
+        for key, mw in day.brine_heat_drawn_mw.items():
+            user = classify_service(key, service_by_key)
+            brine_by["cool" if user == "cool" else "heat"] += mw * HOURS_PER_DAY
         consumed = day.electricity_consumed_mw * HOURS_PER_DAY
         generated = day.electricity_generated_mw * HOURS_PER_DAY
         purchased = max(0.0, consumed - generated)
@@ -920,6 +963,7 @@ def carrier_balance(
         associated_gas_burned_mwh=totals["burned_assoc"],
         associated_gas_burned_by_service_mwh={s: assoc_by[s] for s in SERVICES},
         associated_gas_flared_mwh=totals["flared"],
+        brine_heat_drawn_by_service_mwh={"heat": brine_by["heat"], "cool": brine_by["cool"]},
         warnings=warnings,
     )
 
@@ -1079,6 +1123,10 @@ class LevelisedCost(StrictModel):
     discount_rate_frac: float
     energy_escalation_real_frac: float
     heat_share_of_shared_frac: float
+    allocation_basis: str = Field(description="ECO-ALLOC basis of heat_share_of_shared_frac.")
+    lcoe_combined_usd_per_mwh: float | None = Field(
+        description="All costs / (heat + cooling) delivered, allocation-free."
+    )
     pv_cost_by_service_usd: dict[str, float]
     pv_heat_cost_usd: float
     pv_cool_cost_usd: float
@@ -1128,6 +1176,21 @@ def annual_opex(
     )
 
 
+def heat_share_of_shared(carriers: CarrierBalance) -> tuple[float, str]:
+    """ECO-ALLOC: share of shared costs charged to heat, and the basis used.
+
+    By brine heat drawn per service when the results report it (an energy share, RC-10: free
+    cooling and electric chillers draw no brine), else by delivered heat vs cooling.
+    """
+    brine = carriers.brine_heat_drawn_by_service_mwh
+    if brine["heat"] + brine["cool"] > 0:
+        return brine["heat"] / (brine["heat"] + brine["cool"]), "brine heat drawn"
+    heat, cool = carriers.heat_delivered_mwh, carriers.cool_delivered_mwh
+    if heat + cool > 0:
+        return heat / (heat + cool), "delivered energy"
+    return 1.0, "no delivered energy"
+
+
 def levelised_cost(
     capex: CapexBreakdown,
     opex: AnnualOpex,
@@ -1159,18 +1222,23 @@ def levelised_cost(
     for line in capex.lines:
         if line.replacement_interval_yr:
             k = 1
-            while (t := round(k * line.replacement_interval_yr)) < analysis_period_yr:
+            while (t := math.floor(k * line.replacement_interval_yr + 0.5)) < analysis_period_yr:
                 pv[line.service] += line.cost_usd * (1.0 + r) ** -t
                 k += 1
     heat, cool = carriers.heat_delivered_mwh, carriers.cool_delivered_mwh
-    share = heat / (heat + cool) if heat + cool > 0 else 1.0
+    share, basis = heat_share_of_shared(carriers)
+    if cool <= 0:
+        share, basis = 1.0, "no cooling delivered"
     pv_heat = pv["heat"] + share * pv["shared"]
     pv_cool = pv["cool"] + (1.0 - share) * pv["shared"]
+    total_mwh = (heat + cool) * annuity
     return LevelisedCost(
         analysis_period_yr=analysis_period_yr,
         discount_rate_frac=r,
         energy_escalation_real_frac=energy_escalation_real_frac,
         heat_share_of_shared_frac=share,
+        allocation_basis=basis,
+        lcoe_combined_usd_per_mwh=sum(pv.values()) / total_mwh if total_mwh > 0 else None,
         pv_cost_by_service_usd=pv,
         pv_heat_cost_usd=pv_heat,
         pv_cool_cost_usd=pv_cool,
@@ -1201,7 +1269,9 @@ def lcoh_fixed_charge_rate(
     heat, cool = carriers.heat_delivered_mwh, carriers.cool_delivered_mwh
     if heat <= 0:
         return None
-    share = heat / (heat + cool)
+    share, _ = heat_share_of_shared(carriers)
+    if cool <= 0:
+        share = 1.0
     fcr = capital_recovery_factor(book.usd_value("discount_rate_frac"), analysis_period_yr)
     om_frac = book.usd_value("om_frac_of_capex_per_yr")
     tcc = capex.by_service_usd["heat"] + share * capex.by_service_usd["shared"]
@@ -1263,8 +1333,14 @@ class EconomicsRequest(StrictModel):
         description="Consumer/burner key → service; unknown keys use keyword rules, else shared.",
     )
     c0_co2_t_per_yr: float | None = Field(default=None, gt=0)
-    energy_escalation_real_frac: float = Field(
-        default=0.0, ge=-0.05, le=0.1, description="ECO-REAL: 0 = constant real prices."
+    energy_escalation_real_frac: float | None = Field(
+        default=None,
+        ge=-0.05,
+        le=0.1,
+        description=(
+            "Real escalation of energy and CO2 prices; None ⇒ ECO-REAL "
+            "(1 + energy_escalation_frac)/(1 + inflation_general_frac) − 1."
+        ),
     )
 
 
@@ -1294,9 +1370,18 @@ class _Inputs:
 
 def _periods(book: CostBook) -> list[int]:
     base = round(book.usd_value("analysis_period_yr"))
-    stated = book.stated_range("analysis_period_yr")
-    others = [round(x) for x in stated] if stated else []
-    return [base] + sorted({p for p in others if p != base})
+    return [base] if base == SHORT_PERIOD_YR else [base, SHORT_PERIOD_YR]
+
+
+def real_energy_escalation(book: CostBook, nominal_frac: float | None = None) -> float:
+    """ECO-REAL: ``(1 + e_nominal)/(1 + inflation) − 1`` from the RC-10 defaults in the config."""
+    nominal = book.usd_value("energy_escalation_frac") if nominal_frac is None else nominal_frac
+    return (1.0 + nominal) / (1.0 + book.usd_value("inflation_general_frac")) - 1.0
+
+
+def _escalation(inputs: _Inputs, book: CostBook) -> float:
+    given = inputs.request.energy_escalation_real_frac
+    return real_energy_escalation(book) if given is None else given
 
 
 def _evaluate(inputs: _Inputs, book: CostBook) -> tuple[CapexBreakdown, AnnualOpex, list]:
@@ -1309,7 +1394,7 @@ def _evaluate(inputs: _Inputs, book: CostBook) -> tuple[CapexBreakdown, AnnualOp
             inputs.carriers,
             book,
             analysis_period_yr=period,
-            energy_escalation_real_frac=inputs.request.energy_escalation_real_frac,
+            energy_escalation_real_frac=_escalation(inputs, book),
         )
         for period in _periods(book)
     ]
@@ -1351,11 +1436,11 @@ def economics(
     book: CostBook | None = None,
 ) -> ToolResult[EconomicsReport]:
     """TL-14 ``economics``: CAPEX, OPEX, LCOH/LCOC (30 and 20 yr), CO₂ and benchmarks (§9.2)."""
-    book = book or CostBook.load(config_dir)
+    book = (book or CostBook.load(config_dir)).fresh()
     inputs = _prepare(request, annual, config_dir)
     capex, opex, levelised = _evaluate(inputs, book)
     base_period = levelised[0]
-    short = next((lv for lv in levelised if lv.analysis_period_yr == 20), None)
+    short = next((lv for lv in levelised if lv.analysis_period_yr == SHORT_PERIOD_YR), None)
     fcr = lcoh_fixed_charge_rate(
         capex, opex, inputs.carriers, book, analysis_period_yr=base_period.analysis_period_yr
     )
@@ -1412,7 +1497,7 @@ def _fmt(value: float | None, spec: str = ".1f") -> str:
 
 def _summary(report: EconomicsReport) -> str:
     base = report.levelised[0]
-    short = next((lv for lv in report.levelised if lv.analysis_period_yr == 20), None)
+    short = next((lv for lv in report.levelised if lv.analysis_period_yr == SHORT_PERIOD_YR), None)
     cap = next((b for b in report.benchmarks if b.name.startswith("heat_price_cap")), None)
     red = report.co2.reduction_vs_c0_frac
     text = (
@@ -1480,7 +1565,7 @@ def cost_sensitivity(
     real energy-price escalation (ECO-REAL) is added as one bar from its base to the RC-10
     range (energy 3–7 % nominal minus general inflation).
     """
-    book = book or CostBook.load(config_dir)
+    book = (book or CostBook.load(config_dir)).fresh()
     inputs = _prepare(request, annual, config_dir)
     _, _, levelised = _evaluate(inputs, book)
     base = _kpi(levelised[0], kpi)
@@ -1552,10 +1637,9 @@ def _escalation_bar(
     inputs: _Inputs, book: CostBook, kpi: Literal["lcoh", "lcoc"], base: float
 ) -> TornadoBar:
     """ECO-REAL: real energy escalation = (1 + e_nominal)/(1 + inflation) − 1 over RC-10's range."""
-    inflation = book.usd_value("inflation_general_frac")
     nominal = book.stated_range("energy_escalation_frac")
     assert nominal is not None
-    real = [(1.0 + e) / (1.0 + inflation) - 1.0 for e in nominal]
+    real = [real_energy_escalation(book, e) for e in nominal]
     results = []
     for value in real:
         request = inputs.request.model_copy(update={"energy_escalation_real_frac": value})
@@ -1566,7 +1650,7 @@ def _escalation_bar(
     return TornadoBar(
         input_name="energy_escalation_real_frac",
         unit="1/yr (real)",
-        base_value=inputs.request.energy_escalation_real_frac,
+        base_value=_escalation(inputs, book),
         low_value=real[0],
         high_value=real[1],
         kpi_base=base,

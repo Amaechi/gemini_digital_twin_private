@@ -195,3 +195,16 @@ def test_evidence_agrees_with_verifier_pd07(handling, mitigations, expected) -> 
     check = DesignVerifier.from_config().verify(evidence).check("PD-07")
     assert check.status == (CheckStatus.PASS if expected == "pass" else CheckStatus.FAIL)
     assert (report.missing_mitigations == []) is (expected == "pass")
+
+
+def test_thresholds_match_register() -> None:
+    """SCL-RULES in config/assumptions.yaml and the module constants must not drift apart."""
+    from gemini_agent.schemas.config import load_config
+
+    rules = load_config("assumptions").get("SCL-RULES").value
+    assert rules == {
+        "ryznar_fail_below": sc.RI_HEAVY_BELOW,
+        "ryznar_inhibitor_below": sc.RI_SLIGHT_BELOW,
+        "gypsum_rs_fail_above": sc.RS_AMBIGUOUS_HIGH,
+        "gypsum_rs_inhibitor_from": sc.RS_AMBIGUOUS_LOW,
+    }

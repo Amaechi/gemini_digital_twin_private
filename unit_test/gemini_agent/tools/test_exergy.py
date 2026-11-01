@@ -133,3 +133,24 @@ def test_climate_year_must_match(climate) -> None:
         ex.exergy_kpi(make_annual(days=1), climate=other)
     report = ex.exergy_kpi(make_annual(days=1)).data  # default climate from config
     assert math.isclose(report.t0_mean_degc, climate.dry_bulb_degc[0])
+
+
+def test_exergy_merges_into_given_kpis_and_flags_ambient_mismatch(climate) -> None:
+    """Exergy fields join the economics KPIs; a simulated ambient ≠ T0 is warned about."""
+    from gemini_agent.schemas.results import KPISet
+
+    base = KPISet(candidate_id="C2-test", currency="USD", lcoh_per_mwh=50.0)
+    annual = make_annual(
+        days=2,
+        heat_by_source_mw={"hex": 1.0},
+        electricity_by_consumer_mw={"esp": 0.3},
+        ambient_dry_bulb_degc=30.0,
+    )
+    result = ex.exergy_kpi(annual, climate=climate, base_kpis=base)
+    kpis = result.data.kpis
+    assert kpis.lcoh_per_mwh == 50.0 and kpis.currency == "USD"
+    assert kpis.exergy_efficiency_frac is not None
+    assert result.data.ambient_mismatch_days == 2
+    assert any("ambient" in w for w in result.warnings)
+    with pytest.raises(ValueError):
+        ex.exergy_kpi(annual, climate=climate, base_kpis=KPISet(candidate_id="other"))

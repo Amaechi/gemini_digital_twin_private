@@ -12,14 +12,14 @@ from gemini_agent.tools.network import PipeGeometry, PipeHeatLossRequest
 GPM_TO_M3S = 3.785411784e-3 / 60.0
 
 
-def test_rc09_example_temperature_drop() -> None:
-    """RC-09 validation: 6″ pre-insulated pipe, 300 gpm, 150 °F ⇒ 0.55 K/km (±10 %).
+def test_rc09_example_relation_and_documented_discrepancy() -> None:
+    """RC-09 "0.55 K/km" example: ΔT relation check plus a documented card discrepancy.
 
-    The card gives only the result; the ΔT relation reproduces it with the implied loss
-    q' ≈ 43 W/m (water 980 kg/m³, 4.19 kJ/kgK at 150 °F). Note for the card (WP-15): with the
-    card's own PUR k = 0.026 W/mK and 25–50 mm thickness the insulation alone gives
-    R_ins ≥ 1.59 m·K/W, while 0.55 K/km at ≈ 55 K over a 12.5 °C ground needs
-    R_total ≈ 1.3 m·K/W — the Guidebook case must use other conditions.
+    This is NOT a reproduction (the card states only the result): the implied loss q' ≈ 43 W/m
+    (water 980 kg/m³, 4.19 kJ/kgK at 150 °F) is put back through ΔT = q'L/(ṁc_p). Discrepancy
+    for WP-15: with the card's own PUR k = 0.026 W/mK and 25–50 mm thickness the insulation alone
+    gives R_ins ≥ 1.59 m·K/W, while 0.55 K/km over 53 K (150 °F − 12.5 °C) needs
+    R_total ≈ 1.24 m·K/W (1.30 at a 10 °C ground) — the Guidebook case uses other conditions.
     """
     m_dot = 300.0 * GPM_TO_M3S * 980.0
     implied_q = 0.55e-3 * m_dot * 4190.0
@@ -29,6 +29,27 @@ def test_rc09_example_temperature_drop() -> None:
     )
     r_ins_25mm = net.insulation_resistance_m_k_per_w(0.0842, 0.025, 0.026)
     assert r_ins_25mm > (65.6 - 12.5) / implied_q
+
+
+def test_rc09_p213_example_bracketed_by_plausible_inputs() -> None:
+    """RC-09 p.213–214: 8″ pre-insulated, 66 °C water, −7 °C surface ⇒ ≈ 32 W/m (range check).
+
+    Insulation thickness, cover and soil conductivity are not on the card: the test inputs
+    (PUR 25–50 mm, centre depth 1.0 m, k_soil 1–2 W/mK) are assumptions of this test only.
+    """
+    r_pipe = 0.2191 / 2  # 8-inch nominal pipe OD 219.1 mm
+
+    def q(thickness: float, k_soil: float) -> float:
+        return net.buried_pipe_heat_loss_w_per_m(
+            66.0,
+            -7.0,
+            pipe_outer_radius_m=r_pipe,
+            insulation_thickness_m=thickness,
+            burial_depth_m=1.0,
+            k_soil_w_per_m_k=k_soil,
+        )
+
+    assert q(0.05, 1.0) < 32.0 < q(0.025, 2.0)
 
 
 def test_layered_resistance_hand_calculation() -> None:
@@ -76,7 +97,7 @@ def test_pipe_heat_loss_layered_reports_min_flow_drop() -> None:
     result = net.pipe_heat_loss(request)
     report = result.data
     assert report.method == "layered_resistance"
-    assert report.ground_temperature_degc == 12.5  # DB-34c
+    assert report.ground_temperature_degc == 10.5  # DB-34c annual mean air (surface)
     assert report.temperature_drop_min_flow_k == pytest.approx(
         8.0 * report.temperature_drop_design_k
     )

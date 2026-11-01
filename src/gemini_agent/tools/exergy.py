@@ -47,6 +47,8 @@ ASSUMPTION_FUEL_EXERGY = "EXG-FUEL"
 ASSUMPTION_BRINE_CP = "DB-33"
 ASSUMPTION_HEATING_RETURN = "DB-31"
 ASSUMPTION_COOLING_RETURN = "DB-32"
+AMBIENT_TOLERANCE_K = 0.5
+"""Warn when the simulated day's ambient differs from the climate-profile T₀ by more."""
 ASSUMPTION_IDS = ["DB-34d", "EXG-FUEL", "EXG-KPI", "DB-33", "DB-31", "DB-32"]
 
 
@@ -122,6 +124,9 @@ class ExergyReport(StrictModel):
     brine_exergy_reinjected_mwh: float = Field(description="Σ ṁ e(T_injection) Δt.")
     utilisation_frac: float | None
     functional_efficiency_frac: float | None
+    ambient_mismatch_days: int = Field(
+        description="Days where DayResult.ambient_dry_bulb_degc differs from T0 by > 0.5 K."
+    )
     kpis: KPISet
 
 
@@ -130,6 +135,10 @@ def _register_float(register: AssumptionsRegister, assumption_id: str) -> float:
     if not isinstance(value, int | float) or isinstance(value, bool):
         raise TypeError(f"assumption {assumption_id} must be a number, got {value!r}")
     return float(value)
+
+
+def _given(value: float | None, default: float) -> float:
+    return default if value is None else value
 
 
 def exergy_balance(
@@ -144,32 +153,37 @@ def exergy_balance(
     cooling_return_degc: float,
     fuel_exergy_factor: float,
     dead_state: str,
+    base_kpis: KPISet | None = None,
 ) -> ExergyReport:
     """Annual exergy terms from the daily results; T₀ = ``dry_bulb_degc[day_index]`` (DB-34d).
 
     Network temperatures come from each ``DayResult`` when set, else the given defaults
-    (DB-16/DB-31 heating, DB-17/DB-32 cooling).
+    (DB-16/DB-31 heating, DB-17/DB-32 cooling). The exergy fields are written into
+    ``base_kpis`` (default ``annual.kpis``), so pass the economics KPIs to merge both.
     """
     totals = dict.fromkeys(
         ("heat", "e_heat", "cool", "e_cold", "w_in", "w_out", "fuel", "e_brine", "e_inj"), 0.0
     )
     cold_days = 0
+    ambient_mismatch = 0
     t0_used: list[float] = []
     for day in annual.days:
         if day.day_index >= len(dry_bulb_degc):
             raise ValueError(f"no dry-bulb temperature for day {day.day_index}")
         t0 = dry_bulb_degc[day.day_index] + KELVIN_OFFSET
         t0_used.append(t0 - KELVIN_OFFSET)
+        if abs(day.ambient_dry_bulb_degc - t0_used[-1]) > AMBIENT_TOLERANCE_K:
+            ambient_mismatch += 1
         heat_mwh = day.heat_supplied_mw * HOURS_PER_DAY
         if heat_mwh > 0:
-            t_s = (day.heating_supply_degc or heating_supply_degc) + KELVIN_OFFSET
-            t_r = (day.heating_return_degc or heating_return_degc) + KELVIN_OFFSET
+            t_s = _given(day.heating_supply_degc, heating_supply_degc) + KELVIN_OFFSET
+            t_r = _given(day.heating_return_degc, heating_return_degc) + KELVIN_OFFSET
             totals["e_heat"] += heat_mwh * delivered_heat_exergy_factor(t_s, t_r, t0)
         totals["heat"] += heat_mwh
         cool_mwh = day.cool_supplied_mw * HOURS_PER_DAY
         if cool_mwh > 0:
-            t_s = (day.cooling_supply_degc or cooling_supply_degc) + KELVIN_OFFSET
-            t_r = (day.cooling_return_degc or cooling_return_degc) + KELVIN_OFFSET
+            t_s = _given(day.cooling_supply_degc, cooling_supply_degc) + KELVIN_OFFSET
+            t_r = _given(day.cooling_return_degc, cooling_return_degc) + KELVIN_OFFSET
             e_cold = cold_exergy_w(cool_mwh, t_s, t_r, t0)
             cold_days += e_cold > 0
             totals["e_cold"] += e_cold
@@ -181,17 +195,19 @@ def exergy_balance(
             if flow_m3h <= 0:
                 continue
             m_dot = flow_m3h * brine_density_kg_m3 / 3600.0
-            seconds = SECONDS_PER_DAY / J_PER_MWH
+            mwh_per_w_day = SECONDS_PER_DAY / J_PER_MWH
             t_prod = day.production_temperature_degc[i] + KELVIN_OFFSET
             totals["e_brine"] += (
-                m_dot * liquid_specific_exergy_j_per_kg(t_prod, t0, brine_cp_j_per_kg_k) * seconds
+                m_dot
+                * liquid_specific_exergy_j_per_kg(t_prod, t0, brine_cp_j_per_kg_k)
+                * mwh_per_w_day
             )
             if day.injection_temperature_degc:
                 t_inj = day.injection_temperature_degc[i] + KELVIN_OFFSET
                 totals["e_inj"] += (
                     m_dot
                     * liquid_specific_exergy_j_per_kg(t_inj, t0, brine_cp_j_per_kg_k)
-                    * seconds
+                    * mwh_per_w_day
                 )
     fuel_exergy = fuel_exergy_factor * totals["fuel"]
     useful = totals["e_heat"] + totals["e_cold"]
@@ -200,8 +216,11 @@ def exergy_balance(
         utilisation = (totals["w_out"] - totals["w_in"] + useful) / totals["e_brine"]
     spent = totals["e_brine"] + totals["w_in"] + fuel_exergy
     functional = (useful + totals["w_out"]) / spent if spent > 0 else None
+    base = base_kpis if base_kpis is not None else annual.kpis
+    if base is not None and base.candidate_id != annual.candidate_id:
+        raise ValueError("base_kpis.candidate_id does not match annual.candidate_id")
     kpis = KPISet.model_validate(
-        (annual.kpis.model_dump() if annual.kpis else {"candidate_id": annual.candidate_id})
+        (base.model_dump() if base else {"candidate_id": annual.candidate_id})
         | {
             "exergy_efficiency_frac": functional,
             "exergy_utilisation_frac": utilisation,
@@ -228,6 +247,7 @@ def exergy_balance(
         brine_exergy_reinjected_mwh=totals["e_inj"],
         utilisation_frac=utilisation,
         functional_efficiency_frac=functional,
+        ambient_mismatch_days=ambient_mismatch,
         kpis=kpis,
     )
 
@@ -245,6 +265,7 @@ def exergy_kpi(
     *,
     climate: ClimateProfile | None = None,
     config_dir: Path | str | None = None,
+    base_kpis: KPISet | None = None,
 ) -> ToolResult[ExergyReport]:
     """TL-14 ``exergy``: annual exergy KPI with T₀ = daily dry-bulb from ``climate`` (DB-34d).
 
@@ -271,6 +292,7 @@ def exergy_kpi(
         cooling_return_degc=_register_float(register, ASSUMPTION_COOLING_RETURN),
         fuel_exergy_factor=_register_float(register, ASSUMPTION_FUEL_EXERGY),
         dead_state=_dead_state_text(climate),
+        base_kpis=base_kpis,
     )
 
     def pct(value: float | None) -> str:
@@ -283,6 +305,11 @@ def exergy_kpi(
         f"T0 = daily dry-bulb (DB-34d)"
     )
     warnings = []
+    if report.ambient_mismatch_days:
+        warnings.append(
+            f"{report.ambient_mismatch_days} day(s) with simulated ambient ≠ climate T0 by > "
+            f"{AMBIENT_TOLERANCE_K} K: dead state from the climate profile (DB-34d)"
+        )
     if report.cool_delivered_mwh > 0 and report.cold_exergy_days == 0:
         warnings.append("cooling delivered above T0 on every day: cold exergy 0 (RC-11)")
     return ToolResult[ExergyReport](

@@ -21,6 +21,7 @@ from gemini_agent.tools.economics import (
 from unit_test.gemini_agent.tools.annual_factory import make_annual
 
 CEPCI_1986_TO_2023 = 797.9 / 318.4
+BOILER_USD_PER_KW = 270.0 * 797.9 / 576.1  # RC-08 2014 $ × CEPCI (gas_boiler price_year note)
 
 
 @pytest.fixture(scope="module")
@@ -191,7 +192,7 @@ def test_capex_lines_and_services(book: CostBook) -> None:
     assert lines["wells"].service == "shared"
     assert lines["hthp"].cost_usd == pytest.approx(12_000 * 1356.0, rel=1e-6)
     assert lines["hthp"].replacement_interval_yr == 15.0
-    assert lines["gas_boiler"].cost_usd == pytest.approx(10_000 * 270.0)
+    assert lines["gas_boiler"].cost_usd == pytest.approx(10_000 * BOILER_USD_PER_KW)
     assert lines["free_cooling_hex"].service == "cool"
     assert capex.total_usd == pytest.approx(sum(capex.by_service_usd.values()))
     assert any("MISSING INPUT" in w and "pump" in w for w in capex.warnings)
@@ -227,8 +228,16 @@ def test_capex_validation_and_chp_fraction(book: CostBook, config_copy, edit_yam
 
     edit_yaml(config_copy / "assumptions.yaml", add_entry)
     register = load_config("assumptions", config_copy)
-    p_el, frac = eco.chp_electric_capacity_mw(2.0, 1 / 3, register)
+    p_el, frac, warnings = eco.chp_electric_capacity_mw(2.0, 1 / 3, register)
     assert (p_el, frac) == (pytest.approx(2.0), 0.5)  # register (WP-06) wins
+    assert warnings and "ignored" in warnings[0]
+
+    def bad_entry(data: dict) -> None:
+        data["assumptions"][-1]["value"] = "half"
+
+    edit_yaml(config_copy / "assumptions.yaml", bad_entry)
+    with pytest.raises(ValueError, match="CHP-EL-FRAC"):
+        eco.chp_electric_capacity_mw(2.0, None, load_config("assumptions", config_copy))
 
 
 def test_small_and_large_electric_boiler(book: CostBook) -> None:
@@ -325,6 +334,7 @@ def _constant_case(**capex_overrides) -> tuple[EconomicsRequest, object]:
     request = EconomicsRequest(
         capex=_capex(gas_boiler_mw=10.0, **capex_overrides),
         gas_handling=GasHandling.PRESSURISED_REINJECT,
+        energy_escalation_real_frac=0.0,
     )
     annual = make_annual(
         heat_by_source_mw={"hex": 10.0},
@@ -338,7 +348,7 @@ def test_lcoh_constant_annuity_matches_hand_calculation(book: CostBook) -> None:
     """RC-10 validation: LCOH of a constant annuity case = hand calculation (±0.1 %)."""
     request, annual = _constant_case()
     report = eco.economics(request, annual, book=book).data
-    capex = 2 * 3.45e6 + 10_000 * 270.0
+    capex = 2 * 3.45e6 + 10_000 * BOILER_USD_PER_KW
     heat = 365 * 240.0
     fuel = 365 * 48.0
     co2_t = fuel * 3.6 * 56.6 / 1000
@@ -455,3 +465,114 @@ def test_tornado_escalation_bar_and_lcoc(book: CostBook) -> None:
     assert esc.high_value == pytest.approx(1.07 / 1.025 - 1)
     assert esc.kpi_at_high > esc.kpi_at_low
     assert math.isfinite(report.kpi_base)
+
+
+# --------------------------------------------------------------------------- review regressions
+def test_reused_book_does_not_leak_items_between_candidates(book: CostBook) -> None:
+    """A shared CostBook must not carry 'used' items from one candidate to the next."""
+    shared = CostBook.load()
+    chiller = EconomicsRequest(
+        capex=_capex(absorption_chiller_mw=2.0, absorption_capacity_fraction=0.7)
+    )
+    eco.economics(chiller, make_annual(heat_by_source_mw={"hex": 5.0}), book=shared)
+    request, annual = _constant_case()
+    result = eco.economics(request, annual, book=shared)
+    names = {item.name for item in result.data.cost_items}
+    assert "absorption_chiller_plant_cost_function_usd" not in names
+    assert not any("VERIFY" in w for w in result.warnings)
+    bars = eco.cost_sensitivity(request, annual, book=shared, top_n=50).data.bars
+    assert "absorption_chiller_plant_cost_function_usd" not in {b.input_name for b in bars}
+
+
+def test_associated_gas_needs_gas_handling() -> None:
+    """DB-36: degassed gas must not vanish silently when gas_handling is unset."""
+    annual = make_annual(days=2, associated_gas_produced_nm3=1000.0)
+    with pytest.raises(ValueError, match="gas_handling"):
+        eco.co2_emissions(Co2Request(), annual)
+
+
+def test_default_escalation_is_real_rate_from_config(book: CostBook) -> None:
+    """ECO-REAL: base = (1.05/1.025) − 1; the tornado bar brackets the base."""
+    assert eco.real_energy_escalation(book) == pytest.approx(1.05 / 1.025 - 1)
+    request, annual = _constant_case()
+    flat = eco.economics(request, annual, book=book).data.levelised[0]
+    default = request.model_copy(update={"energy_escalation_real_frac": None})
+    escalated = eco.economics(default, annual, book=book).data.levelised[0]
+    assert escalated.energy_escalation_real_frac == pytest.approx(0.02439, abs=1e-5)
+    assert escalated.lcoh_usd_per_mwh > flat.lcoh_usd_per_mwh
+    bars = eco.cost_sensitivity(default, annual, book=book, top_n=50).data.bars
+    esc = next(b for b in bars if b.input_name == "energy_escalation_real_frac")
+    assert esc.low_value < esc.base_value < esc.high_value
+    assert esc.kpi_at_low < esc.kpi_base < esc.kpi_at_high
+
+
+def test_shared_costs_follow_brine_heat_drawn(book: CostBook) -> None:
+    """ECO-ALLOC: free cooling / electric chillers draw no brine, so wells go to heat."""
+    request = EconomicsRequest(
+        capex=_capex(electric_chiller_mw=4.0), energy_escalation_real_frac=0.0
+    )
+    days = {
+        "heat_by_source_mw": {"hex": 9.0},
+        "cool_by_source_mw": {"chiller": 3.0},
+        "electricity_by_consumer_mw": {"esp": 1.0, "electric_chiller": 0.5},
+    }
+    no_brine = eco.economics(request, make_annual(**days), book=book).data.levelised[0]
+    assert no_brine.allocation_basis == "delivered energy"
+    brine = eco.economics(
+        request, make_annual(brine_heat_drawn_mw={"hex1": 9.0}, **days), book=book
+    ).data.levelised[0]
+    assert brine.allocation_basis == "brine heat drawn"
+    assert brine.heat_share_of_shared_frac == 1.0
+    assert brine.lcoc_usd_per_mwh < no_brine.lcoc_usd_per_mwh
+    absorption = eco.economics(
+        request,
+        make_annual(brine_heat_drawn_mw={"hex1": 9.0, "absorption_drive": 3.0}, **days),
+        book=book,
+    ).data.levelised[0]
+    assert absorption.heat_share_of_shared_frac == pytest.approx(0.75)
+    total = sum(brine.pv_cost_by_service_usd.values())
+    assert brine.lcoe_combined_usd_per_mwh == pytest.approx(
+        total / ((9.0 + 3.0) * 24 * 365 * sum(1.08**-t for t in range(1, 31)))
+    )
+
+
+def test_multiplier_sensitivity_on_premium(book: CostBook) -> None:
+    """ECO-SENS-MULT: ±30 % on the premium; the stated range still widens the bounds."""
+    deviated = book.usd("well_deviated_multiplier")
+    assert deviated.sensitivity_low == pytest.approx(1.0875)
+    assert deviated.sensitivity_high == pytest.approx(1.1625)
+    titanium = book.usd("plate_hex_titanium_multiplier")
+    assert (titanium.sensitivity_low, titanium.sensitivity_high) == (
+        pytest.approx(1.35),
+        pytest.approx(1.65),
+    )
+
+
+def test_replacement_years_round_half_up(book: CostBook) -> None:
+    """Non-integer intervals: 7.5 yr ⇒ years 8, 15, 23 (30 excluded)."""
+    capex = eco.CapexBreakdown(
+        lines=[
+            eco.CapexLine(
+                name="x", items=[], service="heat", cost_usd=1.0, replacement_interval_yr=7.5
+            )
+        ],
+        total_usd=1.0,
+        by_service_usd={"heat": 1.0, "cool": 0.0, "shared": 0.0},
+    )
+    carriers = eco.carrier_balance(
+        make_annual(days=1, heat_by_source_mw={"hex": 1.0}),
+        gas_handling=None,
+        associated_gas_lhv_mj_per_nm3=28.64,
+    )
+    opex = eco.AnnualOpex(
+        by_service_usd={"heat": 0.015, "cool": 0.0, "shared": 0.0},
+        om_usd=0.015,
+        electricity_usd=0.0,
+        grid_gas_usd=0.0,
+        co2_usd=0.0,
+        total_usd=0.015,
+    )
+    lv = eco.levelised_cost(capex, opex, carriers, book, analysis_period_yr=30)
+    om = sum(0.015 * 1.08**-t for t in range(1, 31))
+    replacements = sum(1.08**-t for t in (8, 15, 23))
+    assert lv.pv_heat_cost_usd == pytest.approx(1.0 + om + replacements)

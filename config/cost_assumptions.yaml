@@ -368,12 +368,15 @@ items:
     value: 270.0
     unit: USD/kW_th
     currency: USD
+    price_year: 2014
+    escalation_index: cepci
     range: "none stated on RC-08 (±30 %, DB-35)"
     source: "RC-08 Emission factors table: gas boiler benchmark US$270/kW_th, 80 % efficiency, 90 % availability (NREL desalination report) [L]"
     tag: L
     note: >-
-      Price year not stated on RC-08 (the NREL desalination figures on RC-10 are 2014 $); not escalated. Used for
-      grid-gas and peak boilers (C0, C1 top-up, C2–C7 peak).
+      price_year 2014 is our reading [A]: RC-08 states none, RC-10 dates the NREL desalination report's figures
+      as 2014 $. × CEPCI 2014→2023 (797.9/576.1, escalation [A]) = 374 $/kW_th. Used for grid-gas and peak
+      boilers (C0, C1 top-up, C2–C7 peak).
   absorption_chiller_plant_cost_function_usd:
     value: {machine_fixed: 83000.0, machine_per_ton: 252.0, plant_fixed: 41000.0, plant_per_ton: 170.0}
     unit: "USD per plant = machine_fixed + machine_per_ton (Q_t − 100)/F + plant_fixed + plant_per_ton (Q_t − 100); Q_t duty in refrigeration tons, F capacity fraction"
@@ -397,7 +400,8 @@ items:
     source: "RC-05 Cost: Guidebook Ch14 p.269 (1986 Means $, decoded, VERIFY) [L]; spec ECO-04"
     tag: L
     note: >-
-      Electric centrifugal plant. × CEPCI 1986→2023 = 2.51. Sanity band (RC-10 benchmarks): water-cooled
+      Electric centrifugal plant; assumed to include its own heat rejection like the absorption plant (the
+      Guidebook compares complete plants; VERIFY) [A]. × CEPCI 1986→2023 = 2.51. Sanity band (RC-10 benchmarks): water-cooled
       centrifugal 740–760 $2022/ton installed (US EIA 2023, chiller only).
   absorption_titanium_tubes_multiplier:
     value: 1.125
