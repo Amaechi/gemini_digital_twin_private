@@ -1,5 +1,7 @@
 .. Modified by the GeoAgent team for SPE GeoHackathon 2026, 2026-11-01: separator gas
    composition (GM-12) and compressor power_el output (GM-02).
+.. Modified by the GeoAgent team for SPE GeoHackathon 2026, 2026-11-01: heat-exchanger
+   secondary-side fluid properties (WP-02).
 
 Surface Equipment
 ==============================================
@@ -172,6 +174,9 @@ Parameters
    * - ``fluid_density``, ``specific_heat``
      - *(optional)* fluid properties :math:`\rho`, :math:`c_p`, default to
        water at STP
+   * - ``secondary_fluid_density``, ``secondary_specific_heat``
+     - *(optional)* secondary-side :math:`\rho`, :math:`c_p` (e.g. district water when
+       the primary side is brine); default to the primary-side values
 
 Inputs
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
