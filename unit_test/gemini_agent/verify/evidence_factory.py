@@ -38,6 +38,7 @@ ABS_COP = 0.65
 HEATING_MW = 20.0
 COOLING_MW = 2.0
 HTHP_HEAT_MW = 6.0
+BOILER_EFF = 0.9  # fixture value only (the verifier checks that fuel exists, not its amount)
 
 
 def project() -> dict[str, Any]:
@@ -76,6 +77,7 @@ def balanced_sources(flows_m3h: list[float]) -> dict[str, dict[str, float]]:
         },
         "cool_by_source_mw": {"absorption": COOLING_MW},
         "electricity_by_consumer_mw": {"esp": 0.4, "injection_pump": 0.3, "hthp": hthp_el},
+        "gas_fuel_by_consumer_mw": {"boiler": (HEATING_MW - direct - HTHP_HEAT_MW) / BOILER_EFF},
         "brine_heat_drawn_mw": {
             "geothermal_hex": direct,
             "hthp": HTHP_HEAT_MW - hthp_el,
@@ -168,9 +170,9 @@ def good_evidence(candidate_id: str = CANDIDATE_ID, **overrides: Any) -> Verific
                 name="HTHP",
                 cop=HP_COP,
                 condensing_degc=103.0,
-                evaporating_degc=41.0,
+                evaporating_degc=43.0,
                 sink_out_degc=100.0,
-                source_out_degc=44.0,
+                source_out_degc=46.0,
             )
         ],
         "absorption": [

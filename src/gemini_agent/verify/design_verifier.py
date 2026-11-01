@@ -209,7 +209,7 @@ class HeatPumpPoint(StrictModel):
     """
 
     name: str
-    cop: float = Field(gt=0, description="Heating COP.")
+    cop: float = Field(ge=1, description="Heating COP (≥ 1, RC-04 eq. 3).")
     condensing_degc: float
     evaporating_degc: float
     sink_out_degc: float
@@ -1009,6 +1009,7 @@ class DesignVerifier:
         delivered = drawn + electricity (direct HEX: none; heat pump: Q_cond = Q_evap + W).
         """
         name = "brine-side energy balance < 1 % (heat drawn = ρ·Q·c_p·ΔT; first law per user)"
+        # Users: see ``_user_balances`` (no heat without an input; drive heat matches COP).
         source = "spec §10.1; DB-08, DB-33; DB-23/DB-24"
         if ev.candidate.doublets == 0:
             out.not_applicable("PH-22", name, "no doublets (C0)", source)
@@ -1019,6 +1020,9 @@ class DesignVerifier:
         rho = self.design_basis.brine.density_kg_m3
         cp = self.brine_cp_j_per_kg_k
         _note(assumption_ids, BRINE_CP_ID)
+        lows = [p.cop_min for p in ev.absorption if p.cop_min is not None]
+        highs = [p.cop_max for p in ev.absorption if p.cop_max is not None]
+        cop_range = (min(lows), max(highs)) if lows and highs else None
         worst, missing = _Bound(), 0
         for day in ev.annual.days:
             active = list(_active_doublets(day))
@@ -1048,19 +1052,7 @@ class DesignVerifier:
                 f"{day.date}: heat drawn {_fmt(drawn)} MW vs brine ρQc_pΔT {_fmt(available)} MW "
                 f"({_fmt(100 * error)} %)",
             )
-            for key, drawn_k in day.brine_heat_drawn_mw.items():
-                if key not in day.heat_by_source_mw:
-                    continue  # e.g. absorption drive heat: not delivered to the network
-                delivered = day.heat_by_source_mw[key]
-                expected = drawn_k + day.electricity_by_consumer_mw.get(key, 0.0)
-                scale = max(abs(delivered), abs(expected))
-                error = abs(delivered - expected) / scale if scale > 0 else 0.0
-                worst.add(
-                    ENERGY_BALANCE_TOL_FRAC - error,
-                    error,
-                    f"{day.date} '{key}': delivered {_fmt(delivered)} MW vs drawn + electricity "
-                    f"{_fmt(expected)} MW",
-                )
+            self._user_balances(day, cop_range, worst)
         if missing:
             out.missing(
                 "PH-22", name, f"brine heat drawn or temperatures on {missing} day(s)", source
@@ -1071,6 +1063,54 @@ class DesignVerifier:
             out.bound(
                 "PH-22", name, worst, limit=ENERGY_BALANCE_TOL_FRAC, unit="frac", source=source
             )
+
+    @staticmethod
+    def _user_balances(
+        day: DayResult, cop_range: tuple[float, float] | None, worst: _Bound
+    ) -> None:
+        """First law per user: no heat source without an energy input.
+
+        - a brine user that delivers network heat: delivered = drawn + its electricity (1 %);
+        - a brine user that delivers no network heat drives cooling of the same key, with the
+          implied COP (cooling / drawn heat) inside the GM-04 bounds of the absorption points;
+        - every other network heat source needs fuel or electricity under the same key.
+        """
+        for key, drawn_k in day.brine_heat_drawn_mw.items():
+            if key in day.heat_by_source_mw:
+                delivered = day.heat_by_source_mw[key]
+                expected = drawn_k + day.electricity_by_consumer_mw.get(key, 0.0)
+                scale = max(abs(delivered), abs(expected))
+                error = abs(delivered - expected) / scale if scale > 0 else 0.0
+                worst.add(
+                    ENERGY_BALANCE_TOL_FRAC - error,
+                    error,
+                    f"{day.date} '{key}': delivered {_fmt(delivered)} MW vs drawn + electricity "
+                    f"{_fmt(expected)} MW",
+                )
+            elif drawn_k > 0 and key not in day.cool_by_source_mw:
+                worst.add(-1.0, drawn_k, f"{day.date} '{key}': brine heat drawn but not used")
+            elif drawn_k > 0 and cop_range is not None:
+                cop = day.cool_by_source_mw[key] / drawn_k
+                lo, hi = cop_range
+                worst.add(
+                    min(cop / lo - 1.0, 1.0 - cop / hi),
+                    cop,
+                    f"{day.date} '{key}': cooling/drive heat = COP {_fmt(cop)} vs "
+                    f"{_fmt(lo)}–{_fmt(hi)} (GM-04)",
+                )
+        for key, heat in day.heat_by_source_mw.items():
+            fed = (
+                key in day.brine_heat_drawn_mw
+                or key in day.gas_fuel_by_consumer_mw
+                or key in day.electricity_by_consumer_mw
+            )
+            if heat > 0 and not fed:
+                worst.add(
+                    -1.0,
+                    heat,
+                    f"{day.date} '{key}': {_fmt(heat)} MW of heat without brine, fuel or "
+                    "electricity input",
+                )
 
     def _hex_checks(self, out: _Checks, ev: VerificationEvidence, types: dict[str, str]) -> None:
         names = {
@@ -1154,15 +1194,15 @@ class DesignVerifier:
             cond_k, evap_k = p.condensing_degc + 273.15, p.evaporating_degc + 273.15
             if (
                 cond_k <= evap_k
-                or p.condensing_degc < p.sink_out_degc
-                or p.evaporating_degc > p.source_out_degc
+                or p.condensing_degc <= p.sink_out_degc
+                or p.evaporating_degc >= p.source_out_degc
             ):
                 carnot.add(
                     -1.0,
                     p.cop,
                     f"{p.name}: configuration error (condensing {_fmt(p.condensing_degc)} °C must "
                     f"exceed the evaporating {_fmt(p.evaporating_degc)} °C and the sink outlet; "
-                    "evaporating must be below the source outlet)",
+                    "evaporating must be below the source outlet: approaches > 0)",
                 )
                 continue
             cop_carnot = cond_k / (cond_k - evap_k)

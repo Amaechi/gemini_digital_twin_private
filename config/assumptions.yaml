@@ -277,12 +277,16 @@ assumptions:
     value: 20.0
     unit: bar(g)
     justification: >-
-      The brine bubble-point (CO₂-release) pressure is not provided, so the DesignVerifier's ESP-intake
-      check (spec §10.1 physical layer) uses the reference card's default: keep the ESP intake at or
-      above 20 bar(g) and flag the missing input. A tool that computes the release pressure passes it
-      explicitly (EspPoint.release_pressure_bar) and the default is not used.
+      The brine bubble-point (CO₂-release) pressure is not provided, so the DesignVerifier uses the
+      reference card's default 20 bar(g) for the ESP-intake check (PH-18) and, for a pressurised loop
+      without degassing (DB-36 option b), as the minimum brine pressure at every brine HEX (PD-10,
+      RC-12), and flags the missing input. A tool that computes the release pressure passes it
+      explicitly (EspPoint.release_pressure_barg / VerificationEvidence.co2_release_pressure_barg) and
+      the default is not used. Caution: with GLR 0.8 Nm³/m³ of mostly CH₄ (DB-09) the true bubble
+      point is likely much higher (an unverified Henry's-law estimate gives ≈ 35–50 bar(a)), so this
+      default is probably non-conservative; a pressurised loop then exceeds gasketed plate-HEX ratings.
     source: RC-01 item 9 [A] (DiPippo eq 4.16–4.20 flash-horizon method; Ch8 p.4)
-    sensitivity: "Release pressure 10 / 30 bar(g): the ESP setting depth moves accordingly."
+    sensitivity: "Release pressure 10 / 30 / 50 bar(g): ESP setting depth and the pressurised-loop HEX rating move accordingly."
     tag: A
     status: default
     added_by: WP-09

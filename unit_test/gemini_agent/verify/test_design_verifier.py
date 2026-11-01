@@ -113,7 +113,7 @@ def test_good_design_is_accepted_with_margins_and_short_summary():
     assert report.check("PH-02").margin == pytest.approx(0.0)  # 86 → 46 °C is exactly 40 K
     assert report.check("PH-07").margin == pytest.approx(4.0 - 1.1)  # RC-03 approach
     assert report.check("PH-10").value == pytest.approx(24.0)  # 84 kPa / 3.5 NTU (RC-03 eq. 4)
-    assert report.check("PH-13").margin == pytest.approx(376.15 / 62.0 - 3.5)  # Carnot
+    assert report.check("PH-13").margin == pytest.approx(376.15 / 60.0 - 3.5)  # Carnot
     assert report.check("PH-22").value == pytest.approx(0.0, abs=1e-9)  # brine balance closes
     assert report.check("PD-09").limit == pytest.approx(87.0)  # DB-20: 12 + 0.03 × 2500
     assert set(report.assumption_ids) == {"DB-33", HP_CARNOT_FRACTION_ID, HP_MAX_LIFT_ID}
@@ -213,8 +213,9 @@ FAILING_CASES: list[tuple[str, Callable[[], dict[str, Any]]]] = [
     ("PH-13", lambda: _first("heat_pumps", cop=7.0)),
     ("PH-13", lambda: _first("heat_pumps", evaporating_degc=104.0)),  # configuration error
     ("PH-13", lambda: _first("heat_pumps", condensing_degc=99.0)),  # below the sink outlet
+    ("PH-13", lambda: _first("heat_pumps", condensing_degc=100.0)),  # zero approach
     ("PH-14", lambda: _first("heat_pumps", max_lift_k=50.0)),
-    ("PH-14", lambda: _first("heat_pumps", cop=3.8)),  # > 0.6 × Carnot 6.07 (RC-04 [A])
+    ("PH-14", lambda: _first("heat_pumps", cop=3.8)),  # > 0.6 × Carnot 6.27 = 3.76 (RC-04 [A])
     ("PH-15", lambda: _first("absorption", cop=0.8)),
     ("PH-15", lambda: _first("absorption", cooling_mw=3.5)),
     ("PH-16", lambda: _first("absorption", pumping_power_mw=0.4)),
@@ -227,6 +228,24 @@ FAILING_CASES: list[tuple[str, Callable[[], dict[str, Any]]]] = [
     (  # heat-pump first law: Q_cond ≠ Q_evap + W
         "PH-22",
         lambda: _days(electricity_by_consumer_mw=_day0("electricity_by_consumer_mw", hthp=2.5)),
+    ),
+    (  # 3 MW of 'heat from nothing': delivered without a drawn, fuel or electricity entry
+        "PH-22",
+        lambda: _days(
+            heat_by_source_mw=_day0(
+                "heat_by_source_mw", hex2=3.0, boiler=ef.day(0).heat_by_source_mw["boiler"] - 3.0
+            )
+        ),
+    ),
+    (  # drive heat inflated: cooling / drawn = 2 / 5.08 = 0.39 < GM-04 minimum 0.55
+        "PH-22",
+        lambda: _days(
+            brine_heat_drawn_mw=_day0(
+                "brine_heat_drawn_mw",
+                geothermal_hex=ef.day(0).brine_heat_drawn_mw["geothermal_hex"] - 2.0,
+                absorption=ef.day(0).brine_heat_drawn_mw["absorption"] + 2.0,
+            )
+        ),
     ),
     ("PH-23", lambda: _hex(ntu=2.5, pressure_drop_pa=60_000.0)),  # too small for 86→70/55→82
     ("PH-23", lambda: _hex(passes=3)),  # 3 × 3.5 = 10.5 > 3.24/0.85
