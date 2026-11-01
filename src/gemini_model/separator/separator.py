@@ -13,7 +13,8 @@ the gas already contains ("inherent" CO2). Source: RC-08 "Associated gas"
 # Modified by the GeoAgent team for SPE GeoHackathon 2026, 2026-11-01: gas composition parameters
 # (ch4_fraction, co2_fraction, fuel_lhv_j_kg; gas_density derived when not given) and outputs
 # (fuel_power_w, inherent_co2_kg_s, ...) for GM-12. Without the new parameters the outputs are
-# zero and every existing output is unchanged.
+# zero and every existing output is unchanged. WP-01 review: an explicit fuel_lhv_j_kg with gas
+# flow but no gas density (no gas_density, no composition) raises instead of giving 0 W fuel.
 
 from gemini_model.model_abstract import StaticModel
 
@@ -137,8 +138,10 @@ class Separator(StaticModel):
         CO2, kg/s). The species flows are the composition's mass fractions
         times ``gas_mass_flow_rate``, so they always add up to it (also
         with an explicit ``gas_density``). Without a composition the
-        species/CO2 outputs are 0, and ``fuel_power_w`` is 0 unless
-        ``fuel_lhv_j_kg`` is given. ``emission`` stays 0: the separator
+        species/CO2 outputs are 0, and ``fuel_power_w`` needs both
+        ``gas_density`` and ``fuel_lhv_j_kg``: it is 0 without an LHV,
+        and an LHV with ``gas_water_ratio`` > 0 but no gas density raises
+        ``ValueError`` (the fuel would silently be 0 W). ``emission`` stays 0: the separator
         does not emit; the CO2 is counted where the gas is burned (or
         vented).
         """
@@ -157,6 +160,11 @@ class Separator(StaticModel):
         fuel_lhv_j_kg = self.parameters.get(
             "fuel_lhv_j_kg", gas["lhv_j_kg"] if gas is not None else 0.0
         )
+        if fuel_lhv_j_kg > 0.0 and gas_water_ratio > 0.0 and gas_density <= 0.0:
+            raise ValueError(
+                "Separator: the fuel LHV is > 0 but the gas density is <= 0, so fuel_power_w would "
+                "be 0 W; give gas_density (kg/Nm3) > 0 or ch4_fraction/co2_fraction."
+            )
 
         if direction == "forward":
             pressure_in = pressure

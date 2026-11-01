@@ -1,5 +1,5 @@
 .. Modified by the GeoAgent team for SPE GeoHackathon 2026, 2026-11-01: "pvt" parameter
-   (GM-01) and superficial gas velocity fix (GM-11).
+   (GM-01) and superficial gas velocity fix (GM-11); ESP specific gravity (WP-01 review).
 
 Well: Pressure and Temperature Hydraulics
 ==========================================
@@ -412,7 +412,10 @@ Fluid PVT and two-phase velocities
 The fluid properties come from ``DPDT.PVT``. Passing a ``"pvt"`` block in the
 parameters (``update_parameters({"pvt": {...}})``, or from project JSON for
 ``well``, ``producer_well`` and ``injector_well``) replaces it with a
-configured ``PVTConstantSTP`` (see :doc:`model_fluid_pvt`).
+configured ``PVTConstantSTP`` (see :doc:`model_fluid_pvt`). For a
+``producer_well`` the block's liquid density also scales the ESP's water
+head/power curves by the specific gravity :math:`SG = \rho_l / 1000` kg/m³
+(``gemini_simulator.well_flow``), so the pump sees the same fluid as the column.
 
 For two-phase cells the superficial velocities passed to Beggs-Brill are
 

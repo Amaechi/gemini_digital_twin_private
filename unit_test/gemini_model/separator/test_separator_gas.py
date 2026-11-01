@@ -94,6 +94,18 @@ def test_explicit_lhv_without_composition_gives_fuel_power():
     assert y["inherent_co2_kg_s"] == 0.0
 
 
+def test_explicit_lhv_without_any_gas_density_raises():
+    """An LHV with gas flow but no density (no gas_density, no composition) is an error.
+
+    Otherwise the gas mass flow is 0 and fuel_power_w silently reads 0 W instead of the
+    RC-08 1.91 MW (WP-01 review).
+    """
+    with pytest.raises(ValueError, match="gas density is <= 0"):
+        _run({"gas_water_ratio": 0.8, "fuel_lhv_j_kg": 29.7e6})
+    # Without gas flow there is no fuel to lose, so the same parameters are accepted.
+    assert _run({"gas_water_ratio": 0.0, "fuel_lhv_j_kg": 29.7e6})["fuel_power_w"] == 0.0
+
+
 def test_legacy_configuration_is_unchanged():
     """Without a composition the old outputs are unchanged and the new ones are 0."""
     y = _run({"gas_water_ratio": 0.5, "gas_density": 0.7})

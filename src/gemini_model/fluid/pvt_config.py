@@ -24,6 +24,7 @@ Source: RC-01 "Inputs" and validation tests (hydrostatic head 252.6 bar for
 """
 
 import math
+import numbers
 
 from gemini_model.fluid.pvt_water_stp import PVTConstantSTP
 
@@ -42,8 +43,9 @@ PVT_PARAMETER_ALIASES = {
 }
 
 # Native keys that must be strictly positive (a zero or negative value would
-# divide by zero or flip the sign of a pressure/heat term).
-_STRICTLY_POSITIVE_KEYS = ("RHOL", "RHOG", "VISL", "VISG", "CPL", "CPG", "TCL", "TCG")
+# divide by zero or flip the sign of a pressure/heat term; Beggs-Brill uses
+# (rho_l / SIGMA) ** 0.25).
+_STRICTLY_POSITIVE_KEYS = ("RHOL", "RHOG", "VISL", "VISG", "CPL", "CPG", "TCL", "TCG", "SIGMA")
 
 
 def _native_keys():
@@ -71,8 +73,11 @@ def normalise_pvt_parameters(pvt_parameters):
         a real number.
     ValueError
         If a key is unknown, an alias and its native key disagree, a value is
-        not finite, a density/viscosity/heat capacity/conductivity is not
-        positive, or ``GMF`` is outside ``[0, 1)``.
+        not finite, a density/viscosity/heat capacity/conductivity/surface
+        tension is not positive, or ``GMF`` is outside ``[0, 1)``.
+
+    Python and numpy real numbers (``int``, ``float``, ``np.int64``,
+    ``np.float32`` ...) are accepted; booleans are not.
     """
     if pvt_parameters is None:
         return {}
@@ -90,7 +95,7 @@ def normalise_pvt_parameters(pvt_parameters):
         if native not in native_keys:
             allowed = sorted(native_keys | set(PVT_PARAMETER_ALIASES))
             raise ValueError(f"Unknown 'pvt' key '{key}'. Allowed keys: {', '.join(allowed)}.")
-        if isinstance(value, bool) or not isinstance(value, (int, float)):
+        if isinstance(value, bool) or not isinstance(value, numbers.Real):
             raise TypeError(f"'pvt' value for '{key}' must be a number, got {value!r}.")
         if not math.isfinite(value):
             raise ValueError(f"'pvt' value for '{key}' must be finite, got {value!r}.")

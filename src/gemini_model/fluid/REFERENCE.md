@@ -11,7 +11,13 @@ aliases (`liquid_density_kg_m3`, `liquid_viscosity_pa_s`, `liquid_specific_heat_
 `liquid_thermal_conductivity_w_mk`, `gas_density_kg_m3`, `gas_viscosity_pa_s`,
 `gas_specific_heat_j_kgk`, `gas_thermal_conductivity_w_mk`, `gas_mass_fraction`,
 `surface_tension_n_m`). Unknown keys, alias/native conflicts, non-finite values,
-non-positive ρ/μ/c_p/k and `GMF` outside [0, 1) raise. No block = GEMINI default.
+non-positive ρ/μ/c_p/k/σ and `GMF` outside [0, 1) raise; numpy real numbers are accepted.
+No block = GEMINI default.
+
+For `producer_well` the block's ρ_l also scales the ESP's water head/power curves by the
+specific gravity SG = ρ_l / 1000 kg/m³ (`gemini_simulator.well_flow._FluidESP`): the pump
+pressure rise is SG ρ_w g H and its brake power SG × the water value (RC-01 items 6–8).
+Without a block, or with ρ_l left at 1000, SG = 1 and the GEMINI ESP is unchanged.
 
 ## Parameter values
 | Quantity | GEMINI default (water, STP) | Design-basis brine | Tag / source |
