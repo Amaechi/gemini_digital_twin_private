@@ -198,42 +198,66 @@ def test_capex_lines_and_services(book: CostBook) -> None:
     assert any("MISSING INPUT" in w and "pump" in w for w in capex.warnings)
 
 
-def test_capex_validation_and_chp_fraction(book: CostBook, config_copy, edit_yaml) -> None:
-    """Check capex validation and chp fraction."""
+def test_capex_validation(book: CostBook) -> None:
+    """Check that CapexRequest refuses incomplete absorption, well and CHP inputs."""
     with pytest.raises(ValueError):
         _capex(absorption_chiller_mw=2.0)  # needs the capacity fraction
     with pytest.raises(ValueError):
         _capex(doublets=0)  # depth given without doublets
+    with pytest.raises(ValueError):
+        _capex(chp_electric_mw=1.0, chp_thermal_mw=2.0)
+
+
+def test_chp_fraction_from_real_register(book: CostBook) -> None:
+    """CHP-EL-FRAC (WP-03: 0.3333 = GEMINI chp.py 1/3) from config/assumptions.yaml is used."""
+    register = load_config("assumptions")
+    entry = register.get("CHP-EL-FRAC")
+    assert entry.value == 0.3333 and entry.added_by == "WP-03"
+    p_el, frac, warnings = eco.chp_electric_capacity_mw(2.0, None, register)
+    assert frac == 0.3333
+    assert p_el == pytest.approx(2.0 * 0.3333 / 0.6667)
+    assert warnings == []
+    # an explicit DEA 0.50 is overridden by the register and warned about
+    _, frac, warnings = eco.chp_electric_capacity_mw(2.0, 0.5, register)
+    assert frac == 0.3333 and "ignored" in warnings[0]
+    # end to end: economics() reads the real register for a CHP sized by its heat output
+    request = EconomicsRequest(capex=_capex(chp_thermal_mw=2.0), energy_escalation_real_frac=0.0)
+    result = eco.economics(request, make_annual(heat_by_source_mw={"chp": 2.0}), book=book)
+    chp = next(line for line in result.data.capex.lines if line.name == "chp")
+    assert chp.cost_usd == pytest.approx(p_el * 1000 * book.usd_value("chp_capex_usd_per_kw_e"))
+    assert any("f = 0.3333" in w for w in result.warnings)
+
+
+def test_chp_fraction_without_or_with_bad_register_entry(
+    book: CostBook, config_copy: Path, edit_yaml
+) -> None:
+    """No entry: the parameter is used, else ValueError; a non-numeric entry raises."""
+
+    def drop_entry(data: dict) -> None:
+        data["assumptions"] = [a for a in data["assumptions"] if a["id"] != "CHP-EL-FRAC"]
+
+    edit_yaml(config_copy / "assumptions.yaml", drop_entry)
+    register = load_config("assumptions", config_copy)
     with pytest.raises(ValueError, match="CHP-EL-FRAC"):
-        eco.capex_breakdown(_capex(chp_thermal_mw=2.0), book, load_config("assumptions"))
+        eco.capex_breakdown(_capex(chp_thermal_mw=2.0), book, register)
     capex = eco.capex_breakdown(
-        _capex(chp_thermal_mw=2.0, chp_electrical_fraction=1 / 3), book, load_config("assumptions")
+        _capex(chp_thermal_mw=2.0, chp_electrical_fraction=0.5), book, register
     )
     chp = next(line for line in capex.lines if line.name == "chp")
-    assert chp.cost_usd == pytest.approx(1.0 * 1000 * book.usd_value("chp_capex_usd_per_kw_e"))
+    assert chp.cost_usd == pytest.approx(2.0 * 1000 * book.usd_value("chp_capex_usd_per_kw_e"))
 
-    def add_entry(data: dict) -> None:
-        """Fixture: add entry."""
+    def bad_entry(data: dict) -> None:
         data["assumptions"].append(
             {
                 "id": "CHP-EL-FRAC",
                 "title": "t",
-                "value": 0.5,
+                "value": "half",
                 "justification": "j",
                 "source": "s",
                 "sensitivity": None,
-                "added_by": "WP-06",
+                "added_by": "WP-03",
             }
         )
-
-    edit_yaml(config_copy / "assumptions.yaml", add_entry)
-    register = load_config("assumptions", config_copy)
-    p_el, frac, warnings = eco.chp_electric_capacity_mw(2.0, 1 / 3, register)
-    assert (p_el, frac) == (pytest.approx(2.0), 0.5)  # register (WP-06) wins
-    assert warnings and "ignored" in warnings[0]
-
-    def bad_entry(data: dict) -> None:
-        data["assumptions"][-1]["value"] = "half"
 
     edit_yaml(config_copy / "assumptions.yaml", bad_entry)
     with pytest.raises(ValueError, match="CHP-EL-FRAC"):

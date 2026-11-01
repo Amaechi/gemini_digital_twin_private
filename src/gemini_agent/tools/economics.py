@@ -87,7 +87,7 @@ ASSUMPTION_GRID_GAS_CO2 = "ECO-CO2-GAS"
 ASSUMPTION_ELECTRICITY_CO2 = "DB-37"
 ASSUMPTION_ASSOC_GAS = "ECO-CO2-AG"
 ASSUMPTION_CHP_EL_FRAC = "CHP-EL-FRAC"
-"""Register id for the CHP electrical fraction of useful output, decided by WP-06 (if present)."""
+"""Register id for the CHP electrical fraction of useful output, decided by WP-03 (0.3333)."""
 ASSUMPTION_IDS = [
     "ECO-CUR",
     "DB-35",
@@ -557,7 +557,7 @@ class CapexRequest(StrictModel):
         default=None,
         gt=0,
         lt=1,
-        description="Electricity / useful output; else register CHP-EL-FRAC (WP-06).",
+        description="Electricity / useful output; else register CHP-EL-FRAC (WP-03).",
     )
     gas_boiler_mw: float = Field(default=0.0, ge=0)
     electric_boiler_mw: float = Field(default=0.0, ge=0)
@@ -615,7 +615,7 @@ def chp_electric_capacity_mw(
     """CHP electrical capacity from its thermal output: ``P_el = P_th · f/(1 − f)``.
 
     ``f`` = electricity share of useful output — GEMINI ``chp.py`` 1/3 vs DEA gas engine ≈ 0.50
-    (RC-08, RC-10); decided by WP-06 in register ``CHP-EL-FRAC`` (a plain number in (0, 1); it
+    (RC-08, RC-10); decided by WP-03 in register ``CHP-EL-FRAC`` (a plain number in (0, 1); it
     wins when present), else the explicit parameter. Returns ``(P_el, f, warnings)``.
     """
     warnings: list[str] = []
@@ -635,7 +635,7 @@ def chp_electric_capacity_mw(
         fraction = float(value)
     if fraction is None:
         raise ValueError(
-            "CHP electrical fraction unknown: register CHP-EL-FRAC (WP-06) missing and no "
+            "CHP electrical fraction unknown: register CHP-EL-FRAC (WP-03) missing and no "
             "chp_electrical_fraction given"
         )
     return thermal_mw * fraction / (1.0 - fraction), fraction, warnings
