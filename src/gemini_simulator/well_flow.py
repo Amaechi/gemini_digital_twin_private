@@ -15,10 +15,13 @@ reservoir/ESP configuration directly, with no extra conversion code.
 # Modified by the GeoAgent team for SPE GeoHackathon 2026, 2026-11-01: optional "pvt" block in the
 # well configs (GM-01) is passed to every DPDT built here; without it the fluid is GEMINI's
 # default water PVT, as before.
+# Modified by the GeoAgent team for SPE GeoHackathon 2026, 2026-11-01 (WP-01 review): the ESP's
+# water head/power curves are scaled by the "pvt" block's specific gravity (RHOL / 1000), so the
+# pump sees the same fluid as the well column; without a block SG = 1 and nothing changes.
 
 import numpy as np
 
-from gemini_model.fluid.pvt_config import build_pvt
+from gemini_model.fluid.pvt_config import build_pvt, liquid_properties
 from gemini_model.pump.esp import ESP
 from gemini_model.reservoir.inflow_performance import IPR
 from gemini_model.well.pressure_drop import DPDT
@@ -128,6 +131,55 @@ def _build_dpdt(segments, roughness=0.01, pvt=None):
     return well
 
 
+class _FluidESP(ESP):
+    """GEMINI ``ESP`` corrected for the pumped fluid's specific gravity (GM-01).
+
+    The ESP head/power polynomials are water catalogue curves: the head is
+    in feet of liquid (independent of the fluid) and is turned into a
+    pressure rise with water's ``rho g`` (``ESP.FT_HEAD_TO_PA``); the brake
+    power is for specific gravity 1. For a denser fluid both scale with
+    ``SG = rho_l / rho_water``: ``dP = SG rho_water g H`` and
+    ``P_shaft = Q dP / eta = SG P_shaft,water`` (RC-01 items 6-8: ESP
+    pressure rise, ``P_hyd = Q dP``, heads divided by SG). The efficiency
+    (``Q H / P``) does not change. ``specific_gravity=1.0`` reproduces the
+    GEMINI ``ESP`` exactly.
+    """
+
+    def __init__(self, specific_gravity=1.0):
+        """Model initialization with the fluid's specific gravity (-)."""
+        super().__init__()
+        self.specific_gravity = specific_gravity
+
+    def head_function(self, pump_flow, freq):
+        """Return the ESP pressure rise (Pa) for the configured fluid."""
+        return super().head_function(pump_flow, freq) * self.specific_gravity
+
+    def power_function(self, pump_flow, freq):
+        """Return the ESP brake power (W) for the configured fluid."""
+        return super().power_function(pump_flow, freq) * self.specific_gravity
+
+
+def _esp_specific_gravity(pvt=None):
+    """Return the well fluid's specific gravity for the ESP curves (-).
+
+    ``RHOL`` of the ``"pvt"`` block divided by GEMINI's default water
+    density (``PVTConstantSTP`` ``RHOL`` = 1000 kg/m3), so a missing block
+    or one that leaves ``RHOL`` at its default gives exactly 1.0. (The ESP's
+    own ``FT_HEAD_TO_PA`` implies 999.74 kg/m3; the 0.03 % difference is
+    GEMINI's and is left as is.)
+    """
+    density_kg_m3, _ = liquid_properties(pvt)
+    water_density_kg_m3, _ = liquid_properties(None)
+    return density_kg_m3 / water_density_kg_m3
+
+
+def _build_esp(esp_config, pvt=None):
+    """Build the producer's ESP, its curves scaled to the ``"pvt"`` fluid (GM-01)."""
+    esp = _FluidESP(_esp_specific_gravity(pvt))
+    esp.update_parameters(esp_config)
+    return esp
+
+
 def solve_primary_flow_m3h(
     well_config,
     wellhead_pressure_bar,
@@ -167,7 +219,9 @@ def solve_primary_flow_m3h(
         ``"pvt"`` overrides the well fluid's PVT properties (native
         ``PVTConstantSTP`` keys or the unit-suffixed aliases in
         :data:`gemini_model.fluid.pvt_config.PVT_PARAMETER_ALIASES`);
-        omit it for GEMINI's default water PVT.
+        omit it for GEMINI's default water PVT. Its liquid density also
+        scales the ESP's water head/power curves (specific gravity
+        ``RHOL / 1000``, see :class:`_FluidESP`).
         ``"trajectory_table"`` is a list of cumulative MD/TVD/ID survey
         stations (station 0 is normally the wellhead, ``MD=TVD=0``),
         matching the MD/TVD/ID nodal-analysis convention used across the
@@ -215,8 +269,7 @@ def solve_primary_flow_m3h(
         top_segments, bottom_segments = _split_trajectory_at_depth(trajectory_segments, esp_depth)
         dpdt_top = _build_dpdt(top_segments, roughness=roughness_m, pvt=pvt)
         dpdt_bottom = _build_dpdt(bottom_segments, roughness=roughness_m, pvt=pvt)
-        esp = ESP()
-        esp.update_parameters(esp_config)
+        esp = _build_esp(esp_config, pvt)
     else:
         dpdt_top = _build_dpdt(trajectory_segments, roughness=roughness_m, pvt=pvt)
         dpdt_bottom = None
@@ -255,8 +308,7 @@ def producer_esp_power_w(well_config, flow_m3h):
     if esp_config is None or esp_freq is None:
         return 0.0
 
-    esp = ESP()
-    esp.update_parameters(esp_config)
+    esp = _build_esp(esp_config, well_config.get("pvt"))
     esp.calculate_output({"pump_freq": esp_freq, "pump_flow": flow_m3h / 3600.0})
     return esp.get_output()["pump_power"]
 
@@ -304,8 +356,7 @@ def producer_esp_pressures_bar(
     # the intake (upstream, pre-boost) pressure is lower by the pump head.
     discharge_pressure_pa = dpdt_top.get_output()["pressure_output"]
 
-    esp = ESP()
-    esp.update_parameters(esp_config)
+    esp = _build_esp(esp_config, well_config.get("pvt"))
     esp.calculate_output({"pump_freq": esp_freq, "pump_flow": flow_m3h / 3600.0})
     pump_head_pa = esp.get_output()["pump_head"]
 

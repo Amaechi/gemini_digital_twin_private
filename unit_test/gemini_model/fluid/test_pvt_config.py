@@ -2,6 +2,7 @@
 
 import math
 
+import numpy as np
 import pytest
 
 from gemini_model.fluid.pvt_config import (
@@ -54,6 +55,14 @@ def test_native_keys_and_comment_keys_are_accepted():
     assert normalised == {"RHOL": 1030.0}
 
 
+@pytest.mark.parametrize("value", [np.int64(1030), np.float32(1030.0), np.float64(1030.0)])
+def test_numpy_real_numbers_are_accepted(value):
+    """Numpy scalars (e.g. from a config generator) are real numbers and become floats."""
+    normalised = normalise_pvt_parameters({"liquid_density_kg_m3": value})
+    assert normalised == {"RHOL": 1030.0}
+    assert type(normalised["RHOL"]) is float
+
+
 def test_alias_and_native_key_may_repeat_the_same_value():
     """Giving the same quantity twice is fine if the values agree."""
     assert normalise_pvt_parameters({"RHOL": 1030.0, "liquid_density_kg_m3": 1030.0}) == {
@@ -68,10 +77,13 @@ def test_alias_and_native_key_may_repeat_the_same_value():
         ({"RHOL": 1030.0, "liquid_density_kg_m3": 1000.0}, ValueError),  # conflict
         ({"RHOL": 0.0}, ValueError),  # not positive
         ({"VISL": -1e-3}, ValueError),
+        ({"SIGMA": -0.07}, ValueError),  # Beggs-Brill needs (rho_l / sigma) ** 0.25
+        ({"SIGMA": 0.0}, ValueError),
         ({"RHOL": math.nan}, ValueError),  # not finite
         ({"GMF": 1.0}, ValueError),  # outside [0, 1)
         ({"RHOL": "1030"}, TypeError),  # not a number
         ({"RHOL": True}, TypeError),
+        ({"RHOL": np.True_}, TypeError),
         ([("RHOL", 1030.0)], TypeError),  # not a dict
         ({1: 1030.0}, TypeError),  # key not a string
     ],

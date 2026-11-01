@@ -3,7 +3,8 @@
 Model: `pressure_drop.DPDT`. Source card: `data/knowledge/reference_cards/RC-01_reservoir_wells_pumps.md`.
 
 ## Equations (RC-01)
-- Single-phase segment loss (RC-01 eq. 5, DiPippo eq. 4.10–4.11):
+- Single-phase segment loss (RC-01 eq. 5, DiPippo eq. 4.10–4.11; the card marks its DiPippo
+  equation forms `VERIFY` against the book — GEMINI's code is authoritative for behaviour):
   `ΔP = ρ g L sin θ + f (L/D) ρ v²/2`, Swamee–Jain friction factor
   `f = 0.25 / [log10(ε/(3.7D) + 5.74/Re^0.9)]²` (`correlation/darcyweisbach.py`).
 - Two-phase segments (gas mass fraction > 0) use Beggs–Brill with superficial

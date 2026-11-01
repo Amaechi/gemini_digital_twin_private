@@ -13,6 +13,7 @@ import pytest
 from gemini_simulator.project_loader import build_project
 from gemini_simulator.well_components import InjectorWell, ProducerWell
 from gemini_simulator.well_flow import (
+    producer_esp_power_w,
     producer_esp_pressures_bar,
     solve_injector_wellhead_pressure_bar,
     solve_primary_flow_m3h,
@@ -80,6 +81,49 @@ def test_producer_flow_with_brine_differs_from_water():
     brine_flow = solve_primary_flow_m3h(brine, **kwargs)
     assert water_flow == pytest.approx(129.02, abs=0.01)  # GEMINI example, default unchanged
     assert brine_flow < water_flow - 1.0
+
+
+def test_esp_pressure_rise_and_power_scale_with_brine_specific_gravity():
+    """The ESP pumps the same brine as the column: dP = SG rho_w g H and P = SG P_water.
+
+    The GEMINI ESP curves are for water (head in ft, brake power at SG 1); with a 1030 kg/m3
+    'pvt' block both scale by SG = 1030 / 1000 (RC-01 items 6-8). Before the WP-01 review the
+    ESP ignored the block (28.44 bar and 175.1 kW for both fluids at 130 m3/h).
+    """
+    water = _project()["components"]["producer_well"]["parameters"]
+    brine = {**water, "pvt": BRINE_PVT}
+    flow_m3h, wellhead_bar = 130.0, 3.0
+    water_intake, water_discharge = producer_esp_pressures_bar(water, flow_m3h, wellhead_bar)
+    brine_intake, brine_discharge = producer_esp_pressures_bar(brine, flow_m3h, wellhead_bar)
+    assert water_intake > 0.0 and brine_intake > 0.0  # not clipped at 0 bar
+    water_rise_bar = water_discharge - water_intake
+    brine_rise_bar = brine_discharge - brine_intake
+    assert water_rise_bar == pytest.approx(28.44, abs=0.01)  # GEMINI water value, unchanged
+    assert brine_rise_bar / water_rise_bar == pytest.approx(1030.0 / 1000.0, rel=1e-12)
+    water_power_w = producer_esp_power_w(water, flow_m3h)
+    assert producer_esp_power_w(brine, flow_m3h) / water_power_w == pytest.approx(
+        1030.0 / 1000.0, rel=1e-12
+    )
+
+
+def test_pvt_block_without_density_keeps_the_gemini_esp():
+    """SG is exactly 1 unless the block sets the liquid density, so the ESP is unchanged."""
+    water = _project()["components"]["producer_well"]["parameters"]
+    no_density = {**water, "pvt": {"liquid_specific_heat_j_kgk": 4100.0}}
+    assert producer_esp_power_w(no_density, 130.0) == producer_esp_power_w(water, 130.0)
+    kwargs = {"wellhead_pressure_bar": 3.0, "wellhead_temperature_c": 80.0}
+    assert solve_primary_flow_m3h(no_density, **kwargs) == solve_primary_flow_m3h(water, **kwargs)
+
+
+def test_producer_flow_with_brine_uses_the_brine_esp():
+    """Regression: the brine producer delivers 114.80 m3/h (112.95 with a water ESP).
+
+    The stronger ESP (x 1.03) recovers part of the flow lost to the heavier column.
+    """
+    water = _project()["components"]["producer_well"]["parameters"]
+    brine = {**water, "pvt": BRINE_PVT}
+    flow_m3h = solve_primary_flow_m3h(brine, wellhead_pressure_bar=3.0, wellhead_temperature_c=80.0)
+    assert flow_m3h == pytest.approx(114.80, abs=0.01)
 
 
 def test_project_json_pvt_reaches_both_wells():

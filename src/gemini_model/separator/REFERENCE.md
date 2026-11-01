@@ -18,7 +18,9 @@ Normal conditions: 0 °C, 1.01325 bar; molar volume 22.414 Nm³/kmol.
   → 1.964 kg/Nm³ = 68.6 kg/GJ_LHV.
 
 Explicit `gas_density` (kg/Nm³) and `fuel_lhv_j_kg` parameters override the derived values.
-Without a composition the new outputs are 0 and existing outputs are unchanged.
+Without a composition the species/CO₂ outputs are 0 and existing outputs are unchanged;
+`fuel_power_w` then needs both `gas_density` and `fuel_lhv_j_kg` (0 without an LHV; an
+LHV with gas flow but no density raises, instead of reporting 0 W).
 The separator's own `emission` output stays 0: CO₂ is counted where the gas is burned
 (or vented; venting CH₄ is not allowed [A], RC-08).
 
