@@ -4,12 +4,14 @@ Source: RC-06 (``data/knowledge/reference_cards/RC-06_electric_chiller.md``, cop
 ``REFERENCE.md``); Geothermal Direct Use Engineering & Design Guidebook (Geo-Heat Center
 1989) p.257-258, 262, 266; spec §3.3 and §7.2 GM-05.
 
-- ``COP = η T_evap / (T_cond - T_evap)`` (K), η ≈ 0.40 (implied 0.39-0.40 by the Guidebook
-  COP 4.39 at 45/90 °F and 4.07 at 45/95 °F, p.257-258) [L]. Known bias (COOL-ELC): that η
-  was implied with the *water* temperatures as cycle temperatures, while the chain below
-  adds -4 K / +3 K approaches; through the chain the Guidebook point needs η ≈ 0.44, so
-  η = 0.40 (card and spec GM-05) understates the COP by ≈ 9-11 % -- it overstates electric
-  power and so favours absorption in comparisons. Sensitivity case: η 0.44.
+- ``COP = η T_evap / (T_cond - T_evap)`` (K) on the **refrigerant basis** (T_evap and T_cond
+  below include the -4 K / +3 K offsets). RC-06 "Temperature basis of η": the Guidebook's
+  0.39-0.40 (COP 4.39 at 45 °F chilled / 90 °F condenser leaving water, p.257-258) is on the
+  water basis; on the model's basis the same point gives η = 4.39 × 32 / 276.35 = 0.508 [D].
+  With ``carnot_efficiency: None`` (default) η is calibrated by
+  :func:`calibrated_carnot_efficiency` from the model's own approach parameters, so the
+  Guidebook point is always reproduced (COOL-ELC); an explicit value overrides it (keep it
+  on the refrigerant basis -- do not mix bases).
 - ``T_evap = T_chilled,supply - 4 K`` [A] (20 °C supply -> 16 °C).
 - ``T_cond = T_cw,leaving + 3 K`` with a cooling tower, ``T_cw,leaving = T_wb + approach
   (4-5 K, default 4.5) + range (~5 K)`` [A]; or ``T_cond = T_db + 8 K`` with a dry cooler [A].
@@ -18,15 +20,19 @@ Source: RC-06 (``data/knowledge/reference_cards/RC-06_electric_chiller.md``, cop
   ``dry_cooler`` option is RC-06's air-cooled condensing (T_db + 8 K); a water-loop dry
   cooler (``heat_rejection`` dry cooler, T_db + 5 K) feeding the condenser gives T_db + 13 K
   (COP 5.26 vs 6.80 at 25 °C) -- a warning says which formula was used.
-- COP capped at 8 and floored at 3 [A]; ``P_el = Q_cool / COP``; ``Q_reject = Q_cool + P_el``.
+- COP capped at 8 and floored at 3 [A]; ``P_el = Q_cool / COP`` is compressor power only (tower
+  fan and condenser-water pump belong to a ``heat_rejection`` component, RC-06);
+  ``Q_reject = Q_cool + P_el``. With η 0.508 the cap of 8 binds at the Dutch design points.
 
 Condenser sensitivity: the model gives ``d ln COP / dT_cond = -1/(T_cond - T_evap)``
-(output ``condenser_sensitivity_per_k``), -4.0 %/K at the Guidebook point (7.2/32.2 °C),
-steeper than the Guidebook data (≈ -2.6 %/K of condenser-water temperature, p.257-258):
-the model's COP falls faster in hot weather (documented check in the unit tests).
+(output ``condenser_sensitivity_per_k``), -3.1 %/K at the Guidebook point (lift 32 K on the
+refrigerant basis), steeper than the Guidebook data (≈ -2.6 %/K of condenser-water
+temperature, p.257-258): the model's COP falls faster in hot weather (documented check).
 
 Capacity is the nominal capacity (no temperature derating); unmet load is reported.
-At 20 °C chilled supply and Dutch summer conditions the model gives COP ≈ 6-8 (RC-06).
+At 20 °C chilled supply and Dutch summer conditions RC-06 expects COP ≈ 6-8; with the
+calibrated η the model reaches the cap (8) there and drops below it only in hotter weather
+(e.g. 6.7 with a dry cooler at 30 °C dry-bulb).
 """
 
 import math
@@ -36,6 +42,11 @@ from gemini_model.model_abstract import StaticModel
 
 KELVIN = 273.15
 HEAT_REJECTION_OPTIONS = ("cooling_tower", "dry_cooler")
+# RC-06 calibration point (Guidebook p.257-258): COP 4.39 at 45 °F chilled water and 90 °F
+# condenser leaving water (water temperatures; the card rounds them to 7.2 / 32.2 °C).
+GUIDEBOOK_COP = 4.39
+GUIDEBOOK_CHILLED_WATER_DEGC = 7.2
+GUIDEBOOK_CONDENSER_WATER_OUT_DEGC = 32.2
 
 
 def _finite(value, name):
@@ -70,6 +81,26 @@ def carnot_cop(evaporator_temperature_degc, condenser_temperature_degc, carnot_e
     return carnot_efficiency * t_evap / lift
 
 
+def calibrated_carnot_efficiency(
+    evaporator_approach_k=4.0,
+    condenser_approach_k=3.0,
+    cop=GUIDEBOOK_COP,
+    chilled_water_degc=GUIDEBOOK_CHILLED_WATER_DEGC,
+    condenser_water_out_degc=GUIDEBOOK_CONDENSER_WATER_OUT_DEGC,
+):
+    """Return η on the model's refrigerant basis that reproduces a COP at water temperatures.
+
+    T_evap = chilled water - evaporator approach, T_cond = condenser leaving water +
+    condenser approach; ``η = COP (T_cond - T_evap) / T_evap`` (K). With the RC-06 defaults
+    (COP 4.39 at 7.2 / 32.2 °C, approaches 4 K / 3 K) η = 4.39 × 32 / 276.35 = 0.508 [D].
+    """
+    t_evap = chilled_water_degc - evaporator_approach_k
+    t_cond = condenser_water_out_degc + condenser_approach_k
+    if t_cond <= t_evap:
+        raise ValueError("calibration point needs T_cond > T_evap")
+    return cop * (t_cond - t_evap) / (t_evap + KELVIN)
+
+
 class ElectricChiller(StaticModel):
     """Electric vapour-compression chiller (RC-06)."""
 
@@ -78,7 +109,7 @@ class ElectricChiller(StaticModel):
         density, specific_heat = liquid_properties()
         self.parameters = {
             "nominal_capacity_w": None,
-            "carnot_efficiency": 0.40,  # [L] Guidebook p.257-258 (0.39-0.40)
+            "carnot_efficiency": None,  # None -> calibrated, refrigerant basis (0.508) [D]
             "heat_rejection": "cooling_tower",  # or "dry_cooler"
             "evaporator_approach_k": 4.0,  # [A] T_evap = T_supply - 4 K
             "condenser_approach_k": 3.0,  # [A] T_cond = T_cw,leaving + 3 K
@@ -110,6 +141,16 @@ class ElectricChiller(StaticModel):
 
     def update_state(self, u, x):
         """Not applicable: static model."""
+
+    def carnot_efficiency(self):
+        """Return η in use: the parameter, or the RC-06 calibration on the model's basis."""
+        p = self.parameters
+        if p.get("carnot_efficiency") is not None:
+            return _positive(p["carnot_efficiency"], "carnot_efficiency")
+        return calibrated_carnot_efficiency(
+            _non_negative(p["evaporator_approach_k"], "evaporator_approach_k"),
+            _non_negative(p["condenser_approach_k"], "condenser_approach_k"),
+        )
 
     def _rho_cp(self):
         """Return ρ c_p (J/(m³ K)) of the chilled water."""
@@ -164,7 +205,7 @@ class ElectricChiller(StaticModel):
         """
         p = self.parameters
         q_nom = _positive(p["nominal_capacity_w"], "nominal_capacity_w")
-        eta = _positive(p["carnot_efficiency"], "carnot_efficiency")
+        eta = self.carnot_efficiency()
         cop_max = _positive(p["cop_max"], "cop_max")
         cop_min = _positive(p["cop_min"], "cop_min")
         if cop_min > cop_max:
@@ -224,6 +265,7 @@ class ElectricChiller(StaticModel):
             "load_ratio": q_cool / q_nom,
             "cop": cop,
             "cop_uncapped": cop_carnot,
+            "carnot_efficiency": eta,
             "evaporator_temperature_degc": t_evap,
             "condenser_temperature_degc": t_cond,
             "condenser_sensitivity_per_k": sensitivity,

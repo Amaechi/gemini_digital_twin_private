@@ -352,9 +352,10 @@ assumptions:
     unit: fraction of cooling duty
     justification: >-
       0.077 kW/ton ÷ 3.517 kW/ton ≈ 2.2 % of Q_cool (Guidebook p.269), the extra tower fan and cooling-water
-      pump of absorption versus electric chilling. If the project also has a heat_rejection component that
-      counts the tower fan and pumps (2 % of heat rejected), set the chiller's aux_power_fraction to 0 to avoid
-      counting them twice.
+      pump of absorption versus electric chilling. Applied only while include_heat_rejection_auxiliaries is
+      true (default). When the project has a heat_rejection component that counts the tower fan and pumps
+      (2 % of heat rejected), set include_heat_rejection_auxiliaries: false (RC-05/RC-06 no-double-counting
+      rule): P_aux = 0 and Q_reject = Q_cool + Q_drive.
     source: RC-05 Auxiliaries [L Guidebook p.269]
     sensitivity: null
     tag: L
@@ -400,9 +401,30 @@ assumptions:
     added_by: WP-02
 
   - id: COOL-ELC
-    title: Electric-chiller COP model defaults
+    title: Electric-chiller Carnot efficiency η on the model's refrigerant basis
     value:
-      carnot_efficiency: 0.40
+      carnot_efficiency: 0.50834
+      basis: "refrigerant: T_evap = chilled supply − 4 K, T_cond = condenser leaving water + 3 K"
+      calibration_point: "COP 4.39 at 7.2 °C chilled / 32.2 °C condenser leaving water (Guidebook p.257–258)"
+    unit: "-"
+    justification: >-
+      RC-06 "Temperature basis of η": the Guidebook's 0.39–0.40 is on the water basis (water temperatures in
+      the COP equation). The model applies the −4 K / +3 K refrigerant offsets (COOL-ELC-APPROACH), so η is
+      calibrated on that basis to reproduce the Guidebook point: η = 4.39 × (35.2 − 3.2) / (3.2 + 273.15) =
+      0.50834 [D] (card: ≈ 0.51 / 0.508). The model does this itself (carnot_efficiency: null →
+      electric_chiller.calibrated_carnot_efficiency from its own approach parameters), so changing an approach
+      keeps the point reproduced. Bases are not mixed. With this η the COP cap of 8 binds at the Dutch design
+      points (tower WB 18.4 / 21 °C, dry 25 °C); below the cap e.g. 6.7 with a dry cooler at 30 °C. P_el is
+      compressor power only; tower fan and pumps belong to the heat-rejection model (RC-06).
+    source: RC-06 temperature-basis row and validation test [D]; Guidebook p.257–258
+    sensitivity: [0.44, 0.513]
+    tag: D
+    status: default
+    added_by: WP-02
+
+  - id: COOL-ELC-APPROACH
+    title: Electric-chiller temperature chain and COP limits
+    value:
       evaporator_approach_k: 4.0
       condenser_approach_k: 3.0
       tower_approach_k: 4.5
@@ -412,17 +434,14 @@ assumptions:
       cop_min: 3.0
     unit: null
     justification: >-
-      COP = η T_evap/(T_cond − T_evap); η 0.39–0.40 implied by the Guidebook (COP 4.39 at 45/90 °F, 4.07 at
-      45/95 °F) [L]; T_evap = supply − 4 K, T_cond = tower leaving water (T_wb + 4–5 K approach + 5 K range)
-      + 3 K, or T_db + 8 K with an air-cooled (dry) condenser; COP capped at 8 and floored at 3 [A]. Known
-      bias: the card's η was implied with the water temperatures as cycle temperatures; through the −4 K/+3 K
-      chain the Guidebook point (COP 4.39) needs η ≈ 0.44, so η 0.40 understates the COP by ≈ 9–11 %
-      (overstates electric power, favouring absorption in comparisons). The constant-η model is also steeper
-      (−4.0 %/K at 7.2/32.2 °C) than the Guidebook data (≈ −2.6 %/K). A water-loop dry cooler (heat_rejection,
-      T_db + 5 K) feeding the condenser gives T_db + 13 K instead of T_db + 8 K (COP 5.26 vs 6.80 at 25 °C).
-      The spec GM-05 row omits the 5 K range; the card (with range) is followed.
-    source: RC-06 [L Guidebook p.257–258] and [A]; spec GM-05
-    sensitivity: "η 0.44 (consistent with the approach chain) and 0.39; tower approach 4–5 K; dry cooler T_db + 13 K (water loop)."
+      RC-06: T_evap = supply − 4 K, T_cond = tower leaving water (T_wb + 4–5 K approach + 5 K range) + 3 K, or
+      T_db + 8 K with an air-cooled (dry) condenser; COP capped at 8 and floored at 3 [A]. The constant-η model
+      is steeper (−3.1 %/K at the Guidebook point) than the Guidebook data (≈ −2.6 %/K). A water-loop dry
+      cooler (heat_rejection, T_db + 5 K) feeding the condenser gives T_db + 13 K instead of T_db + 8 K (the
+      model warns). The spec GM-05 row omits the 5 K range; the card (with range) is followed. Sensitivity of η:
+      0.44 is the condenser-offset-only reading (RC-06), 0.513 the 45/95 °F Guidebook point on the model basis.
+    source: RC-06 [A]; spec GM-05
+    sensitivity: "tower approach 4–5 K; dry cooler T_db + 13 K (water loop)."
     tag: A
     status: default
     added_by: WP-02

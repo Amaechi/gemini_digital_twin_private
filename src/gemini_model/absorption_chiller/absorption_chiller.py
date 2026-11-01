@@ -43,9 +43,11 @@ generator tubes.
 Outputs: ``cooling_power_w`` Q_E, ``drive_heat_w`` Q_G = Q_E/COP, ``heat_rejected_w``
 = Q_E + Q_G + P_aux (exact), ``power_el`` = P_aux = ``aux_power_fraction`` Q_E
 (0.077 kW/ton ≈ 2.2 %: extra tower fan + cooling-water pump vs an electric chiller,
-Guidebook p.269 -- set it to 0 if a separate ``heat_rejection`` component already counts
-the tower fan and pumps), ``power_th`` = Q_E (useful cooling), ``emission`` 0, circuit
-outlet temperatures and flows, ``validity_warnings``.
+Guidebook p.269), ``power_th`` = Q_E (useful cooling), ``emission`` 0, circuit outlet
+temperatures and flows, ``validity_warnings``. ``include_heat_rejection_auxiliaries``
+(default True) switches P_aux on; set it to False when a ``heat_rejection`` component is
+connected, which counts the tower fan and pumps itself (RC-05/RC-06 no-double-counting rule;
+P_aux = 0 and Q_reject = Q_E + Q_G).
 
 Materials (RC-05, p.266-267): Cu / 90-10 CuNi generator tubes are incompatible with
 geothermal brine -> titanium generator tubes (+10-15 % machine cost) or an isolation HEX
@@ -113,6 +115,8 @@ class AbsorptionChiller(StaticModel):
             "chilled_water_temperature_out_degc": 20.0,  # supply set point (spec)
             "chilled_water_temperature_in_degc": 26.0,  # return, DB-32 [A]
             "aux_power_fraction": 0.077 / ghc1989.KW_PER_TON,  # 0.077 kW/ton, p.269
+            # False when a heat_rejection component is connected (it counts fan + pumps).
+            "include_heat_rejection_auxiliaries": True,
             "ghc1989_conservative_clamp": True,
             "drive_density_kg_m3": density,
             "drive_specific_heat_j_kgk": specific_heat,
@@ -211,6 +215,11 @@ class AbsorptionChiller(StaticModel):
         q_nom = _positive(p["nominal_capacity_w"], "nominal_capacity_w")
         q_cap = _non_negative(p["max_capacity_fraction"], "max_capacity_fraction") * q_nom
         aux_fraction = _non_negative(p["aux_power_fraction"], "aux_power_fraction")
+        include_aux = p["include_heat_rejection_auxiliaries"]
+        if not isinstance(include_aux, bool):
+            raise TypeError(
+                f"include_heat_rejection_auxiliaries must be True or False, got {include_aux!r}"
+            )
         dt_generator = _positive(p["generator_delta_t_k"], "generator_delta_t_k")
         cw_range = _positive(p["cooling_water_range_k"], "cooling_water_range_k")
 
@@ -243,7 +252,7 @@ class AbsorptionChiller(StaticModel):
                 warnings,
             )
 
-        p_aux = aux_fraction * q_e
+        p_aux = aux_fraction * q_e if include_aux else 0.0
         q_ac = q_e + q_g
         q_reject = q_ac + p_aux
 

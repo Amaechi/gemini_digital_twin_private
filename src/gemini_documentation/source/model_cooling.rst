@@ -60,7 +60,9 @@ points it reproduces Method A within 1.0 % (capacity) and 2.1 % (COP). Results a
 water are extrapolated and flagged in ``validity_warnings``. Capacity never exceeds the nameplate.
 
 Energy balance: :math:`Q_{reject} = Q_E + Q_G + P_{aux}` with :math:`P_{aux}` = 0.077 kW/ton
-(≈ 2.2 % of :math:`Q_E`, extra tower fan and pump). Each external circuit (drive, cooling water,
+(≈ 2.2 % of :math:`Q_E`, extra tower fan and pump) while ``include_heat_rejection_auxiliaries`` is
+true (default); set it to false when a ``heat_rejection`` component is connected, which counts the
+fan and pumps itself (:math:`P_{aux} = 0`). Each external circuit (drive, cooling water,
 chilled water) has its own density and heat capacity; with a given flow its outlet temperature
 follows from :math:`\rho c_p V \Delta T = Q`, otherwise a fixed ΔT is used (generator 7.2 K,
 cooling-water range 5 K) and the required flow is reported. With a given drive flow, Method B
@@ -101,12 +103,14 @@ Electric chiller
    COP = \eta\,\frac{T_{evap}}{T_{cond} - T_{evap}}, \qquad P_{el} = \frac{Q}{COP}, \qquad
    Q_{reject} = Q + P_{el}
 
-with :math:`\eta = 0.40`, :math:`T_{evap} = T_{supply} - 4` K, :math:`T_{cond} = T_{wb} + 4.5 + 5 + 3`
+with :math:`T_{evap} = T_{supply} - 4` K, :math:`T_{cond} = T_{wb} + 4.5 + 5 + 3`
 (cooling tower) or :math:`T_{db} + 8` (dry cooler), COP between 3 and 8. Inputs: ``cooling_load_w``
 or ``chilled_water_flow_rate_m3s``; ``ambient_wet_bulb_degc`` or ``ambient_dry_bulb_degc``; optional
-``cooling_water_temperature_in_degc`` (then :math:`T_{cond} = T_{cw,in} + 5 + 3`). Note: the card's
-η was implied with water temperatures as cycle temperatures; with the approach chain the Guidebook
-point needs η ≈ 0.44, so η = 0.40 understates the COP by ≈ 9–11 % (sensitivity case).
+``cooling_water_temperature_in_degc`` (then :math:`T_{cond} = T_{cw,in} + 5 + 3`). η is on this
+**refrigerant basis**: calibrated so that the Guidebook point (COP 4.39 at 7.2 °C chilled / 32.2 °C
+condenser leaving water) is reproduced, :math:`\eta = 4.39 \times 32 / 276.35 = 0.508` (the
+Guidebook's 0.39–0.40 is on the water basis; RC-06). With this η the COP cap of 8 binds at the
+Dutch design points. :math:`P_{el}` is compressor power only.
 
 Heat rejection
 ---------------------------

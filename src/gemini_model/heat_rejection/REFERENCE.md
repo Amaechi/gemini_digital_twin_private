@@ -20,8 +20,9 @@ Plants* 3e, Ch23 p.11–12 (Miravalles comparison). Spec §7.2 GM-06.
   without it the range is fixed (5 K) and the flow is reported.
 - `heat_to_ambient_w = heat_load_w + power_el` (all energy leaves as heat). No capacity limit:
   size the unit at the summer design point (DB-34b: 25.0 °C DB / 18.4 °C WB; warm case 30/21 °C).
-- Wiring: for an absorption chiller set its `aux_power_fraction` to 0 (or wire
-  `absorber_condenser_heat_w`), else the tower fan/pump is counted twice (COOL-ABS-AUX).
+- Wiring: for an absorption chiller set `include_heat_rejection_auxiliaries: false`, else the
+  tower fan/pump is counted twice (COOL-ABS-AUX). The electric chiller's `power_el` is
+  compressor power only (RC-06).
 - A wet tower whose fixed-approach leaving water is ≤ 0 °C returns a freeze warning
   (freeze protection not modelled).
 - Assumption entry COOL-HR.

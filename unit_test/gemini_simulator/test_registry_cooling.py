@@ -6,7 +6,10 @@ import pytest
 
 from gemini_model.absorption_chiller import characteristic
 from gemini_model.absorption_chiller.absorption_chiller import AbsorptionChiller
-from gemini_model.electric_chiller.electric_chiller import ElectricChiller
+from gemini_model.electric_chiller.electric_chiller import (
+    ElectricChiller,
+    calibrated_carnot_efficiency,
+)
 from gemini_model.free_cooling.free_cooling import FreeCooling
 from gemini_model.heat_rejection.heat_rejection import DEFAULT_APPROACH_K, HeatRejection
 from gemini_simulator.project_loader import build_project
@@ -50,7 +53,8 @@ def cooling_plant_project(t_wb_degc, load_w):
                 "type": "absorption_chiller",
                 "parameters": {
                     "nominal_capacity_w": 2e6,
-                    "aux_power_fraction": 0.0,  # the tower below counts fan + pump power
+                    # the tower below counts fan + pump power (RC-05/RC-06 rule)
+                    "include_heat_rejection_auxiliaries": False,
                     "drive_density_kg_m3": 1030.0,
                     "drive_specific_heat_j_kgk": 4100.0,
                 },
@@ -129,6 +133,9 @@ def test_cooling_plant_project_runs_and_balances(t_wb_degc, mode):
     # The towers reject what the chillers reject, at T_wb + 4.5 K.
     assert chiller_tower["heat_rejected_w"] == pytest.approx(chiller["heat_rejected_w"])
     assert absorber_tower["heat_rejected_w"] == pytest.approx(absorber["heat_rejected_w"])
+    # Switch off: the tower counts fan + pumps, so the chiller adds no aux power.
+    assert absorber["power_el"] == 0.0
+    assert absorber["heat_rejected_w"] == absorber["absorber_condenser_heat_w"]
     assert absorber["cooling_water_temperature_in_degc"] == pytest.approx(t_wb_degc + 4.5)
     if chiller["cooling_power_w"] > 0.0:
         assert chiller["condenser_temperature_degc"] == pytest.approx(t_wb_degc + 4.5 + 5.0 + 3.0)
@@ -151,6 +158,7 @@ def test_model_defaults_match_the_assumptions_register():
     absorber = AbsorptionChiller().parameters
     assert register["COOL-ABS-B"]["value"] == absorber["duhring_slope"]
     assert register["COOL-ABS-CAP"]["value"] == absorber["max_capacity_fraction"]
+    assert absorber["include_heat_rejection_auxiliaries"] is True
     assert register["COOL-ABS-AUX"]["value"] == pytest.approx(
         absorber["aux_power_fraction"], rel=1e-4
     )
@@ -162,7 +170,16 @@ def test_model_defaults_match_the_assumptions_register():
         assert calibration[key] == pytest.approx(value, rel=1e-4), key
 
     electric = ElectricChiller().parameters
-    for key, value in register["COOL-ELC"]["value"].items():
+    elc = register["COOL-ELC"]
+    assert elc["tag"] == "D"
+    assert electric["carnot_efficiency"] is None  # calibrated from the approaches below
+    assert elc["value"]["carnot_efficiency"] == pytest.approx(
+        calibrated_carnot_efficiency(
+            electric["evaporator_approach_k"], electric["condenser_approach_k"]
+        ),
+        rel=1e-5,
+    )
+    for key, value in register["COOL-ELC-APPROACH"]["value"].items():
         assert electric[key] == value, key
 
     rejection = HeatRejection().parameters

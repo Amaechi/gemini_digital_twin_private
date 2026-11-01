@@ -78,7 +78,9 @@ temperatures and flows, `drive_delta_t_k`, `minimum_drive_flow_rate_m3s` (Method
 
 ## Auxiliaries and materials
 - P_aux = 0.077 kW/ton ≈ 2.2 % of Q_cool (p.269): extra tower fan + cooling-water pump vs electric
-  (COOL-ABS-AUX). Set `aux_power_fraction: 0` when a `heat_rejection` component counts them.
+  (COOL-ABS-AUX), applied while `include_heat_rejection_auxiliaries` is true (default). Set it to
+  false when a `heat_rejection` component is connected, which counts the fan and pumps itself
+  (RC-05/RC-06 no-double-counting rule): P_aux = 0, Q_reject = Q_E + Q_G.
 - Well/drive pumping chargeable to absorption: 0.20–0.28 kW/ton; can approach 50 % of an electric
   chiller's power (p.262, 263, 270) ⇒ verifier check (not in this model).
 - Cu / 90-10 CuNi generator tubes are incompatible with geothermal fluid (H₂S, NH₃, O₂) ⇒ titanium

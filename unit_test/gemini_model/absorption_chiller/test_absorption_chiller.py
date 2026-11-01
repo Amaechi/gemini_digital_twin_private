@@ -188,6 +188,28 @@ def test_fixed_delta_t_mode_agrees_with_flow_mode_at_the_reported_flows():
     )
 
 
+@pytest.mark.parametrize("method", ["characteristic", "ghc1989"])
+def test_heat_rejection_auxiliaries_switch(method):
+    """include_heat_rejection_auxiliaries: True adds 0.077 kW/ton; False (tower connected) 0."""
+    inputs = {
+        "drive_temperature_in_degc": 95.0,
+        "cooling_water_temperature_in_degc": 27.0,
+        "cooling_load_w": 0.5 * Q_NOM,
+    }
+    on = run(make_chiller(method=method), **inputs)
+    off = run(make_chiller(method=method, include_heat_rejection_auxiliaries=False), **inputs)
+    assert on["power_el"] == pytest.approx(0.077 / 3.517 * on["cooling_power_w"], rel=1e-14)
+    assert off["power_el"] == off["aux_power_w"] == 0.0
+    assert off["heat_rejected_w"] == off["absorber_condenser_heat_w"]
+    assert off["heat_rejected_w"] == pytest.approx(on["heat_rejected_w"] - on["power_el"])
+    assert (off["cooling_power_w"], off["drive_heat_w"]) == (
+        on["cooling_power_w"],
+        on["drive_heat_w"],
+    )
+    with pytest.raises(TypeError, match="include_heat_rejection_auxiliaries"):
+        make_chiller(include_heat_rejection_auxiliaries="no").calculate_output(inputs)
+
+
 def test_part_load_cop_falls_slightly_with_characteristic_method():
     """Method B part load reduces ΔΔt: Q_E = load and the COP is below the full-load COP."""
     inputs = {"drive_temperature_in_degc": 95.0, "cooling_water_temperature_in_degc": 27.0}
