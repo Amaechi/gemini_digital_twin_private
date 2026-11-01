@@ -60,6 +60,7 @@
 <li class="toctree-l3"><a class="reference internal" href="#description">5.3.1. Description</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#parameters">5.3.2. Parameters</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#outputs">5.3.3. Outputs</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#setting-the-pvt-from-project-json">5.3.4. Setting the PVT from project JSON</a></li>
 </ul>
 </li>
 <li class="toctree-l2"><a class="reference internal" href="model_reservoir.html">5.4. Reservoir Performance Models</a></li>
@@ -162,6 +163,29 @@ extrapolation.</p>
 <code class="docutils literal notranslate"><span class="pre">(rho_g,</span> <span class="pre">rho_l,</span> <span class="pre">gmf,</span> <span class="pre">eta_g,</span> <span class="pre">eta_l,</span> <span class="pre">cp_g,</span> <span class="pre">cp_l,</span> <span class="pre">K_g,</span> <span class="pre">K_l,</span> <span class="pre">sigma)</span></code> used
 directly by the well hydraulics model (see <a class="reference internal" href="model_well_hydraulics.html"><span class="doc">Well: Pressure and Temperature Hydraulics</span></a>) to
 compute mixture density, friction, and heat transfer.</p>
+</section>
+<section id="setting-the-pvt-from-project-json">
+<h2><span class="section-number">5.3.4. </span>Setting the PVT from project JSON<a class="headerlink" href="#setting-the-pvt-from-project-json" title="Link to this heading"></a></h2>
+<p>The <code class="docutils literal notranslate"><span class="pre">well</span></code>, <code class="docutils literal notranslate"><span class="pre">producer_well</span></code> and <code class="docutils literal notranslate"><span class="pre">injector_well</span></code> components accept an
+optional <code class="docutils literal notranslate"><span class="pre">&quot;pvt&quot;</span></code> parameter block, built into a <code class="docutils literal notranslate"><span class="pre">PVTConstantSTP</span></code> by
+<code class="docutils literal notranslate"><span class="pre">gemini_model.fluid.pvt_config.build_pvt</span></code>. Keys are the native parameter
+names above or unit-suffixed aliases (<code class="docutils literal notranslate"><span class="pre">liquid_density_kg_m3</span></code>,
+<code class="docutils literal notranslate"><span class="pre">liquid_viscosity_pa_s</span></code>, <code class="docutils literal notranslate"><span class="pre">liquid_specific_heat_j_kgk</span></code>,
+<code class="docutils literal notranslate"><span class="pre">gas_mass_fraction</span></code>, …). Unknown keys and unphysical values raise an
+error; without the block the water defaults above are used. For example, the
+design-basis brine:</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="nt">"pvt"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">"liquid_density_kg_m3"</span><span class="p">:</span><span class="w"> </span><span class="mf">1030.0</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">"liquid_viscosity_pa_s"</span><span class="p">:</span><span class="w"> </span><span class="mf">0.0004</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">"liquid_specific_heat_j_kgk"</span><span class="p">:</span><span class="w"> </span><span class="mf">4100.0</span><span class="p">}</span>
+</pre></div>
+</div>
+<p>Over 2.5 km the brine column is about 7.4 bar heavier than water. The same
+block sets the primary-loop density and heat capacity in
+<code class="docutils literal notranslate"><span class="pre">gemini_simulator.kpi</span></code>. Use <code class="docutils literal notranslate"><span class="pre">heat_exchanger_fluid_parameters</span></code> to set the
+matching <code class="docutils literal notranslate"><span class="pre">fluid_density</span></code> and <code class="docutils literal notranslate"><span class="pre">specific_heat</span></code> parameters of the heat
+exchanger, boiler and CHP; they are not copied automatically, and
+<code class="docutils literal notranslate"><span class="pre">kpi.fluid_consistency_issues</span></code> reports a mismatch. See
+<code class="docutils literal notranslate"><span class="pre">src/gemini_model/fluid/REFERENCE.md</span></code>.</p>
 </section>
 </section>
 

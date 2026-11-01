@@ -121,6 +121,18 @@
 <p>Estimates the pressure and temperature drop across a surface separator
 vessel, given a linear flow-dependent pressure resistance and a fixed
 temperature drop.</p>
+<p>Optionally (GM-12) it also characterises the separated associated gas from
+its CH4/CO2 composition: gas density, fuel LHV, fuel power and the CO2 that
+the gas already contains (“inherent” CO2). Source: RC-08 “Associated gas”
+(Nm3 at 0 degC, 1.01325 bar; CH4 LHV 35.8 MJ/Nm3).</p>
+<p class="rubric">Functions</p>
+<table class="autosummary longtable docutils align-default">
+<tbody>
+<tr class="row-odd"><td><p><a class="reference internal" href="#gemini_model.separator.separator.associated_gas_properties" title="gemini_model.separator.separator.associated_gas_properties"><code class="xref py py-obj docutils literal notranslate"><span class="pre">associated_gas_properties</span></code></a>(ch4_fraction, ...)</p></td>
+<td><p>Return the properties of a binary CH4/CO2 associated gas.</p></td>
+</tr>
+</tbody>
+</table>
 <p class="rubric">Classes</p>
 <table class="autosummary longtable docutils align-default">
 <tbody>
@@ -154,6 +166,23 @@ it can be passed on unchanged to a downstream component; a further
 output, <code class="docutils literal notranslate"><span class="pre">flow_rate_m3h</span></code>, echoes the same liquid flow converted
 to m3/h, for downstream components that expect that convention
 (e.g. a well model).</p>
+<p>Gas composition (GM-12, all optional): <code class="docutils literal notranslate"><span class="pre">ch4_fraction</span></code> and
+<code class="docutils literal notranslate"><span class="pre">co2_fraction</span></code> (mole fractions, must add up to 1) give the gas
+density and fuel LHV via <a class="reference internal" href="#gemini_model.separator.separator.associated_gas_properties" title="gemini_model.separator.separator.associated_gas_properties"><code class="xref py py-func docutils literal notranslate"><span class="pre">associated_gas_properties()</span></code></a>;
+explicit <code class="docutils literal notranslate"><span class="pre">gas_density</span></code> (kg/Nm3) and <code class="docutils literal notranslate"><span class="pre">fuel_lhv_j_kg</span></code> (J/kg)
+parameters override the derived values. <code class="docutils literal notranslate"><span class="pre">gas_water_ratio</span></code> is in
+Nm3 gas per m3 liquid, so <code class="docutils literal notranslate"><span class="pre">gas_flow_rate</span></code> is in Nm3/s. Extra
+outputs: <code class="docutils literal notranslate"><span class="pre">gas_density_kg_nm3</span></code>, <code class="docutils literal notranslate"><span class="pre">fuel_lhv_j_kg</span></code>,
+<code class="docutils literal notranslate"><span class="pre">fuel_power_w</span></code> (W, LHV basis = gas mass flow x LHV),
+<code class="docutils literal notranslate"><span class="pre">ch4_mass_flow_kg_s</span></code>, <code class="docutils literal notranslate"><span class="pre">inherent_co2_kg_s</span></code> (CO2 contained in the
+gas, kg/s) and <code class="docutils literal notranslate"><span class="pre">co2_if_burned_kg_s</span></code> (inherent plus combustion
+CO2, kg/s). The species flows are the composition’s mass fractions
+times <code class="docutils literal notranslate"><span class="pre">gas_mass_flow_rate</span></code>, so they always add up to it (also
+with an explicit <code class="docutils literal notranslate"><span class="pre">gas_density</span></code>). Without a composition the
+species/CO2 outputs are 0, and <code class="docutils literal notranslate"><span class="pre">fuel_power_w</span></code> is 0 unless
+<code class="docutils literal notranslate"><span class="pre">fuel_lhv_j_kg</span></code> is given. <code class="docutils literal notranslate"><span class="pre">emission</span></code> stays 0: the separator
+does not emit; the CO2 is counted where the gas is burned (or
+vented).</p>
 </dd></dl>
 
 <dl class="py method">
@@ -185,6 +214,36 @@ to m3/h, for downstream components that expect that convention
 <dd><p>Update the state based on input u and state x.</p>
 </dd></dl>
 
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="gemini_model.separator.separator.associated_gas_properties">
+<span class="sig-prename descclassname"><span class="pre">gemini_model.separator.separator.</span></span><span class="sig-name descname"><span class="pre">associated_gas_properties</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ch4_fraction</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">co2_fraction</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/gemini_model/separator/separator.html#associated_gas_properties"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#gemini_model.separator.separator.associated_gas_properties" title="Link to this definition"></a></dt>
+<dd><p>Return the properties of a binary CH4/CO2 associated gas.</p>
+<p>Source: RC-08 “Associated gas” [D]. Mole fractions equal volume
+fractions for an ideal gas, and the two must add up to 1.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>ch4_fraction</strong> (<em>float</em>) – Mole (= Nm3) fractions of CH4 and CO2 (-).</p></li>
+<li><p><strong>co2_fraction</strong> (<em>float</em>) – Mole (= Nm3) fractions of CH4 and CO2 (-).</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><code class="docutils literal notranslate"><span class="pre">density_kg_nm3</span></code> (kg/Nm3), <code class="docutils literal notranslate"><span class="pre">lhv_j_nm3</span></code> (J/Nm3), <code class="docutils literal notranslate"><span class="pre">lhv_j_kg</span></code>
+(J/kg), <code class="docutils literal notranslate"><span class="pre">ch4_kg_per_nm3</span></code> and <code class="docutils literal notranslate"><span class="pre">co2_kg_per_nm3</span></code> (kg of each species
+per Nm3 of gas; the CO2 one is the inherent CO2) and
+<code class="docutils literal notranslate"><span class="pre">co2_if_burned_kg_per_nm3</span></code> (inherent CO2 plus CO2 from burning the
+CH4, kg/Nm3). For 80/20 mol %: 0.965 kg/Nm3, 29.7 MJ/kg and
+1.964 kg/Nm3 (= 68.6 kg/GJ_LHV).</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>dict</p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>ValueError</strong> – If a fraction is outside [0, 1] or the two do not add up to 1.</p>
+</dd>
+</dl>
 </dd></dl>
 
 </section>

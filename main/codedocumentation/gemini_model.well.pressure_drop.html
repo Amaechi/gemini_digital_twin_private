@@ -161,7 +161,10 @@ pressure and temperature.</p>
 <dd><p>Update model parameters.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><p><strong>parameters</strong> (<em>dict</em>) – Parameters dict as defined by the model.</p>
+<dd class="field-odd"><p><strong>parameters</strong> (<em>dict</em>) – Parameters dict as defined by the model. An optional <code class="docutils literal notranslate"><span class="pre">&quot;pvt&quot;</span></code>
+dict (see <a class="reference internal" href="gemini_model.fluid.pvt_config.html#gemini_model.fluid.pvt_config.normalise_pvt_parameters" title="gemini_model.fluid.pvt_config.normalise_pvt_parameters"><code class="xref py py-func docutils literal notranslate"><span class="pre">gemini_model.fluid.pvt_config.normalise_pvt_parameters()</span></code></a>)
+replaces <code class="docutils literal notranslate"><span class="pre">self.PVT</span></code> with a <code class="docutils literal notranslate"><span class="pre">PVTConstantSTP</span></code> built from it, so the
+fluid can be set from project JSON (GM-01).</p>
 </dd>
 </dl>
 </dd></dl>
