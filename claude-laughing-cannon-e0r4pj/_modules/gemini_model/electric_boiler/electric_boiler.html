@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>gemini_model.electric_boiler.electric_boiler &mdash; GEMINI Geothermal Digital Twin (claude/laughing-cannon-e0r4pj)</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=19f00094" />
+
+  
+  <!--[if lt IE 9]>
+    <script src="../../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+        <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+        <script src="../../../_static/documentation_options.js?v=e62cebb8"></script>
+        <script src="../../../_static/doctools.js?v=9a2dae69"></script>
+        <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            GEMINI Geothermal Digital Twin
+          </a>
+              <div class="version">
+                claude/laughing-cannon-e0r4pj
+              </div>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Table of Contents</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../index_about_gemini.html">1. About GEMINI</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../index_getting_started.html">2. Getting started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../index_setup.html">3. Set-up</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../index_applications.html">4. Applications</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../index_models.html">5. Models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../index_sourcecode.html">6. Source code documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../glossary.html">7. Glossary</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">GEMINI Geothermal Digital Twin</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">gemini_model.electric_boiler.electric_boiler</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for gemini_model.electric_boiler.electric_boiler</h1><div class="highlight"><pre>
+<span></span><span class="sd">"""Electric boiler (peak / back-up heat) with a constant efficiency (GM-08).</span>
+
+<span class="sd">Source: spec §7.2 GM-08 (η 0.99); RC-10 "Sourced values" (DEA Electricity &amp; DH catalogue ch. 41</span>
+<span class="sd">"Electric boilers": η 0.99, register EB-ETA); RC-04 peaking practice (boiler in series on the</span>
+<span class="sd">return, Guidebook p.260). See ``REFERENCE.md``.</span>
+
+<span class="sd">- ``P_el = Q_th / η`` (W); losses ``P_el - Q_th``; no direct emission (grid CO₂ is accounted in</span>
+<span class="sd">  economics, WP-08).</span>
+<span class="sd">- Duty either from ``heat_demand_w`` or from a water flow heated to the set point:</span>
+<span class="sd">  ``Q = ρ c_p V (T_set - T_in)`` (0 if the inlet is already at or above the set point).</span>
+<span class="sd">- Capacity limit: ``Q_th = min(Q_demand, nominal_capacity_w)``; the unmet part is reported and,</span>
+<span class="sd">  with a flow, the outlet stays below the set point (``T_out = T_in + Q_th / (ρ c_p V)``).</span>
+<span class="sd">"""</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">math</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">gemini_model.fluid.pvt_config</span><span class="w"> </span><span class="kn">import</span> <span class="n">liquid_properties</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">gemini_model.model_abstract</span><span class="w"> </span><span class="kn">import</span> <span class="n">StaticModel</span>
+
+<span class="n">DEFAULT_EFFICIENCY</span> <span class="o">=</span> <span class="mf">0.99</span>
+<span class="sd">"""η 0.99 (spec GM-08; DEA ch. 41), register EB-ETA."""</span>
+<span class="n">DEFAULT_SUPPLY_TEMPERATURE_DEGC</span> <span class="o">=</span> <span class="mf">100.0</span>
+<span class="sd">"""Heating supply set point 100 °C (CLAUDE.md hard limit; spec DB)."""</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_finite</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">name</span><span class="p">):</span>
+    <span class="n">value</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">math</span><span class="o">.</span><span class="n">isfinite</span><span class="p">(</span><span class="n">value</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2"> must be finite, got </span><span class="si">{</span><span class="n">value</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">value</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_non_negative</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">name</span><span class="p">):</span>
+    <span class="n">value</span> <span class="o">=</span> <span class="n">_finite</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">name</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">value</span> <span class="o">&lt;</span> <span class="mf">0.0</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2"> must be &gt;= 0, got </span><span class="si">{</span><span class="n">value</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">value</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_positive</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">name</span><span class="p">):</span>
+    <span class="k">if</span> <span class="n">value</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2"> must be set"</span><span class="p">)</span>
+    <span class="n">value</span> <span class="o">=</span> <span class="n">_finite</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">name</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">value</span> <span class="o">&lt;=</span> <span class="mf">0.0</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2"> must be &gt; 0, got </span><span class="si">{</span><span class="n">value</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">value</span>
+
+
+<div class="viewcode-block" id="ElectricBoiler">
+<a class="viewcode-back" href="../../../codedocumentation/gemini_model.electric_boiler.electric_boiler.html#gemini_model.electric_boiler.electric_boiler.ElectricBoiler">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">ElectricBoiler</span><span class="p">(</span><span class="n">StaticModel</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Electric boiler: heat = efficiency × electricity, up to the nominal capacity (GM-08)."""</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">"""Model initialization with GM-08 defaults (nominal capacity must be set)."""</span>
+        <span class="n">density</span><span class="p">,</span> <span class="n">specific_heat</span> <span class="o">=</span> <span class="n">liquid_properties</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s2">"nominal_capacity_w"</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>  <span class="c1"># heat output, W</span>
+            <span class="s2">"efficiency"</span><span class="p">:</span> <span class="n">DEFAULT_EFFICIENCY</span><span class="p">,</span>  <span class="c1"># EB-ETA</span>
+            <span class="s2">"water_temperature_out_degc"</span><span class="p">:</span> <span class="n">DEFAULT_SUPPLY_TEMPERATURE_DEGC</span><span class="p">,</span>
+            <span class="s2">"water_density_kg_m3"</span><span class="p">:</span> <span class="n">density</span><span class="p">,</span>
+            <span class="s2">"water_specific_heat_j_kgk"</span><span class="p">:</span> <span class="n">specific_heat</span><span class="p">,</span>
+        <span class="p">}</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">output</span> <span class="o">=</span> <span class="p">{}</span>
+
+<div class="viewcode-block" id="ElectricBoiler.update_parameters">
+<a class="viewcode-back" href="../../../codedocumentation/gemini_model.electric_boiler.electric_boiler.html#gemini_model.electric_boiler.electric_boiler.ElectricBoiler.update_parameters">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">update_parameters</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">parameters</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">"""Update model parameters.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        parameters: dict</span>
+<span class="sd">            Parameters dict as defined by the model.</span>
+<span class="sd">        """</span>
+        <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">parameters</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="n">value</span></div>
+
+
+<div class="viewcode-block" id="ElectricBoiler.initialize_state">
+<a class="viewcode-back" href="../../../codedocumentation/gemini_model.electric_boiler.electric_boiler.html#gemini_model.electric_boiler.electric_boiler.ElectricBoiler.initialize_state">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">initialize_state</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">"""Not applicable: static model."""</span></div>
+
+
+<div class="viewcode-block" id="ElectricBoiler.update_state">
+<a class="viewcode-back" href="../../../codedocumentation/gemini_model.electric_boiler.electric_boiler.html#gemini_model.electric_boiler.electric_boiler.ElectricBoiler.update_state">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">update_state</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">u</span><span class="p">,</span> <span class="n">x</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">"""Not applicable: static model."""</span></div>
+
+
+<div class="viewcode-block" id="ElectricBoiler.calculate_output">
+<a class="viewcode-back" href="../../../codedocumentation/gemini_model.electric_boiler.electric_boiler.html#gemini_model.electric_boiler.electric_boiler.ElectricBoiler.calculate_output">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">calculate_output</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">u</span><span class="p">,</span> <span class="n">x</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">"""Calculate heat output, electricity use and (with a flow) the outlet temperature.</span>
+
+<span class="sd">        Inputs ``u``: exactly one of ``heat_demand_w`` (W) or ``water_flow_rate_m3s`` (m³/s,</span>
+<span class="sd">        with ``water_temperature_in_degc``); optional ``water_temperature_out_degc`` (set point,</span>
+<span class="sd">        overrides the parameter).</span>
+<span class="sd">        """</span>
+        <span class="n">p</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span>
+        <span class="n">q_nom</span> <span class="o">=</span> <span class="n">_positive</span><span class="p">(</span><span class="n">p</span><span class="p">[</span><span class="s2">"nominal_capacity_w"</span><span class="p">],</span> <span class="s2">"nominal_capacity_w"</span><span class="p">)</span>
+        <span class="n">efficiency</span> <span class="o">=</span> <span class="n">_positive</span><span class="p">(</span><span class="n">p</span><span class="p">[</span><span class="s2">"efficiency"</span><span class="p">],</span> <span class="s2">"efficiency"</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">efficiency</span> <span class="o">&gt;</span> <span class="mf">1.0</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"efficiency must be &lt;= 1, got </span><span class="si">{</span><span class="n">efficiency</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+        <span class="n">t_set</span> <span class="o">=</span> <span class="n">_finite</span><span class="p">(</span>
+            <span class="n">u</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"water_temperature_out_degc"</span><span class="p">,</span> <span class="n">p</span><span class="p">[</span><span class="s2">"water_temperature_out_degc"</span><span class="p">]),</span>
+            <span class="s2">"water_temperature_out_degc"</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="n">has_demand</span> <span class="o">=</span> <span class="n">u</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"heat_demand_w"</span><span class="p">)</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+        <span class="n">has_flow</span> <span class="o">=</span> <span class="n">u</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"water_flow_rate_m3s"</span><span class="p">)</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+        <span class="k">if</span> <span class="n">has_demand</span> <span class="o">==</span> <span class="n">has_flow</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"give exactly one of heat_demand_w or water_flow_rate_m3s"</span><span class="p">)</span>
+
+        <span class="n">flow</span> <span class="o">=</span> <span class="n">t_in</span> <span class="o">=</span> <span class="n">t_out</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="k">if</span> <span class="n">has_flow</span><span class="p">:</span>
+            <span class="n">flow</span> <span class="o">=</span> <span class="n">_non_negative</span><span class="p">(</span><span class="n">u</span><span class="p">[</span><span class="s2">"water_flow_rate_m3s"</span><span class="p">],</span> <span class="s2">"water_flow_rate_m3s"</span><span class="p">)</span>
+            <span class="n">t_in</span> <span class="o">=</span> <span class="n">_finite</span><span class="p">(</span><span class="n">u</span><span class="p">[</span><span class="s2">"water_temperature_in_degc"</span><span class="p">],</span> <span class="s2">"water_temperature_in_degc"</span><span class="p">)</span>
+            <span class="n">rho_cp</span> <span class="o">=</span> <span class="n">_positive</span><span class="p">(</span><span class="n">p</span><span class="p">[</span><span class="s2">"water_density_kg_m3"</span><span class="p">],</span> <span class="s2">"water_density_kg_m3"</span><span class="p">)</span> <span class="o">*</span> <span class="n">_positive</span><span class="p">(</span>
+                <span class="n">p</span><span class="p">[</span><span class="s2">"water_specific_heat_j_kgk"</span><span class="p">],</span> <span class="s2">"water_specific_heat_j_kgk"</span>
+            <span class="p">)</span>
+            <span class="n">demand</span> <span class="o">=</span> <span class="n">rho_cp</span> <span class="o">*</span> <span class="n">flow</span> <span class="o">*</span> <span class="nb">max</span><span class="p">(</span><span class="n">t_set</span> <span class="o">-</span> <span class="n">t_in</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">demand</span> <span class="o">=</span> <span class="n">_non_negative</span><span class="p">(</span><span class="n">u</span><span class="p">[</span><span class="s2">"heat_demand_w"</span><span class="p">],</span> <span class="s2">"heat_demand_w"</span><span class="p">)</span>
+
+        <span class="n">q_th</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="n">demand</span><span class="p">,</span> <span class="n">q_nom</span><span class="p">)</span>
+        <span class="n">power_el</span> <span class="o">=</span> <span class="n">q_th</span> <span class="o">/</span> <span class="n">efficiency</span>
+        <span class="k">if</span> <span class="n">has_flow</span><span class="p">:</span>
+            <span class="n">t_out</span> <span class="o">=</span> <span class="n">t_in</span> <span class="o">+</span> <span class="n">q_th</span> <span class="o">/</span> <span class="p">(</span><span class="n">rho_cp</span> <span class="o">*</span> <span class="n">flow</span><span class="p">)</span> <span class="k">if</span> <span class="n">flow</span> <span class="o">&gt;</span> <span class="mf">0.0</span> <span class="k">else</span> <span class="n">t_in</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">output</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s2">"heat_output_w"</span><span class="p">:</span> <span class="n">q_th</span><span class="p">,</span>
+            <span class="s2">"heat_demand_w"</span><span class="p">:</span> <span class="n">demand</span><span class="p">,</span>
+            <span class="s2">"unmet_heat_w"</span><span class="p">:</span> <span class="nb">max</span><span class="p">(</span><span class="n">demand</span> <span class="o">-</span> <span class="n">q_th</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">),</span>
+            <span class="s2">"load_ratio"</span><span class="p">:</span> <span class="n">q_th</span> <span class="o">/</span> <span class="n">q_nom</span><span class="p">,</span>
+            <span class="s2">"efficiency"</span><span class="p">:</span> <span class="n">efficiency</span><span class="p">,</span>
+            <span class="s2">"losses_w"</span><span class="p">:</span> <span class="n">power_el</span> <span class="o">-</span> <span class="n">q_th</span><span class="p">,</span>
+            <span class="s2">"water_flow_rate_m3s"</span><span class="p">:</span> <span class="n">flow</span><span class="p">,</span>
+            <span class="s2">"water_temperature_in_degc"</span><span class="p">:</span> <span class="n">t_in</span><span class="p">,</span>
+            <span class="s2">"water_temperature_out_degc"</span><span class="p">:</span> <span class="n">t_out</span> <span class="k">if</span> <span class="n">has_flow</span> <span class="k">else</span> <span class="n">t_set</span><span class="p">,</span>
+            <span class="s2">"power_el"</span><span class="p">:</span> <span class="n">power_el</span><span class="p">,</span>
+            <span class="s2">"power_th"</span><span class="p">:</span> <span class="n">q_th</span><span class="p">,</span>
+            <span class="s2">"emission"</span><span class="p">:</span> <span class="mf">0.0</span><span class="p">,</span>
+        <span class="p">}</span></div>
+</div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, TNO.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
