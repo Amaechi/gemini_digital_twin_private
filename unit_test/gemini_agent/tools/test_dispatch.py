@@ -14,6 +14,7 @@ from gemini_agent.tools.dispatch import (
     Db30Rule,
     FastPlant,
     StorageSpec,
+    _absorption_drive_m3s,
     availability_calendar,
     db30_rule,
     dispatch_day,
@@ -47,6 +48,13 @@ def plants(map_cache):
         "C4": make_candidate("C4", 2, depth_m=3200.0),
         "C7": make_candidate("C7", 2, parent_id="C2-2d"),
         "C0": make_candidate("C0", 0, equipment_sizes={"peak_boiler_mw": 6.0}),
+        "C2-deep": make_candidate(
+            "C2",
+            2,
+            depth_m=3200.0,
+            candidate_id="C2-deep",
+            equipment_sizes={"hthp_heating_mw": 4.0},
+        ),
     }
     return {key: FastPlant(c, gb=gb, sub=sub, map_cache_dir=map_cache) for key, c in cases.items()}
 
@@ -263,6 +271,17 @@ def test_cooling_merit_order(plants):
     assert no_abs["electric_chiller"] > 0 and "absorption_chiller" not in no_abs
 
 
+def test_absorption_drive_is_smallest_meeting_flow(plants):
+    """COOL-ABS-DRV: drive ≥ minimum × 1.01; a larger residual needs more drive (bisection)."""
+    plant = plants["C3"]
+    day = day_conditions(load_config("design_basis").cooling.peak_date)
+    small = _absorption_drive_m3s(plant, day, 0.5e6) * 3600.0
+    large = _absorption_drive_m3s(plant, day, 8.0e6) * 3600.0
+    assert small == pytest.approx(138.49 * 1.01, rel=1e-3)  # minimum drive + TL-05 tolerance
+    assert small < large <= plant.flow_max_m3h
+    assert _absorption_drive_m3s(plant, day, 0.0) == 0.0
+
+
 def test_absorption_minimum_load(plants):
     """DSP-ABS-MIN: a residual below the minimum load goes to the electric chiller."""
     fast = _dispatch(plants["C3"], JULY, absorption_min_frac=0.99)
@@ -271,16 +290,37 @@ def test_absorption_minimum_load(plants):
     assert any("DSP-ABS-MIN" in n for n in fast.plan.notes)
 
 
-def test_hp_turndown_rule(plants):
-    """DSP-HP-MIN: below the minimum the HTHPs go off only when HEX + CHP carry the same flows."""
+def test_hp_turndown_cycling_note(plants):
+    """DSP-HP-MIN: 100 °C needs the HTHP at 85 °C brine, so a low HTHP load is cycling (kept on)."""
     plant = plants["C2"]
     base = _dispatch(plant, JULY, hp_min_frac=0.0)
     assert base.plan.heat_pumps_on and not any("DSP-HP-MIN" in n for n in base.plan.notes)
-    strict = _dispatch(plant, JULY, hp_min_frac=1.0)
-    assert any("DSP-HP-MIN" in n for n in strict.plan.notes)
-    if not strict.plan.heat_pumps_on:
-        assert strict.plan.flows_m3h == base.plan.flows_m3h
-        assert strict.day.unmet_heating_mwh == 0.0
+    strict = _dispatch(plant, JULY, hp_min_frac=1.0, hp_extra_flow_frac=0.10)
+    assert strict.plan.heat_pumps_on
+    assert any("on/off cycling" in n for n in strict.plan.notes)
+    assert strict.plan.flows_m3h == base.plan.flows_m3h
+
+
+def test_hp_turndown_switches_off_trickle(plants):
+    """DSP-HP-MIN: with 105 °C brine a 3 kW HTHP trickle goes off for ≤ 10 % more brine."""
+    plant = plants["C2-deep"]
+    day = day_conditions(PEAK)
+    kept = _dispatch(plant, PEAK, hp_extra_flow_frac=0.0)
+    assert kept.plan.heat_pumps_on and any("on/off cycling" in n for n in kept.plan.notes)
+    hp = sum(v for k, v in kept.day.heat_by_source_mw.items() if k.startswith("hthp"))
+    assert 0 < hp < 0.1 * 4.0
+    off = _dispatch(plant, PEAK, hp_extra_flow_frac=0.10)
+    assert not off.plan.heat_pumps_on and any("HTHPs off" in n for n in off.plan.notes)
+    assert not any(k.startswith("hthp") for k in off.day.heat_by_source_mw)
+    assert sum(kept.plan.flows_m3h) < sum(off.plan.flows_m3h) <= 1.1 * sum(kept.plan.flows_m3h)
+    assert off.day.unmet_heating_mwh == 0.0
+    assert off.day.heat_by_source_mw["peak_boiler"] < 0.01  # HEX-share control resolution
+    full = simulate_plant_day(
+        plant.candidate, day, off.plan.plant_dispatch(), gb=plant.gb, sub=plant.sub
+    )
+    assert full.valid and full.day is not None
+    assert not any(k.startswith("hthp") for k in full.day.heat_by_source_mw)
+    assert full.day.unmet_heating_mwh == 0.0
 
 
 def test_unmet_recorded_when_boiler_too_small(plants):

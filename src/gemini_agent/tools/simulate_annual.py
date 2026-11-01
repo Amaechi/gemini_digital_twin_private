@@ -30,12 +30,12 @@ import json
 import re
 import time
 from collections import Counter
-from collections.abc import Sequence
+from collections.abc import Collection, Sequence
 from pathlib import Path
 from typing import Any, Literal
 
 import pandas as pd
-from pydantic import Field, JsonValue
+from pydantic import Field, JsonValue, model_validator
 
 from gemini_agent.memory.design_cache import DesignCache, config_hash
 from gemini_agent.schemas.candidate import Candidate
@@ -96,6 +96,8 @@ CACHE_VERSION = 1
 DEFAULT_RUNS_ROOT = REPO_ROOT / "runs"
 RUN_ID_PATTERN = r"^[A-Za-z0-9][A-Za-z0-9_.\-]{0,95}$"
 MAX_WARNINGS = 25
+STORAGE_BALANCE_TOL_FRAC = 0.01
+"""Seasonal storage end − start energy above 1 % of capacity is warned (RC-09 annual balance)."""
 SOURCES = [
     "spec §8 SIM-01…07",
     "spec §2.4 DB-30",
@@ -129,10 +131,16 @@ class SimulateAnnualRequest(StrictModel):
     parent_concept: ConceptId | None = Field(default=None, description="For C6–C8.")
     compare_day_indices: list[int] | None = Field(
         default=None,
-        description="Fast mode: also run these days in full mode and compare (SIM-04).",
+        description="Fast mode only: also run these days in full mode and compare (SIM-04).",
     )
     run_id: str | None = Field(default=None, pattern=RUN_ID_PATTERN)
     write_outputs: bool = True
+
+    @model_validator(mode="after")
+    def _check(self) -> SimulateAnnualRequest:
+        if self.mode == "full" and self.compare_day_indices is not None:
+            raise ValueError("compare_day_indices is for fast mode (full mode compares every day)")
+        return self
 
 
 class YearData(StrictModel):
@@ -249,11 +257,18 @@ def _placement_load(plant: FastPlant, year: YearData) -> list[float]:
     return [d.heating_demand_mw + (d.cooling_demand_mw / cop if cop else 0.0) for d in year.days]
 
 
-def compare_days(full: Sequence[DayResult], fast: Sequence[DayResult]) -> ModeComparison:
+def compare_days(
+    full: Sequence[DayResult],
+    fast: Sequence[DayResult],
+    *,
+    invalid_day_indices: Collection[int] = (),
+) -> ModeComparison:
     """Compare full and fast days by the SIM-04 / PD-06 rule; the worst item per day.
 
     Per source heat and cooling and unmet demand relative to the day's demand (or supply),
-    electricity relative to the larger of the two.
+    electricity relative to the larger of the two. A day GEMINI could not run in full mode
+    (``invalid_day_indices``) fails outright: its full result is the fast one and would compare
+    equal.
     """
     by_index = {d.day_index: d for d in fast}
     rows = []
@@ -262,6 +277,19 @@ def compare_days(full: Sequence[DayResult], fast: Sequence[DayResult]) -> ModeCo
         other = by_index.get(day.day_index)
         if other is None:
             raise ValueError(f"no fast result for day {day.day_index}")
+        if day.day_index in invalid_day_indices:
+            rows.append(
+                DayModeComparison(
+                    day_index=day.day_index,
+                    date=day.date,
+                    max_discrepancy_frac=1.0,
+                    worst_item="full mode invalid (GEMINI could not run the day)",
+                    heat_supplied_fast_mw=other.heat_supplied_mw,
+                    heat_supplied_full_mw=day.heat_supplied_mw,
+                    status="fail",
+                )
+            )
+            continue
         items: list[tuple[float, str]] = []
         sides = (
             ("heat", day.heat_by_source_mw, other.heat_by_source_mw, day.heating_demand_mw,
@@ -465,9 +493,20 @@ def _dedupe(warnings: Sequence[str]) -> list[str]:
     ]
 
 
-def cache_config(request: SimulateAnnualRequest, calendar: AvailabilityCalendar) -> dict:
-    """Return what the annual result depends on (SIM-07 key payload)."""
+def cache_config(
+    request: SimulateAnnualRequest,
+    calendar: AvailabilityCalendar,
+    config_dir: Path | str | None = None,
+) -> dict:
+    """Return what the annual result depends on (SIM-07 key payload).
+
+    Includes the register, design basis and limits it reads (DSP-*, STO-REC-HT, DB-*); a change
+    of the dispatch rules or the fast model in code needs a ``CACHE_VERSION`` bump.
+    """
     return {
+        "assumptions": load_config("assumptions", config_dir).model_dump(mode="json"),
+        "design_basis": load_config("design_basis", config_dir).model_dump(mode="json"),
+        "limits": load_config("limits", config_dir).model_dump(mode="json"),
         "candidate": request.candidate.model_dump(mode="json"),
         "design": request.design.model_dump(mode="json") if request.design else None,
         "parent_concept": request.parent_concept,
@@ -491,6 +530,12 @@ def run_annual(
     candidate = request.candidate
     register = load_config("assumptions", config_dir)
     year = year or year_conditions(config_dir)
+    if plant is not None and (
+        plant.candidate != candidate
+        or plant.design != request.design
+        or plant.parent_concept != request.parent_concept
+    ):
+        raise ValueError("the prebuilt FastPlant is not the requested candidate/design/parent")
     plant = plant or FastPlant(
         candidate,
         design=request.design,
@@ -498,7 +543,10 @@ def run_annual(
         config_dir=config_dir,
         map_cache_dir=map_cache_dir,
     )
-    hp_min = float(register.get("DSP-HP-MIN").value)  # type: ignore[arg-type]
+    hp_rule = register.get("DSP-HP-MIN").value
+    assert isinstance(hp_rule, dict)
+    hp_min = float(hp_rule["min_part_load_frac"])
+    hp_extra = float(hp_rule["max_extra_flow_frac"])
     abs_min = float(register.get("DSP-ABS-MIN").value)  # type: ignore[arg-type]
     rule = db30_rule(request.db30_answer, register=register)
     calendar = availability_calendar(
@@ -526,6 +574,7 @@ def run_annual(
             storage_net_mw=net,
             hp_min_frac=hp_min,
             absorption_min_frac=abs_min,
+            hp_extra_flow_frac=hp_extra,
         )
 
     fast_days = {i: dispatch(i) for i in indices}
@@ -568,12 +617,13 @@ def run_annual(
         missing = sorted(set(full_indices) - set(indices))
         if missing:
             raise ValueError(f"comparison days {missing[:5]} are not simulated")
-        full_results, invalid, evidence, full_warnings = _run_full(
+        full_results, invalid_by_day, evidence, full_warnings = _run_full(
             plant, year, calendar, {i: fast_days[i] for i in full_indices}
         )
+        invalid = list(invalid_by_day.values())
         warnings += full_warnings
         fast_subset = [fast_days[i].day for i in full_indices]
-        comparison = compare_days(full_results, fast_subset)
+        comparison = compare_days(full_results, fast_subset, invalid_day_indices=invalid_by_day)
         if comparison.status != "pass":
             warnings.append(
                 "SIM-04 fast vs full: max daily discrepancy "
@@ -612,6 +662,19 @@ def run_annual(
         breakthrough_yr=min((c.breakthrough_time_yr for c in end_of_life), default=None),
     )
     annual = annual.model_copy(update={"kpis": kpis})
+    head = []
+    if invalid:
+        head.append(
+            f"{len(invalid)} full-mode day(s) GEMINI could not run: fast results kept and "
+            f"flagged, comparison failed (first: {invalid[0]})"
+        )
+    if storage is not None and abs(storage.cyclic_mismatch_mwh) > STORAGE_BALANCE_TOL_FRAC * (
+        storage.spec.capacity_mwh
+    ):
+        head.append(
+            f"C6 storage not in annual balance: end − start {storage.cyclic_mismatch_mwh:.0f} MWh "
+            f"(> {100 * STORAGE_BALANCE_TOL_FRAC:g} % of capacity, RC-09 seasonal ATES)"
+        )
     if request.mode == "full":
         fast_kpis = annual_kpis(fast_annual, plant, co2_t_per_yr=None)
         fast_annual = fast_annual.model_copy(update={"kpis": fast_kpis})
@@ -619,7 +682,7 @@ def run_annual(
         candidate_id=candidate.id,
         mode=request.mode,
         config_hash=config_hash(
-            cache_config(request, calendar), namespace=cache_namespace(request.mode)
+            cache_config(request, calendar, config_dir), namespace=cache_namespace(request.mode)
         ),
         calendar=calendar,
         annual=annual,
@@ -632,7 +695,7 @@ def run_annual(
         evidence=evidence,
         end_of_life=end_of_life,
         elapsed_s=time.perf_counter() - start,
-        warnings=_dedupe(warnings),
+        warnings=head + _dedupe(warnings),
     )
 
 
@@ -646,10 +709,14 @@ def _run_full(
     year: YearData,
     calendar: AvailabilityCalendar,
     fast_days: dict[int, FastDay],
-) -> tuple[list[DayResult], list[str], FullModeEvidence | None, list[str]]:
-    """GEMINI every day with the fast plan (TL-11 controls on); invalid days keep the fast day."""
+) -> tuple[list[DayResult], dict[int, str], FullModeEvidence | None, list[str]]:
+    """GEMINI every day with the fast plan (TL-11 controls on).
+
+    A day GEMINI cannot run keeps the fast ``DayResult`` (flagged) so the year stays complete;
+    it is returned in the invalid map, fails the comparison and is warned about (never silent).
+    """
     results: list[DayResult] = []
-    invalid: list[str] = []
+    invalid: dict[int, str] = {}
     warnings: list[str] = []
     evidence: FullModeEvidence | None = None
     for index, fast in sorted(fast_days.items()):
@@ -667,7 +734,8 @@ def _run_full(
             sub=plant.sub,
         )
         if not sim.valid or sim.day is None:
-            invalid.append(f"{plan.date}: {'; '.join(sim.failures)[:200]}")
+            invalid[index] = f"{plan.date}: {'; '.join(sim.failures)[:200]}"
+            warnings.append(f"full mode invalid on {invalid[index]} (fast result kept, flagged)")
             results.append(
                 fast.day.model_copy(
                     update={"flags": [*fast.day.flags, "full mode invalid: fast result"]}
@@ -707,10 +775,16 @@ def verification_evidence(
     """WP-09 ``VerificationEvidence`` from a TL-12 result (full mode: both modes for PD-06).
 
     ``extra`` passes the other evidence (subsurface, scaling, absorption points, ESP points with
-    p_b, …) that WP-14 collects from TL-05/07/08/22.
+    p_b, …) that WP-14 collects from TL-05/07/08/22. Raises ``ValueError`` when full-mode days
+    were invalid (their full result would be the fast one).
     """
     if sim.candidate_id != candidate.id:
         raise ValueError(f"simulation of '{sim.candidate_id}' given for '{candidate.id}'")
+    if sim.invalid_full_days:
+        raise ValueError(
+            f"{len(sim.invalid_full_days)} full-mode day(s) could not be run in GEMINI "
+            f"(first: {sim.invalid_full_days[0]}): no full-mode evidence for them"
+        )
     ev = sim.evidence
     full = sim.mode == "full"
     data: dict[str, Any] = {
@@ -853,6 +927,8 @@ def _summary(sim: AnnualSimulation) -> str:
     )
     if sim.comparison is not None:
         text += f", fast/full {100 * sim.comparison.max_discrepancy_frac:.2f} %"
+    if sim.invalid_full_days:
+        text = f"{text}, INVALID full days {len(sim.invalid_full_days)}"
     return text[:300]
 
 
@@ -864,7 +940,12 @@ def simulate_annual(
     map_cache_dir: Path | str | None = None,
     cache: DesignCache | None = None,
 ) -> ToolResult[AnnualSimulation]:
-    """TL-12: dispatch the year in ``request.mode`` and write ``runs/<run_id>/`` (module doc)."""
+    """TL-12: dispatch the year in ``request.mode`` and write ``runs/<run_id>/`` (module doc).
+
+    With ``cache`` the KPIs are stored under ``config_hash`` (SIM-07); a caller that only needs
+    KPIs reads them back with ``cache.get(key)`` before calling (the full daily results are not
+    cached).
+    """
     sim = run_annual(request, config_dir=config_dir, map_cache_dir=map_cache_dir)
     if request.write_outputs:
         run_id = request.run_id or f"annual-{sim.candidate_id}-{sim.mode}-{sim.config_hash[:8]}"
@@ -873,7 +954,7 @@ def simulate_annual(
     summary = _summary(sim)
     if cache is not None:
         cache.put(
-            cache_config(request, sim.calendar),
+            cache_config(request, sim.calendar, config_dir),
             namespace=cache_namespace(sim.mode),
             kpis=sim.annual.kpis,
             summary=summary,

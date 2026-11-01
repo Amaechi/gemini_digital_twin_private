@@ -1308,16 +1308,20 @@ assumptions:
 
   - id: DSP-HP-MIN
     title: HTHP minimum daily part load before switching the heat pumps off
-    value: 0.10
+    value:
+      min_part_load_frac: 0.10
+      max_extra_flow_frac: 0.10
     unit: "-"
     justification: >-
-      RC-04 gives no HTHP turndown. Below 10 % of the reference heat (hthp_heating_mw, else the HTHP heat at
-      the DB-18 peak with all doublets at the design flow) the HTHPs are switched off when HEX + CHP carry the
-      load at the same doublet flows (no extra brine or CHP must-run heat); otherwise a daily average below
-      the minimum is read as on/off cycling within the day and kept (noted). Removes the July "trickle"
-      operation (≈ 150 W, COP 9.8) of WP-06.
+      RC-04 gives no HTHP turndown. Below min_part_load_frac of the reference heat (hthp_heating_mw, else the
+      HTHP heat at the DB-18 peak with all doublets at the design flow) the HTHPs are switched off if HEX + CHP
+      carry the load with at most max_extra_flow_frac more total brine (DSP-FLOW re-solved without HTHPs), so
+      no large brine or CHP must-run increase is bought against the HEX → HTHP → CHP merit order; otherwise a
+      daily average below the minimum is read as on/off cycling within the day and kept (noted). The WP-06
+      July trickle at full flow (≈ 150 W, COP 9.8) is removed by DSP-FLOW's minimum flow; this rule removes
+      the remaining small trickles with hot brine (e.g. 3 kW at 105 °C wellhead).
     source: engineering assumption [A]; WP-06 follow-up (PROGRESS)
-    sensitivity: [0.0, 0.25]
+    sensitivity: "min_part_load_frac 0–0.25; max_extra_flow_frac 0–0.25"
     tag: A
     status: default
     added_by: WP-07

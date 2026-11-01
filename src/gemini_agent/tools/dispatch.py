@@ -1007,6 +1007,7 @@ def dispatch_day(
     storage_net_mw: float = 0.0,
     hp_min_frac: float,
     absorption_min_frac: float,
+    hp_extra_flow_frac: float = 0.0,
 ) -> FastDay:
     """Merit-order dispatch of one day on the fast model (module doc, SIM-03)."""
     notes: list[str] = []
@@ -1068,22 +1069,26 @@ def dispatch_day(
         hp_heat = point.hp_heat_w()
         minimum = hp_min_frac * plant.hp_reference_w
         if 0.0 < hp_heat < minimum:
-            # HTHPs off only when HEX + CHP carry the load on no more brine (the merit order puts
-            # the HTHP before CHP must-run heat); otherwise the daily average below the minimum
-            # part load means on/off cycling within the day (DSP-HP-MIN).
-            if met and meets(flows, False):
+            # HTHPs off when HEX + CHP carry the load with at most hp_extra_flow_frac more brine
+            # (the merit order puts the HTHP before CHP must-run heat, so no large flow increase
+            # is bought); otherwise the daily average below the minimum part load means on/off
+            # cycling within the day (DSP-HP-MIN).
+            off_flows, off_met = solve(False) if met else (flows, False)
+            limit = sum(flows) * (1.0 + hp_extra_flow_frac)
+            if off_met and sum(off_flows) <= limit + 1e-9:
                 notes.append(
-                    f"HTHPs off: {hp_heat / 1e6:.3f} MW < DSP-HP-MIN {minimum / 1e6:.3f} MW and "
-                    "HEX + CHP carry the load at the same flows"
+                    f"HTHPs off: {hp_heat / 1e6:.3f} MW < DSP-HP-MIN {minimum / 1e6:.3f} MW; HEX + "
+                    f"CHP carry the load at {sum(off_flows):.1f} m³/h (was {sum(flows):.1f})"
                 )
-                hp_on = False
+                hp_on, flows = False, off_flows
                 point = plant.run(
                     day, flows, hp_on=False, drive_flow_m3s=drive_m3s, plant_heating_mw=plant_heat
                 )
             else:
                 notes.append(
                     f"HTHP heat {hp_heat / 1e6:.3f} MW below DSP-HP-MIN {minimum / 1e6:.3f} MW: "
-                    "on/off cycling within the day (HEX + CHP alone cannot carry the load)"
+                    "on/off cycling within the day (HEX + CHP alone need more brine or cannot "
+                    "carry the load)"
                 )
     if not met:
         notes.append("geothermal at maximum flow on the available doublets; peak boiler fills")
@@ -1271,6 +1276,11 @@ class StorageBalance(StrictModel):
     net_mw_by_day: dict[int, float] = Field(
         description="Day index → net storage heat to the network (> 0 discharge)."
     )
+
+    @property
+    def cyclic_mismatch_mwh(self) -> float:
+        """End − start energy of the reported pass (≈ 0 for a balanced seasonal store, RC-09)."""
+        return self.final_energy_mwh - self.initial_energy_mwh
 
 
 def storage_spec(candidate: Candidate, register: AssumptionsRegister) -> StorageSpec | None:

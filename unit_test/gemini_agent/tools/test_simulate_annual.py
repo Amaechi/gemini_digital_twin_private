@@ -7,10 +7,12 @@ import json
 import pandas as pd
 import pytest
 
+import gemini_agent.tools.simulate_annual as sa
 from gemini_agent.memory.design_cache import DesignCache
 from gemini_agent.runner.design_runner import _db30_interpretation_b
 from gemini_agent.schemas.config import load_config
 from gemini_agent.schemas.results import AnnualResult
+from gemini_agent.tools.dispatch import FastPlant
 from gemini_agent.tools.economics import (
     CapexRequest,
     Co2Request,
@@ -288,6 +290,77 @@ def test_c6_storage_ledger_year(map_cache):
     for day in sim.annual.days:
         assert day.heat_supplied_mw == pytest.approx(day.heating_demand_mw, abs=1e-5)
     assert any("DSP-STORAGE" in w for w in sim.warnings)
+
+
+def test_c6_storage_full_mode(map_cache):
+    """Full mode replays storage days: plant serves demand ∓ storage, the network sees demand."""
+    c6 = make_candidate(
+        "C6",
+        2,
+        parent_id="C3-2d",
+        equipment_sizes={
+            "storage_capacity_mwh": 3000.0,
+            "storage_power_mw": 5.0,
+            "peak_boiler_mw": 30.0,
+            "hthp_heating_mw": 4.0,
+        },
+    )
+    sim = run_annual(
+        SimulateAnnualRequest(candidate=c6, mode="full", day_indices=[14, 120, 190]),
+        map_cache_dir=map_cache,
+    )
+    nets = {p.day_index: p.storage_net_mw for p in sim.plans}
+    assert nets[14] > 0 and nets[190] < 0  # winter discharge, summer charge
+    for day in sim.annual.days:
+        assert day.heat_by_source_mw["storage"] == pytest.approx(nets[day.day_index])
+        assert day.heat_supplied_mw == pytest.approx(day.heating_demand_mw, abs=1e-3)
+        assert day.unmet_heating_mwh == 0.0
+    assert sim.comparison is not None and sim.comparison.status == "pass"
+
+
+def test_c6_without_storage_size_warns(map_cache):
+    """C6 without a storage size runs the parent plant and says so."""
+    c6 = make_candidate("C6", 2, parent_id="C3-2d")
+    sim = run_annual(SimulateAnnualRequest(candidate=c6, day_indices=[14]), map_cache_dir=map_cache)
+    assert sim.storage is None and any("storage_capacity_mwh" in w for w in sim.warnings)
+
+
+def test_invalid_full_day_is_never_silent(c2, map_cache, monkeypatch):
+    """A day GEMINI cannot run fails the comparison, is warned and blocks the evidence."""
+    real = sa.simulate_plant_day
+
+    def broken(candidate, day, *args, **kwargs):
+        sim = real(candidate, day, *args, **kwargs)
+        if day.day_index == 190:
+            return sim.model_copy(update={"valid": False, "failures": ["forced"], "day": None})
+        return sim
+
+    monkeypatch.setattr(sa, "simulate_plant_day", broken)
+    result = simulate_annual(
+        SimulateAnnualRequest(
+            candidate=c2, mode="full", day_indices=[14, 190], write_outputs=False
+        ),
+        map_cache_dir=map_cache,
+    )
+    sim = result.data
+    assert len(sim.invalid_full_days) == 1 and "forced" in sim.invalid_full_days[0]
+    assert sim.comparison is not None and sim.comparison.status == "fail"
+    row = next(r for r in sim.comparison.days if r.day_index == 190)
+    assert row.status == "fail" and "invalid" in row.worst_item
+    assert "full mode invalid: fast result" in sim.annual.days[1].flags
+    assert result.warnings[0].startswith("1 full-mode day(s) GEMINI could not run")
+    assert "INVALID full days 1" in result.summary
+    with pytest.raises(ValueError, match="could not be run"):
+        verification_evidence(sim, c2)
+
+
+def test_request_and_plant_guards(c2, map_cache):
+    """compare_day_indices is fast-mode only; a prebuilt plant must match the request."""
+    with pytest.raises(ValueError, match="fast mode"):
+        SimulateAnnualRequest(candidate=c2, mode="full", compare_day_indices=[1])
+    plant = FastPlant(make_candidate("C3", 2), map_cache_dir=map_cache)
+    with pytest.raises(ValueError, match="prebuilt FastPlant"):
+        run_annual(SimulateAnnualRequest(candidate=c2, day_indices=[1]), plant=plant)
 
 
 def test_c0_boiler_only(map_cache):
