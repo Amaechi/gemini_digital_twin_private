@@ -9,8 +9,10 @@ GEMINI returns the target flow within 1 %. Per operating point it also gives
   the undisturbed geothermal gradient (RC-01 eq 1 and envelope note, U = 10 W/(m² K) in GEMINI);
 * the ESP Δp and power both ways: GEMINI's stage curve and the challenge rule
   ``P_shaft = Q Δp / 0.70`` with ``P_el = P_shaft / (η_motor η_VFD)`` (RC-01 eq 6, DB-13, DB-40);
-* the ESP intake-pressure check against the bubble/CO₂-release pressure (RC-01 item 9), NPSH
-  available (RC-01 item 8) and the gas-release depths (flash-depth method, DiPippo eq 4.16–4.20);
+* the brine bubble point from Henry's law (RC-01 item 9, Sander 2023 constants; sea water basis,
+  pure water as second bound), the ESP-intake setpoint 1.2 · p_b, NPSH available (RC-01 item 8),
+  the gas-release depths (flash-depth method, DiPippo eq 4.16–4.20) and p_b as explicit evidence
+  for the DesignVerifier (``EspEvidence`` = WP-09 ``EspPoint``);
 * the injector wellhead pressure and injection-pump power from GEMINI ``InjectorWell`` with the
   brine PVT block and friction as a loss for the downward flow (RC-01 eq 12).
 
@@ -47,6 +49,7 @@ from gemini_agent.schemas.common import StrictModel, ToolResult
 from gemini_agent.schemas.config import REPO_ROOT
 from gemini_agent.tools.design_basis import (
     G_M_S2,
+    MOLAR_VOLUME_NM3_PER_KMOL,
     PA_PER_BAR,
     SECONDS_PER_HOUR,
     brine_heat_mw,
@@ -78,11 +81,22 @@ RUNOUT_SEARCH_MAX_M3H = 2000.0
 """Numerical: upper end of the scan for the ESP curve's zero-head (run-out) flow."""
 INJECTION_PRESSURE_BRACKET_BAR = (0.001, 500.0)
 """GEMINI ``InjectorWell`` default bracket; the floor means 'no pump needed'."""
+HENRY_REFERENCE_TEMPERATURE_K = 298.15
+"""RC-01 item 9: reference temperature of the van 't Hoff form H(T) = H° exp[B (1/T − 1/T°)]."""
+HENRY_CONSTANTS = {
+    "sea_water": {"CH4": (1.2e-5, 1100.0), "CO2": (2.8e-4, 2600.0)},
+    "pure_water": {"CH4": (1.4e-5, 1600.0), "CO2": (3.4e-4, 2300.0)},
+}
+"""RC-01 item 9: (H° in mol m⁻³ Pa⁻¹, B in K) per solvent and gas. Source: Sander, Compilation of
+Henry's law constants v5.0.0, Atmos. Chem. Phys. 23, 10901–12440 (2023); Burkholder et al.
+2019 [L]."""
+HENRY_CHECKED_RANGE_DEGC = (25.0, 100.0)
+"""RC-01 item 9: range over which CH₄ p_b is stated to rise with T (van 't Hoff extrapolation)."""
 LINESHAFT_ECONOMICAL_MAX_M = 730.0
 """RC-01 item 11: lineshaft pumps are economical for setting depths below ≈ 730–800 m [L]."""
 MAP_STEP_M3H = 10.0
 """TL-06 default flow step."""
-MAP_CACHE_VERSION = "wp05-2"
+MAP_CACHE_VERSION = "wp05-3"
 """Bump when the operating-point algorithm changes: it is part of the cache key."""
 DEFAULT_CACHE_DIR = REPO_ROOT / "runs" / "cache" / "doublet_maps"
 """Performance maps are cached here (``runs/`` is git-ignored)."""
@@ -165,6 +179,53 @@ class EspDesign(StrictModel):
     notes: list[str] = Field(default_factory=list)
 
 
+class GasPartialPressure(StrictModel):
+    """Henry's-law partial pressure of one dissolved gas (RC-01 item 9)."""
+
+    gas: Literal["CH4", "CO2"]
+    concentration_mol_m3: float = Field(description="c_i = GLR · y_i / 0.022414.")
+    henry_mol_m3_pa: float = Field(description="H_i(T) = H° exp[B (1/T − 1/298.15)].")
+    partial_pressure_bara: float = Field(description="c_i / H_i(T).")
+
+
+class BubblePointEstimate(StrictModel):
+    """Bubble point for one set of Henry constants (sea water or pure water)."""
+
+    solvent: Literal["sea_water", "pure_water"]
+    gases: list[GasPartialPressure]
+    bubble_pressure_bara: float = Field(description="p_b = Σ c_i / H_i(T).")
+
+
+class BubblePoint(StrictModel):
+    """Brine bubble point and ESP-intake setpoint (RC-01 item 9; SUB-PBUB)."""
+
+    temperature_degc: float
+    gas_liquid_ratio_nm3_per_m3: float
+    basis: BubblePointEstimate = Field(description="SUB-PBUB basis (sea water).")
+    second_bound: BubblePointEstimate = Field(description="SUB-PBUB second bound (pure water).")
+    margin_factor: float = Field(description="SUB-PBUB [A]: setpoint = factor · p_b.")
+    atmospheric_pressure_bara: float
+    release_pressure_bara: float = Field(description="p_b of the basis.")
+    release_pressure_barg: float = Field(description="p_b of the basis, gauge.")
+    intake_setpoint_bara: float = Field(description="VER-ESP-PB: intake ≥ factor · p_b.")
+    intake_setpoint_barg: float
+    notes: list[str] = Field(default_factory=list)
+
+
+class EspEvidence(StrictModel):
+    """ESP evidence for the DesignVerifier: the fields of WP-09 ``EspPoint`` (PH-18, PH-19).
+
+    ``release_pressure_barg`` is the computed bubble point p_b, passed explicitly so the verifier
+    does not fall back to its register default.
+    """
+
+    name: str
+    intake_pressure_barg: float
+    release_pressure_barg: float
+    npsh_available_m: float | None = None
+    npsh_required_m: float | None = Field(default=None, description="Not given (SUB-NPSH).")
+
+
 class ResolvedDoublet(StrictModel):
     """All inputs of one doublet after defaults and ESP sizing (the cache key of TL-06)."""
 
@@ -183,7 +244,7 @@ class ResolvedDoublet(StrictModel):
     producer_wellhead_pressure_barg: float
     injection_pump_suction_barg: float
     brine_cooling_k: float
-    bubble_pressure_barg: float
+    bubble_point: BubblePoint
     npsh_margin_m: float
     vapour_pressure_bound_bara: float
     vapour_pressure_bound_valid_to_degc: float
@@ -254,16 +315,27 @@ class OperatingPoint(StrictModel):
     esp_flow_to_bep_ratio: float | None = Field(
         default=None, description="Q / (Q_BEP · f/60): flow vs the affinity-scaled BEP."
     )
-    intake_margin_bar: float | None = Field(default=None, description="P_intake − P_bubble.")
+    release_pressure_barg: float | None = Field(
+        default=None, description="Bubble point p_b (Henry's law, SUB-PBUB), gauge."
+    )
+    intake_setpoint_barg: float | None = Field(
+        default=None, description="ESP-intake setpoint 1.2 · p_b (VER-ESP-PB), gauge."
+    )
+    intake_margin_bar: float | None = Field(
+        default=None, description="P_intake − setpoint (≥ 0 required)."
+    )
     npsh_available_m: float | None = None
     gas_release_depth_m: float | None = Field(
-        default=None, description="Where the unboosted flowing pressure equals P_bubble."
+        default=None, description="Where the unboosted flowing pressure equals p_b."
     )
     setting_depth_margin_m: float | None = Field(
         default=None, description="ESP setting depth − gas-release depth (> 0 required)."
     )
     tubing_gas_release_depth_m: float | None = Field(
         default=None, description="Above this depth gas leaves solution in the tubing."
+    )
+    esp_evidence: EspEvidence | None = Field(
+        default=None, description="For the DesignVerifier (WP-09 EspPoint), p_b explicit."
     )
     wellhead_temperature_degc: float | None = None
     wellbore_cooling_k: float | None = None
@@ -541,6 +613,87 @@ def _root_depth(func: Callable[[float], float], low: float, high: float) -> floa
     return float(brentq(func, low, high, xtol=1e-6))
 
 
+# --------------------------------------------------------------------------- bubble point
+def henry_constant_mol_m3_pa(h0_mol_m3_pa: float, b_k: float, temperature_k: float) -> float:
+    """Van 't Hoff form ``H(T) = H° exp[B (1/T − 1/298.15)]`` (RC-01 item 9)."""
+    return h0_mol_m3_pa * math.exp(
+        b_k * (1.0 / temperature_k - 1.0 / HENRY_REFERENCE_TEMPERATURE_K)
+    )
+
+
+def dissolved_gas_mol_m3(gas_liquid_ratio_nm3_per_m3: float, mol_frac: float) -> float:
+    """``c_i = GLR · y_i / 0.022414`` mol/m³ (Nm³ at 0 °C, 1.01325 bar; RC-01 item 9, RC-08)."""
+    return gas_liquid_ratio_nm3_per_m3 * mol_frac / (MOLAR_VOLUME_NM3_PER_KMOL / 1000.0)
+
+
+def bubble_point_estimate(
+    temperature_degc: float,
+    gas_liquid_ratio_nm3_per_m3: float,
+    ch4_mol_frac: float,
+    co2_mol_frac: float,
+    solvent: str,
+) -> BubblePointEstimate:
+    """``p_b = Σ c_i / H_i(T)`` for one set of Henry constants (RC-01 item 9; ideal gas)."""
+    if solvent not in HENRY_CONSTANTS:
+        raise ValueError(f"unknown solvent {solvent!r}; expected {sorted(HENRY_CONSTANTS)}")
+    temperature_k = temperature_degc + CELSIUS_TO_KELVIN
+    gases = []
+    for gas, mol_frac in (("CH4", ch4_mol_frac), ("CO2", co2_mol_frac)):
+        h0, b_k = HENRY_CONSTANTS[solvent][gas]
+        henry = henry_constant_mol_m3_pa(h0, b_k, temperature_k)
+        concentration = dissolved_gas_mol_m3(gas_liquid_ratio_nm3_per_m3, mol_frac)
+        gases.append(
+            GasPartialPressure(
+                gas=gas,
+                concentration_mol_m3=concentration,
+                henry_mol_m3_pa=henry,
+                partial_pressure_bara=concentration / henry / PA_PER_BAR,
+            )
+        )
+    return BubblePointEstimate(
+        solvent=solvent,
+        gases=gases,
+        bubble_pressure_bara=sum(g.partial_pressure_bara for g in gases),
+    )
+
+
+def brine_bubble_point(basis: SubsurfaceBasis, temperature_degc: float) -> BubblePoint:
+    """Return the bubble point and ESP-intake setpoint of the DB-09 brine (SUB-PBUB)."""
+    estimates = [
+        bubble_point_estimate(
+            temperature_degc,
+            basis.gas_liquid_ratio_nm3_per_m3,
+            basis.gas_ch4_mol_frac,
+            basis.gas_co2_mol_frac,
+            solvent,
+        )
+        for solvent in (basis.bubble_point_basis, basis.bubble_point_second_bound)
+    ]
+    p_b = estimates[0].bubble_pressure_bara
+    setpoint = basis.bubble_point_margin_factor * p_b
+    low, high = HENRY_CHECKED_RANGE_DEGC
+    notes = []
+    if not low <= temperature_degc <= high:
+        notes.append(
+            f"Bubble point at {temperature_degc:.1f} °C is outside the {low:g}–{high:g} °C range "
+            "checked on RC-01 item 9 (single-parameter van 't Hoff extrapolation)."
+        )
+    atmospheric = basis.atmospheric_pressure_bara
+    return BubblePoint(
+        temperature_degc=temperature_degc,
+        gas_liquid_ratio_nm3_per_m3=basis.gas_liquid_ratio_nm3_per_m3,
+        basis=estimates[0],
+        second_bound=estimates[1],
+        margin_factor=basis.bubble_point_margin_factor,
+        atmospheric_pressure_bara=atmospheric,
+        release_pressure_bara=p_b,
+        release_pressure_barg=p_b - atmospheric,
+        intake_setpoint_bara=setpoint,
+        intake_setpoint_barg=setpoint - atmospheric,
+        notes=notes,
+    )
+
+
 # --------------------------------------------------------------------------- resolution
 def _esp_head_pa(
     doublet: ResolvedDoublet, stages: int, flow_m3h: float, frequency_hz: float
@@ -593,6 +746,10 @@ def resolve_doublet(design: DoubletDesign, basis: SubsurfaceBasis) -> ResolvedDo
     head_coeff, power_coeff = _scaled_coefficients(head0, power0, flow_scale)
     runout, bep, bep_eff = curve_runout_and_bep(head_coeff, power_coeff, f_nom)
     reservoir_top = depth - 0.5 * basis.thickness_m
+    # At the reservoir temperature: CH₄ p_b rises with T over 25–100 °C (RC-01), so the
+    # slightly cooler intake makes this the conservative end.
+    bubble = brine_bubble_point(basis, conditions.temperature_degc)
+    notes.extend(bubble.notes)
     provisional_depth = design.esp_setting_depth_m or 0.5 * depth
     if provisional_depth >= depth:
         raise ValueError(f"ESP setting depth {provisional_depth:g} m is not above {depth:g} m")
@@ -626,7 +783,7 @@ def resolve_doublet(design: DoubletDesign, basis: SubsurfaceBasis) -> ResolvedDo
                 else design.injection_pump_suction_barg
             ),
             brine_cooling_k=cooling,
-            bubble_pressure_barg=basis.bubble_pressure_barg,
+            bubble_point=bubble,
             npsh_margin_m=basis.npsh_margin_m,
             vapour_pressure_bound_bara=basis.vapour_pressure_bound_bara,
             vapour_pressure_bound_valid_to_degc=basis.vapour_pressure_bound_valid_to_degc,
@@ -676,16 +833,17 @@ def resolve_doublet(design: DoubletDesign, basis: SubsurfaceBasis) -> ResolvedDo
     if setting_depth is None:
         sized.append("setting_depth")
         p_wf = _bottomhole_pressure_barg(draft, q_max, "production_reservoir")
-        p_bubble = basis.bubble_pressure_barg
+        setpoint = bubble.intake_setpoint_barg
 
         def margin(z: float) -> float:
-            return _unboosted_pressure_barg(draft, q_max, z, p_wf) - p_bubble
+            return _unboosted_pressure_barg(draft, q_max, z, p_wf) - setpoint
 
         if margin(depth) < 0.0:
             setting_depth = reservoir_top
             notes.append(
-                f"No setting depth keeps the intake ≥ {p_bubble:g} bar(g) at {q_max:g} m³/h "
-                f"(P_wf {p_wf:.1f} bar(g)); pump set at the reservoir top {reservoir_top:.0f} m."
+                f"No setting depth keeps the intake ≥ {setpoint:.1f} bar(g) (1.2·p_b) at "
+                f"{q_max:g} m³/h (P_wf {p_wf:.1f} bar(g)); pump set at the reservoir top "
+                f"{reservoir_top:.0f} m."
             )
         elif margin(0.0) >= 0.0:
             setting_depth = basis.esp_setting_depth_step_m
@@ -809,18 +967,24 @@ def operating_point(doublet: ResolvedDoublet, flow_m3h: float) -> OperatingPoint
         )
     reasons: list[str] = []
 
-    # ESP setting checks: intake vs bubble point, NPSH, gas-release depths (RC-01 items 8–9).
-    p_bubble = doublet.bubble_pressure_barg
-    base["intake_margin_bar"] = hyd["p_intake"] - p_bubble
+    # ESP setting checks: intake vs 1.2·p_b, NPSH, gas-release depths (RC-01 items 8–9).
+    p_bubble = doublet.bubble_point.release_pressure_barg
+    setpoint = doublet.bubble_point.intake_setpoint_barg
+    base.update(
+        release_pressure_barg=p_bubble,
+        intake_setpoint_barg=setpoint,
+        intake_margin_bar=hyd["p_intake"] - setpoint,
+    )
     if hyd["p_intake"] <= _DRY_INTAKE_BARG:
         reasons.append(
             f"ESP set above the dynamic fluid level at {flow_m3h:g} m³/h (GEMINI clamps the intake "
             "pressure at 0): set the pump deeper"
         )
-    elif hyd["p_intake"] < p_bubble:
+    elif hyd["p_intake"] < setpoint:
         reasons.append(
-            f"ESP intake {hyd['p_intake']:.1f} bar(g) is below the bubble/CO₂-release pressure "
-            f"{p_bubble:g} bar(g) (SUB-PBUB): set the pump deeper"
+            f"ESP intake {hyd['p_intake']:.1f} bar(g) is below the setpoint {setpoint:.1f} bar(g) "
+            f"= 1.2 × bubble point {p_bubble:.1f} bar(g) (SUB-PBUB, VER-ESP-PB): set the pump "
+            "deeper"
         )
     if doublet.reservoir_temperature_degc <= doublet.vapour_pressure_bound_valid_to_degc:
         npsh = (
@@ -840,6 +1004,12 @@ def operating_point(doublet: ResolvedDoublet, flow_m3h: float) -> OperatingPoint
             f"Brine above {doublet.vapour_pressure_bound_valid_to_degc:g} °C: vapour-pressure "
             "bound not valid (SUB-NPSH), NPSH not evaluated."
         )
+    base["esp_evidence"] = EspEvidence(
+        name=f"producer ESP @ {flow_m3h:g} m3/h",
+        intake_pressure_barg=hyd["p_intake"],
+        release_pressure_barg=p_bubble,
+        npsh_available_m=base.get("npsh_available_m"),
+    )
     p_wf = hyd["p_wf"]
 
     def unboosted_margin(z: float) -> float:
@@ -868,7 +1038,7 @@ def operating_point(doublet: ResolvedDoublet, flow_m3h: float) -> OperatingPoint
         )
         base["tubing_gas_release_depth_m"] = z_tubing
         notes.append(
-            f"Wellhead {upstream_whp:.1f} < {p_bubble:g} bar(g): gas leaves solution above "
+            f"Wellhead {upstream_whp:.1f} < p_b {p_bubble:.1f} bar(g): gas leaves solution above "
             f"≈ {z_tubing:.0f} m in the tubing; dose inhibitor below it (RC-12) or hold pressure."
         )
 
@@ -908,9 +1078,9 @@ def operating_point(doublet: ResolvedDoublet, flow_m3h: float) -> OperatingPoint
             )
         if injector_whp < p_bubble:
             notes.append(
-                f"Injector wellhead {injector_whp:.1f} < {p_bubble:g} bar(g): dissolved gas can "
-                "leave solution at the injector top unless the loop is degassed or held above "
-                "SUB-PBUB (C7)."
+                f"Injector wellhead {injector_whp:.1f} < p_b {p_bubble:.1f} bar(g): dissolved gas "
+                "can leave solution at the injector top unless the loop is degassed or held "
+                "above p_b (C7, SUB-PBUB)."
             )
         if not reasons:
             base["total_pump_electric_power_w"] = (
@@ -1017,7 +1187,8 @@ def _point_summary(doublet: ResolvedDoublet, point: OperatingPoint) -> str:
         f"{head}: ESP {point.esp_frequency_hz:.1f} Hz{mode}, Δp {point.esp_dp_bar:.1f} bar, "
         f"shaft {point.esp_shaft_power_w / 1e6:.2f} MW (curve "
         f"{point.esp_curve_shaft_power_w / 1e6:.2f}), intake {point.esp_intake_pressure_barg:.1f} "
-        f"bar(g); T_wh {point.wellhead_temperature_degc:.1f}°C; inj WHP "
+        f"≥ 1.2·p_b {point.intake_setpoint_barg:.1f} bar(g); T_wh "
+        f"{point.wellhead_temperature_degc:.1f}°C; inj WHP "
         f"{point.injector_wellhead_pressure_barg:.1f} bar(g), pump "
         f"{point.injection_pump_shaft_power_w / 1e6:.2f} MW shaft; total "
         f"{point.total_pump_electric_power_w / 1e6:.2f} MW_e"
@@ -1173,22 +1344,31 @@ def doublet_performance_map(
 __all__ = [
     "DEFAULT_CACHE_DIR",
     "FLOW_TOLERANCE_FRAC",
+    "HENRY_CONSTANTS",
     "MAP_CACHE_VERSION",
     "TOOL_ID_MAP",
     "TOOL_ID_OPERATING_POINT",
+    "BubblePoint",
+    "BubblePointEstimate",
     "DoubletDesign",
     "DoubletPerformanceMap",
     "EspDesign",
+    "EspEvidence",
+    "GasPartialPressure",
     "OperatingPoint",
     "OperatingPointReport",
     "OperatingPointRequest",
     "PerformanceMapRequest",
     "ResolvedDoublet",
+    "brine_bubble_point",
+    "bubble_point_estimate",
     "build_performance_map",
     "code_fingerprint",
     "curve_runout_and_bep",
+    "dissolved_gas_mol_m3",
     "doublet_operating_point",
     "doublet_performance_map",
+    "henry_constant_mol_m3_pa",
     "map_cache_key",
     "map_flows",
     "operating_point",

@@ -30,7 +30,10 @@ def test_basis_reads_every_register_entry(basis):
         register.get(assumption_id)
     assert basis.well_roughness_m == pytest.approx(0.0457e-3)  # RC-01 eq 5 steel, not 0.01 m
     assert basis.well_inner_diameter_m == pytest.approx(2 * basis.wellbore_radius_m)
-    assert basis.bubble_pressure_barg == 20.0  # RC-01 item 9 default
+    assert basis.bubble_point_basis == "sea_water"  # RC-01 item 9 (Henry's law)
+    assert basis.bubble_point_second_bound == "pure_water"
+    assert basis.bubble_point_margin_factor == 1.2
+    assert basis.gas_liquid_ratio_nm3_per_m3 == 0.8  # DB-09
     assert basis.esp_frequency_min_hz == 30.0 and basis.esp_frequency_max_hz == 70.0
     assert basis.analysis_period_yr == 30.0
     assert basis.wire_to_water_efficiency_frac == pytest.approx(0.70 * 0.93 * 0.97)
@@ -53,6 +56,8 @@ def test_basis_follows_config_edits(config_copy, edit_yaml):
     [
         ("SUB-WELL", "trajectory", "deviated", "vertical"),
         ("DB-40", "pump_hydraulic_efficiency_frac", 0.65, "limits"),
+        ("SUB-PBUB", "method", "default_20_barg", "henry_law"),
+        ("SUB-PBUB", "basis", "brine", "basis"),
     ],
 )
 def test_basis_rejects_inconsistent_register(

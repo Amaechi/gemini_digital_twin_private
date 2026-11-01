@@ -20,13 +20,19 @@ from gemini_agent.tools.design_basis import productivity_index_m3h_per_bar
 from gemini_agent.tools.doublet import (
     DEFAULT_CACHE_DIR,
     FLOW_TOLERANCE_FRAC,
+    HENRY_CONSTANTS,
     DoubletDesign,
+    EspEvidence,
     OperatingPointRequest,
     PerformanceMapRequest,
+    brine_bubble_point,
+    bubble_point_estimate,
     build_performance_map,
     curve_runout_and_bep,
+    dissolved_gas_mol_m3,
     doublet_operating_point,
     doublet_performance_map,
+    henry_constant_mol_m3_pa,
     map_flows,
     operating_point,
     resolve_doublet,
@@ -96,6 +102,64 @@ def test_swamee_jain_card_validation():
     assert friction_factor == pytest.approx(0.0158, rel=0.01)
 
 
+def test_henry_constant_card_validation():
+    """RC-01 item 9: H_CH₄(360.15 K, sea water) = 0.636 mol m⁻³ bar⁻¹ (±1 %)."""
+    h0, b_k = HENRY_CONSTANTS["sea_water"]["CH4"]
+    assert henry_constant_mol_m3_pa(h0, b_k, 360.15) * 1e5 == pytest.approx(0.636, rel=0.01)
+    assert henry_constant_mol_m3_pa(h0, b_k, 298.15) == h0  # reference temperature
+
+
+def test_bubble_point_card_validation(basis):
+    """RC-01 item 9 at 87 °C: p_b 46.1 (sea) / 52.2 (pure) bar(a); CO₂ 1.1 bar; setpoint 55.3."""
+    assert dissolved_gas_mol_m3(0.8, 0.8) == pytest.approx(28.55, abs=0.01)
+    assert dissolved_gas_mol_m3(0.8, 0.2) == pytest.approx(7.14, abs=0.01)
+    bubble = brine_bubble_point(basis, 87.0)
+    assert bubble.basis.solvent == "sea_water" and bubble.second_bound.solvent == "pure_water"
+    assert bubble.release_pressure_bara == pytest.approx(46.1, abs=0.5)
+    assert bubble.second_bound.bubble_pressure_bara == pytest.approx(52.2, abs=0.5)
+    co2 = next(g for g in bubble.basis.gases if g.gas == "CO2")
+    assert co2.partial_pressure_bara == pytest.approx(1.1, abs=0.1)
+    assert bubble.intake_setpoint_bara == pytest.approx(55.3, abs=0.1)
+    assert bubble.release_pressure_barg == pytest.approx(bubble.release_pressure_bara - 1.01325)
+    assert not bubble.notes  # 87 °C is inside the card's 25–100 °C range
+
+
+def test_bubble_point_matches_register_record(basis):
+    """The p_b values recorded in SUB-PBUB are the ones the tool computes at DB-01 (87 °C)."""
+    record = load_config("assumptions").get("SUB-PBUB").value
+    bubble = brine_bubble_point(basis, record["at_temperature_degc"])
+    assert bubble.margin_factor == record["intake_margin_factor"] == 1.2
+    assert bubble.release_pressure_bara == pytest.approx(record["bubble_pressure_bara"], abs=0.05)
+    assert bubble.second_bound.bubble_pressure_bara == pytest.approx(
+        record["bubble_pressure_pure_water_bara"], abs=0.05
+    )
+    assert bubble.intake_setpoint_bara == pytest.approx(record["intake_setpoint_bara"], abs=0.05)
+
+
+def test_bubble_point_monotonic():
+    """RC-01 item 9: p_b rises with GLR and, for CH₄ over 25–100 °C, with temperature."""
+    by_glr = [
+        bubble_point_estimate(87.0, glr, 0.8, 0.2, "sea_water").bubble_pressure_bara
+        for glr in (0.4, 0.8, 1.2)
+    ]
+    assert by_glr == sorted(by_glr) and by_glr[1] == pytest.approx(2 * by_glr[0])
+    by_temperature = [
+        bubble_point_estimate(t, 0.8, 1.0, 0.0, solvent).bubble_pressure_bara
+        for solvent in ("sea_water", "pure_water")
+        for t in (25.0, 50.0, 75.0, 100.0)
+    ]
+    assert by_temperature[:4] == sorted(by_temperature[:4])
+    assert by_temperature[4:] == sorted(by_temperature[4:])
+
+
+def test_bubble_point_outside_checked_range_is_noted(basis):
+    """Above 100 °C (or below 25 °C) the van 't Hoff extrapolation is flagged."""
+    assert brine_bubble_point(basis, 102.0).notes
+    assert brine_bubble_point(basis, 24.0).notes
+    with pytest.raises(ValueError, match="solvent"):
+        bubble_point_estimate(87.0, 0.8, 0.8, 0.2, "brine")
+
+
 # --------------------------------------------------------------------------- ESP sizing
 def test_gemini_stage_curve_matches_register_statement(basis):
     """SUB-ESP: GEMINI stage curve BEP ≈ 183 m³/h (72 %), run-out ≈ 280 m³/h at 60 Hz."""
@@ -118,9 +182,11 @@ def test_esp_sized_by_register_rules(basis, doublet):
     assert full.esp_frequency_hz <= esp.frequency_nominal_hz
     fewer = resolve_doublet(DoubletDesign(esp_stages=esp.stages - 1), basis)
     assert operating_point(fewer, basis.flow_max_m3h).esp_frequency_hz > 60.0
-    assert esp.setting_depth_m == 510.0 and esp.setting_depth_m % 10.0 == 0.0
+    assert esp.setting_depth_m == 840.0 and esp.setting_depth_m % 10.0 == 0.0
     assert full.intake_margin_bar >= 0.0
-    shallower = resolve_doublet(DoubletDesign(esp_setting_depth_m=500.0), basis)
+    shallower = resolve_doublet(
+        DoubletDesign(esp_setting_depth_m=esp.setting_depth_m - 10.0), basis
+    )
     assert operating_point(shallower, basis.flow_max_m3h).intake_margin_bar < 0.0
 
 
@@ -255,28 +321,56 @@ def test_trends_across_the_map(perf_map):
         assert values == sorted(values), field
 
 
-def test_gas_release_and_npsh_checks(basis, full_flow):
-    """RC-01 items 8–9: intake ≥ P_bubble, NPSHA ≥ 15 m, release depth above the pump."""
-    assert full_flow.esp_intake_pressure_barg >= basis.bubble_pressure_barg
+def test_gas_release_and_npsh_checks(basis, doublet, full_flow):
+    """RC-01 items 8–9: intake ≥ 1.2·p_b, NPSHA ≥ 15 m, release depth above the pump."""
+    bubble = doublet.bubble_point
+    assert full_flow.release_pressure_barg == bubble.release_pressure_barg
+    assert full_flow.intake_setpoint_barg == pytest.approx(
+        1.2 * bubble.release_pressure_bara - 1.01325
+    )
+    assert full_flow.esp_intake_pressure_barg >= full_flow.intake_setpoint_barg
     assert full_flow.npsh_available_m >= basis.npsh_margin_m
-    assert 0.0 < full_flow.gas_release_depth_m < 510.0
+    assert 0.0 < full_flow.gas_release_depth_m < doublet.esp.setting_depth_m
     assert full_flow.setting_depth_margin_m > 0.0
+    gradient_bar_per_m = basis.density_kg_m3 * G / 1e5 + _friction_bar(basis, 300.0) / (
+        basis.design_depth_m
+    )
     assert full_flow.tubing_gas_release_depth_m == pytest.approx(
-        (basis.bubble_pressure_barg - basis.producer_wellhead_pressure_barg)
-        / (basis.density_kg_m3 * G / 1e5),
-        rel=0.02,
+        (bubble.release_pressure_barg - basis.producer_wellhead_pressure_barg) / gradient_bar_per_m,
+        rel=1e-3,
     )
     assert any("RC-12" in note for note in full_flow.notes)
 
 
-def test_pressurised_loop_has_no_tubing_release(basis):
-    """C7: wellhead held above P_bubble ⇒ no tubing release; Δp rises by the WHP increase."""
-    design = DoubletDesign(producer_wellhead_pressure_barg=25.0)
+def test_esp_evidence_carries_bubble_point(full_flow):
+    """p_b goes to the verifier explicitly (WP-09 EspPoint.release_pressure_barg)."""
+    evidence = full_flow.esp_evidence
+    assert isinstance(evidence, EspEvidence)
+    assert evidence.release_pressure_barg == full_flow.release_pressure_barg
+    assert evidence.intake_pressure_barg == full_flow.esp_intake_pressure_barg
+    assert evidence.npsh_available_m == full_flow.npsh_available_m
+    assert evidence.npsh_required_m is None  # NPSHR not given (SUB-NPSH)
+
+
+def test_esp_evidence_matches_verifier_esp_point(full_flow):
+    """Contract with WP-09: the evidence validates as ``EspPoint`` (runs once WP-09 is merged)."""
+    verifier = pytest.importorskip("gemini_agent.verify.design_verifier")
+    point = verifier.EspPoint(**full_flow.esp_evidence.model_dump())
+    assert point.release_pressure_barg == full_flow.release_pressure_barg
+
+
+def test_pressurised_loop_has_no_tubing_release(basis, doublet):
+    """C7: wellhead held above p_b (≈ 45 bar(g)) ⇒ no tubing release; Δp rises with the WHP."""
+    whp = 50.0
+    assert whp > doublet.bubble_point.release_pressure_barg
+    design = DoubletDesign(producer_wellhead_pressure_barg=whp)
     point = operating_point(resolve_doublet(design, basis), 300.0)
-    base = operating_point(resolve_doublet(DoubletDesign(), basis), 300.0)
+    base = operating_point(doublet, 300.0)
     assert point.feasible
     assert point.tubing_gas_release_depth_m is None
-    assert point.esp_dp_bar - base.esp_dp_bar == pytest.approx(22.0, abs=1e-6)
+    assert point.esp_dp_bar - base.esp_dp_bar == pytest.approx(
+        whp - basis.producer_wellhead_pressure_barg, abs=1e-6
+    )
 
 
 # --------------------------------------------------------------------------- other modes
@@ -322,7 +416,7 @@ def test_infeasible_points_are_flagged(basis, design, flow, reason):
 
 
 def test_shallow_design_sets_pump_at_reservoir_top(basis):
-    """If no depth keeps the intake ≥ P_bubble at Q_max the pump sits at the reservoir top."""
+    """If no depth keeps the intake ≥ 1.2·p_b at Q_max the pump sits at the reservoir top."""
     doublet = resolve_doublet(DoubletDesign(depth_m=400.0), basis)
     assert doublet.esp.setting_depth_m == pytest.approx(400.0 - 0.5 * basis.thickness_m)
     assert any("reservoir top" in note for note in doublet.esp.notes)
@@ -331,9 +425,11 @@ def test_shallow_design_sets_pump_at_reservoir_top(basis):
     assert any("DB-04" in note for note in perf.points[0].notes)  # T_inj below 12 °C
 
 
-def test_lineshaft_range_is_noted(doublet):
-    """RC-01 item 11: a 510 m setting is in the lineshaft-economical range (informational)."""
-    assert any("lineshaft" in note for note in doublet.esp.notes)
+def test_lineshaft_range_is_noted(basis, doublet):
+    """RC-01 item 11: settings below ≈ 730 m are lineshaft-economical (informational note)."""
+    assert not any("lineshaft" in note for note in doublet.esp.notes)  # 840 m
+    shallow = resolve_doublet(DoubletDesign(esp_setting_depth_m=600.0), basis)
+    assert any("lineshaft" in note for note in shallow.esp.notes)
 
 
 def test_esp_flow_to_affinity_bep_ratio(full_flow, doublet):

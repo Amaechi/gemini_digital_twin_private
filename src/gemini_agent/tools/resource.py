@@ -48,6 +48,8 @@ ASSUMPTION_ESP = "SUB-ESP"
 ASSUMPTION_SUCTION = "SUB-PSUC"
 ASSUMPTION_SPACING = "SUB-SPACING"
 
+BUBBLE_POINT_SOLVENTS = frozenset({"sea_water", "pure_water"})
+"""Henry's-law constant sets on RC-01 item 9."""
 DEPTH_TOLERANCE_M = 1e-6
 """A depth within this of DB-01 uses the given reservoir pressure DB-05 (else hydrostatic)."""
 MAX_REPORT_FLOWS = 12
@@ -84,7 +86,12 @@ class SubsurfaceBasis(StrictModel):
     well_inner_diameter_m: float = Field(description="SUB-WELL [A].")
     well_roughness_m: float = Field(description="SUB-WELL [A] (RC-01 eq 5 steel).")
     producer_wellhead_pressure_barg: float = Field(description="SUB-PWH [A].")
-    bubble_pressure_barg: float = Field(description="SUB-PBUB [A] (RC-01 item 9).")
+    gas_liquid_ratio_nm3_per_m3: float = Field(description="DB-09 GLR.")
+    gas_ch4_mol_frac: float = Field(description="DB-09.")
+    gas_co2_mol_frac: float = Field(description="DB-09.")
+    bubble_point_basis: str = Field(description="SUB-PBUB: Henry constants used for p_b.")
+    bubble_point_second_bound: str = Field(description="SUB-PBUB: Henry constants of the bound.")
+    bubble_point_margin_factor: float = Field(description="SUB-PBUB [A]: intake ≥ factor · p_b.")
     npsh_margin_m: float = Field(description="SUB-NPSH [A] (RC-01 item 8).")
     vapour_pressure_bound_bara: float = Field(description="SUB-NPSH [A].")
     vapour_pressure_bound_valid_to_degc: float = Field(description="SUB-NPSH [A].")
@@ -152,6 +159,14 @@ def load_subsurface_basis(config_dir: Path | str | None = None) -> SubsurfaceBas
     well = _mapping(register, ASSUMPTION_WELL)
     npsh = _mapping(register, ASSUMPTION_NPSH)
     esp = _mapping(register, ASSUMPTION_ESP)
+    bubble = _mapping(register, ASSUMPTION_BUBBLE_PRESSURE)
+    if bubble.get("method") != "henry_law":
+        raise ValueError(f"{ASSUMPTION_BUBBLE_PRESSURE}: only method 'henry_law' is supported")
+    for key in ("basis", "second_bound"):
+        if bubble.get(key) not in BUBBLE_POINT_SOLVENTS:
+            raise ValueError(
+                f"{ASSUMPTION_BUBBLE_PRESSURE} {key} must be one of {sorted(BUBBLE_POINT_SOLVENTS)}"
+            )
     if well.get("trajectory") != "vertical":
         raise ValueError(f"{ASSUMPTION_WELL}: only a vertical trajectory is supported")
     injectivity_rule = register.get(ASSUMPTION_INJECTIVITY).value
@@ -186,7 +201,12 @@ def load_subsurface_basis(config_dir: Path | str | None = None) -> SubsurfaceBas
         well_inner_diameter_m=float(well["inner_diameter_m"]),
         well_roughness_m=float(well["roughness_m"]),
         producer_wellhead_pressure_barg=_number(register, ASSUMPTION_PRODUCER_WHP),
-        bubble_pressure_barg=_number(register, ASSUMPTION_BUBBLE_PRESSURE),
+        gas_liquid_ratio_nm3_per_m3=brine.gas_liquid_ratio_nm3_per_m3,
+        gas_ch4_mol_frac=brine.gas_ch4_mol_frac,
+        gas_co2_mol_frac=brine.gas_co2_mol_frac,
+        bubble_point_basis=str(bubble["basis"]),
+        bubble_point_second_bound=str(bubble["second_bound"]),
+        bubble_point_margin_factor=float(bubble["intake_margin_factor"]),
         npsh_margin_m=float(npsh["npsh_margin_m"]),
         vapour_pressure_bound_bara=float(npsh["vapour_pressure_bound_bara"]),
         vapour_pressure_bound_valid_to_degc=float(npsh["vapour_pressure_bound_valid_to_degc"]),

@@ -303,27 +303,48 @@ assumptions:
       GEMINI's own doublet example (simulator_examples/projects/doublet_plant.json) produces against a
       3.0 bar wellhead pressure, and the C2/C3 reference process degasses at the surface (spec §3.5). With
       this value TL-05 reproduces the RC-01 envelope (ESP Δp 30–40 bar, ≈ 0.4 MW shaft at 300 m³/h). A
-      pressurised loop without degassing (C7, DB-36) must keep the wellhead above the bubble/CO₂-release
-      pressure (SUB-PBUB; RC-12) and passes its own value to TL-05. Pressures are gauge throughout.
+      pressurised loop without degassing (C7, DB-36) must keep the wellhead above the bubble point
+      (SUB-PBUB, ≈ 45 bar(g) at 87 °C; RC-01 item 9, RC-12) and passes its own value to TL-05; that exceeds
+      the plate-HEX ratings on RC-03. Pressures are gauge throughout.
     source: GEMINI doublet_plant.json boundary input; GEOAGENT_DESIGN_SPEC §3.5; RC-01 envelope; RC-12
-    sensitivity: [3.0, 25.0]
+    sensitivity: [3.0, 50.0]
     tag: A
     status: default
     added_by: WP-05
 
   - id: SUB-PBUB
-    title: Brine bubble-point / CO₂-release pressure (ESP intake limit)
-    value: 20.0
-    unit: bar(g)
+    title: Brine bubble-point pressure (Henry's law) and ESP-intake setpoint (VER-ESP-PB)
+    value:
+      method: henry_law
+      basis: sea_water
+      second_bound: pure_water
+      intake_margin_factor: 1.2
+      bubble_pressure_bara: 46.1
+      bubble_pressure_pure_water_bara: 52.2
+      at_temperature_degc: 87.0
+      intake_setpoint_bara: 55.3
+    unit: null
     justification: >-
-      The bubble-point pressure of the brine is not given (missing input). RC-01 item 9 default: keep the
-      ESP intake at or above 20 bar(g) and flag it. TL-05 sizes the ESP setting depth so that the intake
-      stays above this pressure at the maximum flow, reports the depth where the unboosted flowing
-      pressure reaches it (flash-depth method, DiPippo eq 4.16–4.20), and reports where gas leaves solution
-      in the tubing when the wellhead pressure is lower (inhibitor dosing depth, RC-12).
-    source: RC-01 item 9 [A]; RC-12 (keep pressure above the CO₂ release point)
-    sensitivity: "Replace with a measured bubble point; the ESP setting depth moves ≈ 10 m per bar."
-    tag: A
+      The design basis gives no bubble point, so it is computed with Henry's law exactly as RC-01 item 9
+      specifies: p_b = Σ c_i / H_i(T), c_i = GLR · y_i / 0.022414 mol/m³ (DB-09: 0.8 Nm³/m³, 80 % CH₄,
+      20 % CO₂), H_i(T) = H_i° · exp[B_i (1/T − 1/298.15)] with the card's sea-water constants (CH₄ 1.2e-5
+      mol m⁻³ Pa⁻¹, B 1100 K; CO₂ 2.8e-4, B 2600 K) as the basis for our 1030 kg/m³ brine and the
+      pure-water constants (CH₄ 1.4e-5, 1600 K; CO₂ 3.4e-4, 2300 K) as the second bound. Ideal gas, no
+      fugacity or water-vapour correction (card). TL-05 evaluates it at the reservoir temperature of each
+      design (CH₄ p_b rises with T over 25–100 °C, so this is the conservative end); the values above are
+      the record at DB-01 (87 °C): p_b 46.1 bar(a) sea water (CH₄ 44.9 + CO₂ 1.1 bar), 52.2 bar(a) pure
+      water. The ESP intake must stay at or above 1.2 · p_b (margin for the van 't Hoff extrapolation
+      298 → 360 K and salinity above sea water [A]) = 55.3 bar(a) = 54.3 bar(g); the card rounds this up
+      to 60 bar(a) only as a default when p_b is not computed. p_b itself is passed to the verifier as the
+      release pressure (EspPoint.release_pressure_barg). Replaces the former 20 bar(g) default, which the
+      card now calls not conservative.
+    source: >-
+      RC-01 item 9 (Henry's-law constants: Sander, Compilation of Henry's law constants v5.0.0, Atmos.
+      Chem. Phys. 23, 10901–12440, 2023; Burkholder et al. 2019, JPL Publication 19-5) [L]; margin 1.2 [A]
+    sensitivity: >-
+      Pure-water bound 52.2 bar(a) (setpoint 62.6 bar(a)); margin 1.1–1.3. The ESP setting depth moves
+      ≈ 10 m per bar of setpoint; a measured bubble point replaces the estimate.
+    tag: L
     status: default
     added_by: WP-05
 
@@ -341,7 +362,7 @@ assumptions:
       RC-01 item 8 (DiPippo Problem 4.5); add NPSHR when a pump is selected. The vapour pressure is bounded
       by water at its normal boiling point (1.01325 bar(a) at 100 °C), which is conservative for brine at
       or below 100 °C (dissolved salt lowers it). Above 100 °C NPSHA is not evaluated (warning). The
-      bubble-point limit SUB-PBUB is far more restrictive at the intake.
+      bubble-point setpoint SUB-PBUB (1.2 · p_b) is far more restrictive at the intake.
     source: RC-01 item 8 [L Guidebook p.173; DiPippo Problem 4.5]; [A]
     sensitivity: "NPSHR of the selected pump (typically a few metres) adds to the 15 m margin."
     tag: A
@@ -369,7 +390,8 @@ assumptions:
       power × k, efficiency unchanged; like k impellers in parallel) so that its best-efficiency point is at
       the maximum design flow. The number of stages is the smallest that gives the required ESP Δp at the
       maximum flow at the nominal 60 Hz (60–70 Hz is kept for decline). The setting depth is the shallowest
-      depth, in 10 m steps, where the intake stays at or above SUB-PBUB at the maximum flow. Frequency window
+      depth, in 10 m steps, where the intake stays at or above the SUB-PBUB setpoint (1.2 · p_b) at the
+      maximum flow. Frequency window
       30–70 Hz (RC-01 item 7); below 30 Hz the flow is held at 30 Hz with a wellhead choke. GEMINI scales
       head by (f/60)² and power by (f/60)³ at the same flow (no flow affinity), so its curve power is
       optimistic at reduced frequency; plant power uses the DB-13/DB-40 rule QΔp/0.70 and the curve power
