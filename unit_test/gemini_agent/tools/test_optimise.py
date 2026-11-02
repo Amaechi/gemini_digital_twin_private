@@ -480,3 +480,20 @@ def test_register_entries_are_complete():
         if entry["id"].startswith(("OPT-", "UQ-")):
             assert entry["added_by"] == "WP-11" and entry["source"] and entry["justification"]
     assert math.isfinite(load_optimiser_settings().tol)
+
+
+def test_pool_is_terminated_when_the_block_fails():
+    """WP-14: an error (or SIGTERM → SystemExit) inside ``with EvaluationPool`` stops the
+    workers at once, so a timed-out run leaves no orphan processes."""
+    from types import SimpleNamespace
+
+    pool = EvaluationPool(SimpleNamespace(scenario=SimpleNamespace(name="base")), workers=2)
+    if pool._pool is None:  # no fork start method on this platform: nothing to leak
+        return
+    workers = list(pool._pool._pool)
+    with pytest.raises(SystemExit), pool:
+        raise SystemExit(143)
+    assert pool._pool is None
+    for process in workers:
+        process.join(timeout=10)
+        assert not process.is_alive()

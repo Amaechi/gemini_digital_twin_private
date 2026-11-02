@@ -38,12 +38,18 @@ jobs:
       - name: Test (pytest)
         env:
           PYTHONPATH: src
-        run: python -m pytest -q unit_test/gemini_model unit_test/gemini_simulator unit_test/gemini_agent -x
+          GEOAGENT_BUDGET: smoke
+        run: python -m pytest -q unit_test/gemini_model unit_test/gemini_simulator unit_test/gemini_agent -x --durations=10
 
+      # WP-14: the CLI runs the real tools; CI uses the smoke budget (register RUN-BUDGET: tiny
+      # DE / Monte Carlo, 13 days, no worker pool). The full-size run is scripts/build_results.py
+      # (results committed under runs/final_policy/). A hang fails fast instead of at the job limit.
       - name: CLI smoke test
+        timeout-minutes: 8
         env:
           PYTHONPATH: src
+          GEOAGENT_BUDGET: smoke
         run: |
           python -m gemini_agent.cli --help
           python -m gemini_agent.cli validate-config
-          python -m gemini_agent.cli run --engine policy --run-id ci-smoke --runs-dir "$RUNNER_TEMP/runs"
+          time python -m gemini_agent.cli run --engine policy --budget smoke --run-id ci-smoke --runs-dir "$RUNNER_TEMP/runs"

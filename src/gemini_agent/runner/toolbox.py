@@ -197,8 +197,12 @@ class Toolbox:
         return spec.func(parsed, context)
 
 
-def default_toolbox(profile: str = "full") -> Toolbox:
-    """Catalogue bound to the real tools (WP-14); ``profile`` = TL-13/TL-15 effort (real_tools)."""
+def default_toolbox(profile: str | None = None, *, config_dir: Path | None = None) -> Toolbox:
+    """Catalogue bound to the real tools (WP-14).
+
+    ``profile`` = search budget of TL-13/TL-15 (register RUN-BUDGET: full / quick / smoke);
+    None → the ``GEOAGENT_BUDGET`` environment variable, else ``full``.
+    """
     from gemini_agent.runner import real_tools
 
-    return real_tools.real_toolbox(profile)
+    return real_tools.real_toolbox(profile, config_dir=config_dir)

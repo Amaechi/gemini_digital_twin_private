@@ -51,6 +51,16 @@ else:
             "tests must not build a real LLM model; pass a FunctionModel/TestModel"
         )
 
+    @pytest.fixture(autouse=True, scope="session")
+    def _smoke_budget():
+        """WP-14: a test that builds a default (real) toolbox and runs the whole pipeline gets the
+        smoke budget (register RUN-BUDGET), never the full-size optimisation + Monte Carlo."""
+        from gemini_agent.runner.real_tools import BUDGET_ENV
+
+        with pytest.MonkeyPatch.context() as patch:
+            patch.setenv(BUDGET_ENV, "smoke")
+            yield
+
     @pytest.fixture(scope="module")
     def stub_tools():
         """Bind the labelled stub catalogue wherever a default toolbox is built (WP-14).

@@ -70,11 +70,18 @@ def test_default_toolbox_binds_every_catalogue_name_to_a_real_tool():
     assert verifier.evidence_provider.__self__ is box.session  # type: ignore[attr-defined]
 
 
-def test_profiles_trade_effort_only():
-    """``full`` keeps the register DE/MC settings (None); unknown names are refused."""
+def test_budgets_come_from_the_register(monkeypatch):
+    """RUN-BUDGET: full keeps OPT-DE/UQ-MC (None); smoke = 1 concept, 13 days, no pool; the
+    default budget is GEOAGENT_BUDGET (tests run with smoke), else full."""
     full = make_profile("full", workers=2)
     assert (full.popsize, full.maxiter, full.mc_samples, full.day_indices) == (None,) * 4
-    assert make_profile("smoke").day_indices is not None
+    assert full.workers == 2 and full.max_concepts is None
+    smoke = make_profile("smoke")
+    assert smoke.workers == 1 and smoke.max_concepts == 1 and len(smoke.day_indices) == 13
+    assert (smoke.maxiter, smoke.mc_samples, smoke.uq_cases) == (0, 2, False)
+    assert make_profile().name == "smoke"  # conftest sets the budget for every test
+    monkeypatch.delenv(real_tools.BUDGET_ENV)
+    assert make_profile().name == "full"
     with pytest.raises(ValueError, match="unknown tool profile"):
         make_profile("fastest")
 
@@ -231,6 +238,7 @@ def test_policy_pipeline_on_real_tools_is_accepted_without_stubs(smoke_run):
     assert latest is not None and latest.verifier == VERIFIER_NAME
     assert {r.dr_id for r in state.decision_records} == {f"DR-{i:02d}" for i in range(1, 11)}
     assert state.selected_id.endswith("-opt")  # P6's sized design joined the run
+    assert [c.id for c in state.candidates if c.id.endswith("-opt")] == [state.selected_id]
     assert state.selected_id in {c.id for c in state.candidates}
     kpis = state.kpis[state.selected_id]
     assert kpis.lcoh_per_mwh is not None and kpis.co2_reduction_vs_c0_frac is not None

@@ -773,7 +773,11 @@ def report_markdown(view: RunView, figure_dir: str = "figures/") -> tuple[str, l
     sections.append("Decision Records")
     lines += ["", "## Decision Records", ""]
     for r in view.decision_records:
-        lines.append(f"- {r['dr_id']} {r['title']}: {r['choice_label']} ({r['decision_source']})")
+        criterion = (r.get("criterion") or {}).get("id")  # #19: decisive criterion + evidence
+        why = f"; criterion {criterion}" if criterion else ""
+        lines.append(
+            f"- {r['dr_id']} {r['title']}: {r['choice_label']} ({r['decision_source']}{why})"
+        )
     if view.answers:
         sections.append("Assumptions and answers")
         lines += ["", "## Assumptions and answers", ""] + [f"- {a}" for a in view.answers]

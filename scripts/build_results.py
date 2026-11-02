@@ -5,7 +5,7 @@ Examples::
 
     PYTHONPATH=src python scripts/build_results.py              # full profile, ≈ 40 min (4 vCPU)
     PYTHONPATH=src python scripts/build_results.py --skip-run       # re-render docs/results only
-    PYTHONPATH=src python scripts/build_results.py --tool-profile quick --run-id quick_policy \
+    PYTHONPATH=src python scripts/build_results.py --budget quick --run-id quick_policy \
         --out-dir runs/quick_policy/results
 
 Steps: (1) ``python -m gemini_agent.cli run --engine policy`` into ``runs/<run_id>/`` (the
@@ -48,7 +48,14 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--run-id", default="final_policy", help="run folder under --runs-dir")
     parser.add_argument("--runs-dir", type=Path, default=ROOT / "runs")
     parser.add_argument("--out-dir", type=Path, default=ROOT / "docs" / "results")
-    parser.add_argument("--tool-profile", choices=["full", "quick", "smoke"], default="full")
+    parser.add_argument(
+        "--budget",
+        "--tool-profile",
+        dest="budget",
+        choices=["full", "quick", "smoke"],
+        default="full",
+        help="search budget (register RUN-BUDGET); the submitted run is full",
+    )
     parser.add_argument("--config-dir", type=Path, default=None)
     parser.add_argument("--skip-run", action="store_true", help="re-render from the existing run")
     parser.add_argument("--eval-root", type=Path, default=SUBMITTED_EVAL_ROOT)
@@ -72,8 +79,8 @@ def run_pipeline(args: argparse.Namespace, run_dir: Path) -> int:
         str(runs_dir),
         "--input-mode",
         "assume",
-        "--tool-profile",
-        args.tool_profile,
+        "--budget",
+        args.budget,
     ]
     if args.config_dir is not None:
         argv += ["--config-dir", str(args.config_dir)]

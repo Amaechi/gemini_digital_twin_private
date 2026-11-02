@@ -157,6 +157,12 @@ _CONCEPTS: tuple[tuple[str, int, float | None, str], ...] = (
 
 
 # =========================================================================== profiles
+BUDGET_ID = "RUN-BUDGET"
+"""Register entry holding the ``quick`` / ``smoke`` search budgets (``full`` = OPT-DE / UQ-MC)."""
+BUDGET_ENV = "GEOAGENT_BUDGET"
+"""Environment variable naming the default budget (CI, tests); unset → ``full``."""
+
+
 @dataclass(frozen=True)
 class ToolProfile:
     """Search effort of TL-13/TL-15 (runtime only; no engineering value changes)."""
@@ -167,6 +173,8 @@ class ToolProfile:
     """Quick checks only: simulated-day subset (economics cover those days); None: full year."""
     own_point_only: bool = False
     """TL-13 sizes the candidate's own doublet count and (verifiable) depth, not OPT-SPACE."""
+    max_concepts: int | None = None
+    """At most this many concepts sized in P6 (None: the phase's ``top_n``)."""
     top_k: int | None = None
     popsize: int | None = None
     maxiter: int | None = None
@@ -178,42 +186,49 @@ class ToolProfile:
     uq_cases: bool = True
 
 
-def make_profile(name: str = "full", workers: int | None = None) -> ToolProfile:
-    """Return a named profile: ``full`` (register OPT-DE/UQ-MC), ``quick`` (evals), ``smoke``."""
-    cpus = workers or os.cpu_count() or 1
-    if name == "full":
-        return ToolProfile("full", workers=cpus)
-    if name == "quick":
-        return ToolProfile(
-            "quick",
-            workers=cpus,
-            own_point_only=True,
-            top_k=1,
-            popsize=1,
-            maxiter=1,
-            maxiter_outage=1,
-            dispatch_search=False,
-            storage_scan=False,
-            mc_samples=12,
-            one_at_a_time=False,
-        )
-    if name == "smoke":
-        return ToolProfile(
-            "smoke",
-            workers=1,
-            day_indices=tuple(range(0, 365, 30)),
-            own_point_only=True,
-            top_k=1,
-            popsize=1,
-            maxiter=0,
-            maxiter_outage=0,
-            dispatch_search=False,
-            storage_scan=False,
-            mc_samples=2,
-            one_at_a_time=False,
-            uq_cases=False,
-        )
-    raise ValueError(f"unknown tool profile '{name}' (full, quick, smoke)")
+_BUDGET_KEYS = frozenset(
+    {
+        "own_point_only", "max_concepts", "top_k", "popsize", "maxiter", "maxiter_outage",
+        "dispatch_search", "storage_scan", "mc_samples", "one_at_a_time", "uq_cases",
+        "day_step", "workers",
+    }
+)  # fmt: skip
+
+
+def default_budget() -> str:
+    """Budget named by ``GEOAGENT_BUDGET`` (CI, tests), else ``full``."""
+    return os.environ.get(BUDGET_ENV, "").strip() or "full"
+
+
+def make_profile(
+    name: str | None = None,
+    workers: int | None = None,
+    *,
+    config_dir: Path | str | None = None,
+) -> ToolProfile:
+    """Return the named budget from the register (RUN-BUDGET); ``None`` → ``default_budget()``.
+
+    ``full`` keeps the OPT-DE / UQ-MC register values; ``workers`` (else the budget's, else all
+    CPUs) sets the TL-13/TL-15 process count (1 = no worker pool).
+    """
+    name = name or default_budget()
+    register = load_config("assumptions", config_dir)
+    budgets: dict[str, Any] = register.get(BUDGET_ID).value  # type: ignore[assignment]
+    if name not in budgets:
+        raise ValueError(f"unknown tool profile '{name}' ({', '.join(budgets)}; {BUDGET_ID})")
+    values = dict(budgets[name] or {})
+    unknown = set(values) - _BUDGET_KEYS
+    if unknown:
+        raise ValueError(f"{BUDGET_ID}.{name}: unknown keys {sorted(unknown)}")
+    step = values.pop("day_step", None)
+    cpus = workers or values.pop("workers", None) or os.cpu_count() or 1
+    values.pop("workers", None)
+    return ToolProfile(
+        name,
+        workers=int(cpus),
+        day_indices=tuple(range(0, 365, int(step))) if step else None,
+        **values,
+    )
 
 
 # =========================================================================== outputs
@@ -404,13 +419,13 @@ class ToolSession:
 
     def __init__(
         self,
-        profile: ToolProfile | str = "full",
+        profile: ToolProfile | str | None = None,
         *,
         map_cache_dir: Path | str | None = None,
         cache: DesignCache | None = None,
     ) -> None:
-        """``profile``: search effort; ``cache``: SIM-07 KPI cache (default ``runs/cache``)."""
-        self.profile = make_profile(profile) if isinstance(profile, str) else profile
+        """``profile``: search budget (RUN-BUDGET); ``cache``: SIM-07 KPI cache (``runs/cache``)."""
+        self.profile = profile if isinstance(profile, ToolProfile) else make_profile(profile)
         self.map_cache_dir = Path(map_cache_dir) if map_cache_dir is not None else None
         self._cache = cache
         self._memos: dict[str, _RunMemo] = {}
@@ -1265,8 +1280,9 @@ class RealTools:
         settings = load_optimiser_settings(context.config_dir)
         sized_out: list[SizedDesign] = []
         skipped: dict[str, str] = {}
+        limit = min(args.top_n, profile.max_concepts or args.top_n)
         for cid in ranked:
-            if len(sized_out) >= args.top_n:
+            if len(sized_out) >= limit:
                 break
             concept_candidate = session.candidate(context, cid)
             concept = concept_candidate.concept
@@ -1746,12 +1762,19 @@ def real_specs(session: ToolSession) -> list[ToolSpec]:
     return specs
 
 
-def real_toolbox(profile: ToolProfile | str = "full", **session_kwargs: Any) -> Toolbox:
+def real_toolbox(
+    profile: ToolProfile | str | None = None,
+    *,
+    config_dir: Path | str | None = None,
+    **session_kwargs: Any,
+) -> Toolbox:
     """Toolbox with every tool real; ``verify_design`` is bound first to the session collector.
 
     The verifier is registered before the other bindings replace the catalogue (WP-09 decision:
     a real stub-free run must never meet a stub verifier at P9).
     """
+    if not isinstance(profile, ToolProfile):
+        profile = make_profile(profile, config_dir=config_dir)
     session = ToolSession(profile, **session_kwargs)
     box = Toolbox([verify_design_spec(session.evidence)])
     for spec in real_specs(session):
