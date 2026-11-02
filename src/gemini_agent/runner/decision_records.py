@@ -435,6 +435,9 @@ def _backup_options(
     def prob(value: float | None) -> str:
         return "n/a" if value is None else f"{value:.2f}"
 
+    def signed(value: float | None) -> str:
+        return "n/a" if value is None else f"{value:+.2f}"
+
     installed_notes = (
         f"{backup.candidate_id}: TL-15 P(demand met) {prob(p0)} with the installed backups"
         + ("; recommended (OPT-ROBUST-BACKUP)" if not install else "")
@@ -442,9 +445,8 @@ def _backup_options(
     if robust_ok:
         robust_notes = (
             f"{robust_id}: TL-15 P(demand met) {prob(p1)}; vs {backup.candidate_id} "
-            f"ΔLCOH {backup.delta_lcoh_per_mwh or 0:+.2f}, "
-            f"ΔLCOC {backup.delta_lcoc_per_mwh or 0:+.2f}"
-            f" USD/MWh, ΔCAPEX {backup.delta_capex_million or 0:+.2f} MUSD ({backup.year_mode} "
+            f"ΔLCOH {signed(backup.delta_lcoh_per_mwh)}, ΔLCOC {signed(backup.delta_lcoc_per_mwh)}"
+            f" USD/MWh, ΔCAPEX {signed(backup.delta_capex_million)} MUSD ({backup.year_mode} "
             "year)" + ("; recommended (OPT-ROBUST-BACKUP)" if install else "")
         )
     elif robust_id is not None and robust_id in excluded:
@@ -564,7 +566,10 @@ def _rule_criterion(
         return next((key for key in preferred if key in keys), None)
 
     def make(cid: str, key: str, source: str, text: str) -> DecisionCriterion:
-        evidence = _evidence_with(state, options, key) or sorted(
+        # Evidence of the options the criterion selects (pre-L-2: DR-10 after DR-11 must not
+        # cite the verification of the design DR-11 replaced).
+        winners = [o for o in options if o.id in best]
+        evidence = _evidence_with(state, winners, key) or sorted(
             {e for o in options if o.id in best for e in o.evidence_ids}
         )
         return DecisionCriterion(
@@ -783,9 +788,14 @@ def render_markdown(record: DecisionRecord) -> str:
     lines += [f"- Why: {record.rationale}"]
     recommended = [o.id for o in record.options if o.recommended]
     if recommended and record.choice not in recommended:
+        follows = (
+            "the chosen option is installed and verified in P9"
+            if record.dr_id == "DR-11"
+            else "the selected design follows the workflow ranking"
+        )
         lines.append(
-            f"- Note: differs from the workflow-recommended option {', '.join(recommended)}; the "
-            "selected design follows the workflow ranking."
+            f"- Note: differs from the workflow-recommended option {', '.join(recommended)}; "
+            f"{follows}."
         )
     if record.stub_evidence:
         lines.append("- WARNING: evidence includes stub tool results; not a final decision.")

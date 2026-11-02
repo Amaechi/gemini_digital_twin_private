@@ -2,6 +2,7 @@
 # file scripts/validate_submission.py @ d69507a. Modified by GeoAgent team, 2026-11-01: required
 # file list replaced by the GeoAgent spec §18 acceptance checklist (final run, eval suite, models,
 # notices, cost placeholders, VERIFY cost items); typed results, Markdown/JSON report, --pytest.
+# 2026-11-02 (pre-L-2): SUB-06 includes DR-11; SUB-11 reads the TL-15 design of a DR-11 variant.
 """Submission checks (spec §18 acceptance checklist; WP-13).
 
 ``validate_submission`` checks every §18 item that a program can check and lists the rest as

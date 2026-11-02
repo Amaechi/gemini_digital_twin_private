@@ -130,7 +130,7 @@ PHASE_SPECS: dict[Phase, PhaseSpec] = {
             Phase.P8,
             Role.ECONOMICS,
             "Run the Monte Carlo uncertainty analysis and the cost sensitivity on the selected "
-            "design; the workflow then prices its robust backups for DR-11.",
+            "design; afterwards the runner (not you) prices its robust backups for DR-11.",
             required_tools=("uncertainty", "sensitivity"),
             default_args={
                 "uncertainty": {"candidate_id": SELECTED},

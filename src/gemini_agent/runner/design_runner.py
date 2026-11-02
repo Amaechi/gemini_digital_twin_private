@@ -990,6 +990,7 @@ class DesignRunner:
             )
             return None
         state.violations = list(verification.violations)
+        state.robust_backup = None  # P8 re-prices the robust backups of the new selection
         redo = {"DR-06", "DR-10", "DR-11"}
         dropped = [state.progress.pop(phase.value, None) for phase in LOOP_BACK_PHASES]
         state.earlier_pass_fallbacks += sum(p.fallbacks for p in dropped if p is not None) + sum(

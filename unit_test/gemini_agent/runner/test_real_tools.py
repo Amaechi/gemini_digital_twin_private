@@ -286,3 +286,54 @@ def test_results_pack_renders_from_the_finished_run(smoke_run, tmp_path):
     assert bars and "USD/MWh" not in title
     rows = json.loads(json.dumps(plots.candidates_table(view)[1].to_dict("records")))
     assert any(row["concept"] == "C0" for row in rows)
+
+
+def test_robust_backup_branches_never_escalate(smoke_run, tmp_path, monkeypatch):
+    """Pre-L-2 step on the smoke run's files (resume path): variant, no TL-15, nothing to add,
+    failed evaluation — the last three return a reason instead of raising (DR-11: installed)."""
+    import shutil
+
+    _, state, run_dir = smoke_run
+    work = tmp_path / "runs" / "smoke"
+    shutil.copytree(run_dir, work)
+    analysed = state.robust_backup.candidate_id
+    context = ToolContext(
+        run_id="smoke",
+        run_dir=work,
+        config_dir=None,
+        candidates=tuple(c for c in state.candidates if not c.id.endswith("-robust")),
+        kpis=dict(state.kpis),
+        selected_id=analysed,
+    )
+    session = ToolSession("smoke")
+    tools = real_tools.RealTools(session)
+    args = CandidateArgs(candidate_id=analysed)
+    result = tools.robust_backup(args, context)  # TL-15 read back from uncertainty_<id>.json
+    out = result.data
+    assert out.robust_candidate_id == f"{analysed}-robust" and out.year_mode == "fast"
+    assert out.added_backup_mw and out.delta_capex_million > 0
+    assert len(result.summary) <= 300 and "DR-11 decides" in result.summary
+    sized = json.loads((work / "session" / "sized_designs.json").read_text("utf-8"))
+    assert sized[out.robust_candidate_id]["robust_backup_of"] == analysed
+
+    other = next(c.id for c in context.candidates if c.id != analysed and c.doublets > 0)
+    missing = tools.robust_backup(CandidateArgs(candidate_id=other), context).data
+    assert missing.robust_candidate_id is None and "no TL-15 result" in missing.reason
+
+    path = work / f"uncertainty_{analysed}.json"
+    report = json.loads(path.read_text("utf-8"))
+    path.write_text(json.dumps(report | {"robust_backup_mw": report["installed_backup_mw"]}))
+    fresh = real_tools.RealTools(ToolSession("smoke"))
+    nothing = fresh.robust_backup(args, context).data
+    assert nothing.robust_candidate_id is None and "within the installed" in nothing.reason
+    path.write_text(json.dumps(report))
+
+    def broken(context, candidate):
+        raise ValueError("no plant")
+
+    failing = ToolSession("smoke")
+    monkeypatch.setattr(failing, "screen", broken)
+    failed = real_tools.RealTools(failing).robust_backup(args, context)
+    assert failed.data.robust_candidate_id is None
+    assert failed.data.reason == "variant not evaluated: no plant" and failed.warnings
+    assert f"{analysed}-robust" not in failing.memo(context).sized

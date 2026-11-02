@@ -776,3 +776,36 @@ def test_dr11_rejected_variant_loops_back_and_keeps_the_installed_backups(tmp_pa
     assert [c for c in choices if c.endswith("backup")] == ["p90-robust-backup", "installed-backup"]
     dr11 = next(r for r in state.decision_records if r.dr_id == "DR-11")
     assert dr11.choice == "installed-backup" and "excluded" in dr11.options[1].notes
+
+
+def test_dr11_llm_may_keep_the_installed_backups_on_the_cost_criterion(tmp_path):
+    """The LLM decides DR-11 on the offered evidence: keeping the backups is a valid choice."""
+
+    def keeps_backups(messages, info):
+        if output_name(info) == "OptionChoice" and "DR-11" in user_prompt(messages)[:20]:
+            choice = {
+                "dr_id": "DR-11",
+                "criterion": "lowest-delta_lcoh_plus_lcoc_per_mwh",
+                "option_id": "installed-backup",
+                "rationale": "lowest delta_lcoh_plus_lcoc_per_mwh in robust_backup: the base-year "
+                "backups add no cost",
+                "rejected": [{"option_id": "p90-robust-backup", "reason": "adds backup cost"}],
+            }
+            return ModelResponse(parts=[TextPart(json.dumps(choice))])
+        return policy_like(messages, info)
+
+    engine, logger = _llm_engine(tmp_path, "lk", keeps_backups)
+    toolbox = _robust_toolbox()
+    runner = _runner(tmp_path, engine=engine, toolbox=toolbox)
+    result = runner.start("", run_id="lk")
+    state = runner.load_state("lk")
+    assert result.status == RunStatus.COMPLETED and result.selected_id == "C2-opt"
+    dr11 = next(r for r in state.decision_records if r.dr_id == "DR-11")
+    assert (dr11.choice, dr11.decision_source) == ("installed-backup", "llm")
+    assert dr11.criterion.key == "delta_lcoh_plus_lcoc_per_mwh"
+    assert state.fallback_count() == 0
+    assert {r.decision_source for r in logger.records()} == {"llm"}
+    events = runner.store("lk").list_events("lk")
+    assert not [e for e in events if e.type == "DESIGN_SELECTED"]
+    md = (tmp_path / "lk" / "decision_records" / "DR-11.md").read_text("utf-8")
+    assert "the chosen option is installed and verified in P9" in md

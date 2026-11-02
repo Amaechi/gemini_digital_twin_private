@@ -1561,8 +1561,18 @@ class RealTools:
         path = context.run_dir / f"uncertainty_{candidate_id}.json"
         if report is None and path.is_file():  # resumed run: TL-15 output from its file
             report = UncertaintyReport.model_validate_json(path.read_text(encoding="utf-8"))
-        if report is None:
-            raise ValueError(f"no TL-15 result for {candidate_id}: run uncertainty first")
+        if report is None:  # DR-11 then offers the installed backups only (no escalation)
+            return self._robust_result(
+                RobustBackupToolOutput(
+                    candidate_id=candidate_id,
+                    robust_backup_percentile=rule.percentile,
+                    installed_backup_mw={},
+                    robust_backup_mw={},
+                    probability_demand_met=None,
+                    probability_demand_met_robust=None,
+                    reason=f"no TL-15 result for {candidate_id} (uncertainty ran on another design)",
+                )
+            )
         installed = session.candidate(context, candidate_id)
         robust_mw = dict(report.robust_backup_mw)
         installed_mw = dict(report.installed_backup_mw)
@@ -1608,21 +1618,27 @@ class RealTools:
         for cache in (memo.screen, memo.full, memo.subsurface, memo.economics):
             cache.pop(robust_id, None)
         session._save_sized(memo)
-        screened = session.screen(context, robust)
-        if screened.simulation is None or screened.evaluation.status != "ok":
-            reason = f"variant not evaluated: {screened.evaluation.reason}"[:300]
+        try:
+            screened = session.screen(context, robust)
+            if screened.simulation is None or screened.evaluation.status != "ok":
+                raise ValueError(screened.evaluation.reason)
+            full = candidate_id in memo.full
+            sim = session.full_year(context, robust) if full else screened.simulation
+            kpis = _merge(
+                sim.annual.kpis or KPISet(candidate_id=robust_id),
+                session.economics_kpis(context, robust),
+            )
+            base_sim, _ = session.year(context, installed)
+            base = _merge(
+                base_sim.annual.kpis or KPISet(candidate_id=candidate_id),
+                session.economics_kpis(context, installed),
+            )
+        except (tl09.ConfigError, ValueError, ArithmeticError, RuntimeError) as exc:
+            # A variant that cannot be simulated or priced is not offered (no escalation).
+            memo.sized.pop(robust_id, None)
+            session._save_sized(memo)
+            reason = f"variant not evaluated: {exc}"[:300]
             return self._robust_result(out.model_copy(update={"reason": reason}))
-        full = candidate_id in memo.full
-        sim = session.full_year(context, robust) if full else screened.simulation
-        kpis = _merge(
-            sim.annual.kpis or KPISet(candidate_id=robust_id),
-            session.economics_kpis(context, robust),
-        )
-        base_sim, _ = session.year(context, installed)
-        base = _merge(
-            base_sim.annual.kpis or KPISet(candidate_id=candidate_id),
-            session.economics_kpis(context, installed),
-        )
         unmet = (sim.annual.unmet_heating_mwh or 0.0) + (sim.annual.unmet_cooling_mwh or 0.0)
 
         def delta(name: str) -> float | None:
@@ -1654,6 +1670,9 @@ class RealTools:
         def prob(value: float | None) -> str:
             return "n/a" if value is None else f"{value:.2f}"
 
+        def signed(value: float | None) -> str:
+            return "n/a" if value is None else f"{value:+.2f}"
+
         if out.robust_candidate_id is None:
             text = f"{ROBUST_BACKUP_ID} {out.candidate_id}: no robust variant ({out.reason})"
         else:
@@ -1662,8 +1681,8 @@ class RealTools:
                 f"{ROBUST_BACKUP_ID} {out.candidate_id} → {out.robust_candidate_id} ({added} MW): "
                 f"P(demand met) {prob(out.probability_demand_met)} → "
                 f"{prob(out.probability_demand_met_robust)}; ΔLCOH "
-                f"{out.delta_lcoh_per_mwh or 0:+.2f}, ΔLCOC {out.delta_lcoc_per_mwh or 0:+.2f} "
-                f"USD/MWh, ΔCAPEX {out.delta_capex_million or 0:+.2f} MUSD ({out.year_mode} year)"
+                f"{signed(out.delta_lcoh_per_mwh)}, ΔLCOC {signed(out.delta_lcoc_per_mwh)} "
+                f"USD/MWh, ΔCAPEX {signed(out.delta_capex_million)} MUSD ({out.year_mode} year)"
                 + ("" if out.robust_meets_demand else "; variant has unmet demand")
             )
         return ToolResult[RobustBackupToolOutput](
