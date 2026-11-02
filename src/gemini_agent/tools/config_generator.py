@@ -798,7 +798,9 @@ class GeneratorBasis(StrictModel):
     hp_evaporator_approach_k: float = Field(description="HP-APPROACH (WP-03).")
     hp_max_lift_k: float = Field(description="VER-HP-LIFT: sink outlet − source outlet.")
     chp_total_efficiency_frac: float
-    chp_electrical_fraction: float = Field(description="CHP-EL-FRAC (WP-03) = chp.py 1/3.")
+    chp_electrical_fraction: float = Field(
+        description="CHP-EL-FRAC (WP-03); chp.py default 1/3, else its electrical_fraction."
+    )
     boiler_efficiency_frac: float
     grid_gas_lhv_j_kg: float
     grid_gas_emission_kg_per_gj: float
@@ -843,16 +845,11 @@ def load_generator_basis(config_dir: Path | str | None = None) -> GeneratorBasis
     chp_cfg = _entry(register, "CFG-CHP")
     boiler_cfg = _entry(register, "CFG-BOILER")
     grid_cfg = _entry(register, "CFG-GRID-GAS")
-    # The CHP electrical share is WP-03's register entry; GEMINI chp.py hard-codes it.
+    # The CHP electrical share is WP-03's register entry; GEMINI chp.py defaults to 1/3 and takes
+    # an "electrical_fraction" parameter (WP-11) that the generator writes only when they differ.
     electrical_fraction = _number(register, CHP_FRACTION_ID)
-    if not math.isclose(
-        electrical_fraction, CHP.ELECTRICAL_POWER_FRACTION, abs_tol=CHP_FRACTION_TOL
-    ):
-        raise ConfigError(
-            f"{CHP_FRACTION_ID} {electrical_fraction} differs from GEMINI chp.py "
-            f"({CHP.ELECTRICAL_POWER_FRACTION:.4f}), which is hard-coded: add an "
-            "electrical_fraction parameter to chp.py before changing it"
-        )
+    if not 0.0 < electrical_fraction < 1.0:
+        raise ConfigError(f"{CHP_FRACTION_ID} must be in (0, 1), got {electrical_fraction}")
     brine = basis.brine
     assoc_lhv, assoc_factor, assoc_density = gas_burner_values(
         brine.gas_ch4_mol_frac, brine.gas_co2_mol_frac
@@ -1423,6 +1420,12 @@ def plan_plant(
             "gas_emission_factor": gb.associated_gas_emission_kg_per_gj,
             **DISTRICT_FLUID,
         }
+        if not math.isclose(
+            gb.chp_electrical_fraction, CHP.ELECTRICAL_POWER_FRACTION, abs_tol=CHP_FRACTION_TOL
+        ):
+            # CHP-EL-FRAC sensitivity (e.g. DEA 0.50): chp.py's default 1/3 is kept otherwise, so
+            # the base-case project (and its hash) is unchanged.
+            chp_params["electrical_fraction"] = gb.chp_electrical_fraction
     boiler_mw = _equipment_mw(candidate, "peak_boiler_mw", gb.heating_peak_mw)
     district = DistrictSpec(
         flow_m3s=district_flow,

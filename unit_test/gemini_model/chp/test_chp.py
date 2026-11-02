@@ -10,6 +10,9 @@ takes an 80% gas fraction / 90% water fraction and this CHP unit takes
 the complementary 20% gas fraction / 10% water fraction.
 """
 
+# Modified by the GeoAgent team for SPE GeoHackathon 2026, 2026-11-01: added the
+# electrical_fraction parameter test (WP-11).
+
 import unittest
 
 from gemini_model.chp.chp import CHP
@@ -60,6 +63,21 @@ class TestCHP(unittest.TestCase):
         self.chp.calculate_output(dict(CHP_INPUT))
         y = self.chp.get_output()
         self.assertAlmostEqual(y["power_el"], y["power_th"] / 2)
+
+    def test_electrical_fraction_parameter(self):
+        """CHP-EL-FRAC 0.50 sensitivity (WP-11): same useful output, split 50/50."""
+        self.chp.calculate_output(dict(CHP_INPUT))
+        base = dict(self.chp.get_output())
+        self.chp.update_parameters({"electrical_fraction": 0.5})
+        self.chp.calculate_output(dict(CHP_INPUT))
+        y = self.chp.get_output()
+        self.assertAlmostEqual(y["power_el"], y["power_th"])
+        total = base["power_el"] + base["power_th"]
+        self.assertAlmostEqual(y["power_el"] + y["power_th"], total)
+        self.assertAlmostEqual(y["emission"], base["emission"])
+        self.chp.update_parameters({"electrical_fraction": 1.0})
+        with self.assertRaises(ValueError):
+            self.chp.calculate_output(dict(CHP_INPUT))
 
     def test_zero_water_flow_no_temperature_rise(self):
         """Test zero (already-split) water flow leaves temperature unchanged."""

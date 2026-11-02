@@ -152,6 +152,12 @@ class DoubletDesign(StrictModel):
     well_inner_diameter_m: float | None = Field(default=None, gt=0, description="None: SUB-WELL.")
     well_roughness_m: float | None = Field(default=None, ge=0, description="None: SUB-WELL.")
     skin: float | None = Field(default=None, description="None: DB-38.")
+    injectivity_factor: float | None = Field(
+        default=None,
+        gt=0,
+        le=1,
+        description="II = factor × PI (cold-injection sensitivity, WP-11); None: SUB-II (II = PI).",
+    )
     esp_flow_scale: float | None = Field(
         default=None, gt=0, description="None: best-efficiency point at the maximum flow."
     )
@@ -762,7 +768,8 @@ def resolve_doublet(design: DoubletDesign, basis: SubsurfaceBasis) -> ResolvedDo
             pressure_model=conditions.pressure_model,
             thickness_m=basis.thickness_m,
             productivity_index_m3h_per_bar=pi,
-            injectivity_index_m3h_per_bar=pi,  # SUB-II: II = PI (RC-01 item 4)
+            # SUB-II: II = PI (RC-01 item 4); a factor < 1 is the cold-injection sensitivity.
+            injectivity_index_m3h_per_bar=pi * (design.injectivity_factor or 1.0),
             density_kg_m3=basis.density_kg_m3,
             viscosity_pa_s=basis.viscosity_pa_s,
             cp_j_per_kg_k=basis.cp_j_per_kg_k,
