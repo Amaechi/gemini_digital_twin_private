@@ -478,7 +478,9 @@ def test_register_entries_are_complete():
     raw = yaml.safe_load(path.read_text(encoding="utf-8"))
     for entry in raw["assumptions"]:
         if entry["id"].startswith(("OPT-", "UQ-")):
-            assert entry["added_by"] == "WP-11" and entry["source"] and entry["justification"]
+            # OPT-ROBUST-BACKUP was added before L-2 (DR-11); the rest by WP-11.
+            assert entry["added_by"] in {"WP-11", "Pre-L-2"}
+            assert entry["source"] and entry["justification"]
     assert math.isfinite(load_optimiser_settings().tol)
 
 

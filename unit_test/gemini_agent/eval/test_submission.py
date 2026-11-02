@@ -335,3 +335,35 @@ def test_incomplete_adapted_header_fails(passing):
     (repo / "scripts" / "bad.py").write_text("# Adapted from marcosanyo/PlantDebugger\n")
     report = validate_submission(**passing)
     assert report.failed_ids() == ["SUB-20"]
+
+
+def test_dr11_variant_takes_its_percentiles_from_the_tl15_design(passing):
+    """SUB-11 (pre-L-2): a DR-11 robust-backup variant is covered by its source's TL-15 run."""
+    from gemini_agent.runner.state import RobustBackup
+
+    run_dir = Path(passing["run_dir"]) / "final"
+    store, state = _load(run_dir)
+    source = state.selected_id
+    variant = next(c for c in state.candidates if c.id == source).model_copy(
+        update={"id": f"{source}-robust"}
+    )
+    state.candidates.append(variant)
+    state.kpis[variant.id] = state.kpis[source].model_copy(
+        update={"candidate_id": variant.id, "percentiles": {}}
+    )
+    state.verifications.append(
+        state.verifications[-1].model_copy(update={"candidate_id": variant.id})
+    )
+    state.selected_id = variant.id
+    _save(run_dir, store, state)
+    statuses = _statuses(validate_submission(**passing))
+    assert statuses["SUB-11"] == CheckStatus.FAIL  # no provenance: the variant has no MC
+    store, state = _load(run_dir)
+    state.robust_backup = RobustBackup(
+        candidate_id=source, robust_candidate_id=variant.id, tool_result_id="TR-902"
+    )
+    _save(run_dir, store, state)
+    report = validate_submission(**passing)
+    check = next(c for c in report.checks if c.id == "SUB-11")
+    assert check.status == CheckStatus.PASS and f"(TL-15 on {source})" in check.detail
+    assert report.ok

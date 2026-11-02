@@ -3,8 +3,14 @@
 Options come from tool results and the configuration, never from an LLM. ``recommended`` is set
 only by a deterministic rule: the option holding the top candidate of
 ``ranking.rank_candidates`` (the optimiser's rule, so DRs agree with the selected design), a
-register default (DR-06, DR-08) or a spec rule (DR-09). Evidence ids are
+register default (DR-06, DR-08, DR-11) or a spec rule (DR-09). Evidence ids are
 tool-result ids (``TR-…``) or config references (``config:…``).
+
+DR-11 (pre-L-2) is the one record whose choice changes the design: the P8 workflow step
+``robust_backup`` prices the TL-15 robust backups as a variant; the option chosen here is the
+design the runner selects for P9 (``installed_design``). OPT-ROBUST-BACKUP sets the
+recommendation; the probability of meeting demand and the LCOH + LCOC change are offered as
+criteria, so either engine can decide either way on the evidence.
 
 Criteria (L-1 follow-up): each question also offers decisive criteria evaluated here on the tool
 results — the recommendation rule first, then KPI criteria that discriminate between the
@@ -17,13 +23,14 @@ from __future__ import annotations
 
 import json
 from collections.abc import Callable, Mapping
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal
 
 from pydantic import BaseModel
 
 from gemini_agent.runner import ranking
-from gemini_agent.runner.state import RunState
+from gemini_agent.runner.state import RobustBackup, RunState
 from gemini_agent.schemas.candidate import Candidate
 from gemini_agent.schemas.config import load_config
 from gemini_agent.schemas.decision import (
@@ -52,7 +59,50 @@ DR_QUESTIONS: dict[str, tuple[str, Role]] = {
     "DR-08": ("Which district-heating return temperature is designed for?", Role.SYSTEM_ARCHITECT),
     "DR-09": ("Which materials are used in the brine loop?", Role.SUBSURFACE),
     "DR-10": ("Which design is recommended?", Role.LEAD_ENGINEER),
+    "DR-11": (
+        (
+            "Which peak-backup capacity is installed: the base-year nameplates or the TL-15 "
+            "robust nameplates?"
+        ),
+        Role.ECONOMICS,
+    ),
 }
+
+ROBUST_BACKUP_ID = "OPT-ROBUST-BACKUP"
+"""Register entry of the DR-11 recommendation rule (pre-L-2)."""
+INSTALLED_BACKUP_OPTION = "installed-backup"
+
+
+@dataclass(frozen=True)
+class RobustBackupRule:
+    """OPT-ROBUST-BACKUP: which DR-11 option the rule recommends, at which TL-15 percentile."""
+
+    recommend: Literal["robust", "installed"]
+    percentile: float
+
+    @property
+    def option_id(self) -> str:
+        """DR-11 option id of the robust backups, e.g. ``p90-robust-backup``."""
+        return f"p{self.percentile:g}-robust-backup"
+
+
+def robust_backup_rule(config_dir: Path | None = None) -> RobustBackupRule:
+    """Load OPT-ROBUST-BACKUP; its percentile must be the one TL-15 used (UQ-MC)."""
+    register = load_config("assumptions", config_dir)
+    value: Any = register.get(ROBUST_BACKUP_ID).value
+    recommend = value.get("recommend")
+    if recommend not in ("robust", "installed"):
+        raise ValueError(f"{ROBUST_BACKUP_ID}.recommend must be robust or installed: {recommend}")
+    percentile = float(value["robust_backup_percentile"])
+    uq: Any = register.get("UQ-MC").value
+    if abs(percentile - float(uq["robust_backup_percentile"])) > 1e-9:
+        raise ValueError(
+            f"{ROBUST_BACKUP_ID}.robust_backup_percentile {percentile:g} differs from UQ-MC "
+            f"robust_backup_percentile {uq['robust_backup_percentile']} (TL-15 computes "
+            "robust_backup_mw at the UQ-MC value)"
+        )
+    return RobustBackupRule(recommend, percentile)
+
 
 _HEAT_TOPUP = {
     "C1": ("gas-boiler-chp-topup", "Plate HEX + gas boiler/CHP top-up (C1)"),
@@ -307,6 +357,8 @@ def _build_options(
                 notes="fails the §10.1 materials check for saline brine",
             ),
         ]
+    if dr_id == "DR-11":
+        return _backup_options(state, config_dir, members)
     if dr_id == "DR-10":
         options = []
         for candidate_id in state.shortlist or ([state.selected_id] if state.selected_id else []):
@@ -341,6 +393,134 @@ def _build_options(
             )
         return options
     raise KeyError(dr_id)
+
+
+def _mw(sizes: Mapping[str, float]) -> str:
+    return ", ".join(f"{key} {value:.2f}" for key, value in sorted(sizes.items())) or "none"
+
+
+def _backup_evidence(state: RunState, backup: RobustBackup) -> list[str]:
+    """Return the robust_backup result, the TL-15 result it rests on and the register entries."""
+    uncertainty = [
+        r.id
+        for r in state.evidence_for(candidate_ids={backup.candidate_id}, tools={"uncertainty"})
+        if r.tool == "uncertainty"
+    ]
+    return (
+        [backup.tool_result_id]
+        + uncertainty[-1:]
+        + [f"config:assumptions.yaml#{ROBUST_BACKUP_ID}", "config:assumptions.yaml#UQ-MC"]
+    )
+
+
+def _backup_options(
+    state: RunState, config_dir: Path | None, members: Members
+) -> list[DecisionOption]:
+    """DR-11 options: keep the installed backups or install the TL-15 robust ones."""
+    backup = state.robust_backup
+    if backup is None or backup.candidate_id != state.selected_id:
+        return []  # no robust_backup result for the selected design yet
+    rule = robust_backup_rule(config_dir)
+    excluded = state.excluded_ids()
+    evidence = _backup_evidence(state, backup)
+    robust_id = backup.robust_candidate_id
+    installed_ok = backup.candidate_id not in excluded
+    robust_ok = robust_id is not None and backup.robust_meets_demand and robust_id not in excluded
+    p0, p1 = backup.probability_demand_met, backup.probability_demand_met_robust
+    raises = robust_ok and p0 is not None and p1 is not None and p1 > p0
+    install = raises and (rule.recommend == "robust" or not installed_ok)
+    members[INSTALLED_BACKUP_OPTION] = [backup.candidate_id] if installed_ok else []
+    members[rule.option_id] = [robust_id] if robust_ok and robust_id else []
+
+    def prob(value: float | None) -> str:
+        return "n/a" if value is None else f"{value:.2f}"
+
+    installed_notes = (
+        f"{backup.candidate_id}: TL-15 P(demand met) {prob(p0)} with the installed backups"
+        + ("; recommended (OPT-ROBUST-BACKUP)" if not install else "")
+    )
+    if robust_ok:
+        robust_notes = (
+            f"{robust_id}: TL-15 P(demand met) {prob(p1)}; vs {backup.candidate_id} "
+            f"ΔLCOH {backup.delta_lcoh_per_mwh or 0:+.2f}, "
+            f"ΔLCOC {backup.delta_lcoc_per_mwh or 0:+.2f}"
+            f" USD/MWh, ΔCAPEX {backup.delta_capex_million or 0:+.2f} MUSD ({backup.year_mode} "
+            "year)" + ("; recommended (OPT-ROBUST-BACKUP)" if install else "")
+        )
+    elif robust_id is not None and robust_id in excluded:
+        robust_notes = f"{robust_id} excluded by DesignGuard/verifier"
+    elif robust_id is not None:
+        robust_notes = f"{robust_id} does not meet demand on every base-year day"
+    else:
+        robust_notes = backup.reason or "no robust variant evaluated"
+    return [
+        DecisionOption(
+            id=INSTALLED_BACKUP_OPTION,
+            label=f"Keep the base-year backup nameplates of {backup.candidate_id} "
+            f"({_mw(backup.installed_backup_mw)} MW)",
+            evidence_ids=evidence,
+            recommended=installed_ok and not install,
+            eligible=installed_ok,
+            notes=installed_notes[:500],
+        ),
+        DecisionOption(
+            id=rule.option_id,
+            label=f"Install the TL-15 P{rule.percentile:g} robust backups "
+            f"({_mw(backup.robust_backup_mw)} MW)" + (f" as {robust_id}" if robust_id else ""),
+            evidence_ids=evidence,
+            recommended=install,
+            eligible=bool(robust_ok),
+            notes=robust_notes[:500],
+        ),
+    ]
+
+
+def installed_design(record: DecisionRecord, state: RunState) -> str | None:
+    """Design a DR-11 choice installs (None for other records or without its evidence)."""
+    backup = state.robust_backup
+    if record.dr_id != "DR-11" or backup is None:
+        return None
+    if record.choice == INSTALLED_BACKUP_OPTION:
+        return backup.candidate_id
+    return backup.robust_candidate_id
+
+
+def _backup_criteria(
+    state: RunState, options: list[DecisionOption], keys: list[str]
+) -> list[DecisionCriterion]:
+    """DR-11 evidence criteria: probability of meeting demand vs the LCOH + LCOC change."""
+    backup = state.robust_backup
+    eligible = [o.id for o in options if o.eligible]
+    if backup is None or len(eligible) < 2:
+        return []
+    robust = next(o for o in eligible if o != INSTALLED_BACKUP_OPTION)
+    criteria = []
+    p0, p1 = backup.probability_demand_met, backup.probability_demand_met_robust
+    if p0 is not None and p1 is not None and p0 != p1 and "probability_demand_met" in keys:
+        criteria.append(
+            DecisionCriterion(
+                id="highest-probability_demand_met",
+                key="probability_demand_met",
+                source="robust_backup",
+                text="highest probability_demand_met over the TL-15 samples in robust_backup",
+                best_option_ids=[robust if p1 > p0 else INSTALLED_BACKUP_OPTION],
+                evidence_ids=_evidence_with(state, options, "probability_demand_met"),
+            )
+        )
+    change = backup.delta_lcoh_plus_lcoc_per_mwh
+    key = "delta_lcoh_plus_lcoc_per_mwh"
+    if change is not None and abs(change) > 1e-9 and key in keys:
+        criteria.append(
+            DecisionCriterion(
+                id=f"lowest-{key}",
+                key=key,
+                source="robust_backup",
+                text=f"lowest {key}: the LCOH plus LCOC change in robust_backup",
+                best_option_ids=[INSTALLED_BACKUP_OPTION if change > 0 else robust],
+                evidence_ids=_evidence_with(state, options, key),
+            )
+        )
+    return criteria
 
 
 def evidence_keys(state: RunState, options: list[DecisionOption]) -> list[str]:
@@ -404,6 +584,15 @@ def _rule_criterion(
         if key is not None:
             text = f"materials check of spec §10.1 for saline brine ({key})"
             return make("spec-materials-check", key, "load_design_basis", text)
+    if dr_id == "DR-11" and recommended and ROBUST_BACKUP_ID in keys:
+        if best[0] == INSTALLED_BACKUP_OPTION:
+            text = f"register rule {ROBUST_BACKUP_ID} keeps installed_backup_mw for this design"
+        else:
+            text = (
+                f"register rule {ROBUST_BACKUP_ID}: install robust_backup_mw when it raises "
+                "probability_demand_met"
+            )
+        return make("opt-robust-backup", ROBUST_BACKUP_ID, "assumptions register", text)
     if dr_id == "DR-10":
         key = pick("verdict")
         if key is not None:
@@ -506,7 +695,8 @@ def build_criteria(
     """Decisive criteria for a question: the recommendation rule first, then KPI criteria."""
     rule = _rule_criterion(dr_id, state, options, keys)
     criteria = [rule] if rule is not None else []
-    for criterion in _kpi_criteria(state, options, members, keys):
+    extra = _backup_criteria(state, options, keys) if dr_id == "DR-11" else []
+    for criterion in extra + _kpi_criteria(state, options, members, keys):
         duplicate = any(
             c.key == criterion.key and c.best_option_ids == criterion.best_option_ids
             for c in criteria

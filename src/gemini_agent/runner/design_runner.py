@@ -5,6 +5,8 @@
 # pause/resume, Decision Records and run artefacts; synchronous; kept _build_context /
 # _compact_payload / _prior_action_signatures ideas. 2026-11-02 (L-1 follow-up): duplicate
 # tool calls rejected by signature, step-kind coercions logged, DR choices checked on criteria.
+# 2026-11-02 (pre-L-2): phase workflow tools (P8 robust_backup) and DR-11, whose choice selects
+# the installed design for P9.
 """Workflow runner: deterministic phases P0–P10 (spec §4.1, §5.2).
 
 The runner decides WHICH phase runs, enforces budgets (AG-04), executes every tool call,
@@ -42,6 +44,7 @@ from gemini_agent.logging.llm_logger import LLMLogger
 from gemini_agent.memory.event_store import SQLiteEventStore
 from gemini_agent.runner.decision_records import (
     build_question,
+    installed_design,
     make_record,
     result_keys,
     write_records,
@@ -53,7 +56,13 @@ from gemini_agent.runner.phases import (
     PhaseSpec,
     next_phase,
 )
-from gemini_agent.runner.state import InputMode, RunState, ToolRecord, Verification
+from gemini_agent.runner.state import (
+    InputMode,
+    RobustBackup,
+    RunState,
+    ToolRecord,
+    Verification,
+)
 from gemini_agent.runner.toolbox import Toolbox, ToolContext, default_toolbox
 from gemini_agent.schemas.config import REPO_ROOT, load_config
 from gemini_agent.schemas.decision import (
@@ -97,6 +106,7 @@ _HISTORY_TYPES = frozenset(
         "CONFLICT",
         "LOOP_BACK",
         "DECISION_RECORD",
+        "DESIGN_SELECTED",
     }
 )
 _REVIEWER_HISTORY_TYPES = frozenset({"TOOL_RESULT", "TOOL_ERROR"})
@@ -387,6 +397,15 @@ class DesignRunner:
                 outcome = self._handle_request(state, request)
                 if outcome == "paused":
                     return "paused"
+        for tool in spec.workflow_tools:
+            # Pre-L-2: the runner's own deterministic steps (outside the agent's AG-04 budget).
+            if tool in prog.completed_tools:
+                continue
+            args = self._default_args(state, spec, tool)
+            if self._call_tool(state, spec, tool, args, "workflow", budgeted=False) == "stopped":
+                return "stopped"
+            if tool not in prog.completed_tools:
+                return self._escalate(state, f"workflow step {tool} failed in {spec.phase.value}")
         for dr_id in spec.decision_records:
             if any(record.dr_id == dr_id for record in state.decision_records):
                 continue
@@ -536,19 +555,22 @@ class DesignRunner:
         tool: str,
         args: dict[str, ArgValue],
         source: DecisionSource,
+        *,
+        budgeted: bool = True,
     ) -> Outcome:
+        """Execute one tool call; ``budgeted=False`` for workflow steps (not the agent's AG-04)."""
         prog = state.phase_progress(spec.phase)
         budget = self._budget(spec)
         tr_id = f"TR-{len(state.tool_results) + 1:03d}"
         if tool not in self.toolbox:
             self._event(state, "TOOL_ERROR", {"id": tr_id, "tool": tool, "error": "unknown tool"})
             return "continue"
-        if prog.tool_calls_used >= budget.max_tool_calls:
+        if budgeted and prog.tool_calls_used >= budget.max_tool_calls:
             return self._escalate(
                 state,
                 f"tool-call budget exceeded in {spec.phase.value} ({budget.max_tool_calls} calls)",
             )
-        prog.tool_calls_used += 1
+        prog.tool_calls_used += int(budgeted)
         signature = self._signature(state, tool, args)
         args = self._resolve_args(state, args)
         tool_spec = self.toolbox.spec(tool)
@@ -654,6 +676,23 @@ class DesignRunner:
             state.shortlist = list(data.shortlist)
             state.selected_id = state.shortlist[0] if state.shortlist else None
             return list(state.shortlist)
+        if tool == "robust_backup":
+            # Pre-L-2: the TL-15 robust-backup variant joins the run unselected (DR-11 decides).
+            variants = list(getattr(data, "candidates", None) or [])
+            ids = {c.id for c in variants}
+            state.candidates = [c for c in state.candidates if c.id not in ids] + variants
+            for kpi in getattr(data, "kpis", None) or []:
+                state.kpis.pop(kpi.candidate_id, None)  # a re-run replaces, never merges
+                self._merge_kpi(state, kpi)
+            state.robust_backup = RobustBackup.model_validate(
+                {
+                    key: value
+                    for key, value in data.model_dump(mode="json").items()
+                    if key in RobustBackup.model_fields
+                }
+                | {"tool_result_id": tr_id}
+            )
+            return [data.candidate_id] + sorted(ids)
         if tool == "verify_design":
             verdict = DesignVerdict(data.verdict)
             stub_evidence = any(record.stub for record in state.tool_results)
@@ -852,6 +891,23 @@ class DesignRunner:
                 "stub_evidence": record.stub_evidence,
             },
         )
+        target = installed_design(record, state)
+        if target is not None and target != state.selected_id:
+            # DR-11 installs the chosen backups: that design is selected and verified in P9.
+            previous = state.selected_id
+            state.selected_id = target
+            state.shortlist = [target] + [c for c in state.shortlist if c != target]
+            self._event(
+                state,
+                "DESIGN_SELECTED",
+                {
+                    "candidate_id": target,
+                    "replaces": previous,
+                    "dr_id": dr_id,
+                    "message": f"{dr_id} {record.choice}: selected {target} instead of "
+                    f"{previous}; the P9 DesignVerifier verifies it",
+                },
+            )
         budget = self._budget(spec)
         if prog.tokens_used > budget.max_tokens:
             return self._escalate(
@@ -934,7 +990,7 @@ class DesignRunner:
             )
             return None
         state.violations = list(verification.violations)
-        redo = {"DR-06", "DR-10"}
+        redo = {"DR-06", "DR-10", "DR-11"}
         dropped = [state.progress.pop(phase.value, None) for phase in LOOP_BACK_PHASES]
         state.earlier_pass_fallbacks += sum(p.fallbacks for p in dropped if p is not None) + sum(
             1

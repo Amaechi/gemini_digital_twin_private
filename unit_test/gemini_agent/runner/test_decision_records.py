@@ -8,15 +8,17 @@ from gemini_agent.agents.engine import PolicyEngine, check_choice, choice_deps
 from gemini_agent.runner.decision_records import (
     build_options,
     build_question,
+    installed_design,
     make_record,
     result_keys,
+    robust_backup_rule,
     write_records,
 )
 from gemini_agent.runner.state import RunState, ToolRecord, Verification
 from gemini_agent.runner.tool_stubs import KPIBatch, stub_toolbox
 from gemini_agent.runner.toolbox import ToolContext
 from gemini_agent.schemas.config import load_config
-from gemini_agent.schemas.decision import DesignVerdict, OptionChoice, Phase
+from gemini_agent.schemas.decision import DR_TITLES, DesignVerdict, OptionChoice, Phase
 from gemini_agent.schemas.results import KPISet
 
 pytestmark = pytest.mark.usefixtures("stub_tools")
@@ -240,7 +242,7 @@ def test_every_policy_record_of_a_stub_run_has_a_grounded_criterion(tmp_path):
     runner = DesignRunner(PolicyEngine(), runs_root=tmp_path)
     runner.start("", run_id="c1")
     state = runner.load_state("c1")
-    assert len(state.decision_records) == 10
+    assert len(state.decision_records) == len(DR_TITLES)
     for record in state.decision_records:
         assert record.criterion is not None, record.dr_id
         assert record.criterion.key in record.rationale, record.dr_id
@@ -248,6 +250,7 @@ def test_every_policy_record_of_a_stub_run_has_a_grounded_criterion(tmp_path):
     criteria = {r.dr_id: r.criterion.id for r in state.decision_records}
     assert criteria["DR-06"] == "db30-non-overlapping" and criteria["DR-08"] == "db31-answer"
     assert criteria["DR-10"] == "selected-not-rejected"
+    assert criteria["DR-11"] == "opt-robust-backup"  # stubs: no robust variant to install
     assert criteria["DR-01"] == "generation-order-passed"  # stubs: no cost evidence yet
 
 
@@ -257,3 +260,169 @@ def test_kpi_criterion_needs_values_for_two_options(tmp_path):
     state.kpis["C1-3d"] = KPISet(candidate_id="C1-3d")  # 3-doublets: no KPI values
     question = build_question("DR-01", state, Phase.P5, None)
     assert [c.id for c in question.criteria] == ["ranking-lowest-lcoh_per_mwh"]
+
+
+# --------------------------------------------------------------------------- DR-11 (pre-L-2)
+def _with_backup(tmp_path, *, p0=0.46, p1=0.90, change=2.05, meets=True, robust="C2-opt-robust"):
+    """State after P8: TL-15 + the robust_backup step on the selected C2-opt."""
+    from gemini_agent.runner.real_tools import RobustBackupToolOutput
+    from gemini_agent.runner.state import RobustBackup
+
+    state = _state(tmp_path)
+    state.selected_id = "C2-opt"
+    installed = {"electric_chiller_mw": 8.2, "peak_boiler_mw": 5.0}
+    robust_mw = {"electric_chiller_mw": 8.2, "peak_boiler_mw": 10.9}
+    out = RobustBackupToolOutput(
+        candidate_id="C2-opt",
+        robust_candidate_id=robust,
+        robust_backup_percentile=90,
+        installed_backup_mw=installed,
+        robust_backup_mw=robust_mw,
+        probability_demand_met=p0,
+        probability_demand_met_robust=p1,
+        kpis=[KPISet(candidate_id=robust or "x")],
+    )
+    for tr_id, tool, ids in (
+        ("TR-010", "uncertainty", ["C2-opt"]),
+        ("TR-011", "robust_backup", ["C2-opt"] + ([robust] if robust else [])),
+    ):
+        state.tool_results.append(
+            ToolRecord(
+                id=tr_id,
+                tool=tool,
+                phase=Phase.P8,
+                args={"candidate_id": "C2-opt"},
+                ok=True,
+                candidate_ids=ids,
+                source="workflow" if tool == "robust_backup" else "policy",
+                data_keys=result_keys(out),
+            )
+        )
+    state.robust_backup = RobustBackup(
+        candidate_id="C2-opt",
+        robust_candidate_id=robust,
+        tool_result_id="TR-011",
+        robust_backup_percentile=90,
+        installed_backup_mw=installed,
+        robust_backup_mw=robust_mw,
+        probability_demand_met=p0,
+        probability_demand_met_robust=p1,
+        delta_lcoh_per_mwh=change,
+        delta_lcoc_per_mwh=0.0,
+        delta_lcoh_plus_lcoc_per_mwh=change,
+        delta_capex_million=2.2,
+        robust_meets_demand=meets,
+        year_mode="full",
+        reason="" if robust else "TL-15 robust need is within the installed backup nameplates",
+    )
+    state.kpis["C2-opt"] = KPISet(
+        candidate_id="C2-opt", lcoh_per_mwh=42.5, lcoc_per_mwh=26.3, capex_million=27.9
+    )
+    if robust:
+        state.kpis[robust] = KPISet(
+            candidate_id=robust, lcoh_per_mwh=42.5 + change, lcoc_per_mwh=26.3, capex_million=30.1
+        )
+    return state
+
+
+def test_dr11_offers_the_robust_backups_with_probability_and_cost_criteria(tmp_path):
+    """OPT-ROBUST-BACKUP recommends the robust backups; the evidence criteria allow either."""
+    state = _with_backup(tmp_path)
+    question = build_question("DR-11", state, Phase.P8, None)
+    assert question.role.value == "economics"
+    assert [(o.id, o.eligible, o.recommended) for o in question.options] == [
+        ("installed-backup", True, False),
+        ("p90-robust-backup", True, True),
+    ]
+    assert "TR-011" in question.options[1].evidence_ids
+    assert "config:assumptions.yaml#OPT-ROBUST-BACKUP" in question.options[1].evidence_ids
+    best = {c.id: c.best_option_ids for c in question.criteria}
+    assert list(best)[:3] == [
+        "opt-robust-backup",
+        "highest-probability_demand_met",
+        "lowest-delta_lcoh_plus_lcoc_per_mwh",
+    ]
+    assert best["opt-robust-backup"] == best["highest-probability_demand_met"]
+    assert best["highest-probability_demand_met"] == ["p90-robust-backup"]
+    assert best["lowest-delta_lcoh_plus_lcoc_per_mwh"] == ["installed-backup"]
+    assert best["lowest-lcoh_per_mwh"] == ["installed-backup"]  # KPI criteria from state.kpis
+    for key in ("probability_demand_met", "delta_lcoh_per_mwh", "delta_lcoc_per_mwh"):
+        assert key in question.evidence_keys
+    # Policy: the register rule → the robust variant is the design to install.
+    choice = PolicyEngine().choose(question, None).value
+    assert (choice.option_id, choice.criterion) == ("p90-robust-backup", "opt-robust-backup")
+    assert check_choice(choice_deps(question), choice) is None
+    record = make_record(question, choice, "policy", state)
+    assert installed_design(record, state) == "C2-opt-robust"
+    # An engine may keep the installed backups on the cost criterion ...
+    keep = OptionChoice(
+        dr_id="DR-11",
+        criterion="lowest-delta_lcoh_plus_lcoc_per_mwh",
+        option_id="installed-backup",
+        rationale="lowest delta_lcoh_plus_lcoc_per_mwh in robust_backup: no added backup cost",
+    )
+    assert check_choice(choice_deps(question), keep) is None
+    kept = make_record(question, keep, "llm", state)
+    assert installed_design(kept, state) == "C2-opt"
+    # ... but not contradict its criterion.
+    wrong = keep.model_copy(update={"option_id": "p90-robust-backup"})
+    assert "contradicts" in check_choice(choice_deps(question), wrong)
+
+
+def test_dr11_keeps_the_installed_backups_without_a_useful_variant(tmp_path):
+    """No gain, unmet demand, a rejected variant or no variant ⇒ installed is recommended."""
+    no_gain = build_question("DR-11", _with_backup(tmp_path / "a", p1=0.46), Phase.P8, None)
+    assert [o.id for o in no_gain.options if o.recommended] == ["installed-backup"]
+    assert no_gain.criteria[0].id == "opt-robust-backup"
+    assert "highest-probability_demand_met" not in {c.id for c in no_gain.criteria}
+    unmet = build_question("DR-11", _with_backup(tmp_path / "b", meets=False), Phase.P8, None)
+    assert [o.id for o in unmet.options if o.eligible] == ["installed-backup"]
+    assert "does not meet demand" in unmet.options[1].notes
+    state = _with_backup(tmp_path / "c")
+    state.verifications.append(
+        Verification(
+            candidate_id="C2-opt-robust",
+            verdict=DesignVerdict.REJECTED,
+            verifier="DesignVerifier",
+            tool_result_id="TR-012",
+            phase=Phase.P9,
+        )
+    )
+    rejected = build_question("DR-11", state, Phase.P8, None)
+    assert [o.id for o in rejected.options if o.eligible] == ["installed-backup"]
+    assert "excluded" in rejected.options[1].notes
+    none = build_question("DR-11", _with_backup(tmp_path / "d", robust=None), Phase.P8, None)
+    assert "within the installed" in none.options[1].notes
+    record = make_record(none, PolicyEngine().choose(none, None).value, "policy", state)
+    assert record.choice == "installed-backup" and record.criterion.id == "opt-robust-backup"
+    # A result for another design than the selected one is stale: no DR-11 yet.
+    stale = _with_backup(tmp_path / "e")
+    stale.selected_id = "C1-opt"
+    assert build_question("DR-11", stale, Phase.P8, None) is None
+
+
+def test_dr11_register_rule_and_percentile_check(tmp_path):
+    """recommend: installed flips the recommendation; the percentile must equal UQ-MC's."""
+    import shutil
+
+    from gemini_agent.schemas.config import REPO_ROOT
+
+    config = tmp_path / "config"
+    shutil.copytree(REPO_ROOT / "config", config)
+    path = config / "assumptions.yaml"
+    text = path.read_text("utf-8")
+    assert text.count("recommend: robust\n") == 1
+    path.write_text(text.replace("recommend: robust\n", "recommend: installed\n"), "utf-8")
+    question = build_question("DR-11", _with_backup(tmp_path / "s"), Phase.P8, config)
+    assert [o.id for o in question.options if o.recommended] == ["installed-backup"]
+    assert "keeps installed_backup_mw" in question.criteria[0].text
+    assert question.criteria[1].best_option_ids == ["p90-robust-backup"]  # still choosable
+    path.write_text(
+        text.replace(
+            "recommend: robust\n      robust_backup_percentile: 90",
+            "recommend: robust\n      robust_backup_percentile: 80",
+        ),
+        "utf-8",
+    )
+    with pytest.raises(ValueError, match="differs from UQ-MC"):
+        robust_backup_rule(config)

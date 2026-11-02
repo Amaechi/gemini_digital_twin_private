@@ -1590,3 +1590,33 @@ assumptions:
     tag: A
     status: default
     added_by: WP-14
+
+  - id: OPT-ROBUST-BACKUP
+    title: Install the TL-15 robust backup nameplates (DR-11 recommendation)
+    value:
+      recommend: robust
+      robust_backup_percentile: 90
+    unit: null
+    justification: >-
+      The peak boiler and the electric chiller are the backup units of the plant (last in the WP-07 merit
+      order, cap-only). TL-13 sizes them to the largest daily output of the single DB-30 design year
+      (OPT-SPACE), i.e. with no reserve; peak/backup-reserve practice sizes backup capacity for the design
+      condition plus the uncertainty of the base load, not for one deterministic year. TL-15 (UQ-MC) gives
+      that evidence per run: the share of Monte Carlo samples meeting demand with the installed nameplates
+      (probability_demand_met) and with robust_backup_mw = the robust_backup_percentile of each sample's
+      required nameplate (probability_demand_met_robust). Rule (DR-11, after P8): recommend installing
+      robust_backup_mw when it is larger than an installed backup, raises the probability of meeting demand,
+      and the variant passes the guard and meets demand on every base-year day; otherwise recommend the
+      installed backups. The variant is re-simulated (TL-12 fast year, plus the full year when the selected
+      design has one, so both rest on the same basis) and re-priced with TL-14 (capex, fuel, O&M of the added
+      nameplate); the DesignVerifier then verifies it in P9 (golden rule 3). Evidence that motivated the
+      entry (WP-14 final policy run, C2-opt): demand met in 46 % of 200 samples with the installed 5.0 MW
+      boiler, 90 % with the P90 10.9 MW boiler, at about +2 USD/MWh LCOH and unchanged LCOC.
+      recommend: robust | installed (the DR-11 option the rule recommends; the engine may choose the other
+      option on an offered criterion). robust_backup_percentile must equal UQ-MC robust_backup_percentile
+      (the percentile TL-15 computed robust_backup_mw at; checked by the tool).
+    source: GEOAGENT_DESIGN_SPEC §9.3 UQ-01/UQ-02 (probability of meeting demand); UQ-MC; OPT-SPACE; user decision (pre-L-2, 2026-11-02) [A]
+    sensitivity: "recommend: installed keeps the TL-13 base-year backups (lower cost, lower probability of meeting demand); a lower percentile buys less robustness for less capex."
+    tag: A
+    status: default
+    added_by: Pre-L-2

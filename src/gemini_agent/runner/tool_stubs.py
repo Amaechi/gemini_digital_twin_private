@@ -72,6 +72,20 @@ class StubOutput(StrictModel):
     note: str = ""
 
 
+class RobustBackupOutput(StrictModel):
+    """``robust_backup`` stub output: the real field names, no variant (no TL-15 evidence)."""
+
+    candidate_id: str
+    robust_candidate_id: str | None = None
+    robust_backup_percentile: float | None = None
+    installed_backup_mw: dict[str, float] = Field(default_factory=dict)
+    robust_backup_mw: dict[str, float] = Field(default_factory=dict)
+    probability_demand_met: float | None = None
+    probability_demand_met_robust: float | None = None
+    robust_meets_demand: bool = False
+    reason: str = ""
+
+
 class DesignBasisOutput(StrictModel):
     """``load_design_basis`` stub: the fixed inputs plus the open design-basis gaps."""
 
@@ -351,6 +365,21 @@ def read_results(args: CandidateArgs, context: ToolContext) -> ToolResult[Result
     )
 
 
+def robust_backup(args: CandidateArgs, context: ToolContext) -> ToolResult[RobustBackupOutput]:
+    """P8 workflow step without TL-15 evidence: no robust variant (DR-11 keeps the backups)."""
+    candidate_id = args.candidate_id if args.candidate_id != "all" else context.selected_id
+    if not candidate_id:
+        raise ValueError("no candidate selected for the robust-backup step")
+    _select(context, candidate_id)
+    return ToolResult[RobustBackupOutput](
+        data=RobustBackupOutput(
+            candidate_id=candidate_id, reason="stub uncertainty: no TL-15 robust nameplates"
+        ),
+        summary=f"STUB robust_backup({candidate_id}): no TL-15 evidence, no robust variant.",
+        warnings=[stub_warning("WP-11")],
+    )
+
+
 def build_report(args: NoArgs, context: ToolContext) -> ToolResult[ReportOutput]:
     """Write a numbers-free report draft listing the Decision Records (WP-14)."""
     path = context.run_dir / "report_draft.md"
@@ -466,6 +495,13 @@ def stub_specs() -> list[ToolSpec]:
             owner="WP-11",
         ),
         _generic("uncertainty", "WP-11", "Monte Carlo P10/P50/P90 on a design.", CandidateArgs),
+        ToolSpec(
+            "robust_backup",
+            "Re-simulate and re-price a design with its TL-15 robust backups (DR-11 evidence).",
+            CandidateArgs,
+            robust_backup,
+            owner="WP-11",
+        ),
         ToolSpec(
             "verify_design",
             "Run the 4-layer DesignVerifier on a candidate.",

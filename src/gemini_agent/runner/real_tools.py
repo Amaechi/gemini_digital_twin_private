@@ -18,7 +18,9 @@ Pipeline (policy order): P1 TL-01/02/02b (+ remembered user answers from
 TL-10 guard → P4 TL-17 → P5 TL-12 fast year + TL-14 economics (C0 CO₂ first, exergy KPI) per
 candidate → P6 TL-13 on the top-ranked concepts (``ranking.rank_candidates``) → P7 TL-12 full
 year (+ TL-14 on it) and the DesignVerifier on the collected evidence → P8 TL-15 + cost
-sensitivity → P9 review → P10 TL-21 figures and the report draft.
+sensitivity, then the workflow's ``robust_backup`` step (the TL-15 robust backup nameplates
+re-simulated and re-priced as ``<id>-robust``) and DR-11 (OPT-ROBUST-BACKUP) → P9 review →
+P10 TL-21 figures and the report draft.
 
 TL-13 depth options are limited to depths the DesignVerifier can accept (``depth_check``, TL-05
 at the DB-11 maximum flow): the ESP-intake NPSH must be evaluable (SUB-NPSH bounds the vapour
@@ -45,6 +47,7 @@ from gemini_agent.memory import project_knowledge
 from gemini_agent.memory.design_cache import DesignCache
 from gemini_agent.memory.event_store import SQLiteEventStore
 from gemini_agent.runner import ranking
+from gemini_agent.runner.decision_records import ROBUST_BACKUP_ID, robust_backup_rule
 from gemini_agent.runner.tool_stubs import GAP_IDS, GAP_QUESTIONS
 from gemini_agent.runner.toolbox import (
     CandidateArgs,
@@ -87,6 +90,7 @@ from gemini_agent.tools.exergy import exergy_kpi
 from gemini_agent.tools.knowledge import knowledge_search
 from gemini_agent.tools.model_builder_tools import model_builder_specs
 from gemini_agent.tools.optimise import (
+    SIGNIFICANT_UNMET_MWH,
     DesignEvaluation,
     EvaluationResult,
     Evaluator,
@@ -139,6 +143,10 @@ DERIVED_CONCEPTS = ("C6", "C7", "C8")
 DEFAULT_PARENT_CONCEPT: ConceptId = "C2"
 """Parent of C6–C8 at generation (P3, before screening); spec §3.4 'best of C2/C3' — the P5
 screening confirms or the Decision Records state otherwise."""
+ROBUST_SUFFIX = "-robust"
+"""Id suffix of a design with the TL-15 robust backup nameplates (DR-11, OPT-ROBUST-BACKUP)."""
+SIZED_SUFFIXES = ("-opt", ROBUST_SUFFIX)
+"""Designs that joined the run after screening (TL-13 optima, robust-backup variants)."""
 SESSION_DIR = "session"
 """Sub-folder of ``runs/<id>/`` holding the sized designs (resume after a pause)."""
 
@@ -317,6 +325,9 @@ class SizedDesign(StrictModel):
     evaluation: DesignEvaluation | None = None
     depth_options_m: list[float] = Field(default_factory=list)
     excluded_depths_m: list[float] = Field(default_factory=list)
+    robust_backup_of: str | None = Field(
+        default=None, description="TL-15 design whose robust backups this variant installs."
+    )
 
 
 class OptimiseToolOutput(StrictModel):
@@ -344,6 +355,36 @@ class UncertaintyToolOutput(StrictModel):
     samples: int
     failed_samples: int
     file: str = ""
+
+
+class RobustBackupToolOutput(StrictModel):
+    """OPT-ROBUST-BACKUP step (P8 workflow): the TL-15 design with its robust backup nameplates.
+
+    The variant is re-simulated and re-priced on the same year basis as the analysed design
+    (``year_mode``); ``delta_*`` = variant − analysed design. Probabilities are TL-15's (share of
+    the Monte Carlo samples meeting demand at the installed / robust nameplates). DR-11 evidence.
+    """
+
+    candidate_id: str
+    robust_candidate_id: str | None = None
+    robust_backup_percentile: float
+    installed_backup_mw: dict[str, float]
+    robust_backup_mw: dict[str, float]
+    added_backup_mw: dict[str, float] = Field(default_factory=dict)
+    probability_demand_met: float | None
+    probability_demand_met_robust: float | None
+    year_mode: str = ""
+    delta_lcoh_per_mwh: float | None = None
+    delta_lcoc_per_mwh: float | None = None
+    delta_lcoh_plus_lcoc_per_mwh: float | None = None
+    delta_capex_million: float | None = None
+    delta_co2_t_per_yr: float | None = None
+    robust_meets_demand: bool = False
+    reason: str = Field(default="", description="Why no robust variant is offered (if none).")
+    candidates: list[Candidate] = Field(
+        default_factory=list, description="The robust variant (joins the run, not selected)."
+    )
+    kpis: list[KPISet] = Field(default_factory=list, description="The variant's KPIs.")
 
 
 class SensitivityToolOutput(StrictModel):
@@ -1275,7 +1316,7 @@ class RealTools:
         session, memo = self.session, self.session.memo(context)
         profile = session.profile
         excluded = context.excluded_ids
-        screened = [c for c in context.candidates if not c.id.endswith("-opt")]
+        screened = [c for c in context.candidates if not c.id.endswith(SIZED_SUFFIXES)]
         ranked = ranking.rank_candidates(screened, context.kpis, exclude_ids=excluded)
         settings = load_optimiser_settings(context.config_dir)
         sized_out: list[SizedDesign] = []
@@ -1496,6 +1537,141 @@ class RealTools:
             warnings=report.warnings[:10],
             assumption_ids=["UQ-RANGES", "UQ-CASES", "UQ-MC", "DB-31"],
             sources=["spec §9.3", "TL-15 uncertainty"],
+        )
+
+    def robust_backup(
+        self, args: CandidateArgs, context: ToolContext
+    ) -> ToolResult[RobustBackupToolOutput]:
+        """OPT-ROBUST-BACKUP: re-simulate and re-price the TL-15 design with its robust backups.
+
+        P8 workflow step after TL-15 (DR-11 evidence). The variant ``<id>-robust`` = the design
+        with ``robust_backup_mw`` (the UQ-MC percentile of each sample's required boiler /
+        electric-chiller nameplate) runs through the TL-13 evaluation (guard → TL-12 fast year →
+        TL-14), plus the TL-12 full year when the design has one (P7), so both designs' KPIs rest
+        on the same basis; TL-14 then prices the added nameplate (capex, O&M, fuel). The variant
+        joins the run unselected; DR-11 decides and the P9 DesignVerifier verifies the selection.
+        """
+        session = self.session
+        memo = session.memo(context)
+        candidate_id = args.candidate_id if args.candidate_id != "all" else context.selected_id
+        if not candidate_id:
+            raise ValueError("no candidate selected for the robust-backup step")
+        rule = robust_backup_rule(context.config_dir)
+        report = memo.uncertainty.get(candidate_id)
+        path = context.run_dir / f"uncertainty_{candidate_id}.json"
+        if report is None and path.is_file():  # resumed run: TL-15 output from its file
+            report = UncertaintyReport.model_validate_json(path.read_text(encoding="utf-8"))
+        if report is None:
+            raise ValueError(f"no TL-15 result for {candidate_id}: run uncertainty first")
+        installed = session.candidate(context, candidate_id)
+        robust_mw = dict(report.robust_backup_mw)
+        installed_mw = dict(report.installed_backup_mw)
+        added = {
+            key: round(value - installed_mw.get(key, 0.0), 6)
+            for key, value in robust_mw.items()
+            if value > installed_mw.get(key, 0.0) + 1e-9
+        }
+        out = RobustBackupToolOutput(
+            candidate_id=candidate_id,
+            robust_backup_percentile=rule.percentile,
+            installed_backup_mw=installed_mw,
+            robust_backup_mw=robust_mw,
+            added_backup_mw=added,
+            probability_demand_met=report.probability_demand_met,
+            probability_demand_met_robust=report.probability_demand_met_robust,
+        )
+        if not robust_mw:
+            reason = "TL-15 has no successful Monte Carlo sample: no robust nameplates"
+            return self._robust_result(out.model_copy(update={"reason": reason}))
+        if not added:
+            reason = "TL-15 robust need is within the installed backup nameplates"
+            return self._robust_result(out.model_copy(update={"reason": reason}))
+        robust_id = f"{candidate_id}{ROBUST_SUFFIX}"
+        robust = installed.model_copy(
+            update={
+                "id": robust_id,
+                "equipment_sizes": installed.equipment_sizes | robust_mw,
+                "description": f"{candidate_id} with the TL-15 P{rule.percentile:g} robust "
+                f"backups ({ROBUST_BACKUP_ID})",
+            }
+        )
+        sized = memo.sized.get(candidate_id)
+        memo.sized[robust_id] = SizedDesign(
+            candidate=robust,
+            concept_candidate_id=sized.concept_candidate_id if sized else candidate_id,
+            parent_concept=session.parent_concept(context, installed),
+            outage_start_indices=session.outages(context, candidate_id),
+            depth_options_m=list(sized.depth_options_m) if sized else [],
+            excluded_depths_m=list(sized.excluded_depths_m) if sized else [],
+            robust_backup_of=candidate_id,
+        )
+        for cache in (memo.screen, memo.full, memo.subsurface, memo.economics):
+            cache.pop(robust_id, None)
+        session._save_sized(memo)
+        screened = session.screen(context, robust)
+        if screened.simulation is None or screened.evaluation.status != "ok":
+            reason = f"variant not evaluated: {screened.evaluation.reason}"[:300]
+            return self._robust_result(out.model_copy(update={"reason": reason}))
+        full = candidate_id in memo.full
+        sim = session.full_year(context, robust) if full else screened.simulation
+        kpis = _merge(
+            sim.annual.kpis or KPISet(candidate_id=robust_id),
+            session.economics_kpis(context, robust),
+        )
+        base_sim, _ = session.year(context, installed)
+        base = _merge(
+            base_sim.annual.kpis or KPISet(candidate_id=candidate_id),
+            session.economics_kpis(context, installed),
+        )
+        unmet = (sim.annual.unmet_heating_mwh or 0.0) + (sim.annual.unmet_cooling_mwh or 0.0)
+
+        def delta(name: str) -> float | None:
+            new, old = getattr(kpis, name), getattr(base, name)
+            return None if new is None or old is None else new - old
+
+        both = [delta("lcoh_per_mwh"), delta("lcoc_per_mwh")]
+        out = out.model_copy(
+            update={
+                "robust_candidate_id": robust_id,
+                "year_mode": sim.mode,
+                "delta_lcoh_per_mwh": both[0],
+                "delta_lcoc_per_mwh": both[1],
+                "delta_lcoh_plus_lcoc_per_mwh": (
+                    None if all(v is None for v in both) else sum(v or 0.0 for v in both)
+                ),
+                "delta_capex_million": delta("capex_million"),
+                "delta_co2_t_per_yr": delta("co2_t_per_yr"),
+                "robust_meets_demand": screened.evaluation.meets_demand
+                and unmet <= SIGNIFICANT_UNMET_MWH,
+                "candidates": [robust],
+                "kpis": [kpis],
+            }
+        )
+        return self._robust_result(out)
+
+    @staticmethod
+    def _robust_result(out: RobustBackupToolOutput) -> ToolResult[RobustBackupToolOutput]:
+        def prob(value: float | None) -> str:
+            return "n/a" if value is None else f"{value:.2f}"
+
+        if out.robust_candidate_id is None:
+            text = f"{ROBUST_BACKUP_ID} {out.candidate_id}: no robust variant ({out.reason})"
+        else:
+            added = ", ".join(f"{k} +{v:.2f}" for k, v in sorted(out.added_backup_mw.items()))
+            text = (
+                f"{ROBUST_BACKUP_ID} {out.candidate_id} → {out.robust_candidate_id} ({added} MW): "
+                f"P(demand met) {prob(out.probability_demand_met)} → "
+                f"{prob(out.probability_demand_met_robust)}; ΔLCOH "
+                f"{out.delta_lcoh_per_mwh or 0:+.2f}, ΔLCOC {out.delta_lcoc_per_mwh or 0:+.2f} "
+                f"USD/MWh, ΔCAPEX {out.delta_capex_million or 0:+.2f} MUSD ({out.year_mode} year)"
+                + ("" if out.robust_meets_demand else "; variant has unmet demand")
+            )
+        return ToolResult[RobustBackupToolOutput](
+            data=out,
+            summary=_short(text + "; DR-11 decides"),
+            warnings=[out.reason] if out.reason else [],
+            assumption_ids=[ROBUST_BACKUP_ID, "UQ-MC", "OPT-SPACE"],
+            sources=["spec §9.3 UQ-01/UQ-02", "TL-15 uncertainty", "TL-12", "TL-14"],
         )
 
     # ---------------------------------------------------------------- P9 / P10
@@ -1736,6 +1912,13 @@ def real_specs(session: ToolSession) -> list[ToolSpec]:
             t.uncertainty,
             "WP-11",
         ),
+        spec(
+            "robust_backup",
+            "Re-simulate and re-price a design with its TL-15 robust backups (DR-11 evidence).",
+            CandidateArgs,
+            t.robust_backup,
+            "WP-11",
+        ),
         *model_builder_specs(),
         spec(
             "read_results",
@@ -1789,6 +1972,7 @@ __all__ = [
     "KPIBatch",
     "OptimiseToolOutput",
     "RealTools",
+    "RobustBackupToolOutput",
     "SizedDesign",
     "ThermalArgs",
     "ToolProfile",

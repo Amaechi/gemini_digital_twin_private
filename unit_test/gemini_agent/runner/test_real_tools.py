@@ -229,22 +229,39 @@ def smoke_run(tmp_path_factory):
 
 
 def test_policy_pipeline_on_real_tools_is_accepted_without_stubs(smoke_run):
-    """S1 shape: completed, ACCEPTED by the real DesignVerifier, no stub call, DR-01…DR-10."""
+    """S1 shape: completed, ACCEPTED by the real DesignVerifier, no stub call, DR-01…DR-11."""
     result, state, run_dir = smoke_run
     assert result.status == RunStatus.COMPLETED, result.summary
     assert result.verdict == DesignVerdict.ACCEPTED.value
     assert not any(record.stub for record in state.tool_results)
     latest = state.latest_verification(state.selected_id)
     assert latest is not None and latest.verifier == VERIFIER_NAME
-    assert {r.dr_id for r in state.decision_records} == {f"DR-{i:02d}" for i in range(1, 11)}
-    assert state.selected_id.endswith("-opt")  # P6's sized design joined the run
-    assert [c.id for c in state.candidates if c.id.endswith("-opt")] == [state.selected_id]
+    assert {r.dr_id for r in state.decision_records} == {f"DR-{i:02d}" for i in range(1, 12)}
+    # P8 workflow step (pre-L-2): the TL-15 robust backups priced, DR-11 decides the installation.
+    backup = state.robust_backup
+    step = next(r for r in state.tool_results if r.tool == "robust_backup")
+    assert (step.phase.value, step.source, step.id) == ("P8", "workflow", backup.tool_result_id)
+    dr11 = next(r for r in state.decision_records if r.dr_id == "DR-11")
+    analysed = backup.candidate_id
+    assert analysed.endswith("-opt")  # P6's sized design joined the run and TL-15 analysed it
+    assert [c.id for c in state.candidates if c.id.endswith("-opt")] == [analysed]
+    assert state.selected_id == (
+        analysed if dr11.choice == "installed-backup" else f"{analysed}-robust"
+    )
     assert state.selected_id in {c.id for c in state.candidates}
-    kpis = state.kpis[state.selected_id]
+    assert state.analysed_id(state.selected_id) == analysed
+    if backup.robust_candidate_id is not None:  # the variant is priced on the same basis
+        robust = state.kpis[backup.robust_candidate_id]
+        assert backup.year_mode == "full" and robust.lcoh_per_mwh is not None
+        assert backup.delta_lcoh_per_mwh == pytest.approx(
+            robust.lcoh_per_mwh - state.kpis[analysed].lcoh_per_mwh
+        )
+        assert backup.delta_capex_million > 0  # the added nameplate is priced
+    kpis = state.kpis[analysed]
     assert kpis.lcoh_per_mwh is not None and kpis.co2_reduction_vs_c0_frac is not None
     p7 = [r for r in state.tool_results if r.tool == "simulate_annual" and r.phase.value == "P7"]
     full = json.loads((run_dir / p7[-1].path).read_text("utf-8"))["data"]["kpis"]
-    full_kpis = next(k for k in full if k["candidate_id"] == state.selected_id)
+    full_kpis = next(k for k in full if k["candidate_id"] == analysed)
     assert kpis.lcoh_per_mwh == full_kpis["lcoh_per_mwh"]  # P8 adds percentiles only
     assert kpis.unmet_heating_days == full_kpis["unmet_heating_days"]
     assert kpis.exergy_efficiency_frac is not None
