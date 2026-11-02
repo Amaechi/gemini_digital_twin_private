@@ -21,7 +21,7 @@ Keep it ≤ 20 KB; it is the hand-off between sessions. Old detail: merged PRs a
 | WP-12 | Model gap & Model Builder | merged (b81cfa9) | [#15](https://github.com/Amaechi/gemini_digital_twin_private/pull/15) | TL-17/18; S7 demo |
 | WP-13 | Eval suite & submission checks | merged (a622551) | [#16](https://github.com/Amaechi/gemini_digital_twin_private/pull/16) | S1–S11; SUB-01…24 |
 | WP-14 | Integration run & figures | merged (c694720) | [#20](https://github.com/Amaechi/gemini_digital_twin_private/pull/20) | real tools |
-| Pre-L-2 | Robust backup (DR-11), final-run instructions | in review | PR-PENDING | OPT-ROBUST-BACKUP; CLOUD_SETUP §7 |
+| Pre-L-2 | Robust backup (DR-11), final-run instructions | in review | [#21](https://github.com/Amaechi/gemini_digital_twin_private/pull/21) | OPT-ROBUST-BACKUP; CLOUD_SETUP §7 |
 | L-1 | Local: pick LLM via S11 eval | todo | | user: CLOUD_SETUP §7.1–7.4 |
 | L-2 | Local: final LLM run + eval transcripts | todo | | user: CLOUD_SETUP §7.5–7.8 |
 | WP-15 | Final review & packaging | todo | | |
