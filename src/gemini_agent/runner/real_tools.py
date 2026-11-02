@@ -20,11 +20,14 @@ candidate → P6 TL-13 on the top-ranked concepts (``ranking.rank_candidates``) 
 year (+ TL-14 on it) and the DesignVerifier on the collected evidence → P8 TL-15 + cost
 sensitivity → P9 review → P10 TL-21 figures and the report draft.
 
-Depth options of degassing concepts are limited to depths whose TL-05 wellhead temperature at
-the DB-11 maximum flow stays at or below the SUB-NPSH boiling bound at the SUB-PSUC letdown
-pressure (DesignVerifier PH-30): hotter brine flashes in the atmospheric degasser (WP-11 physics
-check). Profiles (``full`` / ``quick`` / ``smoke``) only trade the TL-13/TL-15 search effort
-(DE budget, Monte Carlo samples) against runtime; ``full`` uses the register values.
+TL-13 depth options are limited to depths the DesignVerifier can accept (``depth_check``, TL-05
+at the DB-11 maximum flow): the ESP-intake NPSH must be evaluable (SUB-NPSH bounds the vapour
+pressure only up to 100 °C, PH-19) and, when degassing, the wellhead brine must stay at or below
+that boiling bound at the SUB-PSUC letdown (PH-30; hotter brine flashes in the atmospheric
+degasser, WP-11 physics check). With the cards' data this caps the register depths at 2.5 km;
+saturation data above 100 °C would re-open the deeper options. Profiles (``full`` / ``quick``
+/ ``smoke``) only trade the TL-13/TL-15 search effort (DE budget, Monte Carlo samples) against
+runtime; ``full`` uses the register values.
 """
 
 from __future__ import annotations
@@ -121,6 +124,8 @@ from gemini_agent.tools.uncertainty import UncertaintyReport, UncertaintyRequest
 from gemini_agent.tools.uncertainty import uncertainty as tl15_uncertainty
 from gemini_agent.verify.design_guard import DesignGuard, GuardResult
 from gemini_agent.verify.design_verifier import (
+    NUMERIC_TOL,
+    P_ATM_BAR,
     DoubletPointEvidence,
     EspPoint,
     SubsurfaceEvidence,
@@ -161,7 +166,7 @@ class ToolProfile:
     day_indices: tuple[int, ...] | None = None
     """Quick checks only: simulated-day subset (economics cover those days); None: full year."""
     own_point_only: bool = False
-    """TL-13 sizes the candidate's own doublet count and (flash-safe) depth instead of OPT-SPACE."""
+    """TL-13 sizes the candidate's own doublet count and (verifiable) depth, not OPT-SPACE."""
     top_k: int | None = None
     popsize: int | None = None
     maxiter: int | None = None
@@ -650,6 +655,14 @@ class ToolSession:
             kpis = _merge(kpis, _exergy_kpis(ex.data, candidate.id))
         return kpis
 
+    def has_absorption(self, context: ToolContext, candidate: Candidate) -> bool:
+        """Return True if the candidate's TL-09 project holds an absorption chiller."""
+        try:
+            roles = self.config(context, candidate).roles
+        except (tl09.ConfigError, ValueError, ArithmeticError, RuntimeError):
+            return False
+        return any("absorption" in str(role) for role in roles.values())
+
     # ------------------------------------------------------------------ TL-05/07/08/22
     def operating_point(
         self, context: ToolContext, depth_m: float | None, flow_m3h: float | None
@@ -668,11 +681,27 @@ class ToolSession:
     def letdown_safe(self, context: ToolContext, depth_m: float) -> bool:
         """PH-30 pre-filter: TL-05 wellhead T at the DB-11 maximum ≤ the SUB-NPSH boiling bound."""
         basis = load_subsurface_basis(context.config_dir)
-        if basis.injection_pump_suction_barg + 1.01325 > basis.vapour_pressure_bound_bara + 1e-9:
+        if basis.injection_pump_suction_barg + P_ATM_BAR > basis.vapour_pressure_bound_bara + 1e-9:
             return True  # pressurised letdown: no card saturation data, PH-30 not evaluated
         point = self.operating_point(context, depth_m, basis.flow_max_m3h)
         t_wh = point.wellhead_temperature_degc
-        return t_wh is not None and t_wh <= basis.vapour_pressure_bound_valid_to_degc
+        bound = basis.vapour_pressure_bound_valid_to_degc
+        # Same relative tolerance as the verifier's bound checks (PH-30), so both agree.
+        return t_wh is not None and t_wh <= bound + NUMERIC_TOL * max(1.0, bound, t_wh)
+
+    def depth_check(self, context: ToolContext, depth_m: float, degas: bool) -> str:
+        """Return why the verifier could not accept a design at this depth ('' if it can).
+
+        TL-05 at the DB-11 maximum flow: NPSH_A evaluable at the ESP intake (SUB-NPSH ≤ 100 °C,
+        PH-19) and, when degassing, no flash at the letdown (PH-30). WP-11 physics follow-up.
+        """
+        basis = load_subsurface_basis(context.config_dir)
+        point = self.operating_point(context, depth_m, basis.flow_max_m3h)
+        if point.npsh_available_m is None:
+            return "ESP-intake NPSH not evaluable above 100 °C (SUB-NPSH, PH-19)"
+        if degas and not self.letdown_safe(context, depth_m):
+            return "degassed brine above its boiling point at the letdown (PH-30)"
+        return ""
 
     def subsurface(self, context: ToolContext, candidate: Candidate) -> dict[str, Any]:
         """TL-05/07/08/22 at the candidate's design point (verifier evidence, sizing table)."""
@@ -697,7 +726,8 @@ class ToolSession:
             if candidate.doublets > 1
             else None
         )
-        assert candidate.gas_handling is not None
+        if candidate.gas_handling is None:
+            raise ValueError(f"{candidate.id}: a geothermal candidate needs its gas handling")
         scaling = tl22.scaling_check(
             tl22.ScalingRequest(
                 gas_handling=candidate.gas_handling,
@@ -1178,8 +1208,9 @@ class RealTools:
     ) -> ToolResult[OptimiseToolOutput]:
         """TL-13 on the top-ranked concepts (screening KPIs, ``ranking.rank_candidates``).
 
-        Each concept is sized over OPT-SPACE (doublets × flash-safe depths; profile ``quick``:
-        the candidate's own point) by the seeded DE on sizes and outage windows; its optimum
+        Each concept is sized over OPT-SPACE (doublets × verifiable depths, ``depth_check``;
+        profile ``quick``: the candidate's own point, else the deepest verifiable register depth
+        above it) by the seeded DE on sizes and outage windows; its optimum
         joins the run as ``<concept>-opt``. A sized design REJECTED by the verifier is not
         re-proposed: the loop moves to the next concept.
         """
@@ -1209,16 +1240,20 @@ class RealTools:
                 else list(settings.depth_options_m)
             )
             degas = concept_candidate.gas_handling == GasHandling.DEGAS_USE
-            safe = [z for z in depths if not degas or session.letdown_safe(context, z)]
-            if not safe and profile.own_point_only and degas:
+            reasons = {z: session.depth_check(context, z, degas) for z in depths}
+            safe = [z for z in depths if not reasons[z]]
+            if not safe and profile.own_point_only:
                 shallower = [
                     z
                     for z in settings.depth_options_m
-                    if z <= (concept_candidate.depth_m or 0.0) and session.letdown_safe(context, z)
+                    if z <= (concept_candidate.depth_m or 0.0)
+                    and not session.depth_check(context, z, degas)
                 ]
                 safe = [max(shallower)] if shallower else []
             if not safe:
-                skipped[cid] = "no flash-safe depth option (PH-30)"
+                skipped[cid] = "no verifiable depth option: " + "; ".join(
+                    f"{z:g} m {why}" for z, why in reasons.items()
+                )
                 continue
             request = OptimiseRequest(
                 concept=concept,
@@ -1254,7 +1289,7 @@ class RealTools:
             candidate = best.candidate.model_copy(
                 update={
                     "id": sized_id,
-                    "parent_id": f"{parent}-opt" if parent else None,
+                    "parent_id": concept_candidate.parent_id,
                     "description": f"TL-13 optimum of {concept} (sized from {cid})",
                 }
             )
@@ -1278,8 +1313,23 @@ class RealTools:
         session._save_sized(memo)
         kpis = [session.economics_kpis(context, s.candidate) for s in sized_out]
         by_id = {k.candidate_id: k for k in kpis}
-        shortlist = ranking.rank_candidates(
+        ranked_ids = ranking.rank_candidates(
             [s.candidate for s in sized_out], by_id, exclude_ids=excluded
+        )
+        # The collector has no absorption operating points (PH-15/16 not evaluated → the
+        # verifier can only say UNVERIFIED): such designs rank after the verifiable ones.
+        unverifiable = {
+            s.candidate.id for s in sized_out if session.has_absorption(context, s.candidate)
+        }
+        shortlist = [i for i in ranked_ids if i not in unverifiable] + [
+            i for i in ranked_ids if i in unverifiable
+        ]
+        skipped.update(
+            {
+                i: "absorption evidence not collected (PH-15/16): ranked after verifiable designs"
+                for i in ranked_ids
+                if i in unverifiable
+            }
         )
         designs = [
             {
@@ -1365,7 +1415,9 @@ class RealTools:
         return ToolResult[UncertaintyToolOutput](
             data=UncertaintyToolOutput(
                 candidate_id=candidate_id,
-                kpis=[report.kpis.model_copy(update={"candidate_id": candidate_id})],
+                # Percentiles only: TL-15's base KPIs are a fast-mode year and would overwrite
+                # the P7 full-mode KPIs of the selected design in the run state (WP-14 review).
+                kpis=[KPISet(candidate_id=candidate_id, percentiles=report.percentiles)],
                 percentiles=report.percentiles,
                 probability_demand_met=report.probability_demand_met,
                 probability_demand_met_robust=report.probability_demand_met_robust,

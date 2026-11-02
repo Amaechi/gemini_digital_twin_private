@@ -41,3 +41,15 @@ def test_ranking_uses_lcoh_and_unmet_demand(tmp_path):
     assert ranked[:2] == ["C2-2d", "C3-2d"] and ranked[-1] == "C1-3d"
     assert "C0-0d" not in ranked
     assert has_kpi_evidence(kpis) and not has_kpi_evidence({"x": KPISet(candidate_id="x")})
+
+
+def test_ranking_adds_lcoc_to_lcoh(tmp_path):
+    """WP-14: the rank key is LCOH + LCOC (TL-13 objective), so cooling cost can flip the order."""
+    toolbox = stub_toolbox()
+    context = ToolContext(run_id="t", run_dir=tmp_path, config_dir=None)
+    candidates = toolbox.execute("generate_candidates", {}, context).data.candidates
+    kpis = {
+        "C2-2d": KPISet(candidate_id="C2-2d", lcoh_per_mwh=30.0, lcoc_per_mwh=40.0),
+        "C3-2d": KPISet(candidate_id="C3-2d", lcoh_per_mwh=35.0, lcoc_per_mwh=20.0),
+    }
+    assert rank_candidates(candidates, kpis)[:2] == ["C3-2d", "C2-2d"]

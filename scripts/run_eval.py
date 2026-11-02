@@ -32,7 +32,6 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT / "src") not in sys.path:
     sys.path.insert(0, str(ROOT / "src"))
 
-from gemini_agent.eval import harness
 from gemini_agent.eval.harness import (
     EVAL_ROOT,
     REPORT_FILE,
@@ -104,7 +103,6 @@ def main(argv: Sequence[str] | None = None) -> int:
         model_dir = args.eval_root / eval_dir_name(model_label("llm", args.model, llm_config))
         hint = OLLAMA_HINT.format(num_ctx=llm_config.ollama.num_ctx, eval_dir=model_dir)
         print(hint, file=sys.stderr)
-    harness.TOOL_PROFILE = args.tool_profile
     try:
         source = str(args.scenarios_file.resolve().relative_to(ROOT))
     except ValueError:
@@ -117,6 +115,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         config_dir=args.config_dir,
         model_tag=args.model,
         scenarios_source=source,
+        tool_profile=args.tool_profile,
     )
     for run in results.runs:
         m = run.metrics

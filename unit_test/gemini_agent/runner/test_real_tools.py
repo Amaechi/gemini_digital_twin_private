@@ -8,11 +8,13 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
 from gemini_agent.agents.engine import PolicyEngine
 from gemini_agent.memory.project_knowledge import KNOWLEDGE_FILE, ProjectFact
+from gemini_agent.runner import real_tools
 from gemini_agent.runner.design_runner import DesignRunner
 from gemini_agent.runner.real_tools import (
     InterferenceArgs,
@@ -31,6 +33,7 @@ from gemini_agent.runner.toolbox import (
 from gemini_agent.schemas.candidate import Candidate
 from gemini_agent.schemas.common import GasHandling
 from gemini_agent.schemas.decision import DesignVerdict, RunStatus
+from gemini_agent.schemas.results import KPISet
 from gemini_agent.tools import plots
 from gemini_agent.verify.design_verifier import VERIFIER_NAME, VerifyDesignTool
 
@@ -118,12 +121,14 @@ def test_design_guard_reports_failed_ids_as_checks(tmp_path):
     assert any("DB-10" in v or "doublet" in v for v in checks["C1-4d"].violations)
 
 
-def test_letdown_filter_excludes_depths_that_flash_in_the_degasser(tmp_path):
-    """PH-30 pre-filter: T_wh at 300 m³/h is 99.4 °C at 3000 m (kept), 105 °C at 3200 m (not)."""
+def test_depth_check_keeps_only_depths_the_verifier_can_accept(tmp_path):
+    """TL-05 at 300 m³/h: T_res 87 °C at 2.5 km (kept); 3.0 km has brine above 100 °C at the ESP
+    (NPSH not evaluable, PH-19); 3.2 km also flashes at the letdown (T_wh 105 °C, PH-30)."""
     session = ToolSession("smoke")
     context = _context(tmp_path)
-    assert session.letdown_safe(context, 3000.0)
-    assert not session.letdown_safe(context, 3200.0)
+    assert session.depth_check(context, 2500.0, degas=True) == ""
+    assert "PH-19" in session.depth_check(context, 3000.0, degas=False)
+    assert session.letdown_safe(context, 3000.0) and not session.letdown_safe(context, 3200.0)
 
 
 def test_sized_designs_survive_a_new_session(tmp_path):
@@ -147,6 +152,44 @@ def test_unknown_candidate_is_an_error(tmp_path):
     with pytest.raises(ValueError, match="unknown candidate_id"):
         box.execute("co2", CandidateArgs(candidate_id="C9-9d").model_dump(), _context(tmp_path))
     assert NoArgs.model_validate({}) is not None
+
+
+class _NoOptimum:
+    """Stand-in TL-13 result without a design that meets demand."""
+
+    best = None
+    screening = ()
+
+    def model_dump(self, **kwargs):
+        return {}
+
+
+def test_optimise_skips_rejected_unverifiable_and_failed_concepts(tmp_path, monkeypatch):
+    """P6: a REJECTED sized design is not re-proposed; quick profile sizes the own point or the
+    deepest verifiable register depth above it (C4 3.2 km → 2.5 km); no optimum → skipped."""
+    requests = []
+
+    def fake_tl13(request, **kwargs):
+        requests.append(request)
+        return SimpleNamespace(data=_NoOptimum())
+
+    monkeypatch.setattr(real_tools, "tl13_optimise_design", fake_tl13)
+    c1 = _candidate(id="C1-3d", concept="C1", doublets=3)
+    c4 = _candidate(id="C4-2d", concept="C4", depth_m=3200.0)
+    kpis = {
+        cid: KPISet(candidate_id=cid, lcoh_per_mwh=value)
+        for cid, value in (("C1-3d", 30.0), ("C2-2d", 40.0), ("C4-2d", 50.0))
+    }
+    context = _context(
+        tmp_path, candidates=(c1, _candidate(), c4), kpis=kpis, rejected_ids=("C1-opt",)
+    )
+    result = real_toolbox("quick").execute("optimise_design", {"top_n": 3}, context)
+    assert result.data.shortlist == [] and result.data.candidates == []
+    assert "rejected by the verifier" in result.data.skipped["C1-3d"]
+    assert "no design that meets demand" in result.data.skipped["C2-2d"]
+    assert [r.concept for r in requests] == ["C2", "C4"]
+    assert [r.depth_options_m for r in requests] == [[2500.0], [2500.0]]
+    assert [r.doublet_options for r in requests] == [[2], [2]]
 
 
 # --------------------------------------------------------------------------- end to end
@@ -176,6 +219,11 @@ def test_policy_pipeline_on_real_tools_is_accepted_without_stubs(smoke_run):
     assert state.selected_id in {c.id for c in state.candidates}
     kpis = state.kpis[state.selected_id]
     assert kpis.lcoh_per_mwh is not None and kpis.co2_reduction_vs_c0_frac is not None
+    p7 = [r for r in state.tool_results if r.tool == "simulate_annual" and r.phase.value == "P7"]
+    full = json.loads((run_dir / p7[-1].path).read_text("utf-8"))["data"]["kpis"]
+    full_kpis = next(k for k in full if k["candidate_id"] == state.selected_id)
+    assert kpis.lcoh_per_mwh == full_kpis["lcoh_per_mwh"]  # P8 adds percentiles only
+    assert kpis.unmet_heating_days == full_kpis["unmet_heating_days"]
     assert kpis.exergy_efficiency_frac is not None
     assert {"p10", "p50", "p90"} <= set(kpis.percentiles["lcoh_per_mwh"])
     for name in ("report_draft.md", "figures/fig_daily_heat.png", "session/sized_designs.json"):

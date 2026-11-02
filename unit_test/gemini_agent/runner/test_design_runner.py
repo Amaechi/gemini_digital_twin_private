@@ -10,8 +10,9 @@ from gemini_agent.logging.llm_logger import LLMLogger
 from gemini_agent.runner.design_runner import DesignRunner, InvalidAnswer
 from gemini_agent.runner.phases import PHASE_SPECS, PhaseBudget
 from gemini_agent.runner.tool_stubs import VerificationOutput, stub_toolbox
-from gemini_agent.runner.toolbox import CandidateArgs, ToolSpec
-from gemini_agent.schemas.common import ToolResult
+from gemini_agent.runner.toolbox import CandidateArgs, OptimiseArgs, ToolSpec
+from gemini_agent.schemas.candidate import Candidate
+from gemini_agent.schemas.common import StrictModel, ToolResult
 from gemini_agent.schemas.config import load_config
 from gemini_agent.schemas.decision import (
     DR_TITLES,
@@ -22,6 +23,7 @@ from gemini_agent.schemas.decision import (
     Role,
     RunStatus,
 )
+from gemini_agent.schemas.results import KPISet
 from unit_test.gemini_agent.llm_fakes import (
     Counting,
     always_invalid,
@@ -459,3 +461,44 @@ def test_llm_gap_question_with_numbers_is_not_shown(tmp_path):
     assert request.question == title
     request = runner._gap_request(state, Phase.P1, "DB-31", "Which DH return temperature?")
     assert request.question == "Which DH return temperature?"
+
+
+class _SizedOut(StrictModel):
+    shortlist: list[str]
+    kpi_evidence: bool
+    candidates: list[Candidate]
+    kpis: list[KPISet]
+
+
+class _UqOut(StrictModel):
+    kpis: list[KPISet]
+
+
+def test_reducer_adds_sized_designs_and_only_uncertainty_percentiles(tmp_path):
+    """WP-14 reducer: P6's sized design joins the run (by id, once) with its KPIs; P8 adds
+    percentiles without touching the other KPIs of the selected design."""
+
+    def optimise(args, context):
+        base = next(c for c in context.candidates if c.concept == "C2")
+        sized = base.model_copy(update={"id": "C2-opt", "design_flow_m3h": 250.0})
+        kpi = KPISet(candidate_id="C2-opt", lcoh_per_mwh=30.0, lcoc_per_mwh=20.0)
+        data = _SizedOut(shortlist=["C2-opt"], kpi_evidence=True, candidates=[sized], kpis=[kpi])
+        return ToolResult[_SizedOut](data=data, summary="fake TL-13")
+
+    def uncertainty(args, context):
+        pct = {"lcoh_per_mwh": {"p10": 28.0, "p50": 30.5, "p90": 34.0}}
+        kpi = KPISet(candidate_id=context.selected_id, percentiles=pct)
+        return ToolResult[_UqOut](data=_UqOut(kpis=[kpi]), summary="fake TL-15")
+
+    toolbox = stub_toolbox()
+    toolbox.register(ToolSpec("optimise_design", "fake", OptimiseArgs, optimise, owner="test"))
+    toolbox.register(ToolSpec("uncertainty", "fake", CandidateArgs, uncertainty, owner="test"))
+    runner = _runner(tmp_path, toolbox=toolbox)
+    result = runner.start("", run_id="sized")
+    state = runner.load_state("sized")
+    assert result.status == RunStatus.COMPLETED and state.selected_id == "C2-opt"
+    ids = [c.id for c in state.candidates]
+    assert ids.count("C2-opt") == 1  # replaced by id, never duplicated
+    kpi = state.kpis["C2-opt"]
+    assert kpi.lcoh_per_mwh == 30.0 and kpi.lcoc_per_mwh == 20.0
+    assert kpi.percentiles["lcoh_per_mwh"]["p50"] == 30.5

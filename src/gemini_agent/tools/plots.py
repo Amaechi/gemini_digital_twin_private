@@ -390,7 +390,7 @@ def tornado_bars(view: RunView) -> tuple[str, list[tuple[str, float, float, floa
             for b in oat
             if b.get("objective_high_per_mwh") is not None
         ][:10]
-        return "LCOH + LCOC swing per input (TL-15 one-at-a-time)", bars
+        return "Objective swing per input: LCOH + LCOC + unmet penalty (TL-15 OAT)", bars
     sens = (view.sensitivity() or {}).get("lcoh") or {}
     bars = [
         (b["input_name"], sens["kpi_base"], b["kpi_at_low"], b["kpi_at_high"])
