@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>gemini_model.absorption_chiller.ghc1989 &mdash; GEMINI Geothermal Digital Twin (claude/laughing-mendel-3tbk7b)</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=19f00094" />
+
+  
+  <!--[if lt IE 9]>
+    <script src="../../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+        <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+        <script src="../../../_static/documentation_options.js?v=4a1902cb"></script>
+        <script src="../../../_static/doctools.js?v=9a2dae69"></script>
+        <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            GEMINI Geothermal Digital Twin
+          </a>
+              <div class="version">
+                claude/laughing-mendel-3tbk7b
+              </div>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Table of Contents</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../index_about_gemini.html">1. About GEMINI</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../index_getting_started.html">2. Getting started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../index_setup.html">3. Set-up</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../index_applications.html">4. Applications</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../index_models.html">5. Models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../index_sourcecode.html">6. Source code documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../glossary.html">7. Glossary</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">GEMINI Geothermal Digital Twin</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">gemini_model.absorption_chiller.ghc1989</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for gemini_model.absorption_chiller.ghc1989</h1><div class="highlight"><pre>
+<span></span><span class="sd">"""Method A: Geo-Heat Center 1989 absorption-chiller correlation (temperatures in °F).</span>
+
+<span class="sd">Source: RC-05 Method A -- Geothermal Direct Use Engineering &amp; Design Guidebook</span>
+<span class="sd">(Geo-Heat Center, 1989), Ch14 p.261-269; the correlations were decoded from the</span>
+<span class="sd">TI-59 program listing on p.268 (RC-05 "Verification status").</span>
+
+<span class="sd">- Hot-water temperature factor ``F_T = (-239 + 1.65 T_hw - 0.001 T_hw^2) / 100``.</span>
+<span class="sd">- Condition factor ``F_c = (323 - 0.838 T_chw - (3.77 - 0.0358 T_chw) T_cw) / 100``,</span>
+<span class="sd">  T_chw leaving chilled water (valid 40-50 °F), T_cw entering cooling water (valid 75-90 °F).</span>
+<span class="sd">- Capacity fraction ``F = F_T F_c`` (fraction of the nominal rating; nominal = Q_required / F).</span>
+<span class="sd">- ``COP = 0.67 (55.4 + 0.185 T_hw) / 100`` (depends on T_hw only).</span>
+
+<span class="sd">Rating basis (p.261-262): 12 psi steam / ~118 °C hot water, 85 °F (29.4 °C) cooling water,</span>
+<span class="sd">44 °F (6.7 °C) chilled water, COP 0.65-0.70. Outside its validity (e.g. our 20 °C chilled</span>
+<span class="sd">water) the correlation is a conservative lower bound only (RC-05).</span>
+<span class="sd">"""</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">math</span>
+
+<span class="c1"># Validity of the condition factor F_c (RC-05, Guidebook p.267-269), °F.</span>
+<span class="n">CHILLED_WATER_VALIDITY_DEGF</span> <span class="o">=</span> <span class="p">(</span><span class="mf">40.0</span><span class="p">,</span> <span class="mf">50.0</span><span class="p">)</span>
+<span class="n">COOLING_WATER_VALIDITY_DEGF</span> <span class="o">=</span> <span class="p">(</span><span class="mf">75.0</span><span class="p">,</span> <span class="mf">90.0</span><span class="p">)</span>
+<span class="c1"># Hot-water range of the rating points used for checks and calibration (RC-05), °F.</span>
+<span class="n">RATING_HOT_WATER_RANGE_DEGF</span> <span class="o">=</span> <span class="p">(</span><span class="mf">180.0</span><span class="p">,</span> <span class="mf">240.0</span><span class="p">)</span>
+<span class="n">RATING_CHILLED_WATER_DEGF</span> <span class="o">=</span> <span class="mf">44.0</span>
+<span class="n">RATING_COOLING_WATER_DEGF</span> <span class="o">=</span> <span class="mf">85.0</span>
+
+<span class="n">KW_PER_TON</span> <span class="o">=</span> <span class="mf">3.517</span>  <span class="c1"># kW of cooling per ton of refrigeration (RC-05 cost section)</span>
+
+
+<div class="viewcode-block" id="degc_to_degf">
+<a class="viewcode-back" href="../../../codedocumentation/gemini_model.absorption_chiller.ghc1989.html#gemini_model.absorption_chiller.ghc1989.degc_to_degf">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">degc_to_degf</span><span class="p">(</span><span class="n">temperature_degc</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Convert °C to °F."""</span>
+    <span class="k">return</span> <span class="n">temperature_degc</span> <span class="o">*</span> <span class="mf">1.8</span> <span class="o">+</span> <span class="mf">32.0</span></div>
+
+
+
+<div class="viewcode-block" id="degf_to_degc">
+<a class="viewcode-back" href="../../../codedocumentation/gemini_model.absorption_chiller.ghc1989.html#gemini_model.absorption_chiller.ghc1989.degf_to_degc">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">degf_to_degc</span><span class="p">(</span><span class="n">temperature_degf</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Convert °F to °C."""</span>
+    <span class="k">return</span> <span class="p">(</span><span class="n">temperature_degf</span> <span class="o">-</span> <span class="mf">32.0</span><span class="p">)</span> <span class="o">/</span> <span class="mf">1.8</span></div>
+
+
+
+<div class="viewcode-block" id="hot_water_factor">
+<a class="viewcode-back" href="../../../codedocumentation/gemini_model.absorption_chiller.ghc1989.html#gemini_model.absorption_chiller.ghc1989.hot_water_factor">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">hot_water_factor</span><span class="p">(</span><span class="n">hot_water_temperature_degf</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Return the hot-water temperature factor F_T (-); RC-05 Method A (Guidebook p.268).</span>
+
+<span class="sd">    Not clipped: values below 0 mean the drive is below the zero-capacity temperature.</span>
+<span class="sd">    """</span>
+    <span class="n">t</span> <span class="o">=</span> <span class="n">hot_water_temperature_degf</span>
+    <span class="k">return</span> <span class="p">(</span><span class="o">-</span><span class="mf">239.0</span> <span class="o">+</span> <span class="mf">1.65</span> <span class="o">*</span> <span class="n">t</span> <span class="o">-</span> <span class="mf">0.001</span> <span class="o">*</span> <span class="n">t</span> <span class="o">*</span> <span class="n">t</span><span class="p">)</span> <span class="o">/</span> <span class="mf">100.0</span></div>
+
+
+
+<div class="viewcode-block" id="condition_factor">
+<a class="viewcode-back" href="../../../codedocumentation/gemini_model.absorption_chiller.ghc1989.html#gemini_model.absorption_chiller.ghc1989.condition_factor">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">condition_factor</span><span class="p">(</span><span class="n">chilled_water_temperature_degf</span><span class="p">,</span> <span class="n">cooling_water_temperature_degf</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Return the condition factor F_c (-) for leaving chilled / entering cooling water (°F).</span>
+
+<span class="sd">    RC-05 Method A (Guidebook p.268); F_c ≈ 1.00 at 44/85 °F. Valid for 40-50 °F chilled</span>
+<span class="sd">    and 75-90 °F cooling water.</span>
+<span class="sd">    """</span>
+    <span class="n">t_chw</span> <span class="o">=</span> <span class="n">chilled_water_temperature_degf</span>
+    <span class="n">t_cw</span> <span class="o">=</span> <span class="n">cooling_water_temperature_degf</span>
+    <span class="k">return</span> <span class="p">(</span><span class="mf">323.0</span> <span class="o">-</span> <span class="mf">0.838</span> <span class="o">*</span> <span class="n">t_chw</span> <span class="o">-</span> <span class="p">(</span><span class="mf">3.77</span> <span class="o">-</span> <span class="mf">0.0358</span> <span class="o">*</span> <span class="n">t_chw</span><span class="p">)</span> <span class="o">*</span> <span class="n">t_cw</span><span class="p">)</span> <span class="o">/</span> <span class="mf">100.0</span></div>
+
+
+
+<div class="viewcode-block" id="capacity_fraction">
+<a class="viewcode-back" href="../../../codedocumentation/gemini_model.absorption_chiller.ghc1989.html#gemini_model.absorption_chiller.ghc1989.capacity_fraction">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">capacity_fraction</span><span class="p">(</span>
+    <span class="n">hot_water_temperature_degf</span><span class="p">,</span> <span class="n">chilled_water_temperature_degf</span><span class="p">,</span> <span class="n">cooling_water_temperature_degf</span>
+<span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Return F = F_T F_c, the capacity as a fraction of the nominal rating (RC-05 Method A)."""</span>
+    <span class="k">return</span> <span class="n">hot_water_factor</span><span class="p">(</span><span class="n">hot_water_temperature_degf</span><span class="p">)</span> <span class="o">*</span> <span class="n">condition_factor</span><span class="p">(</span>
+        <span class="n">chilled_water_temperature_degf</span><span class="p">,</span> <span class="n">cooling_water_temperature_degf</span>
+    <span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="cop">
+<a class="viewcode-back" href="../../../codedocumentation/gemini_model.absorption_chiller.ghc1989.html#gemini_model.absorption_chiller.ghc1989.cop">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">cop</span><span class="p">(</span><span class="n">hot_water_temperature_degf</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Return the thermal COP = 0.67 (55.4 + 0.185 T_hw)/100 (RC-05 Method A, Guidebook p.268)."""</span>
+    <span class="k">return</span> <span class="mf">0.67</span> <span class="o">*</span> <span class="p">(</span><span class="mf">55.4</span> <span class="o">+</span> <span class="mf">0.185</span> <span class="o">*</span> <span class="n">hot_water_temperature_degf</span><span class="p">)</span> <span class="o">/</span> <span class="mf">100.0</span></div>
+
+
+
+<div class="viewcode-block" id="zero_capacity_temperature_degf">
+<a class="viewcode-back" href="../../../codedocumentation/gemini_model.absorption_chiller.ghc1989.html#gemini_model.absorption_chiller.ghc1989.zero_capacity_temperature_degf">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">zero_capacity_temperature_degf</span><span class="p">():</span>
+<span class="w">    </span><span class="sd">"""Return the lower root of F_T = 0 (≈ 160.5 °F = 71.4 °C), the zero-capacity drive temperature.</span>
+
+<span class="sd">    Method A keeps this temperature fixed whatever the chilled/cooling-water</span>
+<span class="sd">    temperatures are (a limitation of the product form F_T F_c; see REFERENCE.md).</span>
+<span class="sd">    """</span>
+    <span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">,</span> <span class="n">c</span> <span class="o">=</span> <span class="o">-</span><span class="mf">0.001</span><span class="p">,</span> <span class="mf">1.65</span><span class="p">,</span> <span class="o">-</span><span class="mf">239.0</span>
+    <span class="k">return</span> <span class="p">(</span><span class="o">-</span><span class="n">b</span> <span class="o">+</span> <span class="n">math</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">b</span> <span class="o">*</span> <span class="n">b</span> <span class="o">-</span> <span class="mf">4.0</span> <span class="o">*</span> <span class="n">a</span> <span class="o">*</span> <span class="n">c</span><span class="p">))</span> <span class="o">/</span> <span class="p">(</span><span class="mf">2.0</span> <span class="o">*</span> <span class="n">a</span><span class="p">)</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, TNO.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
