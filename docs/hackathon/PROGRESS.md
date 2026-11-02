@@ -157,7 +157,7 @@ One line per decision, grouped by WP; dated 11-01 (WP-00: 10-31). Why: the `conf
 **WP-14 → WP-15**
 - `AbsorptionPoint` not collected ⇒ C3/C4 UNVERIFIED (ranked last); `HeatPumpPoint` lacks max sink T.
 - Physics check: ESP intake 0.86 bar over 1.2·p_b (sea-water basis; pure water fails ⇒ ESP ≈ 65 m deeper); free cooling 87 % on smoothed normals (optimistic); HTHP COP = VER-HP-ETA cap (DEA 4–7 % lower); installed-heating KPI rates the HEX at 300 m³/h; boiler 5.0 MW has 0.03 MW spare (robust 10.9 MW).
-- Final run is assume mode (SUB-02 WARN): L-2 reruns ask mode. TL-23 not in the catalogue.
+- Final run: assume mode (SUB-02 WARN); L-2 reruns in ask mode.
 - Full suite ≈ 7 min (smoke pipeline ≈ 75 s).
 
 **L-1 / L-2**
