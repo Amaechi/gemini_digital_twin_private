@@ -1,7 +1,8 @@
 # Adapted from marcosanyo/PlantDebugger (Apache-2.0), Copyright 2026 Plant Debugger contributors,
 # file services/plant-debugger/plant_debugger/agent/prompt.py @ d69507a (structure and rule style
 # only). Modified by GeoAgent team, 2026-11-01: GeoAgent roles, phases, tools and rules;
-# 2026-11-02 (L-1 follow-up): step-kind map per role, second few-shot, DR criteria.
+# 2026-11-02 (L-1 follow-up): step-kind map per role, second few-shot, DR criteria; L-1 P0
+# follow-up: meaning of each no-tool kind, finalise first.
 """System prompts and per-call prompts for the role agents (spec §5.1, §5.4).
 
 Prompts are short on purpose (spec §5.4.4, MEM-06): role, numbered rules, the step kind of each
@@ -50,6 +51,15 @@ FEW_SHOT = (
     'the hard limits.", "expected_outcome": "Pass or fail per candidate."}], "open_questions": []}'
 )
 
+NO_TOOL_KIND_NOTES: dict[str, str] = {
+    "finalise": "phase objective met; also the in-scope answer in P0",
+    "escalate": "no safe path remains",
+    "refuse": "P0 only, off-topic request",
+    "delegate": "note to the runner; never ends a phase",
+}
+"""Meaning of each kind without a tool, in prompt order (L-1 P0 follow-up: ``finalise`` first;
+three models answered P0 with ``delegate``, the first kind the earlier list showed)."""
+
 ROLE_BRIEFS: dict[Role, str] = {
     Role.LEAD_ENGINEER: (
         "You are the Lead Engineer of a deep-geothermal district heating (100 degC) and cooling "
@@ -97,9 +107,7 @@ def step_kinds(role: Role) -> str:
     tool_kind = {tool: kind for kind, tools in KIND_TOOLS.items() if tools for tool in tools}
     pairs = ", ".join(f"{tool}={tool_kind.get(tool, 'call_tool')}" for tool in ROLES[role].tools)
     no_tool = ", ".join(
-        f"{kind} (P0 only)" if kind == "refuse" else kind
-        for kind, tools in KIND_TOOLS.items()
-        if tools is None
+        f"{kind} ({note})" for kind, note in NO_TOOL_KIND_NOTES.items() if KIND_TOOLS[kind] is None
     )
     return f"STEP_KINDS (tool=kind): {pairs}. Steps with tool null: {no_tool}."
 

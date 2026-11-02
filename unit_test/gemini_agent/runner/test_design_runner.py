@@ -809,3 +809,240 @@ def test_dr11_llm_may_keep_the_installed_backups_on_the_cost_criterion(tmp_path)
     assert not [e for e in events if e.type == "DESIGN_SELECTED"]
     md = (tmp_path / "lk" / "decision_records" / "DR-11.md").read_text("utf-8")
     assert "the chosen option is installed and verified in P9" in md
+
+
+# --------------------------------------------------------------------------- L-1 P0 follow-up
+# Recorded P0 answers of the real Ollama S11 runs (branch l1-p0-evidence, llm_calls.jsonl): three
+# of five models never said finalise in P0 and were escalated ("step budget exceeded in P0").
+P0_REPLAYS: dict[str, list[dict]] = {
+    "qwen3.6:35b-a3b": [
+        {
+            "kind": "delegate",
+            "rationale": "The request is in scope and the objective is met; proceed to the next "
+            "phase.",
+            "expected_outcome": "Transition to P1",
+        },
+        {
+            "kind": "delegate",
+            "rationale": "The user prompt is in scope and complete. No further intake actions are "
+            "needed; proceed to the next phase.",
+            "expected_outcome": "Transition to P1.",
+        },
+        {
+            "kind": "delegate",
+            "rationale": "The request is in scope and explicitly asks to select, size, and "
+            "validate a system. The objective of Intake is to confirm this alignment. Since the "
+            "prompt confirms the domain and intent, we delegate to proceed to the next phase.",
+            "expected_outcome": "Transition to P1 or subsequent design phases.",
+        },
+    ],
+    "gemma4:26b-a4b": [
+        {
+            "kind": "delegate",
+            "rationale": "The request is in scope and aligns with the geothermal design objective. "
+            "No further intake checks are required.",
+            "expected_outcome": "Transition to the next phase.",
+        },
+        {
+            "kind": "delegate",
+            "rationale": "The user request is within scope and provides a clear objective for the "
+            "design study. No further intake validation is required.",
+            "expected_outcome": "Transition to the next phase.",
+        },
+        {
+            "kind": "delegate",
+            "rationale": "The request is in scope and aligns with the design objective. The intake "
+            "phase is complete.",
+            "expected_outcome": "Transition to the next phase.",
+        },
+    ],
+    "qwen3.5:9b-q4_K_M": [
+        {
+            "kind": "call_tool",
+            "tool": "knowledge_search",
+            "args": {
+                "query": "deep-geothermal district heating cooling 100 degC 20 degC GEMINI "
+                "digital twin",
+                "limit": 3,
+            },
+            "rationale": "Confirm system design intent before proceeding.",
+            "expected_outcome": "",
+        },
+        {
+            "kind": "delegate",
+            "rationale": "Request is in scope; proceed to candidate generation phase.",
+            "expected_outcome": "Transition to next workflow phase.",
+        },
+        {
+            "kind": "delegate",
+            "rationale": "Phase objective met; request is in scope and prior search validated "
+            "domain context.",
+            "expected_outcome": "Proceed to P1 workflow.",
+        },
+    ],
+}
+
+
+def _replay_p0(steps: list[dict]):
+    """FunctionModel function: the recorded P0 answers in order (last one repeated), else policy."""
+    answers = list(steps)
+
+    def func(messages, info):
+        if output_name(info) == "Decision" and user_prompt(messages).startswith("PHASE P0 "):
+            step = answers.pop(0) if len(answers) > 1 else answers[0]
+            decision = {"phase": "P0", "steps": [step], "open_questions": []}
+            return ModelResponse(parts=[TextPart(json.dumps(decision))])
+        return policy_like(messages, info)
+
+    return func
+
+
+def _p0_events(runner: DesignRunner, run_id: str, event_type: str) -> list:
+    events = runner.store(run_id).list_events(run_id)
+    return [e for e in events if e.type == event_type and e.phase == "P0"]
+
+
+@pytest.mark.parametrize("model", sorted(P0_REPLAYS))
+def test_p0_replay_of_an_in_scope_request_reaches_p1(tmp_path, model):
+    """L-1 P0 follow-up: the recorded P0 answers (delegate / a tool) no longer escalate."""
+    run_id = model.replace(":", "_")
+    engine, _ = _llm_engine(tmp_path, run_id, _replay_p0(P0_REPLAYS[model]))
+    runner = _runner(tmp_path, engine=engine)
+    result = runner.start("", run_id=run_id)
+    assert result.status == RunStatus.COMPLETED, result.summary
+    starts = _phase_starts(runner, run_id)
+    assert starts[:2] == ["P0", "P1"]
+    assert not _p0_events(runner, run_id, "ESCALATE")
+    rejected = _p0_events(runner, run_id, "STEP_REJECTED")
+    assert rejected and all(
+        "only valid steps are finalise" in e.payload["message"] for e in rejected
+    )
+    closed = _p0_events(runner, run_id, "INTAKE_CLOSED")
+    assert len(closed) == 1 and closed[0].payload["in_scope"] is True
+    assert "step budget exceeded in P0 (3 steps)" in closed[0].payload["message"]
+    assert not _p0_events(runner, run_id, "TOOL_RESULT")
+    state = runner.load_state(run_id)
+    prog = state.phase_progress(Phase.P0)
+    assert prog.tool_calls_used == 0 and prog.steps_used == PHASE_SPECS[Phase.P0].budget.max_steps
+
+
+def test_p0_replay_of_an_off_topic_request_is_still_refused(tmp_path):
+    """S3 with a model that never says refuse: the deterministic intake refuses, no tool runs."""
+    engine, _ = _llm_engine(tmp_path, "s3", _replay_p0(P0_REPLAYS["gemma4:26b-a4b"]))
+    runner = _runner(tmp_path, engine=engine)
+    result = runner.start("What's the best pizza in Delft?", run_id="s3")
+    assert result.status == RunStatus.REFUSED and result.phase == Phase.P0
+    assert "please ask about the design" in result.summary
+    assert _phase_starts(runner, "s3") == ["P0"]
+    closed = _p0_events(runner, "s3", "INTAKE_CLOSED")
+    assert len(closed) == 1 and closed[0].payload["in_scope"] is False
+    assert runner.load_state("s3").phase_progress(Phase.P0).tool_calls_used == 0
+
+
+@pytest.mark.parametrize(
+    ("prompt", "conflict"),
+    [
+        ("Supply heating at 120 °C", "(DB-16)"),
+        (
+            (
+                "Design the geothermal heating and cooling system. The geothermal gradient is "
+                "30 °C/km but the reservoir is 150 °C at 2.5 km."
+            ),
+            "is inconsistent with the design basis",
+        ),
+    ],
+    ids=["S5", "S9"],
+)
+def test_p0_replay_keeps_the_constraint_conflict_check(tmp_path, prompt, conflict):
+    """S5/S9: the conflicts the intake records are the same with the replayed P0 answers."""
+    policy = _runner(tmp_path)
+    policy.start(prompt, run_id="pol")
+    expected = policy.load_state("pol").conflicts
+    assert expected and any(conflict in text for text in expected)
+    engine, _ = _llm_engine(tmp_path, "rep", _replay_p0(P0_REPLAYS["qwen3.6:35b-a3b"]))
+    replay = _runner(tmp_path, engine=engine)
+    result = replay.start(prompt, run_id="rep")
+    assert result.status == RunStatus.COMPLETED and "P1" in _phase_starts(replay, "rep")
+    assert replay.load_state("rep").conflicts == expected
+    assert not _p0_events(replay, "rep", "ESCALATE")
+
+
+class _ScriptedEngine(PolicyEngine):
+    """Policy engine whose P0 decisions are scripted (one step each); records the P0 contexts."""
+
+    name = "scripted"
+
+    def __init__(self, p0_steps: list[NextStep]) -> None:
+        self.p0_steps = list(p0_steps)
+        self.contexts = []
+
+    def decide(self, context):
+        if context.phase == Phase.P0 and self.p0_steps:
+            self.contexts.append(context)
+            step = self.p0_steps.pop(0)
+            return EngineResult(Decision(phase=Phase.P0, steps=[step]), source="llm")
+        return super().decide(context)
+
+
+def test_p0_rejects_every_other_kind_and_tool_then_closes_from_the_intake(tmp_path):
+    """Runner level: tools, delegate and escalate are rejected in P0; the intake closes it."""
+    steps = [
+        NextStep(
+            kind="call_tool",
+            tool="knowledge_search",
+            args={"query": "scope"},
+            rationale="Look it up.",
+        ),
+        NextStep(kind="delegate", rationale="Hand over to the next phase."),
+        NextStep(kind="escalate", rationale="Unsure how to confirm the scope."),
+    ]
+    engine = _ScriptedEngine(steps)
+    runner = _runner(tmp_path, engine=engine)
+    result = runner.start("", run_id="k1")
+    assert result.status == RunStatus.COMPLETED
+    rejected = _p0_events(runner, "k1", "STEP_REJECTED")
+    assert [e.payload["step"]["kind"] for e in rejected] == ["call_tool", "delegate", "escalate"]
+    assert all("no tool runs in intake" in e.payload["message"] for e in rejected)
+    assert len(_p0_events(runner, "k1", "INTAKE_CLOSED")) == 1
+    assert not _p0_events(runner, "k1", "ESCALATE") and not _p0_events(runner, "k1", "TOOL_RESULT")
+    # The P0 context tells the model what is valid and offers no tool.
+    assert engine.contexts and all(c.allowed_tools == [] for c in engine.contexts)
+    assert "finalise if in_scope is true or refuse if it is false" in engine.contexts[0].objective
+    # The second P0 context shows the feedback of the first rejection.
+    assert any(
+        h["type"] == "STEP_REJECTED" and "only valid steps" in h["message"]
+        for h in engine.contexts[1].history
+    )
+
+
+def test_p0_finalise_and_refuse_still_close_the_phase_without_the_intake_event(tmp_path):
+    """A model that answers as asked: finalise (in scope) → P1; refuse (off-topic) → refused."""
+    engine = _ScriptedEngine([NextStep(kind="finalise", rationale="In scope.")])
+    runner = _runner(tmp_path, engine=engine)
+    assert runner.start("", run_id="f1").status == RunStatus.COMPLETED
+    assert not _p0_events(runner, "f1", "INTAKE_CLOSED")
+    assert not _p0_events(runner, "f1", "STEP_REJECTED")
+    engine = _ScriptedEngine([NextStep(kind="refuse", rationale="Off-topic.")])
+    runner = _runner(tmp_path, engine=engine)
+    result = runner.start("Best pizza in Delft?", run_id="f2")
+    assert result.status == RunStatus.REFUSED and not _p0_events(runner, "f2", "INTAKE_CLOSED")
+
+
+def test_policy_engine_p0_is_unchanged(tmp_path):
+    """The policy engine finalises P0 on its first step: no rejection, no intake close."""
+    runner = _runner(tmp_path)
+    assert runner.start("", run_id="p0").status == RunStatus.COMPLETED
+    decisions = _p0_events(runner, "p0", "DECISION")
+    assert [s["kind"] for d in decisions for s in d.payload["steps"]] == ["finalise"]
+    assert not _p0_events(runner, "p0", "STEP_REJECTED")
+    assert not _p0_events(runner, "p0", "INTAKE_CLOSED")
+    assert runner.load_state("p0").phase_progress(Phase.P0).steps_used == 1
+
+
+def test_step_budget_still_escalates_outside_p0(tmp_path):
+    """AG-04 is unchanged after P0: a used-up step budget in P1 escalates."""
+    budgets = {Phase.P1: PhaseBudget(max_steps=1)}
+    engine = _ScriptedEngine([])
+    result = _runner(tmp_path, engine=engine, budgets=budgets).start("", run_id="b3")
+    assert result.status == RunStatus.ESCALATED and result.phase == Phase.P1
+    assert "step budget exceeded in P1 (1 steps)" in result.summary

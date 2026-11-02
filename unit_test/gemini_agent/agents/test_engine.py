@@ -627,3 +627,14 @@ def test_hollow_llm_rationale_is_retried_then_grounded(tmp_path):
     assert policy.criterion == "ranking-lowest-lcoh_per_mwh" and policy.option_id == "2-doublets"
     assert "lcoh_per_mwh" in policy.rationale
     assert check_choice(choice_deps(_criteria_question()), policy) is None
+
+
+def test_step_kinds_names_finalise_first_with_the_meaning_of_each_no_tool_kind():
+    """L-1 P0 follow-up: finalise leads the no-tool kinds; delegate never ends a phase."""
+    prompt = system_prompt(Role.LEAD_ENGINEER)
+    block = prompt.split("Steps with tool null: ", 1)[1].split("\n", 1)[0]
+    assert block.startswith("finalise (")
+    assert "in-scope answer in P0" in block
+    assert "delegate (note to the runner; never ends a phase)" in block
+    assert "refuse (P0 only, off-topic request)" in block
+    assert block.index("finalise") < block.index("delegate")
