@@ -179,6 +179,7 @@ One line per decision, grouped by WP; dated 11-01 (WP-00: 10-31). Why: the `conf
 - Server settings and tag checks: CLOUD_SETUP §7.1–7.2 (`OLLAMA_CONTEXT_LENGTH=65536` on `ollama serve`; `num_ctx` ignored).
 - Act/format split (spec §5.4.3) not implemented: add it if L-1 shows tool-call problems. Paused LLM runs from before a9083b7 may not reload.
 - **Re-run L-1** after [#19](https://github.com/Amaechi/gemini_digital_twin_private/pull/19) and the WP-10 P0 follow-up (§7.3): check fallbacks, `kind_coercions`, `step_rejections`, tokens/phase, no call > `request_timeout_s`, no "Thinking Process" in content; gpt-oss can't disable reasoning (`thinking: true` needs more `max_output_tokens`).
+- WP-13/15: the eval harness counts STEP_REJECTED/ESCALATE only; add an `intake_closed` metric if L-1 should show how often the deterministic P0 close was needed (grep `INTAKE_CLOSED` in events.jsonl meanwhile).
 - L-1 re-run (11-02, before the P0 fix): qwen3.6:35b-a3b, gemma4:26b-a4b, qwen3.5:9b escalated in P0 (`delegate` ×3, 10–16 s); gemma4:12b, qwen3.6:27b passed P0. Expect `INTAKE_CLOSED` / P0 `step_rejections` in the eval metrics now; a model that answers `finalise` costs one P0 call.
 
 **Pre-L-2 → WP-15**

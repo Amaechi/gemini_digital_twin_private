@@ -28,10 +28,11 @@ from gemini_agent.agents.engine import (
 )
 from gemini_agent.agents.roles import ROLES
 from gemini_agent.logging.llm_logger import LLMLogger
-from gemini_agent.prompts.system import FEW_SHOT, system_prompt
+from gemini_agent.prompts.system import FEW_SHOT, NO_TOOL_KIND_NOTES, system_prompt
 from gemini_agent.runner.toolbox import default_toolbox
 from gemini_agent.schemas.config import load_config
 from gemini_agent.schemas.decision import (
+    NO_TOOL_KINDS,
     Decision,
     DecisionContext,
     DecisionCriterion,
@@ -638,3 +639,4 @@ def test_step_kinds_names_finalise_first_with_the_meaning_of_each_no_tool_kind()
     assert "delegate (note to the runner; never ends a phase)" in block
     assert "refuse (P0 only, off-topic request)" in block
     assert block.index("finalise") < block.index("delegate")
+    assert set(NO_TOOL_KIND_NOTES) == NO_TOOL_KINDS  # a new no-tool kind cannot vanish silently

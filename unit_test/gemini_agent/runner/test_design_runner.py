@@ -906,10 +906,15 @@ def _p0_events(runner: DesignRunner, run_id: str, event_type: str) -> list:
 def test_p0_replay_of_an_in_scope_request_reaches_p1(tmp_path, model):
     """L-1 P0 follow-up: the recorded P0 answers (delegate / a tool) no longer escalate."""
     run_id = model.replace(":", "_")
-    engine, _ = _llm_engine(tmp_path, run_id, _replay_p0(P0_REPLAYS[model]))
+    engine, logger = _llm_engine(tmp_path, run_id, _replay_p0(P0_REPLAYS[model]))
     runner = _runner(tmp_path, engine=engine)
     result = runner.start("", run_id=run_id)
     assert result.status == RunStatus.COMPLETED, result.summary
+    # The 9b model's tool call is caught by the engine validator (empty P0 tool list ⇒ one
+    # retry); the delegate answers pass validation and are rejected by the runner.
+    p0_calls = [r for r in logger.records() if r.phase == "P0"]
+    assert [r.retries for r in p0_calls] == ([1, 0, 0] if "9b" in model else [0, 0, 0])
+    assert {r.decision_source for r in p0_calls} == {"llm"}
     starts = _phase_starts(runner, run_id)
     assert starts[:2] == ["P0", "P1"]
     assert not _p0_events(runner, run_id, "ESCALATE")
