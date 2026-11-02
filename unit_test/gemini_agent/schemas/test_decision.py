@@ -20,9 +20,9 @@ from gemini_agent.schemas.decision import (
 
 
 def test_phase_order_and_dr_titles():
-    """Eleven phases P0–P10 in order; ten Decision Records DR-01…DR-10."""
+    """Eleven phases P0–P10 in order; Decision Records DR-01…DR-10 plus DR-11 (pre-L-2)."""
     assert [p.value for p in Phase] == [f"P{i}" for i in range(11)]
-    assert sorted(DR_TITLES) == [f"DR-{i:02d}" for i in range(1, 11)]
+    assert sorted(DR_TITLES) == [f"DR-{i:02d}" for i in range(1, 12)]
 
 
 @pytest.mark.parametrize(

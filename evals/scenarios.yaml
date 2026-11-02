@@ -20,7 +20,7 @@ scenarios:
       - {type: phases_in_order, words: [P0, P1, P2, P3, P4, P5, P6, P7, P8, P9, P10], expect: "every phase P0–P10 runs, in order (verifier loop-backs allowed)"}
       - {type: loops_within_limit, expect: "verifier loop-backs stay within the limit (spec §5.2: ≤ 3)"}
       - {type: selected_candidate, expect: "a candidate is selected that was neither guard-failed nor REJECTED"}
-      - {type: decision_records, expect: "DR-01…DR-10 are written"}
+      - {type: decision_records, expect: "DR-01…DR-11 are written"}
       - {type: files, files: [run_summary.json, events.jsonl, token_summary.json, report_draft.md], expect: "run artefacts are written"}
       - {type: verdict, equals: ACCEPTED, expect: "the verifier ACCEPTs the selected design (promoted WP-14)"}
       - {type: stub_tool_calls_max, value: 0, expect: "0 stub tool calls (promoted WP-14: real tools bound)"}

@@ -275,7 +275,7 @@ Runtime settings (NFR): `num_ctx` / `OLLAMA_CONTEXT_LENGTH` ≥ 32K (64K preferr
 - AG-04 MUST: step, tool-call and token budgets per phase (Pydantic AI `UsageLimits`); exceeding ⇒ escalate with summary.
 - AG-05 MUST: `request_missing_input` pauses the workflow (state saved), resumes with the answer; non-interactive runs record a labelled assumption instead.
 - AG-06 MUST: off-topic questions refused/redirected; constraint conflicts explained.
-- AG-07 MUST: Decision Records for: DR-01 number of doublets; DR-02 well depth; DR-03 heat top-up technology; DR-04 cooling technology mix; DR-05 storage yes/no; DR-06 maintenance windows; DR-07 gas handling (degas+CHP vs pressurised reinjection); DR-08 return temperature; DR-09 materials; DR-10 final selection. Each: question, options, evidence (tool-result IDs), choice, why others rejected.
+- AG-07 MUST: Decision Records for: DR-01 number of doublets; DR-02 well depth; DR-03 heat top-up technology; DR-04 cooling technology mix; DR-05 storage yes/no; DR-06 maintenance windows; DR-07 gas handling (degas+CHP vs pressurised reinjection); DR-08 return temperature; DR-09 materials; DR-10 final selection; DR-11 backup capacity (added pre-L-2, 2026-11-02: install the TL-15 robust backup nameplates or keep the base-year ones, OPT-ROBUST-BACKUP, decided after P8). Each: question, options, evidence (tool-result IDs), choice, why others rejected.
 - AG-08 SHOULD: reviewer independence (different prompt; MAY use a different model family).
 
 ### 5.2 Workflow phases (deterministic skeleton)
@@ -582,7 +582,7 @@ For cloud-session execution use the work packages in `docs/hackathon/WORK_PACKAG
 ## 18. Acceptance checklist
 - [ ] ACCEPTED design, 0 unmet heating/cooling days over 365 days (or justified).
 - [ ] DB-10…17 satisfied every day (verifier report).
-- [ ] C0–C7 compared with KPIs; DR-01…DR-10 written.
+- [ ] C0–C7 compared with KPIs; DR-01…DR-10 (+ DR-11) written.
 - [ ] Absorption, electric chiller, heat rejection, free cooling models with reference cards, textbook-example tests, registered, documented.
 - [ ] Brine PVT configurable and consistent.
 - [ ] LCOH/LCOC, CO₂ vs C0, exergy, sensitivity, Monte Carlo P10/P50/P90.

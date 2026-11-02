@@ -47,7 +47,7 @@ Optional extra scrutiny (WP-01, 02, 05, 07, 10): before merging, start one more 
 
 ## Part D — Your laptop (after Batch 7)
 
-Follow `CLOUD_SETUP.md` §7 exactly: pull, install Ollama and the model tags, run the three commands (model pick L-1, final run L-2, evaluation transcripts), commit `runs/final/` on a branch `local-llm-run`, push it and merge its PR (direct pushes to `main` are blocked by A3). Cloud machines have no GPU, so this is the only part that needs your hardware.
+Follow `CLOUD_SETUP.md` §7 exactly: pull, install Ollama and the model tags, start `ollama serve` with the §7.2 settings, run steps 7.3–7.7 (S11 per model + compare = L-1; the final ask-mode run you approve and the S1–S11 eval = L-2; `validate_submission`), commit `runs/final/` on a branch `local-llm-run`, push it and merge its PR (direct pushes to `main` are blocked by A3). Cloud machines have no GPU, so this is the only part that needs your hardware.
 
 ## Part E — Finish
 

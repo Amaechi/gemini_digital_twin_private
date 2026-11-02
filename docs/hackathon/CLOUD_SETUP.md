@@ -80,25 +80,189 @@ GitHub settings (see RUNBOOK.md A3): classic branch protection on `main` — req
 - `/context` shows usage. Do not paste large files or logs into the chat.
 
 ## 7. Local steps you run on your laptop (needs Ollama; GPU/unified memory)
-After WP-13/14 are merged:
+Do this after WP-14 (c694720) and the pre-L-2 PR (DR-11 backup capacity, OPT-ROBUST-BACKUP) are merged, so the LLM run takes the same decisions as the policy run in `runs/final_policy/`. These steps are **L-1** (pick the model with S11) and **L-2** (the final LLM run and the S1–S11 transcripts). They are the only way to make `scripts/validate_submission.py` pass **SUB-02, SUB-12, SUB-15, SUB-16 and SUB-17**, because a cloud session has no GPU. Run every command from the repo root, inside the venv, in an interactive terminal (zsh or bash). Everything is written under `runs/final/`, which is the only run folder git tracks apart from `runs/final_policy/`.
+
+**What the five checks read** (`src/gemini_agent/eval/submission.py`; `validate_submission.py` defaults to `--run-dir runs/final --eval-root runs/final/eval`):
+
+| Check | Passes when | Step |
+|---|---|---|
+| SUB-02 | `runs/final/<run>/run_summary.json` has `status` = `completed` and `approval` = `approved` | 7.5 (answer `yes`) |
+| SUB-12 | the same run folder holds `llm_calls.jsonl` (≥ 1 record) and `token_summary.json` | 7.5 (`--engine llm`) |
+| SUB-15 | some `runs/final/eval/<dir>/eval_results.json` with `engine` = `llm` has S10 with a `token_comparison` | 7.6 |
+| SUB-16 | `runs/final/eval/model_comparison.json` lists ≥ 2 models with `engine` = `llm` | 7.3 + 7.4 |
+| SUB-17 | **one** `runs/final/eval/<dir>/eval_results.json` (`engine` = `llm`) has every scenario S1–S11 (none `error` or `skipped`), and each scenario folder has `events.jsonl` and `llm_calls.jsonl` (a `refused` run is excused from `llm_calls.jsonl`) | 7.6 |
+
+`validate_submission` reads `runs/final/run_summary.json` or the **only** `runs/final/*/run_summary.json`. If it finds two run folders, it stops with "several runs". So keep exactly one run folder there: `runs/final/final_llm/` (`--runs-dir runs/final --run-id final_llm`). The `runs/final/eval/` folder does not count as a run folder, because its runs sit one level deeper.
+
+**Time estimates.** These are estimates, not laptop measurements. The tool times come from this repo's runs on a 2–4-core cloud machine: the full-budget policy build took 554 s (WP-14, PROGRESS.md), and quick-budget eval scenarios took 181–228 s each (`docs/results/eval_policy_quick/EVAL_REPORT.md`). The LLM time could not be measured here (no Ollama, no GPU). A completed run makes about 46 structured LLM calls (counted in the dry run, where every TestModel call fell back to the policy; the pre-L-2 DR-11 adds one; a real model may make more or fewer), each with a prompt of about 2 k tokens (6.7 k characters) and a short JSON answer. Assuming 3–30 s per call on a 16–36 GB laptop gives about 3–25 min of LLM time per run. That range depends on the model and hardware, and your machine may fall outside it. **Time your 7.3 run and scale the later steps from it.**
+
+| Step | Estimate | Basis |
+|---|---|---|
+| 7.1 setup + model pulls | 10–40 min | download of 6.6–23 GB per model |
+| 7.3 S11, per model (quick) | 5–30 min | ≈ 3 min tools + LLM |
+| 7.4 compare | seconds | 0.6 s here |
+| 7.5 final run (full) | 15–35 min + your answers | ≈ 9 min tools (fewer with more cores) + LLM |
+| 7.6 S1–S11 (quick) | 1–5 h, ≈ 10–11 × your 7.3 time | 12 runs: S2 pauses and S3 is refused early; S10 runs twice, and its naive run sends the whole history |
+| 7.7 validate | < 1 min (+ ≈ 7 min with `--pytest`) | 1.1 s here; tests 6 min 39 s here |
+| 7.8 commit + push | a few minutes | ≈ 30–50 MB to push. The smoke-budget dry run wrote 20 MB for S1–S11 and 1.2 MB for the final run (caches excluded). Quick and full budgets write full-year CSVs (≈ 0.4 MB each), so expect more. No single file was over 2 MB. |
+
+### 7.1 One-time setup
 ```bash
-cd gemini_digital_twin_private && git pull
-uv venv -p 3.12 .venv && source .venv/bin/activate && uv pip install -r requirements-hackathon.txt
-# install Ollama (ollama.com), then pull the models in config/llm.yaml. Tags verified on ollama.com 31 Oct 2026
-# (all exist; families carry the "tools" + "thinking" badges; 256K context):
-#   16 GB: qwen3.5:9b (6.6 GB) + gemma4:12b (8.0 GB)
-#   36 GB: qwen3.6:35b-a3b (23 GB, orchestrator) + qwen3.6:27b (18–19 GB, coder) — one loaded at a time
-# Still confirm locally: `ollama show <tag>` lists "tools" (L-1).
-export OLLAMA_CONTEXT_LENGTH=65536
-ollama serve &
-PYTHONPATH=src python scripts/run_eval.py --engine llm --model <tag> --scenarios S11   # L-1 pick model
-PYTHONPATH=src python -m gemini_agent.cli run --engine llm --model <tag> --out runs/final   # L-2
-PYTHONPATH=src python scripts/run_eval.py --engine llm --model <tag> --out runs/final/eval   # S1–S11 transcripts
-git checkout -b local-llm-run && git add runs/final && git commit -m "Final LLM run and evaluation transcripts" && git push -u origin local-llm-run
-# then open a PR on GitHub and merge it (main only accepts PRs)
+cd gemini_digital_twin_private
 ```
-Record the model, hardware and token totals in PROGRESS.md. Then run WP-15 in the cloud.
-Optional commercial comparison: same commands with a provider model configured in `config/llm.yaml` (API key in your shell, never committed).
+```bash
+git switch main
+```
+```bash
+git pull
+```
+```bash
+uv venv -p 3.12 .venv
+```
+```bash
+source .venv/bin/activate
+```
+```bash
+uv pip install -r requirements-hackathon.txt
+```
+Next, install Ollama (ollama.com) and pull the two models you will compare. The tags come from `config/llm.yaml` and were verified on ollama.com on 31 Oct 2026:
+- 16 GB profile: `qwen3.5:9b` (6.6 GB, orchestrator) and `gemma4:12b` (8.0 GB, coder).
+- 36 GB profile: `qwen3.6:35b-a3b` (23 GB) and `qwen3.6:27b` (18–19 GB).
+
+S11 should compare a 16 GB-class model with a 36 GB-class model if your laptop can run the larger one. Otherwise compare the two 16 GB tags.
+
+Placeholders used below (replace the `< >` as well):
+- `<model-a>`, `<model-b>`: the two Ollama tags you compare, e.g. `qwen3.5:9b` (the `config/llm.yaml` 16gb orchestrator) and `gemma4:12b` or `qwen3.6:35b-a3b`.
+- `<model>`: the tag you pick in 7.4.
+- `<dir-a>`, `<dir-b>`, `<dir>`: their eval folders. The folder name is the tag with every character other than letters, digits, `.`, `_` and `-` replaced by `_`. For example `qwen3.5:9b` → `qwen3.5_9b`, `gemma4:12b` → `gemma4_12b`, `qwen3.6:35b-a3b` → `qwen3.6_35b-a3b`.
+```bash
+ollama pull <model-a>
+```
+```bash
+ollama pull <model-b>
+```
+```bash
+ollama show <model-a>
+```
+Under `Capabilities` the output must list `tools`. Repeat the check for `<model-b>`.
+
+### 7.2 Start the Ollama server with the required settings
+These are **server** settings, so they must be in the environment of the `ollama serve` process. Exporting them in the shell that runs `run_eval.py` or `gemini_agent.cli` does nothing, because that shell is only an HTTP client. The CLI prints an `OLLAMA_CONTEXT_LENGTH` reminder but cannot check the value. The Ollama desktop app starts its own server without these settings, so quit it first (menu bar → Quit Ollama). Then run this in a separate terminal and leave it open:
+```bash
+OLLAMA_MAX_LOADED_MODELS=1 OLLAMA_NUM_PARALLEL=1 OLLAMA_CONTEXT_LENGTH=65536 OLLAMA_FLASH_ATTENTION=1 OLLAMA_KV_CACHE_TYPE=q8_0 ollama serve
+```
+- `OLLAMA_MAX_LOADED_MODELS=1` keeps one model in memory, because 16 or 36 GB cannot hold two. Without `--model`, the orchestrator and coder swap; with `--model`, one tag serves both roles.
+- `OLLAMA_NUM_PARALLEL=1` handles one request at a time. Every parallel slot would need its own 64 K context.
+- `OLLAMA_CONTEXT_LENGTH=65536` is **required**. Ollama's OpenAI-compatible endpoint ignores `num_ctx: 65536` from `config/llm.yaml` (spec §5.4.7), and the server default is much shorter, so long prompts would be truncated without any warning.
+- `OLLAMA_FLASH_ATTENTION=1` and `OLLAMA_KV_CACHE_TYPE=q8_0` are optional. Together they cut the KV-cache memory of the 64 K context roughly in half (the q8_0 cache needs flash attention). Leave both out if a model behaves oddly.
+
+To check the settings, look at the server's first log lines: they should print a `server config` line containing these values. If you see "address already in use", another Ollama server is still running; quit it and start again. To keep the desktop app instead, set the variables for it: on macOS run `launchctl setenv OLLAMA_CONTEXT_LENGTH 65536` (one call per variable) and restart the app; on a Linux service run `sudo systemctl edit ollama`, add `Environment="OLLAMA_CONTEXT_LENGTH=65536"` lines under `[Service]`, then restart the service.
+
+### 7.3 Step (a), L-1: S11 for each candidate model
+```bash
+PYTHONPATH=src python scripts/run_eval.py --engine llm --model <model-a> --tool-profile quick --scenarios S11 --eval-root runs/final/eval
+```
+```bash
+PYTHONPATH=src python scripts/run_eval.py --engine llm --model <model-b> --tool-profile quick --scenarios S11 --eval-root runs/final/eval
+```
+Each call writes `runs/final/eval/<dir-a>/` (and then `<dir-b>/`) containing:
+- `S11/`: a normal run folder with `events.jsonl`, `llm_calls.jsonl` and `token_summary.json`;
+- `eval_results.json` and `EVAL_REPORT.md`;
+- a `cache/` folder (not committed, see 7.8).
+
+`--tool-profile quick` is both the `run_eval.py` default and the eval budget set by the register entry RUN-BUDGET: the candidate's own point, one DE generation and 12 Monte Carlo samples. `run_eval.py` has no `--budget` flag and ignores `GEOAGENT_BUDGET`. Exit code 1 only means a scenario check failed; the files are still written. Run `ls runs/final/eval` to see the folder names.
+
+### 7.4 Step (b), L-1: compare and pick
+```bash
+PYTHONPATH=src python scripts/run_eval.py --compare runs/final/eval/<dir-a> runs/final/eval/<dir-b> --eval-root runs/final/eval
+```
+This prints the S11 table and writes `runs/final/eval/model_comparison.json` and `model_comparison.md` (SUB-16). Pick `<model>` in this order: S11 completed, highest tool-call validity, fewest fallbacks, retries and step rejections, then fewest tokens and shortest runtime. **Run the comparison now, while each folder holds only S11, and do not re-run it after 7.6.** `--compare` adds up every scenario in a folder, so after 7.6 it would compare S1–S11 of one model with S11 of the other. `model_comparison.json` keeps the S11 numbers from this step.
+
+### 7.5 Step (c), L-2: the final LLM run, approved by you
+```bash
+PYTHONPATH=src python -m gemini_agent.cli run --engine llm --model <model> --budget full --runs-dir runs/final --run-id final_llm --input-mode ask
+```
+`--budget full` is the RUN-BUDGET setting for the submitted run. It is also the default unless `GEOAGENT_BUDGET` is set. The run writes `runs/final/final_llm/`: `run_summary.json`, `events.sqlite`, `events.jsonl`, `llm_calls.jsonl`, `token_summary.json`, `decision_records/`, `figures/`, `tool_results/`, `report_draft.md` and the other run files.
+
+With the default brief, the terminal asks four questions (order checked in the dry run):
+1. P1, DB-30: how to read "330 daily steps" (A or B). Press **Enter** to keep the register default, `A`.
+2. P1, DB-31: the heating return temperature. Press **Enter** to keep `55` °C, or type a value.
+3. P1, DB-32: the cooling return temperature. Press **Enter** to keep `26` °C, or type a value.
+4. P10: `Approve the recommended design <id> (verifier verdict …)? yes/no`. Read the verdict, then type **`yes`**.
+
+Between P1 and P10 nothing needs you. In P8 the LLM (Economics role) decides **DR-11**: keep the TL-13 base-year backup nameplates or install the TL-15 P90 robust backups (register OPT-ROBUST-BACKUP recommends the robust ones when they raise the probability of meeting demand; the policy run chose `C2-opt-robust`). The option it picks becomes the selected design, so the approval question may name `<…>-opt-robust`; the P9 DesignVerifier verifies that design before you are asked.
+
+The run should end with exit code 0 and `approval approved`.
+- Answering `no` exits with code 6 and fails SUB-02. Exit code 4 means the run escalated.
+- An LLM may word a P1 question differently, so read each prompt; the default is always shown.
+- The terminal must be interactive. If input is piped (`printf 'yes\n' | …`), the CLI does not read stdin: the run pauses at the first P1 question and exits with code 3. Continue it with `resume` as shown below.
+- A run id cannot be used twice ("already exists; use resume"). To start over, run `rm -rf runs/final/final_llm` first. Never leave a second run folder in `runs/final/`.
+
+**Alternative: `--input-mode pause`.** This answers each question with a separate command:
+```bash
+PYTHONPATH=src python -m gemini_agent.cli run --engine llm --model <model> --budget full --runs-dir runs/final --run-id final_llm --input-mode pause
+```
+The run exits with code 3 at each question and prints it. Answer each question with the following command, once per question:
+```bash
+PYTHONPATH=src python -m gemini_agent.cli resume --budget full --runs-dir runs/final --run-id final_llm --answer <answer>
+```
+Use the answer that matches the printed question: DB-30 → `A`, DB-31 → `55`, DB-32 → `26` (the register defaults), APPROVAL → `approve` (or `yes`). After the last P1 answer, that resume runs P2–P10 (the long part) and then pauses for the approval. The last resume exits with code 0.
+- `resume` reuses the engine and `--model` stored in the run's `events.sqlite`, but not the budget, so repeat `--budget full`.
+- The CLI's own `resume with:` hint leaves out `--runs-dir`. Without `--runs-dir runs/final`, `resume` looks in `runs/final_llm/` and fails with "unknown run".
+
+### 7.6 Step (d), L-2: the full S1–S11 eval for the chosen model
+```bash
+PYTHONPATH=src python scripts/run_eval.py --engine llm --model <model> --tool-profile quick --eval-root runs/final/eval
+```
+Without `--scenarios`, the command runs all of S1–S11. S10 runs twice (`S10-naive/` and `S10-optimised/`) and writes `S10-token_comparison.json`, which SUB-15 needs. This step replaces the S11-only `runs/final/eval/<dir>/eval_results.json` and the `S11/` folder from 7.3.
+
+Every `run_eval.py` call rewrites `eval_results.json` with only the scenarios it ran. So never finish with a `--scenarios` subset in `<dir>`: SUB-17 needs S1–S11 in one file. To repeat a scenario, re-run this full command. Exit code 1 means some scenario check failed (see `EVAL_REPORT.md`). SUB-17 only needs every scenario to have run without `error`.
+
+### 7.7 Step (e): validate
+```bash
+PYTHONPATH=src python scripts/validate_submission.py
+```
+The defaults are `--run-dir runs/final --eval-root runs/final/eval`. SUB-02, 12, 15, 16 and 17 must read `pass`. The other checks judge the LLM run's design in the same way they judged the WP-14 policy run: SUB-03 needs ACCEPTED, SUB-14 and SUB-22 warn, SUB-23 and SUB-24 are manual. Exit code 1 means some check failed. Add `--pytest` to also run the unit tests.
+
+### 7.8 Step (f): branch, commit, PR (never on `main`)
+First record the model, the hardware (chip, RAM), the token totals from `runs/final/final_llm/token_summary.json` and the SUB table from 7.7 in `docs/hackathon/PROGRESS.md`.
+```bash
+git switch -c local-llm-run
+```
+```bash
+git add runs/final docs/hackathon/PROGRESS.md
+```
+```bash
+git status --short
+```
+Check the staged files:
+- Only `runs/final/final_llm/…`, `runs/final/eval/…` and `PROGRESS.md` should be staged, and nothing else.
+- No `cache/` folders. They hold the tools' `design_cache.sqlite` memo (≈ 1 MB each in the dry run), which is not evidence; `.gitignore` excludes `runs/final/**/cache/`.
+- The `events.sqlite` files are meant to be committed, as in `runs/final_policy/`.
+- A file over 50 MB would be unusual (GitHub warns at 50 MB and refuses 100 MB); look into it before pushing.
+```bash
+du -sh runs/final
+```
+```bash
+git commit -m "L-1/L-2: final LLM run (<model>) and S1–S11 eval transcripts"
+```
+```bash
+git push -u origin local-llm-run
+```
+Then open the PR on github.com: open the repo → **Compare & pull request** → base `main`. Use the title `L-1/L-2: Final LLM run and evaluation transcripts`, click Create, wait for `hackathon_tests` to pass, then **Squash and merge**. (Optional, with the GitHub CLI: `gh pr create --base main --head local-llm-run --title "L-1/L-2: Final LLM run and evaluation transcripts" --body "Model <model>; validate_submission SUB-02/12/15/16/17 pass"`.) After the merge, run WP-15 in the cloud.
+
+A commercial comparison model is not available: `config/llm.yaml` has only the Ollama endpoint, and `--model` takes Ollama tags.
+
+**Verification.** On 2 Nov 2026, every `run_eval.py`, `gemini_agent.cli` and `validate_submission.py` command above was dry-run in a cloud session into a scratch copy of this layout (`<scratch>/runs/final/…`, passed through the same `--runs-dir` and `--eval-root` flags). The dry run used `--engine testmodel` for `run_eval.py`, `--engine policy` for `cli run`/`resume` (which accept only policy or llm), and `--budget/--tool-profile smoke`. Results:
+- ask mode on a pseudo-terminal: Enter × 3, then `yes` → `completed`, `approval approved`, exit code 0;
+- piped `printf 'yes\n'` → paused at DB-30, exit code 3;
+- pause mode: `run` → exit code 3; resume with `A` → 3, `55` → 3, `26` → 3 (now at the approval), `approve` → 0, `approval approved`;
+- `--compare` wrote `runs/final/eval/model_comparison.json`;
+- the full suite wrote S1–S11 including `S10-token_comparison.json` (364 s with the smoke budget);
+- `validate_submission` with the default-style paths found `runs/final/final_llm/` next to `eval/` and `cache/`. SUB-02 passed for both the ask run and the pause run. SUB-12 and SUB-15–17 failed only because no run had `engine` = `llm`.
+- On a copy with the eval results relabelled as `llm`, SUB-15, SUB-16 and SUB-17 passed. SUB-12 passed on a run folder written through the LLM logging path (TestModel).
+
+What was not checked: real Ollama calls, the settings in 7.2, real timings, and the git commands (the `.gitignore` rule for `runs/final/**/cache/` was checked with `git check-ignore`).
 
 ## 8. Submission
 1. GitHub → fork `GEMINI-Digital-Twin/gemini-geothermal-suite-open` to your account (public).

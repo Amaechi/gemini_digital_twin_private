@@ -1,6 +1,6 @@
 {
  "data": {
-  "candidate_id": "C2-opt",
+  "candidate_id": "C2-opt-robust",
   "verdict": "ACCEPTED",
   "violations": [],
   "verifier": "DesignVerifier",
@@ -757,9 +757,9 @@
    "SUB-NPSH"
   ],
   "stub_evidence": false,
-  "summary": "DesignVerifier C2-opt: ACCEPTED; all 46 checks pass; tightest PH-02 margin 0 K"
+  "summary": "DesignVerifier C2-opt-robust: ACCEPTED; all 46 checks pass; tightest PH-02 margin 0 K"
  },
- "summary": "DesignVerifier C2-opt: ACCEPTED; all 46 checks pass; tightest PH-02 margin 0 K",
+ "summary": "DesignVerifier C2-opt-robust: ACCEPTED; all 46 checks pass; tightest PH-02 margin 0 K",
  "warnings": [
   "NPSH_R not given for ['esp_1', 'esp_2', 'producer ESP @ 296 m3/h'] (SUB-NPSH): checked NPSH_A \u2265 15 m; add NPSH_R when the pump is selected",
   "electric_chiller: COP inf capped at 8 [\u00d782]",

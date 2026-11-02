@@ -5,7 +5,9 @@ run before the phase may close (spec §5.4.6: the runner calls them itself if th
 them) and the Decision Records made at the end of the phase (AG-07). DR-02 (depth) and DR-07
 (gas handling) are taken in P5 rather than P2 because their options are candidates screened
 in P5. WP-14 added ``sensitivity`` to P8 (SUB-11 needs a sensitivity result) and ``plot_figures``
-to P10 (TL-21 figures from tool outputs).
+to P10 (TL-21 figures from tool outputs). Pre-L-2 added workflow tools — run by the runner itself
+after the required tools and before the Decision Records, never offered to the agent — and the
+P8 ``robust_backup`` step with DR-11 (OPT-ROBUST-BACKUP).
 """
 
 from __future__ import annotations
@@ -40,6 +42,10 @@ class PhaseSpec:
     default_args: dict[str, dict[str, ArgValue]] = field(default_factory=dict)
     budget: PhaseBudget = field(default_factory=PhaseBudget)
     decision_records: tuple[str, ...] = ()
+    workflow_tools: tuple[str, ...] = ()
+    """Deterministic steps the runner runs at phase close, after the required tools and before
+    the Decision Records (default arguments; not in the agent's tool list, context or AG-04
+    tool-call budget)."""
 
 
 PHASE_SPECS: dict[Phase, PhaseSpec] = {
@@ -124,13 +130,16 @@ PHASE_SPECS: dict[Phase, PhaseSpec] = {
             Phase.P8,
             Role.ECONOMICS,
             "Run the Monte Carlo uncertainty analysis and the cost sensitivity on the selected "
-            "design.",
+            "design; afterwards the runner (not you) prices its robust backups for DR-11.",
             required_tools=("uncertainty", "sensitivity"),
             default_args={
                 "uncertainty": {"candidate_id": SELECTED},
                 "sensitivity": {"candidate_id": SELECTED},
+                "robust_backup": {"candidate_id": SELECTED},
             },
             budget=PhaseBudget(max_steps=8, max_tool_calls=6),
+            decision_records=("DR-11",),
+            workflow_tools=("robust_backup",),
         ),
         PhaseSpec(
             Phase.P9,

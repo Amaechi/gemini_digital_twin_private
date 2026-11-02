@@ -1,13 +1,13 @@
 {
  "data": {
-  "candidate_id": "C2-opt",
+  "candidate_id": "C2-opt-robust",
   "kpis": {
-   "candidate_id": "C2-opt",
+   "candidate_id": "C2-opt-robust",
    "unmet_heating_days": 0,
    "unmet_heating_mwh": 0.0,
    "unmet_cooling_days": 0,
    "unmet_cooling_mwh": 0.0,
-   "installed_heating_mw": 30.39731526180497,
+   "installed_heating_mw": 36.297315261804975,
    "installed_cooling_mw": 16.79078720356259,
    "heat_by_source_mwh": {
     "hex_1": 36514.935398522925,
@@ -31,11 +31,11 @@
    "co2_t_per_yr": 7359.760067508943,
    "co2_reduction_vs_c0_frac": 0.7205030890034602,
    "currency": "USD",
-   "capex_million": 27.862074201628168,
-   "opex_million_per_yr": 2.249772804447775,
-   "lcoh_per_mwh": 42.543254236815166,
+   "capex_million": 30.06838334934558,
+   "opex_million_per_yr": 2.2828674416635364,
+   "lcoh_per_mwh": 44.594657257513354,
    "lcoc_per_mwh": 26.31307471020228,
-   "lcoh_20yr_per_mwh": 44.271934557007484,
+   "lcoh_20yr_per_mwh": 46.58067865608345,
    "lcoc_20yr_per_mwh": 28.6425530851727,
    "electricity_purchased_mwh": 7954.493791530005,
    "grid_gas_fuel_mwh": 4523.702338972718,
@@ -58,80 +58,20 @@
     "heating_supply_margin_k": -1.4210854715202004e-14,
     "heat_surplus_margin_mw": -0.0,
     "hthp_capacity_margin_mw": 0.00015987159212382807,
-    "peak_boiler_capacity_margin_mw": 0.02767338724078261,
+    "peak_boiler_capacity_margin_mw": 5.927673387240783,
     "cooling_supply_margin_k": 0.0
    },
    "thermal_breakthrough_yr": 66.13986857265058,
-   "percentiles": {
-    "lcoh_per_mwh": {
-     "p10": 33.790933978581805,
-     "p50": 47.304981273767524,
-     "p90": 66.1362972660628
-    },
-    "lcoc_per_mwh": {
-     "p10": 20.856446122365995,
-     "p50": 26.695320108798732,
-     "p90": 34.449955252933904
-    },
-    "lcoh_plus_lcoc_per_mwh": {
-     "p10": 59.35287549801341,
-     "p50": 73.8588409522473,
-     "p90": 96.5245812151034
-    },
-    "co2_t_per_yr": {
-     "p10": 5311.900430743194,
-     "p50": 8329.113805158791,
-     "p90": 11919.681277482645
-    },
-    "capex_million": {
-     "p10": 23.576612239608075,
-     "p50": 27.034210101199584,
-     "p90": 30.523276643095844
-    },
-    "unmet_heating_days": {
-     "p10": 0.0,
-     "p50": 2.0,
-     "p90": 71.0
-    },
-    "unmet_cooling_days": {
-     "p10": 0.0,
-     "p50": 0.0,
-     "p90": 0.0
-    },
-    "unmet_heating_mwh": {
-     "p10": 0.0,
-     "p50": 13.30839582240084,
-     "p90": 2772.5177320684656
-    },
-    "unmet_cooling_mwh": {
-     "p10": 0.0,
-     "p50": 0.0,
-     "p90": 0.0
-    },
-    "thermal_breakthrough_yr": {
-     "p10": 47.98247702341413,
-     "p50": 70.51224543239745,
-     "p90": 101.13707287468456
-    },
-    "required_peak_boiler_mw": {
-     "p10": 5.0,
-     "p50": 5.380145071261888,
-     "p90": 10.852732403620434
-    },
-    "required_electric_chiller_mw": {
-     "p10": 8.2,
-     "p50": 8.2,
-     "p90": 8.2
-    }
-   }
+   "percentiles": {}
   },
   "shortlist": [
+   "C2-opt-robust",
    "C2-opt",
    "C6-opt",
    "C1-opt"
   ]
  },
- "summary": "read_results: candidate C2-opt; KPIs available.",
+ "summary": "read_results: candidate C2-opt-robust; KPIs available.",
  "warnings": [],
  "assumption_ids": [],
  "sources": []

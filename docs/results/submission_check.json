@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-11-02T15:20:59.201979+00:00",
+  "generated_at": "2026-11-02T17:22:46.752370+00:00",
   "repo_root": "/home/user/gemini_digital_twin_private",
   "run_dir": "/home/user/gemini_digital_twin_private/runs/final_policy",
   "eval_root": "/home/user/gemini_digital_twin_private/runs/final/eval",
@@ -20,13 +20,13 @@
       "id": "SUB-03",
       "item": "§18: ACCEPTED design (final verifier verdict)",
       "status": "pass",
-      "detail": "selected C2-opt, verdict ACCEPTED"
+      "detail": "selected C2-opt-robust, verdict ACCEPTED"
     },
     {
       "id": "SUB-04",
       "item": "No stub tool calls (run_summary.json stub_tool_calls = 0)",
       "status": "pass",
-      "detail": "0/22 tool calls were stubs"
+      "detail": "0/23 tool calls were stubs"
     },
     {
       "id": "SUB-05",
@@ -36,7 +36,7 @@
     },
     {
       "id": "SUB-06",
-      "item": "§18: DR-01…DR-10 written",
+      "item": "§18: DR-01…DR-10 (+ DR-11) written",
       "status": "pass",
       "detail": "missing none"
     },
@@ -50,7 +50,7 @@
       "id": "SUB-08",
       "item": "§18: DB-10…17 satisfied every day (verifier report)",
       "status": "pass",
-      "detail": "DesignVerifier on C2-opt: no violations"
+      "detail": "DesignVerifier on C2-opt-robust: no violations"
     },
     {
       "id": "SUB-09",
@@ -68,7 +68,7 @@
       "id": "SUB-11",
       "item": "§18: sensitivity and Monte Carlo P10/P50/P90",
       "status": "pass",
-      "detail": "sensitivity ['sensitivity']; percentiles ['lcoh_per_mwh', 'lcoc_per_mwh', 'lcoh_plus_lcoc_per_mwh', 'co2_t_per_yr', 'capex_million', 'unmet_heating_days', 'unmet_cooling_days', 'unmet_heating_mwh', 'unmet_cooling_mwh', 'thermal_breakthrough_yr', 'required_peak_boiler_mw', 'required_electric_chiller_mw']"
+      "detail": "sensitivity ['sensitivity']; percentiles ['lcoh_per_mwh', 'lcoc_per_mwh', 'lcoh_plus_lcoc_per_mwh', 'co2_t_per_yr', 'capex_million', 'unmet_heating_days', 'unmet_cooling_days', 'unmet_heating_mwh', 'unmet_cooling_mwh', 'thermal_breakthrough_yr', 'required_peak_boiler_mw', 'required_electric_chiller_mw'] (TL-15 on C2-opt)"
     },
     {
       "id": "SUB-12",

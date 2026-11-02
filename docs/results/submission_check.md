@@ -1,6 +1,6 @@
 # GeoAgent submission check (spec §18)
 
-Generated: 2026-11-02T15:20:59.201979+00:00
+Generated: 2026-11-02T17:22:46.752370+00:00
 Final run: `/home/user/gemini_digital_twin_private/runs/final_policy`  
 Eval root: `/home/user/gemini_digital_twin_private/runs/final/eval`
 
@@ -10,15 +10,15 @@ Eval root: `/home/user/gemini_digital_twin_private/runs/final/eval`
 |---|---|---|---|
 | SUB-01 | DL-04: final run artefacts (run_summary.json, events.sqlite, events.jsonl) | PASS | /home/user/gemini_digital_twin_private/runs/final_policy; missing none |
 | SUB-02 | Run completed (P0–P10) and the recommended design was approved (P10) | WARN | approval pending: non-interactive run; approve with an ask-mode run |
-| SUB-03 | §18: ACCEPTED design (final verifier verdict) | PASS | selected C2-opt, verdict ACCEPTED |
-| SUB-04 | No stub tool calls (run_summary.json stub_tool_calls = 0) | PASS | 0/22 tool calls were stubs |
+| SUB-03 | §18: ACCEPTED design (final verifier verdict) | PASS | selected C2-opt-robust, verdict ACCEPTED |
+| SUB-04 | No stub tool calls (run_summary.json stub_tool_calls = 0) | PASS | 0/23 tool calls were stubs |
 | SUB-05 | No final Decision Record with stub_evidence | PASS | stub evidence in none |
-| SUB-06 | §18: DR-01…DR-10 written | PASS | missing none |
+| SUB-06 | §18: DR-01…DR-10 (+ DR-11) written | PASS | missing none |
 | SUB-07 | §18: 0 unmet heating/cooling days over 365 days (or justified) | PASS | unmet heating days 0, cooling days 0 |
-| SUB-08 | §18: DB-10…17 satisfied every day (verifier report) | PASS | DesignVerifier on C2-opt: no violations |
+| SUB-08 | §18: DB-10…17 satisfied every day (verifier report) | PASS | DesignVerifier on C2-opt-robust: no violations |
 | SUB-09 | §18: C0–C7 compared with KPIs | PASS | concepts without KPIs: none |
 | SUB-10 | §18: LCOH/LCOC, CO2 vs C0, exergy (selected design) | PASS | missing none |
-| SUB-11 | §18: sensitivity and Monte Carlo P10/P50/P90 | PASS | sensitivity ['sensitivity']; percentiles ['lcoh_per_mwh', 'lcoc_per_mwh', 'lcoh_plus_lcoc_per_mwh', 'co2_t_per_yr', 'capex_million', 'unmet_heating_days', 'unmet_cooling_days', 'unmet_heating_mwh', 'unmet_cooling_mwh', 'thermal_breakthrough_yr', 'required_peak_boiler_mw', 'required_electric_chiller_mw'] |
+| SUB-11 | §18: sensitivity and Monte Carlo P10/P50/P90 | PASS | sensitivity ['sensitivity']; percentiles ['lcoh_per_mwh', 'lcoc_per_mwh', 'lcoh_plus_lcoc_per_mwh', 'co2_t_per_yr', 'capex_million', 'unmet_heating_days', 'unmet_cooling_days', 'unmet_heating_mwh', 'unmet_cooling_mwh', 'thermal_breakthrough_yr', 'required_peak_boiler_mw', 'required_electric_chiller_mw'] (TL-15 on C2-opt) |
 | SUB-12 | §18: llm_calls.jsonl + token_summary.json (final run) | FAIL | 0 LLM calls; ['no llm_calls.jsonl records (the final run must use --engine llm)'] |
 | SUB-13 | Cost placeholders set (CostAssumptions.unset_placeholders() empty) | PASS | unset placeholders: none |
 | SUB-14 | VERIFY-tagged cost items flagged (cost_items[].verify, RC-05) | WARN | economics used VERIFY-tagged items ['absorption_chiller_plant_cost_function_usd', 'electric_chiller_plant_cost_function_usd']: state the RC-05 caveat in the report |

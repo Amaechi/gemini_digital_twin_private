@@ -2,6 +2,7 @@
 # file scripts/validate_submission.py @ d69507a. Modified by GeoAgent team, 2026-11-01: required
 # file list replaced by the GeoAgent spec §18 acceptance checklist (final run, eval suite, models,
 # notices, cost placeholders, VERIFY cost items); typed results, Markdown/JSON report, --pytest.
+# 2026-11-02 (pre-L-2): SUB-06 includes DR-11; SUB-11 reads the TL-15 design of a DR-11 variant.
 """Submission checks (spec §18 acceptance checklist; WP-13).
 
 ``validate_submission`` checks every §18 item that a program can check and lists the rest as
@@ -279,8 +280,8 @@ def check_no_stub_evidence(ctx: SubmissionContext) -> SubmissionCheck:
 
 
 def check_decision_records(ctx: SubmissionContext) -> SubmissionCheck:
-    """SUB-06: DR-01…DR-10 written as JSON and Markdown."""
-    item = "§18: DR-01…DR-10 written"
+    """SUB-06: every Decision Record (DR-01…DR-10, DR-11 since pre-L-2) written as JSON and MD."""
+    item = "§18: DR-01…DR-10 (+ DR-11) written"
     if (failed := _needs_run("SUB-06", item, ctx)) is not None:
         return failed
     folder = ctx.run.run_dir / "decision_records"
@@ -362,7 +363,11 @@ def check_economics_kpis(ctx: SubmissionContext) -> SubmissionCheck:
 
 
 def check_uncertainty(ctx: SubmissionContext) -> SubmissionCheck:
-    """SUB-11: a non-stub sensitivity result and P10/P50/P90 percentiles."""
+    """SUB-11: a non-stub sensitivity result and P10/P50/P90 percentiles.
+
+    The percentiles are those of the design TL-15 analysed: the selected design itself, or the
+    design whose robust backups DR-11 installed (``RunState.analysed_id``).
+    """
     item = "§18: sensitivity and Monte Carlo P10/P50/P90"
     if (failed := _needs_run("SUB-11", item, ctx)) is not None:
         return failed
@@ -371,7 +376,8 @@ def check_uncertainty(ctx: SubmissionContext) -> SubmissionCheck:
         for r in ctx.run.state.tool_results
         if "sensitivity" in r.tool and r.ok and not r.stub
     ]
-    kpis = _selected_kpis(ctx.run)
+    analysed = ctx.run.state.analysed_id(ctx.run.state.selected_id)
+    kpis = ctx.run.state.kpis.get(analysed) if analysed else None
     percentiles = [
         name
         for name, values in (kpis.percentiles if kpis else {}).items()
@@ -384,6 +390,7 @@ def check_uncertainty(ctx: SubmissionContext) -> SubmissionCheck:
     ]
     detail = (
         f"sensitivity {sorted(set(sensitivity)) or 'none'}; percentiles {percentiles or 'none'}"
+        + (f" (TL-15 on {analysed})" if analysed != ctx.run.state.selected_id else "")
     )
     return _passes("SUB-11", item, not problems, detail)
 

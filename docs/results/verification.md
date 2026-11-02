@@ -1,4 +1,4 @@
-**Verdict: ACCEPTED** (DesignVerifier) — DesignVerifier C2-opt: ACCEPTED; all 46 checks pass; tightest PH-02 margin 0 K
+**Verdict: ACCEPTED** (DesignVerifier) — DesignVerifier C2-opt-robust: ACCEPTED; all 46 checks pass; tightest PH-02 margin 0 K
 
 Violations: none; not evaluated: none
 

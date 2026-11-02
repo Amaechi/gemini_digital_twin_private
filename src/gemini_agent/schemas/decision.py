@@ -3,6 +3,7 @@
 # 2026-11-01: incident kinds/tools replaced by the GeoAgent phase/step kinds of spec §5.3; added
 # Decision Records (AG-07), option choices, missing-input requests (AG-05) and run status enums.
 # 2026-11-02 (L-1 follow-up): pre-validation hook for step kinds; DR criteria and evidence keys.
+# 2026-11-02 (pre-L-2): DR-11 backup capacity (OPT-ROBUST-BACKUP).
 """Typed decisions exchanged between the workflow runner and the decision engines (spec §5.3).
 
 The runner owns the phase order (P0–P10); an engine (deterministic policy or an LLM agent) only
@@ -315,7 +316,17 @@ class DecisionContext(StrictModel):
 
 
 DR_IDS = Literal[
-    "DR-01", "DR-02", "DR-03", "DR-04", "DR-05", "DR-06", "DR-07", "DR-08", "DR-09", "DR-10"
+    "DR-01",
+    "DR-02",
+    "DR-03",
+    "DR-04",
+    "DR-05",
+    "DR-06",
+    "DR-07",
+    "DR-08",
+    "DR-09",
+    "DR-10",
+    "DR-11",
 ]
 
 DR_TITLES: dict[str, str] = {
@@ -329,8 +340,10 @@ DR_TITLES: dict[str, str] = {
     "DR-08": "Return temperature",
     "DR-09": "Materials",
     "DR-10": "Final selection",
+    "DR-11": "Backup capacity (robustness)",
 }
-"""AG-07 Decision Records."""
+"""AG-07 Decision Records DR-01…DR-10, plus DR-11 (pre-L-2): install the TL-15 robust backup
+nameplates or keep the base-year ones (OPT-ROBUST-BACKUP), decided after P8."""
 
 
 class DecisionOption(StrictModel):

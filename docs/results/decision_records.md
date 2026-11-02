@@ -177,16 +177,36 @@ Rejected options:
 - Run: `final_policy` · phase P9 · role lead_engineer
 - Decision source: **policy**
 - Question: Which design is recommended?
-- **Choice: C2-opt** — C2-opt (TL-13 optimum of C2 (sized from C2-2d))
-- Decisive criterion: selected design whose latest verifier verdict is not REJECTED (key `verdict` from verify_design; evidence TR-016, TR-020)
-- Why: Decisive criterion: selected design whose latest verifier verdict is not REJECTED; it selects C2-opt (TR-016, TR-020).
+- **Choice: C2-opt-robust** — C2-opt-robust (C2-opt with the TL-15 P90 robust backups (OPT-ROBUST-BACKUP))
+- Decisive criterion: selected design whose latest verifier verdict is not REJECTED (key `verdict` from verify_design; evidence TR-021)
+- Why: Decisive criterion: selected design whose latest verifier verdict is not REJECTED; it selects C2-opt-robust (TR-021).
 
 | Option | Label | Eligible | Recommended | Evidence |
 |---|---|---|---|---|
-| C2-opt | C2-opt (TL-13 optimum of C2 (sized from C2-2d)) | yes | yes | TR-014, TR-015, TR-016, TR-017, TR-018, TR-019, TR-020 |
+| C2-opt-robust | C2-opt-robust (C2-opt with the TL-15 P90 robust backups (OPT-ROBUST-BACKUP)) | yes | yes | TR-019, TR-020, TR-021 |
+| C2-opt | C2-opt (TL-13 optimum of C2 (sized from C2-2d)) | no | no | TR-014, TR-015, TR-016, TR-017, TR-018, TR-019 |
 | C6-opt | C6-opt (TL-13 optimum of C6 (sized from C6-2d)) | no | no | TR-014 |
 | C1-opt | C1-opt (TL-13 optimum of C1 (sized from C1-3d)) | no | no | TR-014 |
 
 Rejected options:
+- C2-opt: Not eligible: not the verified design (only the verified design can be selected)
 - C6-opt: Not eligible: not the verified design (only the verified design can be selected)
 - C1-opt: Not eligible: not the verified design (only the verified design can be selected)
+
+
+# DR-11 Backup capacity (robustness)
+
+- Run: `final_policy` · phase P8 · role economics
+- Decision source: **policy**
+- Question: Which peak-backup capacity is installed: the base-year nameplates or the TL-15 robust nameplates?
+- **Choice: p90-robust-backup** — Install the TL-15 P90 robust backups (electric_chiller_mw 8.20, peak_boiler_mw 10.90 MW) as C2-opt-robust
+- Decisive criterion: register rule OPT-ROBUST-BACKUP: install robust_backup_mw when it raises probability_demand_met (key `OPT-ROBUST-BACKUP` from assumptions register; evidence TR-017, TR-019, config:assumptions.yaml#OPT-ROBUST-BACKUP, config:assumptions.yaml#UQ-MC)
+- Why: Decisive criterion: register rule OPT-ROBUST-BACKUP: install robust_backup_mw when it raises probability_demand_met; it selects p90-robust-backup (TR-017, TR-019, config:assumptions.yaml#OPT-ROBUST-BACKUP).
+
+| Option | Label | Eligible | Recommended | Evidence |
+|---|---|---|---|---|
+| installed-backup | Keep the base-year backup nameplates of C2-opt (electric_chiller_mw 8.20, peak_boiler_mw 5.00 MW) | yes | no | TR-019, TR-017, config:assumptions.yaml#OPT-ROBUST-BACKUP, config:assumptions.yaml#UQ-MC |
+| p90-robust-backup | Install the TL-15 P90 robust backups (electric_chiller_mw 8.20, peak_boiler_mw 10.90 MW) as C2-opt-robust | yes | yes | TR-019, TR-017, config:assumptions.yaml#OPT-ROBUST-BACKUP, config:assumptions.yaml#UQ-MC |
+
+Rejected options:
+- installed-backup: Not a best option under opt-robust-backup.

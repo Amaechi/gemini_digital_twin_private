@@ -7,8 +7,9 @@ Reducer contract (``DesignRunner``): the runner reads these ``ToolResult.data`` 
 name — ``load_design_basis.open_gaps``, ``generate_candidates.candidates``,
 ``design_guard.checks``, ``simulate_annual.kpis`` / ``economics.kpis`` / ``uncertainty.kpis``
 (``KPISet`` list), ``optimise_design.shortlist`` (+ optional ``candidates``: sized designs that
-join the run, and ``kpis``), ``verify_design.verdict`` / ``violations`` / ``verifier``.
-Real tools keep these field names.
+join the run, and ``kpis``), ``robust_backup`` (pre-L-2: ``candidate_id``, the variant in
+``candidates`` + ``kpis`` and the DR-11 evidence fields of ``RunState.robust_backup``),
+``verify_design.verdict`` / ``violations`` / ``verifier``. Real tools keep these field names.
 
 ``default_toolbox`` binds the real tools (WP-14, ``runner/real_tools.py``, ``stub=False``);
 the labelled stubs in ``runner/tool_stubs.py`` (``stub_toolbox``) remain for tests that exercise

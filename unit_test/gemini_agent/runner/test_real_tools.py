@@ -229,22 +229,39 @@ def smoke_run(tmp_path_factory):
 
 
 def test_policy_pipeline_on_real_tools_is_accepted_without_stubs(smoke_run):
-    """S1 shape: completed, ACCEPTED by the real DesignVerifier, no stub call, DR-01…DR-10."""
+    """S1 shape: completed, ACCEPTED by the real DesignVerifier, no stub call, DR-01…DR-11."""
     result, state, run_dir = smoke_run
     assert result.status == RunStatus.COMPLETED, result.summary
     assert result.verdict == DesignVerdict.ACCEPTED.value
     assert not any(record.stub for record in state.tool_results)
     latest = state.latest_verification(state.selected_id)
     assert latest is not None and latest.verifier == VERIFIER_NAME
-    assert {r.dr_id for r in state.decision_records} == {f"DR-{i:02d}" for i in range(1, 11)}
-    assert state.selected_id.endswith("-opt")  # P6's sized design joined the run
-    assert [c.id for c in state.candidates if c.id.endswith("-opt")] == [state.selected_id]
+    assert {r.dr_id for r in state.decision_records} == {f"DR-{i:02d}" for i in range(1, 12)}
+    # P8 workflow step (pre-L-2): the TL-15 robust backups priced, DR-11 decides the installation.
+    backup = state.robust_backup
+    step = next(r for r in state.tool_results if r.tool == "robust_backup")
+    assert (step.phase.value, step.source, step.id) == ("P8", "workflow", backup.tool_result_id)
+    dr11 = next(r for r in state.decision_records if r.dr_id == "DR-11")
+    analysed = backup.candidate_id
+    assert analysed.endswith("-opt")  # P6's sized design joined the run and TL-15 analysed it
+    assert [c.id for c in state.candidates if c.id.endswith("-opt")] == [analysed]
+    assert state.selected_id == (
+        analysed if dr11.choice == "installed-backup" else f"{analysed}-robust"
+    )
     assert state.selected_id in {c.id for c in state.candidates}
-    kpis = state.kpis[state.selected_id]
+    assert state.analysed_id(state.selected_id) == analysed
+    if backup.robust_candidate_id is not None:  # the variant is priced on the same basis
+        robust = state.kpis[backup.robust_candidate_id]
+        assert backup.year_mode == "full" and robust.lcoh_per_mwh is not None
+        assert backup.delta_lcoh_per_mwh == pytest.approx(
+            robust.lcoh_per_mwh - state.kpis[analysed].lcoh_per_mwh
+        )
+        assert backup.delta_capex_million > 0  # the added nameplate is priced
+    kpis = state.kpis[analysed]
     assert kpis.lcoh_per_mwh is not None and kpis.co2_reduction_vs_c0_frac is not None
     p7 = [r for r in state.tool_results if r.tool == "simulate_annual" and r.phase.value == "P7"]
     full = json.loads((run_dir / p7[-1].path).read_text("utf-8"))["data"]["kpis"]
-    full_kpis = next(k for k in full if k["candidate_id"] == state.selected_id)
+    full_kpis = next(k for k in full if k["candidate_id"] == analysed)
     assert kpis.lcoh_per_mwh == full_kpis["lcoh_per_mwh"]  # P8 adds percentiles only
     assert kpis.unmet_heating_days == full_kpis["unmet_heating_days"]
     assert kpis.exergy_efficiency_frac is not None
@@ -269,3 +286,54 @@ def test_results_pack_renders_from_the_finished_run(smoke_run, tmp_path):
     assert bars and "USD/MWh" not in title
     rows = json.loads(json.dumps(plots.candidates_table(view)[1].to_dict("records")))
     assert any(row["concept"] == "C0" for row in rows)
+
+
+def test_robust_backup_branches_never_escalate(smoke_run, tmp_path, monkeypatch):
+    """Pre-L-2 step on the smoke run's files (resume path): variant, no TL-15, nothing to add,
+    failed evaluation — the last three return a reason instead of raising (DR-11: installed)."""
+    import shutil
+
+    _, state, run_dir = smoke_run
+    work = tmp_path / "runs" / "smoke"
+    shutil.copytree(run_dir, work)
+    analysed = state.robust_backup.candidate_id
+    context = ToolContext(
+        run_id="smoke",
+        run_dir=work,
+        config_dir=None,
+        candidates=tuple(c for c in state.candidates if not c.id.endswith("-robust")),
+        kpis=dict(state.kpis),
+        selected_id=analysed,
+    )
+    session = ToolSession("smoke")
+    tools = real_tools.RealTools(session)
+    args = CandidateArgs(candidate_id=analysed)
+    result = tools.robust_backup(args, context)  # TL-15 read back from uncertainty_<id>.json
+    out = result.data
+    assert out.robust_candidate_id == f"{analysed}-robust" and out.year_mode == "fast"
+    assert out.added_backup_mw and out.delta_capex_million > 0
+    assert len(result.summary) <= 300 and "DR-11 decides" in result.summary
+    sized = json.loads((work / "session" / "sized_designs.json").read_text("utf-8"))
+    assert sized[out.robust_candidate_id]["robust_backup_of"] == analysed
+
+    other = next(c.id for c in context.candidates if c.id != analysed and c.doublets > 0)
+    missing = tools.robust_backup(CandidateArgs(candidate_id=other), context).data
+    assert missing.robust_candidate_id is None and "no TL-15 result" in missing.reason
+
+    path = work / f"uncertainty_{analysed}.json"
+    report = json.loads(path.read_text("utf-8"))
+    path.write_text(json.dumps(report | {"robust_backup_mw": report["installed_backup_mw"]}))
+    fresh = real_tools.RealTools(ToolSession("smoke"))
+    nothing = fresh.robust_backup(args, context).data
+    assert nothing.robust_candidate_id is None and "within the installed" in nothing.reason
+    path.write_text(json.dumps(report))
+
+    def broken(context, candidate):
+        raise ValueError("no plant")
+
+    failing = ToolSession("smoke")
+    monkeypatch.setattr(failing, "screen", broken)
+    failed = real_tools.RealTools(failing).robust_backup(args, context)
+    assert failed.data.robust_candidate_id is None
+    assert failed.data.reason == "variant not evaluated: no plant" and failed.warnings
+    assert f"{analysed}-robust" not in failing.memo(context).sized

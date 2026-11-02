@@ -80,7 +80,7 @@ def test_policy_run_completes_p0_to_p10_with_artefacts(tmp_path):
     run_dir = tmp_path / "r1"
     for name in ("run_summary.json", "events.jsonl", "token_summary.json", "report_draft.md"):
         assert (run_dir / name).exists(), name
-    assert len(list((run_dir / "decision_records").glob("DR-*.json"))) == 10
+    assert len(list((run_dir / "decision_records").glob("DR-*.json"))) == len(DR_TITLES)
     summary = json.loads((run_dir / "run_summary.json").read_text())
     assert summary["approval"] == "pending" and summary["stub_tool_calls"] > 0
     assert any(
@@ -344,7 +344,9 @@ def test_llm_engine_path_completes_and_logs_every_call(tmp_path):
     assert {r.decision_source for r in records} == {"llm"}
     assert all(d.payload["source"] == "llm" for d in decisions)
     assert all(r.decision_source == "llm" for r in state.decision_records)
-    assert all(t.source == "llm" for t in state.tool_results)
+    workflow = {t for spec in PHASE_SPECS.values() for t in spec.workflow_tools}
+    assert all(t.source == "llm" for t in state.tool_results if t.tool not in workflow)
+    assert {t.source for t in state.tool_results if t.tool in workflow} == {"workflow"}
     summary = json.loads((tmp_path / "l1" / "token_summary.json").read_text())
     assert summary["total"]["calls"] == len(records) and summary["total"]["input_tokens"] > 0
     assert set(summary["by_phase"]) == {p.value for p in Phase}
@@ -624,7 +626,8 @@ def test_duplicate_guard_scope(tmp_path):
     state = runner.load_state("g1")
     verify = [r for r in state.tool_results if r.tool == "verify_design"]
     assert [(r.phase, r.source) for r in verify] == [(Phase.P7, "policy"), (Phase.P9, "policy")]
-    assert verify[0].signature == verify[1].signature  # same args, same state: exempt in P9
+    # Pre-L-2: P8's robust_backup step and DR-11 change the run state between P7 and P9.
+    assert verify[0].signature != verify[1].signature
     assert not [e for e in runner.store("g1").list_events("g1") if e.type == "STEP_REJECTED"]
 
     def record(tool, args, phase, ok=True):
@@ -664,3 +667,145 @@ def test_duplicate_guard_scope(tmp_path):
     assert runner._duplicate_of(state, p7, "simulate_annual", {}) == sim
     state.loop_count += 1
     assert runner._duplicate_of(state, p7, "simulate_annual", {}) is None
+
+
+# --------------------------------------------------------------------------- DR-11 (pre-L-2)
+def _robust_toolbox(reject_robust: bool = False):
+    """Stub toolbox + fake TL-13 (C2-opt), a fake robust_backup step and a stub verifier."""
+    from gemini_agent.runner.real_tools import RobustBackupToolOutput
+
+    def optimise(args, context):
+        base = next(c for c in context.candidates if c.concept == "C2")
+        sized = base.model_copy(update={"id": "C2-opt", "equipment_sizes": {"peak_boiler_mw": 5.0}})
+        kpi = KPISet(candidate_id="C2-opt", lcoh_per_mwh=42.5, lcoc_per_mwh=26.3)
+        data = _SizedOut(shortlist=["C2-opt"], kpi_evidence=True, candidates=[sized], kpis=[kpi])
+        return ToolResult[_SizedOut](data=data, summary="fake TL-13")
+
+    def robust_backup(args, context):
+        installed = next(c for c in context.candidates if c.id == args.candidate_id)
+        variant = installed.model_copy(
+            update={"id": f"{installed.id}-robust", "equipment_sizes": {"peak_boiler_mw": 10.9}}
+        )
+        data = RobustBackupToolOutput(
+            candidate_id=installed.id,
+            robust_candidate_id=variant.id,
+            robust_backup_percentile=90,
+            installed_backup_mw={"peak_boiler_mw": 5.0},
+            robust_backup_mw={"peak_boiler_mw": 10.9},
+            added_backup_mw={"peak_boiler_mw": 5.9},
+            probability_demand_met=0.46,
+            probability_demand_met_robust=0.9,
+            year_mode="full",
+            delta_lcoh_per_mwh=2.05,
+            delta_lcoc_per_mwh=0.0,
+            delta_lcoh_plus_lcoc_per_mwh=2.05,
+            delta_capex_million=2.2,
+            robust_meets_demand=True,
+            candidates=[variant],
+            kpis=[KPISet(candidate_id=variant.id, lcoh_per_mwh=44.55, lcoc_per_mwh=26.3)],
+        )
+        return ToolResult[RobustBackupToolOutput](data=data, summary="fake robust_backup")
+
+    def verify(args, context):
+        candidate = context.selected_id if args.candidate_id == "all" else args.candidate_id
+        verdict = "REJECTED" if reject_robust and candidate.endswith("-robust") else "UNVERIFIED"
+        return ToolResult[VerificationOutput](
+            data=VerificationOutput(
+                candidate_id=candidate,
+                verdict=verdict,
+                violations=["boiler"] if verdict == "REJECTED" else [],
+                verifier="fake",
+            ),
+            summary=f"fake verifier: {verdict}",
+        )
+
+    toolbox = stub_toolbox()
+    toolbox.register(ToolSpec("optimise_design", "fake", OptimiseArgs, optimise, owner="test"))
+    toolbox.register(
+        ToolSpec("robust_backup", "fake", CandidateArgs, robust_backup, owner="test", stub=False)
+    )
+    toolbox.register(ToolSpec("verify_design", "fake", CandidateArgs, verify, owner="test"))
+    return toolbox
+
+
+def test_dr11_installs_the_robust_backups_and_p9_verifies_that_design(tmp_path):
+    """The workflow step runs after P8's tools; the DR-11 choice selects the design for P9."""
+    runner = _runner(tmp_path, toolbox=_robust_toolbox())
+    result = runner.start("", run_id="rb")
+    state = runner.load_state("rb")
+    assert result.status == RunStatus.COMPLETED and result.selected_id == "C2-opt-robust"
+    p8 = [r for r in state.tool_results if r.phase == Phase.P8]
+    assert [(r.tool, r.source) for r in p8] == [
+        ("uncertainty", "policy"),
+        ("sensitivity", "policy"),
+        ("robust_backup", "workflow"),
+    ]
+    assert state.robust_backup.tool_result_id == p8[-1].id
+    assert state.progress["P8"].tool_calls_used == 2  # the workflow step is not the agent's
+    dr11 = next(r for r in state.decision_records if r.dr_id == "DR-11")
+    assert (dr11.choice, dr11.criterion.id) == ("p90-robust-backup", "opt-robust-backup")
+    assert state.shortlist[0] == "C2-opt-robust" and "C2-opt" in state.shortlist
+    assert state.kpis["C2-opt-robust"].lcoh_per_mwh == 44.55
+    assert state.analysed_id("C2-opt-robust") == "C2-opt"
+    events = runner.store("rb").list_events("rb")
+    selected = [e.payload for e in events if e.type == "DESIGN_SELECTED"]
+    assert selected == [
+        {
+            "candidate_id": "C2-opt-robust",
+            "replaces": "C2-opt",
+            "dr_id": "DR-11",
+            "message": "DR-11 p90-robust-backup: selected C2-opt-robust instead of C2-opt; the P9 "
+            "DesignVerifier verifies it",
+        }
+    ]
+    p9 = [r for r in state.tool_results if r.phase == Phase.P9 and r.tool == "verify_design"]
+    assert [r.args["candidate_id"] for r in p9] == ["C2-opt-robust"]
+    assert next(r for r in state.decision_records if r.dr_id == "DR-10").choice == "C2-opt-robust"
+    assert result.verdict == "UNVERIFIED"  # stub verifier: never ACCEPTED (golden rule 3)
+
+
+def test_dr11_rejected_variant_loops_back_and_keeps_the_installed_backups(tmp_path):
+    """A variant the P9 verifier REJECTs is excluded: the next pass re-decides DR-11."""
+    runner = _runner(tmp_path, toolbox=_robust_toolbox(reject_robust=True))
+    result = runner.start("", run_id="rr")
+    state = runner.load_state("rr")
+    assert result.status == RunStatus.COMPLETED and result.selected_id == "C2-opt"
+    assert state.loop_count == 1 and "C2-opt-robust" in state.excluded_ids()
+    events = runner.store("rr").list_events("rr")
+    choices = [e.payload["choice"] for e in events if e.type == "DECISION_RECORD"]
+    assert [c for c in choices if c.endswith("backup")] == ["p90-robust-backup", "installed-backup"]
+    dr11 = next(r for r in state.decision_records if r.dr_id == "DR-11")
+    assert dr11.choice == "installed-backup" and "excluded" in dr11.options[1].notes
+
+
+def test_dr11_llm_may_keep_the_installed_backups_on_the_cost_criterion(tmp_path):
+    """The LLM decides DR-11 on the offered evidence: keeping the backups is a valid choice."""
+
+    def keeps_backups(messages, info):
+        if output_name(info) == "OptionChoice" and "DR-11" in user_prompt(messages)[:20]:
+            choice = {
+                "dr_id": "DR-11",
+                "criterion": "lowest-delta_lcoh_plus_lcoc_per_mwh",
+                "option_id": "installed-backup",
+                "rationale": "lowest delta_lcoh_plus_lcoc_per_mwh in robust_backup: the base-year "
+                "backups add no cost",
+                "rejected": [{"option_id": "p90-robust-backup", "reason": "adds backup cost"}],
+            }
+            return ModelResponse(parts=[TextPart(json.dumps(choice))])
+        return policy_like(messages, info)
+
+    engine, logger = _llm_engine(tmp_path, "lk", keeps_backups)
+    toolbox = _robust_toolbox()
+    runner = _runner(tmp_path, engine=engine, toolbox=toolbox)
+    result = runner.start("", run_id="lk")
+    state = runner.load_state("lk")
+    assert result.status == RunStatus.COMPLETED and result.selected_id == "C2-opt"
+    dr11 = next(r for r in state.decision_records if r.dr_id == "DR-11")
+    assert (dr11.choice, dr11.decision_source) == ("installed-backup", "llm")
+    assert dr11.criterion.key == "delta_lcoh_plus_lcoc_per_mwh"
+    assert state.fallback_count() == 0
+    assert {r.decision_source for r in logger.records()} == {"llm"}
+    events = runner.store("lk").list_events("lk")
+    assert not [e for e in events if e.type == "DESIGN_SELECTED"]
+    md = (tmp_path / "lk" / "decision_records" / "DR-11.md").read_text("utf-8")
+    assert "the chosen option is installed and verified in P9" in md

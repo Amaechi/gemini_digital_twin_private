@@ -177,3 +177,65 @@ def test_report_puts_the_answer_first(tmp_path):
     assert "**C1-opt**" in text and "LCOH 33.0 USD/MWh" in text and "85% below" in text
     assert "![fig_daily_heat.png](fig_daily_heat.png)" in text
     assert "LIM-SUB-01 ESP has no flow affinity" in text  # WP-12 limitations reported
+
+
+def test_dr11_variant_reports_its_tl15_source_and_the_change(tmp_path):
+    """Pre-L-2: a DR-11 robust-backup variant reads the TL-15 analysis of its source design."""
+    view = _view(tmp_path / "run")
+    run_dir = view.run_dir
+    robust = _candidate("C1-opt", "C1", 3).model_copy(
+        update={"id": "C1-opt-robust", "equipment_sizes": {"peak_boiler_mw": 9.0}}
+    )
+    sized = {
+        "C1-opt": {"candidate": _candidate("C1-opt", "C1", 3).model_dump(mode="json")},
+        "C1-opt-robust": {
+            "candidate": robust.model_dump(mode="json"),
+            "robust_backup_of": "C1-opt",
+        },
+    }
+    (run_dir / "session" / "sized_designs.json").write_text(json.dumps(sized), "utf-8")
+    uq = json.loads((run_dir / "uncertainty_C1-opt.json").read_text("utf-8"))
+    uq |= {
+        "candidate_id": "C1-opt",
+        "probability_demand_met": 0.46,
+        "probability_demand_met_robust": 0.9,
+        "installed_backup_mw": {"peak_boiler_mw": 4.5},
+        "robust_backup_mw": {"peak_boiler_mw": 9.0},
+    }
+    (run_dir / "uncertainty_C1-opt.json").write_text(json.dumps(uq), "utf-8")
+    step = {
+        "candidate_id": "C1-opt",
+        "robust_candidate_id": "C1-opt-robust",
+        "delta_lcoh_per_mwh": 2.05,
+        "delta_lcoc_per_mwh": 0.0,
+        "delta_capex_million": 2.2,
+        "year_mode": "full",
+    }
+    (run_dir / "tool_results" / "TR-019_robust_backup.json").write_text(
+        json.dumps({"data": step}), "utf-8"
+    )
+    (run_dir / "annual_C1-opt-robust_full.csv").write_text(
+        (run_dir / "annual_C1-opt_full.csv").read_text("utf-8"), "utf-8"
+    )
+    view.candidates.append(robust)
+    view.kpis["C1-opt-robust"] = view.kpis["C1-opt"].model_copy(
+        update={"candidate_id": "C1-opt-robust", "lcoh_per_mwh": 35.2}
+    )
+    view.selected_id = "C1-opt-robust"
+    view.decision_records.append(
+        {"dr_id": "DR-11", "title": "Backup", "choice": "p90-robust-backup",
+         "choice_label": "robust", "decision_source": "llm"}
+    )  # fmt: skip
+    assert view.analysed_id() == "C1-opt" and view.uncertainty()["candidate_id"] == "C1-opt"
+    assert view.sensitivity() is not None
+    sizing = plots.sizing_table(view)
+    assert (
+        "| peak_boiler_mw | 9.00 | TL-15 robust backup (DR-11, OPT-ROBUST-BACKUP); C1-opt: 4.50 |"
+        in sizing
+    )
+    table = plots.uncertainty_table(view)
+    assert table.startswith("TL-15 on C1-opt (base-year backups); the selected C1-opt-robust")
+    text, _ = plots.report_markdown(view)
+    assert "**C1-opt-robust**" in text and "LCOH 35.2 USD/MWh" in text
+    assert "demand met in 46% of samples" in text and "→ 90% (installed by DR-11, llm)" in text
+    assert "ΔLCOH +2.05, ΔLCOC +0.00 USD/MWh, ΔCAPEX +2.20 MUSD (full year" in text

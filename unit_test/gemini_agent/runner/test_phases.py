@@ -2,6 +2,7 @@
 
 import pytest
 
+from gemini_agent.agents.roles import ROLES
 from gemini_agent.runner.phases import PHASE_ORDER, PHASE_SPECS, next_phase
 from gemini_agent.runner.ranking import has_kpi_evidence, rank_candidates
 from gemini_agent.runner.tool_stubs import stub_toolbox
@@ -22,8 +23,11 @@ def test_phase_table_is_complete_and_ordered():
     for spec in PHASE_SPECS.values():
         assert spec.budget.max_steps > len(spec.required_tools)
         assert spec.budget.max_tool_calls >= len(spec.required_tools)
-        assert all(tool in toolbox for tool in spec.required_tools)
-        assert set(spec.default_args) <= set(spec.required_tools)
+        assert all(tool in toolbox for tool in spec.required_tools + spec.workflow_tools)
+        assert set(spec.default_args) <= set(spec.required_tools + spec.workflow_tools)
+        # Workflow steps belong to the runner, never to the agent (pre-L-2).
+        assert not set(spec.workflow_tools) & set(ROLES[spec.role].tools), spec.phase
+    assert PHASE_SPECS[Phase.P8].workflow_tools == ("robust_backup",)
 
 
 def test_ranking_uses_lcoh_and_unmet_demand(tmp_path):

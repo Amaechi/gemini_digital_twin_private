@@ -4,7 +4,7 @@
   "phase": "P10",
   "engine": "policy",
   "input_mode": "assume",
-  "selected_candidate": "C2-opt",
+  "selected_candidate": "C2-opt-robust",
   "verdict": "ACCEPTED",
   "approval": "pending",
   "loop_count": 0,
@@ -75,14 +75,20 @@
       "stub_evidence": false
     },
     {
+      "dr_id": "DR-11",
+      "choice": "p90-robust-backup",
+      "decision_source": "policy",
+      "stub_evidence": false
+    },
+    {
       "dr_id": "DR-10",
-      "choice": "C2-opt",
+      "choice": "C2-opt-robust",
       "decision_source": "policy",
       "stub_evidence": false
     }
   ],
-  "tool_calls": 22,
+  "tool_calls": 23,
   "stub_tool_calls": 0,
-  "final_summary": "Completed P0\u2013P10: selected C2-opt (verifier verdict ACCEPTED); 10 Decision Records; approval pending; 0/22 tool calls were stubs.",
+  "final_summary": "Completed P0\u2013P10: selected C2-opt-robust (verifier verdict ACCEPTED); 11 Decision Records; approval pending; 0/23 tool calls were stubs.",
   "escalation_reason": ""
 }

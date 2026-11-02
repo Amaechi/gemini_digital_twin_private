@@ -126,13 +126,18 @@ class RunView:
         path = self.run_dir / name
         return json.loads(path.read_text(encoding="utf-8")) if path.is_file() else None
 
+    def analysed_id(self) -> str | None:
+        """Design TL-15 analysed for the selected one (its source when DR-11 installed backups)."""
+        sized = self.sized().get(self.selected_id or "") or {}
+        return sized.get("robust_backup_of") or self.selected_id
+
     def uncertainty(self) -> dict[str, Any] | None:
-        """TL-15 report of the selected design."""
-        return self.json_file(f"uncertainty_{self.selected_id}.json")
+        """TL-15 report covering the selected design (``analysed_id``)."""
+        return self.json_file(f"uncertainty_{self.analysed_id()}.json")
 
     def sensitivity(self) -> dict[str, Any] | None:
-        """TL-14 cost sensitivity of the selected design."""
-        return self.json_file(f"sensitivity_{self.selected_id}.json")
+        """TL-14 cost sensitivity covering the selected design (``analysed_id``)."""
+        return self.json_file(f"sensitivity_{self.analysed_id()}.json")
 
     def sized(self) -> dict[str, Any]:
         """TL-13 sized designs (``session/sized_designs.json``)."""
@@ -371,8 +376,8 @@ def plot_uncertainty(view: RunView, out_dir: Path, files: list[str]) -> None:
         base = (report.get("base") or {}).get(kpi)
         if base is not None:
             ax.axvline(base, color=INK_2, linewidth=1, linestyle="--", label=f"base {base:.1f}")
-        _style(ax, f"{label} uncertainty (TL-15 Monte Carlo)", ylabel="cumulative probability",
-               xlabel="USD/MWh")  # fmt: skip
+        _style(ax, f"{label} uncertainty (TL-15 Monte Carlo, {report.get('candidate_id')})",
+               ylabel="cumulative probability", xlabel="USD/MWh")  # fmt: skip
         ax.legend(frameon=False, fontsize=8, loc="lower right")
     _save(fig, out_dir, "fig_uncertainty.png", files)
 
@@ -519,6 +524,10 @@ def sizing_table(view: RunView) -> str:
         return "No selected design.\n"
     k = view.kpis.get(c.id)
     sized = view.sized().get(c.id, {})
+    source = sized.get("robust_backup_of")  # DR-11 variant: backups above the source's
+    source_sizes = ((view.sized().get(source) or {}).get("candidate") or {}).get(
+        "equipment_sizes", {}
+    )
     rows = [
         ["Design", c.id, c.description],
         ["Doublets", str(c.doublets), "DB-10: 1–3"],
@@ -529,7 +538,13 @@ def sizing_table(view: RunView) -> str:
         ["Cooling return (DB-32)", _num(c.cooling_return_degc, ".0f") + " °C", "supply 20 °C"],
     ]
     for key, value in sorted(c.equipment_sizes.items()):
-        rows.append([key, _num(value, ".2f"), "TL-13 size / right-sized backup"])
+        basis = "TL-13 size / right-sized backup"
+        if source and value != source_sizes.get(key):
+            basis = (
+                f"TL-15 robust backup (DR-11, OPT-ROBUST-BACKUP); {source}: "
+                f"{_num(source_sizes.get(key), '.2f')}"
+            )
+        rows.append([key, _num(value, ".2f"), basis])
     if sized.get("outage_start_indices"):
         rows.append(["Outage start days (0-based)", str(sized["outage_start_indices"]), "DR-06"])
     if sized.get("excluded_depths_m"):
@@ -618,11 +633,18 @@ def uncertainty_table(view: RunView) -> str:
     report = view.uncertainty()
     if not report:
         return "No uncertainty analysis.\n"
+    analysed = report.get("candidate_id")
+    head = f"TL-15 on {analysed}"
+    if analysed != view.selected_id:
+        head += (
+            f" (base-year backups); the selected {view.selected_id} installs its robust backups "
+            "(DR-11, OPT-ROBUST-BACKUP)"
+        )
     rows = [
         [kpi] + [_num(v.get(p), ".2f") for p in ("p10", "p50", "p90")]
         for kpi, v in sorted((report.get("percentiles") or {}).items())
     ]
-    text = _md_table(["KPI", "P10", "P50", "P90"], rows)
+    text = head + ".\n\n" + _md_table(["KPI", "P10", "P50", "P90"], rows)
     text += (
         f"\nSamples {len(report.get('samples') or [])} (failed {report.get('failed_samples')}); "
         f"P(demand met) at installed backups {report.get('probability_demand_met')}; robust "
@@ -726,12 +748,29 @@ def report_markdown(view: RunView, figure_dir: str = "figures/") -> tuple[str, l
         ]
         uq = view.uncertainty() or {}
         if uq.get("probability_demand_met") is not None:
+            analysed = view.analysed_id()
+            dr11 = next((r for r in view.decision_records if r.get("dr_id") == "DR-11"), None)
+            if analysed != view.selected_id:
+                status = f"installed by DR-11, {(dr11 or {}).get('decision_source', 'n/a')}"
+            elif dr11 is not None:
+                status = f"not installed: DR-11 chose {dr11['choice']}"
+            else:
+                status = "not installed: no DR-11"
             lines.append(
-                f"- Robustness (TL-15, {len(uq.get('samples') or [])} samples): demand met in "
-                f"{uq['probability_demand_met']:.0%} of samples with the installed backups; "
-                f"backups {uq.get('robust_backup_mw')} MW → "
-                f"{_num(uq.get('probability_demand_met_robust'), '.0%')} (not installed: "
-                "decision for the review)"
+                f"- Robustness (TL-15 on {analysed}, {len(uq.get('samples') or [])} samples): "
+                f"demand met in {uq['probability_demand_met']:.0%} of samples with the "
+                f"base-year backups {uq.get('installed_backup_mw')} MW; robust backups "
+                f"{uq.get('robust_backup_mw')} MW → "
+                f"{_num(uq.get('probability_demand_met_robust'), '.0%')} ({status})"
+            )
+        backup = latest_tool_data(view.run_dir, "robust_backup") or {}
+        if backup.get("robust_candidate_id"):
+            lines.append(
+                f"- Backup capacity (DR-11): {backup['robust_candidate_id']} vs "
+                f"{backup['candidate_id']}: ΔLCOH {_num(backup.get('delta_lcoh_per_mwh'), '+.2f')}"
+                f", ΔLCOC {_num(backup.get('delta_lcoc_per_mwh'), '+.2f')} USD/MWh, ΔCAPEX "
+                f"{_num(backup.get('delta_capex_million'), '+.2f')} MUSD "
+                f"({backup.get('year_mode')} year, TL-12 + TL-14)"
             )
     else:
         lines.append("No design selected.")
@@ -743,7 +782,8 @@ def report_markdown(view: RunView, figure_dir: str = "figures/") -> tuple[str, l
     ) + "".join(f"\n- {cid}: {why}" for cid, why in (opt.get("skipped") or {}).items())
     alternatives = candidates_table(view)[0] + (
         "\nRows `C*-Nd` are the spec §3.4 screening points (TL-12 fast year); `*-opt` rows are "
-        "the TL-13 optima (P6); `*` marks the selected design." + notes + "\n"
+        "the TL-13 optima (P6); a `*-robust` row is an optimum with its TL-15 robust backups "
+        "(P8, DR-11); `*` marks the selected design." + notes + "\n"
     )
     for title, body in (
         ("Alternatives compared (C0–C8)", alternatives),

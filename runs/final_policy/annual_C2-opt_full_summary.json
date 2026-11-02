@@ -2,7 +2,7 @@
  "tool": "TL-12",
  "candidate_id": "C2-opt",
  "mode": "full",
- "config_hash": "546740a54d76297c64de18bc8cc691c29e391427b6bb1e5fb5bce713b8968b35",
+ "config_hash": "a32512d4643677974a2c136a553f326166fd6401b2b4d72779807bfbc696fc08",
  "year": 2027,
  "interpretation": "A",
  "simulated_days": 365,
@@ -133,7 +133,7 @@
   "injection_pump_2": "shared",
   "peak_boiler": "heat"
  },
- "elapsed_s": 8.519076658000358,
+ "elapsed_s": 7.988875088999976,
  "warnings": [
   "hthp_1: MISSING HTHP datasheet values ['max_lift_k', 'max_sink_temperature_degc', 'max_carnot_fraction']: RC-04 defaults VER-HP-ETA, VER-HP-LIFT; max sink temperature not checked [\u00d71160]",
   "hthp_1: COP 5.30 capped at 0.6 x Carnot = 4.48 (RC-04) [\u00d71160]",

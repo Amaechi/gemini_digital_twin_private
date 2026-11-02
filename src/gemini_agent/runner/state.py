@@ -60,6 +60,30 @@ class Verification(StrictModel):
     phase: Phase
 
 
+class RobustBackup(StrictModel):
+    """Reducer copy of the latest ``robust_backup`` result (DR-11 evidence, OPT-ROBUST-BACKUP).
+
+    ``candidate_id`` is the design TL-15 analysed (installed backups); ``robust_candidate_id`` the
+    same design with the TL-15 robust backups (None: nothing to add or not evaluated).
+    """
+
+    candidate_id: str
+    robust_candidate_id: str | None = None
+    tool_result_id: str
+    robust_backup_percentile: float | None = None
+    installed_backup_mw: dict[str, float] = Field(default_factory=dict)
+    robust_backup_mw: dict[str, float] = Field(default_factory=dict)
+    probability_demand_met: float | None = None
+    probability_demand_met_robust: float | None = None
+    delta_lcoh_per_mwh: float | None = None
+    delta_lcoc_per_mwh: float | None = None
+    delta_lcoh_plus_lcoc_per_mwh: float | None = None
+    delta_capex_million: float | None = None
+    robust_meets_demand: bool = False
+    year_mode: str = ""
+    reason: str = Field(default="", description="Why there is no usable robust variant.")
+
+
 class PhaseProgress(StrictModel):
     """Budget use and completion inside one phase pass."""
 
@@ -104,6 +128,9 @@ class RunState(StrictModel):
     answers: list[InputAnswer] = Field(default_factory=list)
     pending: InputRequest | None = None
     decision_records: list[DecisionRecord] = Field(default_factory=list)
+    robust_backup: RobustBackup | None = Field(
+        default=None, description="Latest robust_backup result (P8, DR-11)."
+    )
     violations: list[str] = Field(default_factory=list)
     approval: Literal["approved", "rejected", "pending"] | None = None
     final_summary: str = ""
@@ -130,6 +157,17 @@ class RunState(StrictModel):
         steps = sum(progress.fallbacks for progress in self.progress.values())
         records = sum(1 for r in self.decision_records if r.decision_source == "policy_fallback")
         return steps + records + self.earlier_pass_fallbacks
+
+    def analysed_id(self, candidate_id: str | None) -> str | None:
+        """Design whose TL-15 analysis covers ``candidate_id``.
+
+        A robust-backup variant (DR-11) is the TL-15 design with larger backups; its Monte Carlo,
+        cases and tornado are those of the design TL-15 analysed.
+        """
+        backup = self.robust_backup
+        if backup is not None and candidate_id and candidate_id == backup.robust_candidate_id:
+            return backup.candidate_id
+        return candidate_id
 
     def latest_verification(self, candidate_id: str | None) -> Verification | None:
         """Most recent verification of a candidate."""

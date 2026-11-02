@@ -32,7 +32,8 @@
    3000.0,
    3200.0,
    3500.0
-  ]
+  ],
+  "robust_backup_of": null
  },
  "C6-opt": {
   "candidate": {
@@ -67,7 +68,8 @@
    3000.0,
    3200.0,
    3500.0
-  ]
+  ],
+  "robust_backup_of": null
  },
  "C1-opt": {
   "candidate": {
@@ -102,6 +104,43 @@
    3000.0,
    3200.0,
    3500.0
-  ]
+  ],
+  "robust_backup_of": null
+ },
+ "C2-opt-robust": {
+  "candidate": {
+   "id": "C2-opt-robust",
+   "concept": "C2",
+   "parent_id": null,
+   "description": "C2-opt with the TL-15 P90 robust backups (OPT-ROBUST-BACKUP)",
+   "doublets": 2,
+   "depth_m": 2500.0,
+   "design_flow_m3h": 296.0,
+   "equipment_sizes": {
+    "hthp_heating_mw": 4.1,
+    "peak_boiler_mw": 10.9,
+    "electric_chiller_mw": 8.2
+   },
+   "gas_handling": "degas_use",
+   "heating_return_degc": 55.0,
+   "cooling_return_degc": 26.0
+  },
+  "concept_candidate_id": "C2-2d",
+  "parent_concept": null,
+  "outage_start_indices": [
+   119,
+   238
+  ],
+  "depth_options_m": [
+   1500.0,
+   2000.0,
+   2500.0
+  ],
+  "excluded_depths_m": [
+   3000.0,
+   3200.0,
+   3500.0
+  ],
+  "robust_backup_of": "C2-opt"
  }
 }
