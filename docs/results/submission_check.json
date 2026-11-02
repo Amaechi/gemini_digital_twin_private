@@ -1,0 +1,152 @@
+{
+  "generated_at": "2026-11-02T15:20:59.201979+00:00",
+  "repo_root": "/home/user/gemini_digital_twin_private",
+  "run_dir": "/home/user/gemini_digital_twin_private/runs/final_policy",
+  "eval_root": "/home/user/gemini_digital_twin_private/runs/final/eval",
+  "checks": [
+    {
+      "id": "SUB-01",
+      "item": "DL-04: final run artefacts (run_summary.json, events.sqlite, events.jsonl)",
+      "status": "pass",
+      "detail": "/home/user/gemini_digital_twin_private/runs/final_policy; missing none"
+    },
+    {
+      "id": "SUB-02",
+      "item": "Run completed (P0–P10) and the recommended design was approved (P10)",
+      "status": "warn",
+      "detail": "approval pending: non-interactive run; approve with an ask-mode run"
+    },
+    {
+      "id": "SUB-03",
+      "item": "§18: ACCEPTED design (final verifier verdict)",
+      "status": "pass",
+      "detail": "selected C2-opt, verdict ACCEPTED"
+    },
+    {
+      "id": "SUB-04",
+      "item": "No stub tool calls (run_summary.json stub_tool_calls = 0)",
+      "status": "pass",
+      "detail": "0/22 tool calls were stubs"
+    },
+    {
+      "id": "SUB-05",
+      "item": "No final Decision Record with stub_evidence",
+      "status": "pass",
+      "detail": "stub evidence in none"
+    },
+    {
+      "id": "SUB-06",
+      "item": "§18: DR-01…DR-10 written",
+      "status": "pass",
+      "detail": "missing none"
+    },
+    {
+      "id": "SUB-07",
+      "item": "§18: 0 unmet heating/cooling days over 365 days (or justified)",
+      "status": "pass",
+      "detail": "unmet heating days 0, cooling days 0"
+    },
+    {
+      "id": "SUB-08",
+      "item": "§18: DB-10…17 satisfied every day (verifier report)",
+      "status": "pass",
+      "detail": "DesignVerifier on C2-opt: no violations"
+    },
+    {
+      "id": "SUB-09",
+      "item": "§18: C0–C7 compared with KPIs",
+      "status": "pass",
+      "detail": "concepts without KPIs: none"
+    },
+    {
+      "id": "SUB-10",
+      "item": "§18: LCOH/LCOC, CO2 vs C0, exergy (selected design)",
+      "status": "pass",
+      "detail": "missing none"
+    },
+    {
+      "id": "SUB-11",
+      "item": "§18: sensitivity and Monte Carlo P10/P50/P90",
+      "status": "pass",
+      "detail": "sensitivity ['sensitivity']; percentiles ['lcoh_per_mwh', 'lcoc_per_mwh', 'lcoh_plus_lcoc_per_mwh', 'co2_t_per_yr', 'capex_million', 'unmet_heating_days', 'unmet_cooling_days', 'unmet_heating_mwh', 'unmet_cooling_mwh', 'thermal_breakthrough_yr', 'required_peak_boiler_mw', 'required_electric_chiller_mw']"
+    },
+    {
+      "id": "SUB-12",
+      "item": "§18: llm_calls.jsonl + token_summary.json (final run)",
+      "status": "fail",
+      "detail": "0 LLM calls; ['no llm_calls.jsonl records (the final run must use --engine llm)']"
+    },
+    {
+      "id": "SUB-13",
+      "item": "Cost placeholders set (CostAssumptions.unset_placeholders() empty)",
+      "status": "pass",
+      "detail": "unset placeholders: none"
+    },
+    {
+      "id": "SUB-14",
+      "item": "VERIFY-tagged cost items flagged (cost_items[].verify, RC-05)",
+      "status": "warn",
+      "detail": "economics used VERIFY-tagged items ['absorption_chiller_plant_cost_function_usd', 'electric_chiller_plant_cost_function_usd']: state the RC-05 caveat in the report"
+    },
+    {
+      "id": "SUB-15",
+      "item": "§18: naive-vs-optimised token comparison (S10, --engine llm)",
+      "status": "fail",
+      "detail": "S10 comparison in models none"
+    },
+    {
+      "id": "SUB-16",
+      "item": "§18: model-size comparison (S11, two --engine llm models)",
+      "status": "fail",
+      "detail": "/home/user/gemini_digital_twin_private/runs/final/eval/model_comparison.json missing (run_eval.py --compare)"
+    },
+    {
+      "id": "SUB-17",
+      "item": "§18: S1–S11 transcripts (prompts, answers, tokens)",
+      "status": "fail",
+      "detail": "no --engine llm eval in /home/user/gemini_digital_twin_private/runs/final/eval"
+    },
+    {
+      "id": "SUB-18",
+      "item": "§18: absorption, electric chiller, heat rejection, free cooling models",
+      "status": "pass",
+      "detail": "problems: none"
+    },
+    {
+      "id": "SUB-19",
+      "item": "§18: brine PVT configurable (DB-08, DB-33)",
+      "status": "pass",
+      "detail": "{'density_kg_m3': 1030.0, 'viscosity_pa_s': 0.0004, 'specific_heat_j_kgk (DB-33)': 4100.0}; consistency across components is part of the verifier verdict (SUB-03)"
+    },
+    {
+      "id": "SUB-20",
+      "item": "§18: Apache-2.0 notices for Plant Debugger reuse",
+      "status": "pass",
+      "detail": "14 adapted file(s); problems: none"
+    },
+    {
+      "id": "SUB-21",
+      "item": "§18: Apache-2.0 notices on modified GEMINI files",
+      "status": "pass",
+      "detail": "11 GEMINI .py file(s) modified since d86e8bb; no notice: none; other modified files (check by hand): none"
+    },
+    {
+      "id": "SUB-22",
+      "item": "§18/DL-03: code pushed with README (API placeholders documented)",
+      "status": "warn",
+      "detail": "README does not mention API placeholders"
+    },
+    {
+      "id": "SUB-23",
+      "item": "§18: 10 slides + appendix, ≤ 5-min video",
+      "status": "manual",
+      "detail": "check the deck and the video by hand"
+    },
+    {
+      "id": "SUB-24",
+      "item": "EV-02: unit tests green (GEMINI + gemini_agent)",
+      "status": "manual",
+      "detail": "run with --pytest to include the suite"
+    }
+  ]
+}

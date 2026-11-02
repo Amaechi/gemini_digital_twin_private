@@ -1,0 +1,19 @@
+{
+  "total": {
+    "calls": 0,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "total_tokens": 0,
+    "requests": 0,
+    "retries": 0,
+    "fallbacks": 0,
+    "errors": 0,
+    "latency_s": 0.0
+  },
+  "by_agent": {},
+  "by_phase": {},
+  "by_agent_phase": {},
+  "by_decision_source": {},
+  "by_model": {},
+  "corrupt_lines": 0
+}

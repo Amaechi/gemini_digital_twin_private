@@ -1568,3 +1568,25 @@ assumptions:
     tag: A
     status: default
     added_by: WP-11
+
+  - id: RUN-BUDGET
+    title: Search budgets of the real tools for evals and CI smoke runs (TL-13/TL-15 effort only)
+    value:
+      full: {}
+      quick: {own_point_only: true, top_k: 1, popsize: 1, maxiter: 1, maxiter_outage: 1, dispatch_search: false, storage_scan: false, mc_samples: 12, one_at_a_time: false}
+      smoke: {own_point_only: true, max_concepts: 1, top_k: 1, popsize: 1, maxiter: 0, maxiter_outage: 0, dispatch_search: false, storage_scan: false, mc_samples: 2, one_at_a_time: false, uq_cases: false, day_step: 30, workers: 1}
+    unit: null
+    justification: >-
+      Runtime only: the same real tools (never stubs) with a smaller search. full = the register values
+      (OPT-SPACE, OPT-DE, UQ-MC) on every CPU — the submitted run (scripts/build_results.py). quick = evals
+      (run_eval.py): the candidate's own doublet count and verifiable depth, one DE generation, 12 Monte Carlo
+      samples, sensitivity cases kept (S6). smoke = CI and the pytest end-to-end run: one concept sized, the
+      DE initial population only, 2 samples, every 30th day of the DB-30 year (economics then cover those
+      days only, so its KPIs are not design results), one process (no worker pool). Keys absent from a
+      budget take the full value; workers absent = all CPUs. Selected with `cli run --budget` (or the
+      GEOAGENT_BUDGET environment variable).
+    source: WP-14 (CI time limit; engineering values stay in OPT-SPACE, OPT-DE, UQ-MC)
+    sensitivity: "Smaller budgets find a worse optimum and wider percentile error; never used for reported results."
+    tag: A
+    status: default
+    added_by: WP-14

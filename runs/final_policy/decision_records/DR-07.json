@@ -1,0 +1,66 @@
+{
+  "dr_id": "DR-07",
+  "title": "Gas handling (degas + CHP vs pressurised reinjection)",
+  "run_id": "final_policy",
+  "phase": "P5",
+  "role": "subsurface",
+  "question": "How is the associated gas handled?",
+  "options": [
+    {
+      "id": "degas-use",
+      "label": "Gas handling: degas_use",
+      "evidence_ids": [
+        "TR-009",
+        "TR-010",
+        "TR-012",
+        "TR-013"
+      ],
+      "recommended": true,
+      "eligible": true,
+      "notes": "candidates: C1-3d, C2-2d, C3-2d, C5-3d, C6-2d, C8-3d; excluded by DesignGuard/verifier: C4-2d; top-ranked (LCOH ranking)"
+    },
+    {
+      "id": "pressurised-reinject",
+      "label": "Gas handling: pressurised_reinject",
+      "evidence_ids": [
+        "TR-009",
+        "TR-010",
+        "TR-012",
+        "TR-013"
+      ],
+      "recommended": false,
+      "eligible": true,
+      "notes": "candidates: C7-2d"
+    }
+  ],
+  "evidence_ids": [
+    "TR-009",
+    "TR-010",
+    "TR-012",
+    "TR-013"
+  ],
+  "choice": "degas-use",
+  "choice_label": "Gas handling: degas_use",
+  "criterion": {
+    "id": "ranking-lowest-lcoh_per_mwh",
+    "key": "lcoh_per_mwh",
+    "source": "economics",
+    "text": "lowest lcoh_per_mwh + lcoc_per_mwh among guard-passed candidates without unmet demand in economics",
+    "best_option_ids": [
+      "degas-use"
+    ],
+    "evidence_ids": [
+      "TR-012",
+      "TR-013"
+    ]
+  },
+  "rationale": "Decisive criterion: lowest lcoh_per_mwh + lcoc_per_mwh among guard-passed candidates without unmet demand in economics; it selects degas-use (TR-012, TR-013).",
+  "rejected": [
+    {
+      "option_id": "pressurised-reinject",
+      "reason": "Not a best option under ranking-lowest-lcoh_per_mwh."
+    }
+  ],
+  "decision_source": "policy",
+  "stub_evidence": false
+}

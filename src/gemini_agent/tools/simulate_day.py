@@ -199,6 +199,11 @@ class SimulatedDay(StrictModel):
     )
     heat_pump_flags: list[HeatPumpFlag] = Field(default_factory=list)
     brine_contact_materials: dict[str, str] = Field(default_factory=dict)
+    model_warnings: list[str] = Field(
+        default_factory=list,
+        description="WP-14: validity warnings of the cooling models and running heat pumps "
+        "(DesignVerifier PH-28).",
+    )
     warnings: list[str] = Field(default_factory=list)
 
 
@@ -689,6 +694,19 @@ def _assemble(
     if "electric_chiller" in roles:
         chiller_warnings = solver.get_output("electric_chiller").get("validity_warnings") or []
         warnings += [f"electric_chiller: {w}" for w in chiller_warnings][:2]
+    # WP-14: every cooling model's validity warnings reach the verifier (PH-28).
+    model_warnings = [
+        f"{name}: {w}"
+        for name in ("free_cooling", "absorption_chiller", "electric_chiller", "heat_rejection")
+        if name in roles
+        for w in solver.get_output(name).get("validity_warnings") or []
+    ]
+    model_warnings += [
+        f"{name}: {w}"
+        for name in names.get("heat_pump", [])
+        if solver.get_output(name).get("running", True)
+        for w in solver.get_output(name).get("validity_warnings") or []
+    ]
 
     # Heating balance and supply temperature.
     supplied = sum(heat.values())
@@ -764,6 +782,7 @@ def _assemble(
             "heat_pumps": hp_points,
             "heat_pump_flags": hp_flags,
             "brine_contact_materials": materials,
+            "model_warnings": model_warnings,
             "warnings": warnings,
         }
     )

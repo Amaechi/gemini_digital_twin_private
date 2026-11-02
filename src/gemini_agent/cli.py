@@ -21,7 +21,9 @@ from __future__ import annotations
 
 import argparse
 import json
+import signal
 import sys
+import threading
 from collections.abc import Sequence
 from datetime import UTC, datetime
 from pathlib import Path
@@ -73,6 +75,15 @@ def _add_engine_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--config-dir", type=Path, default=None, help="override config/ directory")
     parser.add_argument(
         "--runs-dir", type=Path, default=None, help=f"runs directory (default {RUNS_ROOT})"
+    )
+    parser.add_argument(
+        "--budget",
+        "--tool-profile",
+        dest="budget",
+        choices=["full", "quick", "smoke"],
+        default=None,
+        help="search budget of the real tools (register RUN-BUDGET): full = OPT-DE/UQ-MC, smoke = "
+        "CI (tiny DE/Monte Carlo, 13 days, no worker pool); default $GEOAGENT_BUDGET, else full",
     )
 
 
@@ -166,7 +177,7 @@ def _runner(args: argparse.Namespace, run_id: str, *, resuming: bool = False) ->
     engine_name = args.engine or stored_engine or llm_config.engine
     if engine_name == "llm":
         print(OLLAMA_CONTEXT_HINT.format(num_ctx=llm_config.ollama.num_ctx), file=sys.stderr)
-    toolbox = default_toolbox()
+    toolbox = default_toolbox(getattr(args, "budget", None), config_dir=args.config_dir)
     engine = create_decision_engine(
         engine_name,
         llm_config,
@@ -249,18 +260,29 @@ def _resume(args: argparse.Namespace) -> int:
     return _report(result)
 
 
+def _exit_on_sigterm(signum: int, frame: object) -> None:
+    """SIGTERM (CI time limit, kill) → SystemExit, so context managers stop worker pools."""
+    raise SystemExit(128 + signum)
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     """Entry point; returns a process exit code."""
-    parser = build_parser()
-    args = parser.parse_args(argv)
-    if args.command == "validate-config":
-        return _validate_config(args.config_dir)
-    if args.command == "run":
-        return _run(args)
-    if args.command == "resume":
-        return _resume(args)
-    parser.print_help()
-    return EXIT_OK
+    main_thread = threading.current_thread() is threading.main_thread()
+    previous = signal.signal(signal.SIGTERM, _exit_on_sigterm) if main_thread else None
+    try:
+        parser = build_parser()
+        args = parser.parse_args(argv)
+        if args.command == "validate-config":
+            return _validate_config(args.config_dir)
+        if args.command == "run":
+            return _run(args)
+        if args.command == "resume":
+            return _resume(args)
+        parser.print_help()
+        return EXIT_OK
+    finally:
+        if main_thread:
+            signal.signal(signal.SIGTERM, previous)
 
 
 if __name__ == "__main__":

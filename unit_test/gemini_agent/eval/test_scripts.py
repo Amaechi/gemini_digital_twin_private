@@ -13,6 +13,8 @@ from gemini_agent.agents.engine import PolicyEngine
 from gemini_agent.runner.design_runner import DesignRunner
 from gemini_agent.schemas.config import REPO_ROOT
 
+pytestmark = pytest.mark.usefixtures("stub_tools")
+
 SCRIPTS = REPO_ROOT / "scripts"
 
 

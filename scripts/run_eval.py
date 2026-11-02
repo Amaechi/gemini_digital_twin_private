@@ -60,6 +60,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="policy (deterministic), testmodel (Pydantic AI TestModel, offline) or llm (Ollama)",
     )
     parser.add_argument("--model", default="", help="Ollama tag for --engine llm")
+    parser.add_argument(
+        "--tool-profile",
+        choices=["full", "quick", "smoke"],
+        default="quick",
+        help="search effort of the real tools (WP-14; the final run uses full)",
+    )
     parser.add_argument("--scenarios", default="", help="comma-separated ids, e.g. S1,S3")
     parser.add_argument("--scenarios-file", type=Path, default=SCENARIOS_FILE)
     parser.add_argument("--eval-root", type=Path, default=EVAL_ROOT)
@@ -109,6 +115,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         config_dir=args.config_dir,
         model_tag=args.model,
         scenarios_source=source,
+        tool_profile=args.tool_profile,
     )
     for run in results.runs:
         m = run.metrics

@@ -43,8 +43,9 @@ def test_pending_items_state_needs_and_reason():
     """Nothing is stubbed silently: each pending item names the WPs it needs and why."""
     suite = load_scenarios()
     pending = {s.id: s.pending for s in suite.scenarios}
-    assert pending["S1"] and pending["S1"][0].check.type == "verdict"
-    assert pending["S1"][0].check.equals == "ACCEPTED" and "WP-14" in pending["S1"][0].needs
+    assert not pending["S1"]  # WP-14 promoted ACCEPTED + 0 stub calls to checks
+    s1 = {check.type: check for check in suite.get("S1").checks}
+    assert s1["verdict"].equals == "ACCEPTED" and s1["stub_tool_calls_max"].value == 0
     for scenario in suite.scenarios:
         for item in scenario.pending:
             assert item.needs and item.reason and item.expect
@@ -88,3 +89,41 @@ def test_scenario_and_suite_validation():
     suite = ScenarioSuite.model_validate({"source": "x", "scenarios": [base]})
     with pytest.raises(KeyError, match="S9"):
         suite.get("S9")
+
+
+def test_tool_output_mentions_reads_the_latest_output_at_a_path(tmp_path):
+    """WP-14 (S6): words must appear in the tool output at the dotted path, not elsewhere."""
+    import json
+
+    from gemini_agent.eval.scenarios import Observation, evaluate
+    from gemini_agent.runner.design_runner import RunResult
+    from gemini_agent.runner.state import RunState, ToolRecord
+    from gemini_agent.schemas.decision import Phase, RunStatus
+
+    (tmp_path / "tool_results").mkdir()
+    output = {"data": {"cases": [{"assumption_id": "DB-31", "value": 45}]}, "assumption_ids": ["X"]}
+    (tmp_path / "tool_results" / "TR-001_uncertainty.json").write_text(json.dumps(output))
+    state = RunState(run_id="r", user_prompt="design", engine="policy", input_mode="assume")
+    state.tool_results.append(
+        ToolRecord(
+            id="TR-001",
+            tool="uncertainty",
+            phase=Phase.P8,
+            args={},
+            ok=True,
+            stub=False,
+            source="policy",
+            path="tool_results/TR-001_uncertainty.json",
+        )
+    )
+    result = RunResult("r", RunStatus.COMPLETED, Phase.P10, None, None, "", tmp_path)
+    obs = Observation(result=result, state=state, run_dir=tmp_path, phases_started=[])
+
+    def check(**kw):
+        return Check(type="tool_output_mentions", expect="e", tool="uncertainty", **kw)
+
+    assert evaluate(check(path="data.cases", words=["DB-31"]), obs).passed
+    assert not evaluate(check(path="data.cases", words=["X"]), obs).passed  # outside the path
+    assert evaluate(check(words=["X"]), obs).passed  # whole output without a path
+    missing = evaluate(Check(type="tool_output_mentions", expect="e", tool="co2", words=["a"]), obs)
+    assert not missing.passed and "not called" in missing.detail

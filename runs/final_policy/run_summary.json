@@ -1,0 +1,88 @@
+{
+  "run_id": "final_policy",
+  "status": "completed",
+  "phase": "P10",
+  "engine": "policy",
+  "input_mode": "assume",
+  "selected_candidate": "C2-opt",
+  "verdict": "ACCEPTED",
+  "approval": "pending",
+  "loop_count": 0,
+  "excluded_candidates": [
+    "C4-2d"
+  ],
+  "llm_fallbacks": 0,
+  "conflicts": [],
+  "assumptions_and_answers": [
+    "DB-30 = {\"interpretation\":\"A\",\"doublet_available_days_per_yr\":330,\"planned_outage_days_per_doublet\":35,\"outages_may_overlap\":false,\"outage_schedule\":\"chosen by the optimiser\",\"demand_met_days_per_yr\":365} (assumed: register default)",
+    "DB-31 = 55.0 degC (assumed: register default)",
+    "DB-32 = 26.0 degC (assumed: register default)",
+    "Human approval pending (non-interactive run)"
+  ],
+  "decision_records": [
+    {
+      "dr_id": "DR-09",
+      "choice": "titanium-plates-no-cu",
+      "decision_source": "policy",
+      "stub_evidence": false
+    },
+    {
+      "dr_id": "DR-01",
+      "choice": "2-doublets",
+      "decision_source": "policy",
+      "stub_evidence": false
+    },
+    {
+      "dr_id": "DR-02",
+      "choice": "depth-2500m",
+      "decision_source": "policy",
+      "stub_evidence": false
+    },
+    {
+      "dr_id": "DR-03",
+      "choice": "hthp-series",
+      "decision_source": "policy",
+      "stub_evidence": false
+    },
+    {
+      "dr_id": "DR-04",
+      "choice": "free-cooling-electric",
+      "decision_source": "policy",
+      "stub_evidence": false
+    },
+    {
+      "dr_id": "DR-05",
+      "choice": "no-storage",
+      "decision_source": "policy",
+      "stub_evidence": false
+    },
+    {
+      "dr_id": "DR-07",
+      "choice": "degas-use",
+      "decision_source": "policy",
+      "stub_evidence": false
+    },
+    {
+      "dr_id": "DR-08",
+      "choice": "dh-return-55",
+      "decision_source": "policy",
+      "stub_evidence": false
+    },
+    {
+      "dr_id": "DR-06",
+      "choice": "optimiser-lowest-load",
+      "decision_source": "policy",
+      "stub_evidence": false
+    },
+    {
+      "dr_id": "DR-10",
+      "choice": "C2-opt",
+      "decision_source": "policy",
+      "stub_evidence": false
+    }
+  ],
+  "tool_calls": 22,
+  "stub_tool_calls": 0,
+  "final_summary": "Completed P0\u2013P10: selected C2-opt (verifier verdict ACCEPTED); 10 Decision Records; approval pending; 0/22 tool calls were stubs.",
+  "escalation_reason": ""
+}

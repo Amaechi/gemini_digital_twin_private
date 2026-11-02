@@ -1,0 +1,29 @@
+{
+ "data": {
+  "files": [
+   "fig_candidates.png",
+   "fig_daily_heat.png",
+   "fig_daily_cooling.png",
+   "fig_load_duration.png",
+   "fig_energy_balance.png",
+   "fig_uncertainty.png",
+   "fig_tornado.png",
+   "fig_tokens.png"
+  ],
+  "tables": [
+   "candidates.md",
+   "sizing.md",
+   "verification.md",
+   "uncertainty.md",
+   "decision_records.md",
+   "candidates.csv"
+  ]
+ },
+ "summary": "TL-21: 8 figures, 6 tables in figures/",
+ "warnings": [],
+ "assumption_ids": [],
+ "sources": [
+  "spec \u00a76 TL-21",
+  "spec \u00a713"
+ ]
+}

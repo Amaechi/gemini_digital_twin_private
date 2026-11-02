@@ -1,0 +1,85 @@
+{
+  "dr_id": "DR-02",
+  "title": "Well depth",
+  "run_id": "final_policy",
+  "phase": "P5",
+  "role": "subsurface",
+  "question": "At which reservoir depth should the wells be drilled?",
+  "options": [
+    {
+      "id": "depth-2500m",
+      "label": "Reservoir at 2500 m TVD",
+      "evidence_ids": [
+        "TR-009",
+        "TR-010",
+        "TR-012",
+        "TR-013",
+        "config:design_basis.yaml#DB-01"
+      ],
+      "recommended": true,
+      "eligible": true,
+      "notes": "candidates: C1-3d, C2-2d, C3-2d, C6-2d, C7-2d, C8-3d; top-ranked (LCOH ranking)"
+    },
+    {
+      "id": "depth-3200m",
+      "label": "Reservoir at 3200 m TVD",
+      "evidence_ids": [
+        "TR-009",
+        "TR-010",
+        "TR-012",
+        "TR-013"
+      ],
+      "recommended": false,
+      "eligible": false,
+      "notes": "candidates: none; excluded by DesignGuard/verifier: C4-2d"
+    },
+    {
+      "id": "depth-1500m",
+      "label": "Reservoir at 1500 m TVD",
+      "evidence_ids": [
+        "TR-009",
+        "TR-010",
+        "TR-012",
+        "TR-013"
+      ],
+      "recommended": false,
+      "eligible": true,
+      "notes": "candidates: C5-3d"
+    }
+  ],
+  "evidence_ids": [
+    "TR-009",
+    "TR-010",
+    "TR-012",
+    "TR-013",
+    "config:design_basis.yaml#DB-01"
+  ],
+  "choice": "depth-2500m",
+  "choice_label": "Reservoir at 2500 m TVD",
+  "criterion": {
+    "id": "ranking-lowest-lcoh_per_mwh",
+    "key": "lcoh_per_mwh",
+    "source": "economics",
+    "text": "lowest lcoh_per_mwh + lcoc_per_mwh among guard-passed candidates without unmet demand in economics",
+    "best_option_ids": [
+      "depth-2500m"
+    ],
+    "evidence_ids": [
+      "TR-012",
+      "TR-013"
+    ]
+  },
+  "rationale": "Decisive criterion: lowest lcoh_per_mwh + lcoc_per_mwh among guard-passed candidates without unmet demand in economics; it selects depth-2500m (TR-012, TR-013).",
+  "rejected": [
+    {
+      "option_id": "depth-3200m",
+      "reason": "Not eligible: candidates: none; excluded by DesignGuard/verifier: C4-2d"
+    },
+    {
+      "option_id": "depth-1500m",
+      "reason": "Not a best option under ranking-lowest-lcoh_per_mwh."
+    }
+  ],
+  "decision_source": "policy",
+  "stub_evidence": false
+}

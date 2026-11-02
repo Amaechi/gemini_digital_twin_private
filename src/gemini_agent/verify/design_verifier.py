@@ -21,6 +21,12 @@ is ``not_applicable``. Verdict:
 - otherwise any required check not evaluated, or evidence from a stub tool → ``UNVERIFIED``;
 - otherwise → ``ACCEPTED``.
 
+WP-14 closed the evidence gaps listed at hand-over (each check has a failing-case test): the TL-05
+design point (PH-25 feasible, PH-26 flow solve error ≤ 1 %, PH-27 ESP-intake margin ≥ 0), the
+cooling and heat-pump model validity warnings (PH-28), the daily ``DayResult.flags`` (PH-29), the
+atmospheric letdown of degassed brine (PH-30, SUB-NPSH bound), TL-08 ``within_limit`` (PD-11) and
+TL-07 ``breakthrough_after_horizon`` (PD-12).
+
 The exergy layer is reported, never pass/fail (spec §10.1). Sources: spec §10.1; RC-03 (plate
 HEX); RC-12 (scaling, materials); RC-01 items 6, 8, 9 (pumps, NPSH, CO₂ release); RC-04 (heat
 pump defaults); DB-08/DB-33 (brine ρ, c_p); spec ENG-06 (spacing, interference, t_b); spec SIM-04
@@ -116,6 +122,23 @@ SPLIT_FRACTION_TOL = 1e-6
 """Splitter fractions must sum to 1 within this tolerance (GEMINI ``Splitter``)."""
 NUMERIC_TOL = 1e-6
 """Relative floating-point tolerance of every bound check; not an engineering coefficient."""
+FLOW_SOLVE_TOL_FRAC = ENERGY_BALANCE_TOL_FRAC
+"""TL-05 ESP-frequency solve: |Q_GEMINI − Q_target| / Q_target ≤ 1 % (same numerical tolerance as
+the energy balance; WP-05 solves to ~1e-12)."""
+VAPOUR_BOUND_ID = "SUB-NPSH"
+"""Register entry: water vapour pressure bounded by 1.01325 bar(a) up to 100 °C (RC-01 item 8)."""
+SUCTION_PRESSURE_ID = "SUB-PSUC"
+"""Register entry: injection-pump suction (degasser letdown, CFG-SURFACE) pressure, bar(g)."""
+MODEL_VALIDITY_FAIL = re.compile(
+    r"(?i)freeze protection not modelled|at or below the zero-capacity|OUTSIDE RC-04 limits"
+)
+"""Model warnings that invalidate the operating point (PH-28): a wet tower below 0 °C water
+(RC-07, no freeze protection), an absorption drive at/below the zero-capacity temperature (RC-05)
+or a heat pump outside its RC-04 limits. Every other model warning (extrapolated correlation,
+capped COP, multi-pass note, missing datasheet → register default) is reported, not failed."""
+DAY_FLAG_FAIL = re.compile(r"(?i)OUTSIDE RC-04 limits|full mode invalid")
+"""``DayResult.flags`` that fail PH-29 (WP-06/07: heat pump outside RC-04 limits; a full-mode day
+GEMINI could not run). Other flags (e.g. HTHP datasheet MISSING → RC-04 defaults) are warnings."""
 PUMP_POWER_TOL_FRAC = ENERGY_BALANCE_TOL_FRAC
 """Numerical consistency tolerance of the reported pump power vs Q·Δp/η (same 1 % as the energy
 balance; not a card value)."""
@@ -273,6 +296,26 @@ class SubsurfaceEvidence(StrictModel):
     well_spacing_m: float | None = Field(default=None, gt=0)
     interference_bar: float | None = Field(default=None, ge=0)
     thermal_breakthrough_yr: float | None = Field(default=None, gt=0)
+    interference_within_limit: bool | None = Field(
+        default=None, description="TL-08 ``within_limit`` at the design separation (PD-11)."
+    )
+    breakthrough_after_horizon: bool | None = Field(
+        default=None, description="TL-07 ``breakthrough_after_horizon`` (ENG-06, PD-12)."
+    )
+    horizon_yr: float | None = Field(default=None, gt=0, description="TL-07 analysis horizon.")
+
+
+class DoubletPointEvidence(StrictModel):
+    """TL-05 design operating point of one doublet (WP-05 ``OperatingPoint``; RC-01)."""
+
+    name: str
+    flow_m3h: float = Field(ge=0)
+    feasible: bool
+    reasons: list[str] = Field(default_factory=list, description="Why TL-05 found it infeasible.")
+    flow_error_frac: float | None = Field(default=None, description="GEMINI flow vs target.")
+    intake_margin_bar: float | None = Field(
+        default=None, description="ESP intake − 1.2 · p_b setpoint (≥ 0 required)."
+    )
 
 
 class ScalingEvidence(StrictModel):
@@ -313,6 +356,17 @@ class VerificationEvidence(StrictModel):
     )
     brine_contact_materials: dict[str, str] = Field(
         default_factory=dict, description="Component → material of brine-wetted parts."
+    )
+    doublet_points: list[DoubletPointEvidence] = Field(
+        default_factory=list, description="TL-05 design points (PH-25…PH-27)."
+    )
+    model_warnings: list[str] = Field(
+        default_factory=list,
+        description="Validity warnings of the cooling / heat-pump models (TL-11/12, PH-28).",
+    )
+    letdown_pressure_barg: float | None = Field(
+        default=None,
+        description="Degasser letdown pressure, bar(g) (CFG-SURFACE); None → SUB-PSUC (PH-30).",
     )
     saline_brine: bool = Field(
         default=True, description="DB-08 brine (1030 kg/m³) is saline → titanium plates (RC-12)."
@@ -588,6 +642,10 @@ class DesignVerifier:
         self.hp_carnot_fraction_default = float(register.get(HP_CARNOT_FRACTION_ID).value)
         self.hp_max_lift_default_k = float(register.get(HP_MAX_LIFT_ID).value)
         self.brine_cp_j_per_kg_k = float(register.get(BRINE_CP_ID).value)
+        vapour: dict[str, Any] = register.get(VAPOUR_BOUND_ID).value  # type: ignore[assignment]
+        self.vapour_bound_bara = float(vapour["vapour_pressure_bound_bara"])
+        self.vapour_bound_degc = float(vapour["vapour_pressure_bound_valid_to_degc"])
+        self.suction_default_barg = float(register.get(SUCTION_PRESSURE_ID).value)  # type: ignore
 
     @classmethod
     def from_config(cls, config_dir: Path | str | None = None) -> DesignVerifier:
@@ -843,7 +901,179 @@ class DesignVerifier:
         self._pump_checks(out, ev, types)
         self._esp_checks(out, ev, types, assumption_ids)
         self._sign_checks(out, ev)
+        self._design_point_checks(out, ev)
+        self._model_validity_checks(out, ev)
+        self._letdown_check(out, ev, assumption_ids)
         return out.items
+
+    # ------------------------------------------------------------------ WP-14 checks
+    @staticmethod
+    def _design_point_checks(out: _Checks, ev: VerificationEvidence) -> None:
+        """PH-25…PH-27: the TL-05 design operating point of every doublet (RC-01; WP-05)."""
+        names = {
+            "PH-25": "TL-05 design point feasible",
+            "PH-26": "TL-05 ESP flow solve error ≤ 1 %",
+            "PH-27": "ESP intake ≥ 1.2 · p_b at the design point (TL-05)",
+        }
+        source = "RC-01 items 6–9; WP-05 TL-05"
+        if ev.candidate.doublets == 0:
+            for check_id, name in names.items():
+                out.not_applicable(check_id, name, "no doublets (C0)", source)
+            return
+        if not ev.doublet_points:
+            for check_id, name in names.items():
+                out.missing(check_id, name, "TL-05 design operating points", source)
+            return
+        bad = [p for p in ev.doublet_points if not p.feasible]
+        out.add(
+            "PH-25",
+            names["PH-25"],
+            CheckStatus.FAIL if bad else CheckStatus.PASS,
+            detail=(
+                "; ".join(
+                    f"{p.name} at {_fmt(p.flow_m3h)} m³/h: {', '.join(p.reasons)}" for p in bad
+                )
+                if bad
+                else f"{len(ev.doublet_points)} design point(s) feasible"
+            ),
+            value=float(len(bad)),
+            limit=0.0,
+            margin=-float(len(bad)),
+            unit="infeasible points",
+            source=source,
+        )
+        errors, intake = _Bound(), _Bound()
+        for p in ev.doublet_points:
+            if p.flow_error_frac is not None:
+                err = abs(p.flow_error_frac)
+                errors.add(
+                    FLOW_SOLVE_TOL_FRAC - err, err, f"{p.name}: flow error {_fmt(100 * err)} %"
+                )
+            if p.intake_margin_bar is not None:
+                intake.add(
+                    p.intake_margin_bar,
+                    p.intake_margin_bar,
+                    f"{p.name}: ESP intake margin {_fmt(p.intake_margin_bar)} bar vs ≥ 0",
+                )
+        if any(p.flow_error_frac is None for p in ev.doublet_points):
+            out.missing("PH-26", names["PH-26"], "TL-05 flow_error_frac", source)
+        else:
+            out.bound(
+                "PH-26", names["PH-26"], errors, limit=FLOW_SOLVE_TOL_FRAC, unit="frac",
+                source=source,
+            )  # fmt: skip
+        if any(p.intake_margin_bar is None for p in ev.doublet_points):
+            out.missing("PH-27", names["PH-27"], "TL-05 intake_margin_bar", source)
+        else:
+            out.bound(
+                "PH-27", names["PH-27"], intake, limit=0.0, unit="bar",
+                source=f"RC-01 item 9; {ESP_MARGIN_ID}; WP-05 TL-05",
+            )  # fmt: skip
+
+    @staticmethod
+    def _model_validity_checks(out: _Checks, ev: VerificationEvidence) -> None:
+        """PH-28 model validity warnings, PH-29 daily flags (WP-02/03/06/07 outputs)."""
+        name = "cooling and heat-pump models within validity (RC-04…RC-07)"
+        source = "RC-04; RC-05; RC-06; RC-07; GM-04"
+        if ev.annual is None:
+            out.missing(
+                "PH-28", name, "full-mode results (model warnings travel with them)", source
+            )
+        else:
+            failing = [w for w in ev.model_warnings if MODEL_VALIDITY_FAIL.search(w)]
+            others = [w for w in ev.model_warnings if not MODEL_VALIDITY_FAIL.search(w)]
+            out.add(
+                "PH-28",
+                name,
+                CheckStatus.FAIL if failing else CheckStatus.PASS,
+                detail=(
+                    "; ".join(failing[:3])
+                    if failing
+                    else f"{len(others)} model warning(s), none invalidates a point"
+                ),
+                value=float(len(failing)),
+                limit=0.0,
+                margin=-float(len(failing)),
+                unit="invalid model points",
+                source=source,
+                warnings=others[:5],
+            )
+        name = "daily result flags (DayResult.flags)"
+        source = "WP-06 simulate_day; WP-07 TL-12"
+        if ev.annual is None:
+            out.missing("PH-29", name, "full-mode daily results", source)
+            return
+        failing_days: list[str] = []
+        other: dict[str, int] = {}
+        for day in ev.annual.days:
+            for flag in day.flags:
+                if DAY_FLAG_FAIL.search(flag):
+                    failing_days.append(f"{day.date}: {flag}")
+                else:
+                    other[flag] = other.get(flag, 0) + 1
+        out.add(
+            "PH-29",
+            name,
+            CheckStatus.FAIL if failing_days else CheckStatus.PASS,
+            detail=(
+                "; ".join(failing_days[:2])
+                + (f" (+{len(failing_days) - 2} more)" if len(failing_days) > 2 else "")
+                if failing_days
+                else f"{sum(other.values())} informational flag(s) on {len(ev.annual.days)} days"
+            ),
+            value=float(len(failing_days)),
+            limit=0.0,
+            margin=-float(len(failing_days)),
+            unit="failing day flags",
+            source=source,
+            warnings=[f"{flag} [×{count}]" for flag, count in list(other.items())[:5]],
+        )
+
+    def _letdown_check(
+        self, out: _Checks, ev: VerificationEvidence, assumption_ids: list[str]
+    ) -> None:
+        """PH-30: degassed brine let down to ≤ 1 atm must stay at or below its boiling point.
+
+        At a letdown pressure ≤ 1.01325 bar(a) water boils above 100 °C (SUB-NPSH vapour-pressure
+        bound, RC-01 item 8): hotter brine flashes in the degasser and the injection-pump suction
+        has no NPSH. Above 1 atm the cards give no saturation data → not evaluated.
+        """
+        name = "degassed brine below its boiling point at the letdown pressure"
+        source = f"RC-01 item 8; {VAPOUR_BOUND_ID}; {SUCTION_PRESSURE_ID}; CFG-SURFACE"
+        candidate = ev.candidate
+        if candidate.doublets == 0 or candidate.gas_handling != GasHandling.DEGAS_USE:
+            out.not_applicable("PH-30", name, "no degassing at atmospheric letdown", source)
+            return
+        letdown = ev.letdown_pressure_barg
+        if letdown is None:
+            letdown = self.suction_default_barg
+            _note(assumption_ids, SUCTION_PRESSURE_ID)
+        if letdown + P_ATM_BAR > self.vapour_bound_bara + 1e-9:
+            out.missing(
+                "PH-30", name,
+                f"saturation pressure above {_fmt(self.vapour_bound_bara)} bar(a) (no card data)",
+                source,
+            )  # fmt: skip
+            return
+        if ev.annual is None:
+            out.missing("PH-30", name, "full-mode production temperatures", source)
+            return
+        _note(assumption_ids, VAPOUR_BOUND_ID)
+        worst = _Bound()
+        for day in ev.annual.days:
+            for i, flow in _active_doublets(day):
+                t = day.production_temperature_degc[i]
+                worst.add(
+                    self.vapour_bound_degc - t,
+                    t,
+                    f"{day.date} doublet {i + 1}: {_fmt(t)} °C brine let down to "
+                    f"{_fmt(letdown)} bar(g) > {_fmt(self.vapour_bound_degc)} °C (flashes)",
+                )
+        out.bound(
+            "PH-30", name, worst, limit=self.vapour_bound_degc, unit="degC", source=source,
+            ok_detail=f"hottest brine {_fmt(self.vapour_bound_degc - worst.margin)} °C ≤ "
+            f"{_fmt(self.vapour_bound_degc)} °C at {_fmt(letdown)} bar(g)",
+        )  # fmt: skip
 
     def _daily_checks(self, out: _Checks, ev: VerificationEvidence) -> None:
         lim = self.limits
@@ -1403,6 +1633,7 @@ class DesignVerifier:
                     out.not_applicable(check_id, name, "no ESP", "RC-01")
             return
         intake, npsh, missing, warnings = _Bound(), _Bound(), [], []
+        no_npshr: list[str] = []
         for p in ev.esps:
             limit, basis = self._setpoint(p.release_pressure_barg, ev, assumption_ids)
             if p.release_pressure_barg is None and ev.co2_release_pressure_barg is None:
@@ -1416,14 +1647,19 @@ class DesignVerifier:
                 f"{p.name}: intake {_fmt(p.intake_pressure_barg)} bar(g) vs ≥ {_fmt(limit)} "
                 f"bar(g) ({basis})",
             )
-            if p.npsh_available_m is None or p.npsh_required_m is None:
+            if p.npsh_available_m is None:
                 missing.append(p.name)
             else:
+                # SUB-NPSH (WP-14): NPSH_R not given (no pump selected) → NPSH_A ≥ 15 m alone.
+                required = p.npsh_required_m
+                if required is None:
+                    required = 0.0
+                    no_npshr.append(p.name)
                 npsh.add(
-                    p.npsh_available_m - p.npsh_required_m - NPSH_MARGIN_M,
+                    p.npsh_available_m - required - NPSH_MARGIN_M,
                     p.npsh_available_m,
                     f"{p.name}: NPSH_A {_fmt(p.npsh_available_m)} m vs NPSH_R "
-                    f"{_fmt(p.npsh_required_m)} + {_fmt(NPSH_MARGIN_M)} m",
+                    f"{_fmt(required)} + {_fmt(NPSH_MARGIN_M)} m",
                 )
         out.bound(
             "PH-18",
@@ -1435,11 +1671,20 @@ class DesignVerifier:
             warnings=warnings,
         )
         if missing:
-            out.missing("PH-19", names["PH-19"], f"NPSH for {missing}", "RC-01 item 8")
+            out.missing("PH-19", names["PH-19"], f"NPSH_A for {missing}", "RC-01 item 8")
         else:
+            npsh_notes = []
+            if no_npshr:
+                _note(assumption_ids, VAPOUR_BOUND_ID)
+                names_ = sorted(set(no_npshr))
+                npsh_notes.append(
+                    f"NPSH_R not given for {names_} ({VAPOUR_BOUND_ID}): checked NPSH_A ≥ "
+                    f"{_fmt(NPSH_MARGIN_M)} m; add NPSH_R when the pump is selected"
+                )
             out.bound(
-                "PH-19", names["PH-19"], npsh, limit=NPSH_MARGIN_M, unit="m", source="RC-01 item 8"
-            )
+                "PH-19", names["PH-19"], npsh, limit=NPSH_MARGIN_M, unit="m",
+                source=f"RC-01 item 8; {VAPOUR_BOUND_ID}", warnings=npsh_notes,
+            )  # fmt: skip
 
     def _sign_checks(self, out: _Checks, ev: VerificationEvidence) -> None:
         name = "no negative flows or powers"
@@ -1563,6 +1808,31 @@ class DesignVerifier:
                     f"{_fmt(value)} {unit} vs {'≤' if upper else '≥'} {_fmt(limit)} {unit}",
                 )
                 out.bound(check_id, name, worst, limit=limit, unit=unit, source=src)
+
+        for check_id, name, flag, applies in (
+            ("PD-11", "TL-08 interference within limit at the design separation",
+             sub.interference_within_limit if sub else None, candidate.doublets > 1),
+            ("PD-12", "TL-07 thermal breakthrough after the analysis horizon",
+             sub.breakthrough_after_horizon if sub else None, geothermal),
+        ):  # fmt: skip
+            src = "spec ENG-06; RC-02; WP-05 TL-07/TL-08"
+            if not applies:
+                out.not_applicable(check_id, name, f"{candidate.doublets} doublet(s)", src)
+            elif flag is None:
+                out.missing(check_id, name, "TL-07/TL-08 screening flag", src)
+            else:
+                horizon = f" (horizon {_fmt(sub.horizon_yr)} yr)" if sub and sub.horizon_yr else ""
+                out.add(
+                    check_id,
+                    name,
+                    CheckStatus.PASS if flag else CheckStatus.FAIL,
+                    detail=f"{'yes' if flag else 'no'}{horizon if check_id == 'PD-12' else ''}",
+                    value=1.0 if flag else 0.0,
+                    limit=1.0,
+                    margin=0.0 if flag else -1.0,
+                    unit="flag",
+                    source=src,
+                )
 
         _fast_full(out, ev)
         _scaling(out, ev)

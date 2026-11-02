@@ -1073,7 +1073,12 @@ def _work(task: tuple[Candidate, list[int] | None, str]) -> DesignEvaluation:
 
 
 class EvaluationPool:
-    """Evaluate designs serially or in a fork pool, caching by :func:`design_key`."""
+    """Evaluate designs serially or in a fork pool, caching by :func:`design_key`.
+
+    Modified by GeoAgent team for SPE GeoHackathon 2026, 2026-11-02 (WP-14): the pool is
+    terminated (not drained) when the ``with`` block exits on an error, so a timed-out or killed
+    run leaves no orphan workers.
+    """
 
     def __init__(self, evaluator: Evaluator, workers: int = 1) -> None:
         """Start ``workers`` processes (1 = serial, in this process)."""
@@ -1086,20 +1091,23 @@ class EvaluationPool:
         if self.workers > 1 and ctx is not None:
             self._pool = ctx.Pool(self.workers, initializer=_init_worker, initargs=(evaluator,))
 
-    def close(self) -> None:
-        """Stop the worker processes."""
+    def close(self, *, terminate: bool = False) -> None:
+        """Stop the worker processes (``terminate``: do not wait for running tasks)."""
         if self._pool is not None:
-            self._pool.close()
-            self._pool.join()
-            self._pool = None
+            pool, self._pool = self._pool, None
+            if terminate:
+                pool.terminate()
+            else:
+                pool.close()
+            pool.join()
 
     def __enter__(self) -> Self:
         """Context manager entry."""
         return self
 
-    def __exit__(self, *exc: object) -> None:
-        """Context manager exit: stop the pool."""
-        self.close()
+    def __exit__(self, exc_type: object, *exc: object) -> None:
+        """Context manager exit: stop the pool; on an error (or SIGTERM → SystemExit) at once."""
+        self.close(terminate=exc_type is not None)
 
     def evaluate(
         self, designs: Sequence[tuple[Candidate, list[int] | None]], *, stage: str = ""

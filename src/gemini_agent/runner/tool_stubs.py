@@ -1,4 +1,7 @@
-"""Labelled tool stubs that let the workflow run P0–P10 before WP-04…WP-09, WP-11 land.
+"""Labelled tool stubs that let the workflow run P0–P10 without the engineering tools.
+
+Since WP-14 ``default_toolbox`` binds the real tools (``runner/real_tools.py``); this catalogue
+(``stub_toolbox``) is kept for tests of the workflow mechanics (fast, no simulation).
 
 WP-12's TL-17/TL-18 tools (``model_gap_analysis`` … ``register_model``) are bound for real
 (``tools/model_builder_tools.model_builder_specs``, ``stub=False``).
@@ -28,6 +31,7 @@ from gemini_agent.runner.toolbox import (
     OptimiseArgs,
     RequestInputArgs,
     SimulateArgs,
+    Toolbox,
     ToolContext,
     ToolSpec,
 )
@@ -374,8 +378,13 @@ def _knowledge(args: KnowledgeArgs, context: ToolContext) -> ToolResult[Any]:
     return knowledge_search(args.query, args.limit)
 
 
+def stub_toolbox() -> Toolbox:
+    """Catalogue bound to the labelled stubs (tests of the workflow mechanics only)."""
+    return Toolbox(stub_specs())
+
+
 def stub_specs() -> list[ToolSpec]:
-    """Return all tool bindings used by ``default_toolbox``."""
+    """Return the stub catalogue (``stub_toolbox``); ``default_toolbox`` binds the real tools."""
     return [
         ToolSpec(
             "knowledge_search",

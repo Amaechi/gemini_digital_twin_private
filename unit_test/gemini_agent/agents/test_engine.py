@@ -45,6 +45,8 @@ from gemini_agent.schemas.decision import (
 )
 from unit_test.gemini_agent.llm_fakes import Counting, fake_model, policy_like
 
+pytestmark = pytest.mark.usefixtures("stub_tools")
+
 LLM_CONFIG = load_config("llm")
 TOOLBOX = default_toolbox()
 

@@ -50,6 +50,7 @@ CheckType = Literal[
     "gap_reported",
     "design_basis_value",
     "dr_mentions",
+    "tool_output_mentions",
     "files",
     "token_saving",
     "llm_metrics",
@@ -70,6 +71,7 @@ _REQUIRED: dict[str, tuple[str, ...]] = {
     "gap_reported": ("contains",),
     "design_basis_value": ("path", "value"),
     "dr_mentions": ("id", "words"),
+    "tool_output_mentions": ("tool", "words"),
     "files": ("files",),
 }
 
@@ -406,6 +408,18 @@ def _dr_mentions(check: Check, obs: Observation) -> tuple[bool, str]:
     return not missing, f"{check.id} misses {missing or 'nothing'}"
 
 
+def _tool_output_mentions(check: Check, obs: Observation) -> tuple[bool, str]:
+    """WP-14: the latest ``tool`` output (at dotted ``path``, e.g. ``data.cases``) names words."""
+    output = obs.tool_output(str(check.tool))
+    if output is None:
+        return False, f"{check.tool} not called"
+    part = _dotted(output, check.path) if check.path else output
+    text = _lower(json.dumps(part, default=str))
+    missing = [word for word in check.words if word.lower() not in text]
+    where = f"{check.tool}.{check.path}" if check.path else str(check.tool)
+    return not missing, f"{where} misses {missing or 'nothing'}"
+
+
 def _files(check: Check, obs: Observation) -> tuple[bool, str]:
     missing = [name for name in check.files if not (obs.run_dir / name).exists()]
     return not missing, f"missing {missing or 'none'}"
@@ -449,6 +463,7 @@ _EVALUATORS = {
     "gap_reported": _gap_reported,
     "design_basis_value": _design_basis_value,
     "dr_mentions": _dr_mentions,
+    "tool_output_mentions": _tool_output_mentions,
     "files": _files,
     "token_saving": _token_saving,
     "llm_metrics": _llm_metrics,

@@ -2,15 +2,15 @@
 
 import pytest
 
-from gemini_agent.runner.tool_stubs import GAP_IDS, stub_specs
-from gemini_agent.runner.toolbox import ToolArgsError, ToolContext, default_toolbox
+from gemini_agent.runner.tool_stubs import GAP_IDS, stub_specs, stub_toolbox
+from gemini_agent.runner.toolbox import ToolArgsError, ToolContext
 from gemini_agent.schemas.decision import DesignVerdict
 
 
 @pytest.fixture()
 def context(tmp_path):
     """Tool context with the stub candidates C0–C8 and C2 selected."""
-    toolbox = default_toolbox()
+    toolbox = stub_toolbox()
     base = ToolContext(run_id="t", run_dir=tmp_path, config_dir=None)
     candidates = toolbox.execute("generate_candidates", {}, base).data.candidates
     return ToolContext(
@@ -25,7 +25,7 @@ def context(tmp_path):
 
 def test_every_stub_is_labelled(context):
     """Stub results say STUB, carry a warning naming the owning WP and produce no KPI numbers."""
-    toolbox = default_toolbox()
+    toolbox = stub_toolbox()
     for spec in stub_specs():
         if not spec.stub:
             continue
@@ -45,7 +45,7 @@ def test_candidates_follow_spec_table(context):
     assert by_concept["C0"].doublets == 0 and by_concept["C4"].depth_m == 3200.0
     assert by_concept["C7"].gas_handling.value == "pressurised_reinject"
     assert {c.heating_return_degc for c in context.candidates} == {55.0}
-    toolbox = default_toolbox()
+    toolbox = stub_toolbox()
     answered = ToolContext(
         run_id="t", run_dir=context.run_dir, config_dir=None, answers={"DB-31": 60.0}
     )
@@ -57,7 +57,7 @@ def test_candidates_follow_spec_table(context):
 
 def test_guard_verify_and_design_basis(context):
     """Guard checks limits; the stub verifier is never ACCEPTED; gaps DB-30…32 are listed."""
-    toolbox = default_toolbox()
+    toolbox = stub_toolbox()
     bad = context.candidates[2].model_copy(update={"doublets": 4, "design_flow_m3h": 400.0})
     guard_ctx = ToolContext(run_id="t", run_dir=context.run_dir, config_dir=None, candidates=(bad,))
     check = toolbox.execute("design_guard", {}, guard_ctx).data.checks[0]
@@ -70,7 +70,7 @@ def test_guard_verify_and_design_basis(context):
 
 def test_argument_validation_and_unknown_candidate(context):
     """Flat argument schemas reject unknown keys; unknown candidate ids raise."""
-    toolbox = default_toolbox()
+    toolbox = stub_toolbox()
     with pytest.raises(ToolArgsError, match="simulate_annual"):
         toolbox.validate_args("simulate_annual", {"mode": "slow"})
     with pytest.raises(ToolArgsError):

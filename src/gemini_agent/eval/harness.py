@@ -297,6 +297,11 @@ def _metrics(runner: DesignRunner, run_id: str, runtime_s: float) -> RunMetrics:
     )
 
 
+TOOL_PROFILE = "quick"
+"""WP-14: default search effort of the real tools in evals (``runner/real_tools.make_profile``);
+the scenarios check behaviour, not optimisation depth (``run_eval.py --tool-profile``)."""
+
+
 def _run_once(
     scenario: Scenario,
     run_id: str,
@@ -307,9 +312,10 @@ def _run_once(
     llm_config: LLMConfig,
     model_tag: str,
     naive: bool,
+    tool_profile: str = TOOL_PROFILE,
 ) -> tuple[Observation, RunMetrics]:
     _clear_run_dir(eval_dir / run_id)
-    toolbox = default_toolbox()
+    toolbox = default_toolbox(tool_profile)
     decision_engine = build_engine(
         engine,
         run_dir=eval_dir / run_id,
@@ -364,6 +370,7 @@ def run_scenario(
     config_dir: Path | None = None,
     llm_config: LLMConfig | None = None,
     model_tag: str = "",
+    tool_profile: str = TOOL_PROFILE,
 ) -> EvalRun:
     """Run one scenario (several runs for token profiles) and evaluate its checks."""
     llm_config = llm_config or load_config("llm", config_dir)
@@ -379,7 +386,9 @@ def run_scenario(
     if engine not in scenario.engines:
         return base.model_copy(update={"note": scenario.skip_reason})
     try:
-        return _run_scenario(scenario, base, eval_dir, config_dir, llm_config, model_tag)
+        return _run_scenario(
+            scenario, base, eval_dir, config_dir, llm_config, model_tag, tool_profile
+        )
     except Exception as exc:  # noqa: BLE001 - one broken scenario must not stop the suite
         return base.model_copy(
             update={"outcome": Outcome.ERROR, "note": f"{type(exc).__name__}: {exc}"[:500]}
@@ -393,6 +402,7 @@ def _run_scenario(
     config_dir: Path | None,
     llm_config: LLMConfig,
     model_tag: str,
+    tool_profile: str = TOOL_PROFILE,
 ) -> EvalRun:
     setup: ScenarioSetup = scenario.setup
     eval_dir.mkdir(parents=True, exist_ok=True)
@@ -414,6 +424,7 @@ def _run_scenario(
                 llm_config=llm_config,
                 model_tag=model_tag,
                 naive=profile == "naive",
+                tool_profile=tool_profile,
             )
             observations[profile] = observation
             metrics = metrics.add(run_metrics)
@@ -457,6 +468,7 @@ def run_suite(
     config_dir: Path | None = None,
     model_tag: str = "",
     scenarios_source: str = "evals/scenarios.yaml",
+    tool_profile: str = TOOL_PROFILE,
 ) -> EvalResults:
     """Run the suite (or ``scenario_ids``) and write ``eval_results.json`` + ``EVAL_REPORT.md``.
 
@@ -474,6 +486,7 @@ def run_suite(
             config_dir=config_dir,
             llm_config=llm_config,
             model_tag=model_tag if engine == "llm" else "",
+            tool_profile=tool_profile,
         )
         for scenario in selected
     ]

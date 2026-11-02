@@ -214,6 +214,10 @@ class FullModeEvidence(StrictModel):
     esps: list[EspPoint] = Field(default_factory=list)
     brine_contact_materials: dict[str, str] = Field(default_factory=dict)
     co2_release_pressure_barg: float | None = None
+    model_warnings: list[str] = Field(
+        default_factory=list,
+        description="WP-14: distinct model validity warnings of the year, first text + [×days].",
+    )
 
 
 class EndOfLifeCheck(StrictModel):
@@ -767,6 +771,7 @@ def _run_full(
     invalid: dict[int, str] = {}
     warnings: list[str] = []
     evidence: FullModeEvidence | None = None
+    model_warnings: dict[str, list[Any]] = {}  # digits-free pattern → [first text, days]
     for index, fast in sorted(fast_days.items()):
         plan = fast.plan
         day = year.days[index]
@@ -823,6 +828,10 @@ def _run_full(
         evidence.esps += sim.esps
         evidence.heat_pumps += sim.heat_pumps
         evidence.brine_contact_materials.update(sim.brine_contact_materials)
+        for text in sim.model_warnings:
+            model_warnings.setdefault(re.sub(r"[-+]?\d[\d.]*", "#", text), [text, 0])[1] += 1
+    if evidence is not None:
+        evidence.model_warnings = [f"{t} [×{n}]" for t, n in model_warnings.values()]
     return results, invalid, evidence, warnings
 
 
@@ -864,6 +873,7 @@ def verification_evidence(
             "esps": ev.esps,
             "brine_contact_materials": ev.brine_contact_materials,
             "co2_release_pressure_barg": ev.co2_release_pressure_barg,
+            "model_warnings": ev.model_warnings,
         }
     owned = sorted(set(extra) & {"candidate", "annual", "fast_annual", "kpis", "stub_evidence"})
     if owned:

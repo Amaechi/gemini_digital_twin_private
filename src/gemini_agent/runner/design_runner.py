@@ -639,11 +639,18 @@ class DesignRunner:
                 (failed.discard if check.passed else failed.add)(check.candidate_id)
             state.guard_failed = sorted(failed)
             return [c.candidate_id for c in data.checks]
-        if tool in {"simulate_annual", "economics"}:
-            for kpi in data.kpis:
+        if tool in {"simulate_annual", "economics", "uncertainty"}:
+            for kpi in getattr(data, "kpis", None) or []:  # WP-14: + uncertainty percentiles
                 self._merge_kpi(state, kpi)
-            return [kpi.candidate_id for kpi in data.kpis]
+            return [kpi.candidate_id for kpi in getattr(data, "kpis", None) or []]
         if tool == "optimise_design":
+            # WP-14: the real TL-13 returns its sized designs; they join the run as candidates.
+            sized = {c.id: c for c in getattr(data, "candidates", None) or []}
+            if sized:
+                state.candidates = [c for c in state.candidates if c.id not in sized]
+                state.candidates += list(sized.values())
+            for kpi in getattr(data, "kpis", None) or []:
+                self._merge_kpi(state, kpi)
             state.shortlist = list(data.shortlist)
             state.selected_id = state.shortlist[0] if state.shortlist else None
             return list(state.shortlist)

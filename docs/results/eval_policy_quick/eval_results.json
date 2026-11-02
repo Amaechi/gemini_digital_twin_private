@@ -1,0 +1,284 @@
+{
+  "generated_at": "2026-11-02T13:05:14.219667+00:00",
+  "engine": "policy",
+  "model": "policy",
+  "eval_dir": "runs/eval_wp14c/policy",
+  "scenarios_source": "evals/scenarios.yaml",
+  "runs": [
+    {
+      "scenario": "S1",
+      "situation": "Full brief + all files",
+      "expected": "Complete design, ACCEPTED",
+      "engine": "policy",
+      "model": "policy",
+      "outcome": "pass",
+      "status": "completed",
+      "phase": "P10",
+      "verdict": "ACCEPTED",
+      "selected_candidate": "C2-opt",
+      "conflicts": [],
+      "metrics": {
+        "runtime_s": 182.221,
+        "tool_calls": 22,
+        "stub_tool_calls": 0,
+        "llm_calls": 0,
+        "llm_valid_calls": 0,
+        "retries": 0,
+        "fallbacks": 0,
+        "step_rejections": 0,
+        "input_tokens": 0,
+        "output_tokens": 0
+      },
+      "checks": [
+        {
+          "type": "status",
+          "expect": "runs P0–P10 to completion",
+          "passed": true,
+          "detail": "status completed"
+        },
+        {
+          "type": "phase",
+          "expect": "ends in P10 (report and approval)",
+          "passed": true,
+          "detail": "phase P10"
+        },
+        {
+          "type": "phases_in_order",
+          "expect": "every phase P0–P10 runs, in order (verifier loop-backs allowed)",
+          "passed": true,
+          "detail": "first starts ['P0', 'P1', 'P2', 'P3', 'P4', 'P5', 'P6', 'P7', 'P8', 'P9', 'P10']; 11 starts"
+        },
+        {
+          "type": "loops_within_limit",
+          "expect": "verifier loop-backs stay within the limit (spec §5.2: ≤ 3)",
+          "passed": true,
+          "detail": "0 loop-back(s) (limit 3)"
+        },
+        {
+          "type": "selected_candidate",
+          "expect": "a candidate is selected that was neither guard-failed nor REJECTED",
+          "passed": true,
+          "detail": "selected C2-opt"
+        },
+        {
+          "type": "decision_records",
+          "expect": "DR-01…DR-10 are written",
+          "passed": true,
+          "detail": "10 DRs; missing none"
+        },
+        {
+          "type": "files",
+          "expect": "run artefacts are written",
+          "passed": true,
+          "detail": "missing none"
+        },
+        {
+          "type": "verdict",
+          "expect": "the verifier ACCEPTs the selected design (promoted WP-14)",
+          "passed": true,
+          "detail": "verdict ACCEPTED"
+        },
+        {
+          "type": "stub_tool_calls_max",
+          "expect": "0 stub tool calls (promoted WP-14: real tools bound)",
+          "passed": true,
+          "detail": "0/22 stub calls"
+        }
+      ],
+      "pending": [],
+      "run_dirs": [
+        "S1"
+      ],
+      "verify_cost_items": [
+        "absorption_chiller_plant_cost_function_usd",
+        "electric_chiller_plant_cost_function_usd"
+      ],
+      "token_comparison": null,
+      "note": ""
+    },
+    {
+      "scenario": "S6",
+      "situation": "Return temperature not given",
+      "expected": "Asks or records DB-31 assumption + sensitivity",
+      "engine": "policy",
+      "model": "policy",
+      "outcome": "pass",
+      "status": "completed",
+      "phase": "P10",
+      "verdict": "ACCEPTED",
+      "selected_candidate": "C2-opt",
+      "conflicts": [],
+      "metrics": {
+        "runtime_s": 181.386,
+        "tool_calls": 22,
+        "stub_tool_calls": 0,
+        "llm_calls": 0,
+        "llm_valid_calls": 0,
+        "retries": 0,
+        "fallbacks": 0,
+        "step_rejections": 0,
+        "input_tokens": 0,
+        "output_tokens": 0
+      },
+      "checks": [
+        {
+          "type": "assumption_or_question",
+          "expect": "asks for, or records, the DB-31 heating return temperature",
+          "passed": true,
+          "detail": "recorded: DB-31 = 55.0 degC (assumed: register default)"
+        },
+        {
+          "type": "status",
+          "expect": "continues on the labelled assumption",
+          "passed": true,
+          "detail": "status completed"
+        },
+        {
+          "type": "tool_output_mentions",
+          "expect": "runs a sensitivity on DB-31 (TL-15 cases, promoted WP-14)",
+          "passed": true,
+          "detail": "uncertainty.data.cases misses nothing"
+        }
+      ],
+      "pending": [],
+      "run_dirs": [
+        "S6"
+      ],
+      "verify_cost_items": [
+        "absorption_chiller_plant_cost_function_usd",
+        "electric_chiller_plant_cost_function_usd"
+      ],
+      "token_comparison": null,
+      "note": ""
+    },
+    {
+      "scenario": "S7",
+      "situation": "Cooling model removed from registry",
+      "expected": "Gap detected; Model Builder writes model + passes reference-example test",
+      "engine": "policy",
+      "model": "policy",
+      "outcome": "pending",
+      "status": "completed",
+      "phase": "P10",
+      "verdict": "ACCEPTED",
+      "selected_candidate": "C2-opt",
+      "conflicts": [],
+      "metrics": {
+        "runtime_s": 181.367,
+        "tool_calls": 22,
+        "stub_tool_calls": 0,
+        "llm_calls": 0,
+        "llm_valid_calls": 0,
+        "retries": 0,
+        "fallbacks": 0,
+        "step_rejections": 0,
+        "input_tokens": 0,
+        "output_tokens": 0
+      },
+      "checks": [
+        {
+          "type": "tool_called",
+          "expect": "runs the model-gap analysis in P4",
+          "passed": true,
+          "detail": "model_gap_analysis called 1x in P4"
+        },
+        {
+          "type": "status",
+          "expect": "the run completes",
+          "passed": true,
+          "detail": "status completed"
+        },
+        {
+          "type": "gap_reported",
+          "expect": "the missing absorption chiller is reported as a gap (promoted WP-14)",
+          "passed": true,
+          "detail": "gaps reported: ['absorption_chiller']"
+        }
+      ],
+      "pending": [
+        {
+          "expect": "the Model Builder writes the model from its reference card and it passes the reference-example test",
+          "needs": [
+            "L-2"
+          ],
+          "reason": "the policy engine's P4 runs the gap analysis only (WP-12 decision); the LLM Model Builder writes and tests the model in the local Ollama run (python -m gemini_agent.agents.model_builder --sandbox runs/s7_demo)",
+          "currently": null,
+          "now_passes": null
+        }
+      ],
+      "run_dirs": [
+        "S7"
+      ],
+      "verify_cost_items": [
+        "electric_chiller_plant_cost_function_usd"
+      ],
+      "token_comparison": null,
+      "note": ""
+    },
+    {
+      "scenario": "S8",
+      "situation": "Permeability 50 mD",
+      "expected": "Re-sizes and explains",
+      "engine": "policy",
+      "model": "policy",
+      "outcome": "pending",
+      "status": "completed",
+      "phase": "P10",
+      "verdict": "ACCEPTED",
+      "selected_candidate": "C2-opt",
+      "conflicts": [],
+      "metrics": {
+        "runtime_s": 227.872,
+        "tool_calls": 22,
+        "stub_tool_calls": 0,
+        "llm_calls": 0,
+        "llm_valid_calls": 0,
+        "retries": 0,
+        "fallbacks": 0,
+        "step_rejections": 0,
+        "input_tokens": 0,
+        "output_tokens": 0
+      },
+      "checks": [
+        {
+          "type": "design_basis_value",
+          "expect": "the design basis carries 50 mD",
+          "passed": true,
+          "detail": "reservoir.permeability_md = 50.0"
+        },
+        {
+          "type": "status",
+          "expect": "the run completes on the changed basis",
+          "passed": true,
+          "detail": "status completed"
+        },
+        {
+          "type": "dr_mentions",
+          "expect": "explains the change in the Decision Records: DR-01 quotes the permeability and TL-04 (promoted WP-14)",
+          "passed": true,
+          "detail": "DR-01 misses nothing"
+        }
+      ],
+      "pending": [
+        {
+          "expect": "re-sizes the doublets for the lower productivity",
+          "needs": [
+            "WP-15"
+          ],
+          "reason": "the real TL-05…TL-13 now size on the 50 mD basis (lower PI → ESP limits the flow), but no scenario check compares the S8 design with S1's yet (needs a cross-run check type)",
+          "currently": null,
+          "now_passes": null
+        }
+      ],
+      "run_dirs": [
+        "S8"
+      ],
+      "verify_cost_items": [
+        "absorption_chiller_plant_cost_function_usd",
+        "electric_chiller_plant_cost_function_usd"
+      ],
+      "token_comparison": null,
+      "note": ""
+    }
+  ]
+}

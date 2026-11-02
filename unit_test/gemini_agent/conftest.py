@@ -51,6 +51,37 @@ else:
             "tests must not build a real LLM model; pass a FunctionModel/TestModel"
         )
 
+    @pytest.fixture(autouse=True, scope="session")
+    def _smoke_budget():
+        """WP-14: a test that builds a default (real) toolbox and runs the whole pipeline gets the
+        smoke budget (register RUN-BUDGET), never the full-size optimisation + Monte Carlo."""
+        from gemini_agent.runner.real_tools import BUDGET_ENV
+
+        with pytest.MonkeyPatch.context() as patch:
+            patch.setenv(BUDGET_ENV, "smoke")
+            yield
+
+    @pytest.fixture(scope="module")
+    def stub_tools():
+        """Bind the labelled stub catalogue wherever a default toolbox is built (WP-14).
+
+        ``default_toolbox`` binds the real engineering tools; tests of the workflow mechanics
+        (runner, CLI, eval harness, submission) opt in with
+        ``pytestmark = pytest.mark.usefixtures("stub_tools")`` to stay fast.
+        """
+        from gemini_agent import cli
+        from gemini_agent.eval import harness
+        from gemini_agent.runner import design_runner, tool_stubs
+
+        def _stubs(*args, **kwargs):
+            return tool_stubs.stub_toolbox()
+
+        # Module scope: module-scoped fixtures (e.g. the eval suites) must see the stubs too.
+        with pytest.MonkeyPatch.context() as patch:
+            for module in (design_runner, cli, harness):
+                patch.setattr(module, "default_toolbox", _stubs)
+            yield
+
     @pytest.fixture(autouse=True)
     def _block_real_llm(monkeypatch):
         """Make any accidental real-model construction fail the test."""

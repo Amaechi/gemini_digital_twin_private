@@ -1,0 +1,283 @@
+{
+ "data": {
+  "candidate_id": "C2-opt",
+  "kpis": [
+   {
+    "candidate_id": "C2-opt",
+    "unmet_heating_days": null,
+    "unmet_heating_mwh": null,
+    "unmet_cooling_days": null,
+    "unmet_cooling_mwh": null,
+    "installed_heating_mw": null,
+    "installed_cooling_mw": null,
+    "heat_by_source_mwh": {},
+    "cool_by_source_mwh": {},
+    "doublet_capacity_factors_frac": [],
+    "electricity_consumed_mwh": null,
+    "electricity_generated_mwh": null,
+    "gas_fuel_mwh": null,
+    "co2_t_per_yr": null,
+    "co2_reduction_vs_c0_frac": null,
+    "currency": null,
+    "capex_million": null,
+    "opex_million_per_yr": null,
+    "lcoh_per_mwh": null,
+    "lcoc_per_mwh": null,
+    "lcoh_20yr_per_mwh": null,
+    "lcoc_20yr_per_mwh": null,
+    "electricity_purchased_mwh": null,
+    "grid_gas_fuel_mwh": null,
+    "exergy_efficiency_frac": null,
+    "exergy_dead_state": null,
+    "exergy_utilisation_frac": null,
+    "min_constraint_margins": {},
+    "thermal_breakthrough_yr": null,
+    "percentiles": {
+     "lcoh_per_mwh": {
+      "p10": 33.790933978581805,
+      "p50": 47.304981273767524,
+      "p90": 66.1362972660628
+     },
+     "lcoc_per_mwh": {
+      "p10": 20.856446122365995,
+      "p50": 26.695320108798732,
+      "p90": 34.449955252933904
+     },
+     "lcoh_plus_lcoc_per_mwh": {
+      "p10": 59.35287549801341,
+      "p50": 73.8588409522473,
+      "p90": 96.5245812151034
+     },
+     "co2_t_per_yr": {
+      "p10": 5311.900430743194,
+      "p50": 8329.113805158791,
+      "p90": 11919.681277482645
+     },
+     "capex_million": {
+      "p10": 23.576612239608075,
+      "p50": 27.034210101199584,
+      "p90": 30.523276643095844
+     },
+     "unmet_heating_days": {
+      "p10": 0.0,
+      "p50": 2.0,
+      "p90": 71.0
+     },
+     "unmet_cooling_days": {
+      "p10": 0.0,
+      "p50": 0.0,
+      "p90": 0.0
+     },
+     "unmet_heating_mwh": {
+      "p10": 0.0,
+      "p50": 13.30839582240084,
+      "p90": 2772.5177320684656
+     },
+     "unmet_cooling_mwh": {
+      "p10": 0.0,
+      "p50": 0.0,
+      "p90": 0.0
+     },
+     "thermal_breakthrough_yr": {
+      "p10": 47.98247702341413,
+      "p50": 70.51224543239745,
+      "p90": 101.13707287468456
+     },
+     "required_peak_boiler_mw": {
+      "p10": 5.0,
+      "p50": 5.380145071261888,
+      "p90": 10.852732403620434
+     },
+     "required_electric_chiller_mw": {
+      "p10": 8.2,
+      "p50": 8.2,
+      "p90": 8.2
+     }
+    }
+   }
+  ],
+  "percentiles": {
+   "lcoh_per_mwh": {
+    "p10": 33.790933978581805,
+    "p50": 47.304981273767524,
+    "p90": 66.1362972660628
+   },
+   "lcoc_per_mwh": {
+    "p10": 20.856446122365995,
+    "p50": 26.695320108798732,
+    "p90": 34.449955252933904
+   },
+   "lcoh_plus_lcoc_per_mwh": {
+    "p10": 59.35287549801341,
+    "p50": 73.8588409522473,
+    "p90": 96.5245812151034
+   },
+   "co2_t_per_yr": {
+    "p10": 5311.900430743194,
+    "p50": 8329.113805158791,
+    "p90": 11919.681277482645
+   },
+   "capex_million": {
+    "p10": 23.576612239608075,
+    "p50": 27.034210101199584,
+    "p90": 30.523276643095844
+   },
+   "unmet_heating_days": {
+    "p10": 0.0,
+    "p50": 2.0,
+    "p90": 71.0
+   },
+   "unmet_cooling_days": {
+    "p10": 0.0,
+    "p50": 0.0,
+    "p90": 0.0
+   },
+   "unmet_heating_mwh": {
+    "p10": 0.0,
+    "p50": 13.30839582240084,
+    "p90": 2772.5177320684656
+   },
+   "unmet_cooling_mwh": {
+    "p10": 0.0,
+    "p50": 0.0,
+    "p90": 0.0
+   },
+   "thermal_breakthrough_yr": {
+    "p10": 47.98247702341413,
+    "p50": 70.51224543239745,
+    "p90": 101.13707287468456
+   },
+   "required_peak_boiler_mw": {
+    "p10": 5.0,
+    "p50": 5.380145071261888,
+    "p90": 10.852732403620434
+   },
+   "required_electric_chiller_mw": {
+    "p10": 8.2,
+    "p50": 8.2,
+    "p90": 8.2
+   }
+  },
+  "probability_demand_met": 0.46,
+  "probability_demand_met_robust": 0.9,
+  "installed_backup_mw": {
+   "peak_boiler_mw": 5.0,
+   "electric_chiller_mw": 8.2
+  },
+  "robust_backup_mw": {
+   "peak_boiler_mw": 10.9,
+   "electric_chiller_mw": 8.2
+  },
+  "cases": [
+   {
+    "case": "ECO-CO2-GAS=51.53",
+    "assumption_id": "ECO-CO2-GAS",
+    "value": 51.53,
+    "status": "ok",
+    "lcoh_per_mwh": 42.466739652373,
+    "lcoc_per_mwh": 26.313715298763487,
+    "delta_lcoh_per_mwh": -0.08428957291744865,
+    "delta_lcoc_per_mwh": 0.0,
+    "unmet_mwh": 0.0
+   },
+   {
+    "case": "DB-31=45",
+    "assumption_id": "DB-31",
+    "value": 45.0,
+    "status": "ok",
+    "lcoh_per_mwh": 36.50989842695669,
+    "lcoc_per_mwh": 26.060914388134602,
+    "delta_lcoh_per_mwh": -6.041130798333761,
+    "delta_lcoc_per_mwh": -0.2528009106288849,
+    "unmet_mwh": 0.0
+   },
+   {
+    "case": "DB-31=65",
+    "assumption_id": "DB-31",
+    "value": 65.0,
+    "status": "ok",
+    "lcoh_per_mwh": 54.700259478017834,
+    "lcoc_per_mwh": 26.513084757005682,
+    "delta_lcoh_per_mwh": 12.149230252727385,
+    "delta_lcoc_per_mwh": 0.1993694582421952,
+    "unmet_mwh": 2605.483641297712
+   },
+   {
+    "case": "DB-31=75",
+    "assumption_id": "DB-31",
+    "value": 75.0,
+    "status": "ok",
+    "lcoh_per_mwh": 74.9189833339373,
+    "lcoc_per_mwh": 26.494863937495065,
+    "delta_lcoh_per_mwh": 32.367954108646856,
+    "delta_lcoc_per_mwh": 0.18114863873157816,
+    "unmet_mwh": 17727.00737503471
+   },
+   {
+    "case": "CHP-EL-FRAC=0.5",
+    "assumption_id": "CHP-EL-FRAC",
+    "value": 0.5,
+    "status": "ok",
+    "lcoh_per_mwh": 41.36104392057858,
+    "lcoc_per_mwh": 25.818297607364283,
+    "delta_lcoh_per_mwh": -1.1899853047118683,
+    "delta_lcoc_per_mwh": -0.49541769139920433,
+    "unmet_mwh": 22.82910583084285
+   },
+   {
+    "case": "SUB-PBUB.basis=pure_water",
+    "assumption_id": "SUB-PBUB",
+    "value": "pure_water",
+    "status": "ok",
+    "lcoh_per_mwh": 42.551029225290456,
+    "lcoc_per_mwh": 26.313715298763487,
+    "delta_lcoh_per_mwh": 7.105427357601002e-15,
+    "delta_lcoc_per_mwh": 0.0,
+    "unmet_mwh": 0.0
+   },
+   {
+    "case": "DB-34b=warm",
+    "assumption_id": "DB-34b",
+    "value": true,
+    "status": "ok",
+    "lcoh_per_mwh": 42.66531607286533,
+    "lcoc_per_mwh": 32.948515616732365,
+    "delta_lcoh_per_mwh": 0.11428684757488128,
+    "delta_lcoc_per_mwh": 6.634800317968878,
+    "unmet_mwh": 0.0
+   },
+   {
+    "case": "DB-30=B",
+    "assumption_id": "DB-30",
+    "value": "B",
+    "status": "ok",
+    "lcoh_per_mwh": 43.41686427515455,
+    "lcoc_per_mwh": 30.446420626656646,
+    "delta_lcoh_per_mwh": 0.8658350498641028,
+    "delta_lcoc_per_mwh": 4.132705327893159,
+    "unmet_mwh": 0.0
+   }
+  ],
+  "samples": 200,
+  "failed_samples": 0,
+  "file": "uncertainty_C2-opt.json"
+ },
+ "summary": "TL-15 C2-opt: 200 MC samples, LCOH P10/P50/P90 33.8/47.3/66.1; P(demand met) 0.46; 8 cases (DB-31 = 45.0, 65.0, 75.0)",
+ "warnings": [
+  "sensitivity production_temperature_shift_k: up to 1230 MWh/yr unmet with the installed backup nameplates (see robust_backup_mw)",
+  "sensitivity heating_return_degc: up to 2605 MWh/yr unmet with the installed backup nameplates (see robust_backup_mw)",
+  "sensitivity geothermal_gradient_k_per_km: up to 680 MWh/yr unmet with the installed backup nameplates (see robust_backup_mw)",
+  "sensitivity heating_demand_scale: up to 149 MWh/yr unmet with the installed backup nameplates (see robust_backup_mw)",
+  "108/200 samples breach a hard limit in operation (counted as demand not met; first: heating_supply_margin_k = -8.709 (DB-16))"
+ ],
+ "assumption_ids": [
+  "UQ-RANGES",
+  "UQ-CASES",
+  "UQ-MC",
+  "DB-31"
+ ],
+ "sources": [
+  "spec \u00a79.3",
+  "TL-15 uncertainty"
+ ]
+}

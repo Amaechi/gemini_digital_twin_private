@@ -12,6 +12,8 @@ from gemini_agent.memory.project_knowledge import (
     new_user_assertion,
 )
 
+pytestmark = pytest.mark.usefixtures("stub_tools")
+
 
 def _event(event_type: str, seq: int = 1, **payload) -> EventRecord:
     return EventRecord(run_id="r1", seq=seq, ts="t", type=event_type, phase="P1", payload=payload)

@@ -21,6 +21,8 @@ from gemini_agent.cli import (
 from gemini_agent.schemas.config import REPO_ROOT
 from unit_test.gemini_agent.llm_fakes import fake_model
 
+pytestmark = pytest.mark.usefixtures("stub_tools")
+
 
 def test_module_help_runs_as_subprocess():
     """`python -m gemini_agent.cli --help` works (WP-00 acceptance)."""
@@ -144,3 +146,30 @@ def test_no_command_prints_help(capsys):
     """Without a command the CLI prints help and exits cleanly."""
     assert main([]) == EXIT_OK
     assert "usage: geoagent" in capsys.readouterr().out
+
+
+def test_budget_option_reaches_the_toolbox_and_sigterm_is_restored(tmp_path, monkeypatch):
+    """WP-14: `--budget smoke` (alias `--tool-profile`) selects the real-tool budget; main()
+    turns SIGTERM into SystemExit (pools unwind) only while it runs."""
+    import signal
+
+    from gemini_agent import cli
+    from gemini_agent.runner.tool_stubs import stub_toolbox
+
+    seen = []
+
+    def fake_default_toolbox(profile=None, *, config_dir=None):
+        seen.append(profile)
+        return stub_toolbox()
+
+    monkeypatch.setattr(cli, "default_toolbox", fake_default_toolbox)
+    before = signal.getsignal(signal.SIGTERM)
+    args = ["run", "--engine", "policy", "--runs-dir", str(tmp_path), "--input-mode", "assume"]
+    assert main([*args, "--run-id", "b1", "--budget", "smoke"]) == EXIT_OK
+    assert main([*args, "--run-id", "b2", "--tool-profile", "quick"]) == EXIT_OK
+    assert main([*args, "--run-id", "b3"]) == EXIT_OK
+    assert seen == ["smoke", "quick", None]  # None → GEOAGENT_BUDGET, else full
+    assert signal.getsignal(signal.SIGTERM) == before
+    with pytest.raises(SystemExit) as exc:
+        cli._exit_on_sigterm(signal.SIGTERM, None)
+    assert exc.value.code == 128 + signal.SIGTERM

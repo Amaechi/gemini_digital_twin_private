@@ -2,6 +2,8 @@
 
 import json
 
+import pytest
+
 from gemini_agent.agents.engine import PolicyEngine, check_choice, choice_deps
 from gemini_agent.runner.decision_records import (
     build_options,
@@ -11,14 +13,17 @@ from gemini_agent.runner.decision_records import (
     write_records,
 )
 from gemini_agent.runner.state import RunState, ToolRecord, Verification
-from gemini_agent.runner.tool_stubs import KPIBatch
-from gemini_agent.runner.toolbox import ToolContext, default_toolbox
+from gemini_agent.runner.tool_stubs import KPIBatch, stub_toolbox
+from gemini_agent.runner.toolbox import ToolContext
+from gemini_agent.schemas.config import load_config
 from gemini_agent.schemas.decision import DesignVerdict, OptionChoice, Phase
 from gemini_agent.schemas.results import KPISet
 
+pytestmark = pytest.mark.usefixtures("stub_tools")
+
 
 def _state(tmp_path) -> RunState:
-    toolbox = default_toolbox()
+    toolbox = stub_toolbox()
     context = ToolContext(run_id="t", run_dir=tmp_path, config_dir=None)
     candidates = toolbox.execute("generate_candidates", {}, context).data.candidates
     state = RunState(run_id="t", user_prompt="design", engine="policy", input_mode="assume")
@@ -132,6 +137,30 @@ def test_records_written_as_json_and_markdown(tmp_path):
     assert data["choice"] == record.choice and data["evidence_ids"] == ["TR-001"]
     markdown = (tmp_path / "dr" / "DR-05.md").read_text()
     assert "Rejected options" in markdown and record.choice in markdown
+
+
+def test_dr01_quotes_the_productivity_basis(tmp_path):
+    """WP-14 (S8): DR-01 options quote the permeability and the real TL-04 summary."""
+    state = _state(tmp_path)
+    state.tool_results.append(
+        ToolRecord(
+            id="TR-002",
+            tool="productivity_index",
+            phase=Phase.P2,
+            args={},
+            ok=True,
+            summary="PI 3.05 m³/h/bar (k 50 mD, h 100 m)",
+            stub=False,
+            source="policy",
+        )
+    )
+    notes = [option.notes for option in build_options("DR-01", state, None)]
+    basis_k = load_config("design_basis").reservoir.permeability_md
+    assert notes and all(
+        f"permeability {basis_k:g} mD" in n and "TR-002 PI 3.05" in n for n in notes
+    )
+    state.tool_results[-1] = state.tool_results[-1].model_copy(update={"stub": True})
+    assert not any("permeability" in o.notes for o in build_options("DR-01", state, None))
 
 
 # --------------------------------------------------------------------------- L-1 follow-up
