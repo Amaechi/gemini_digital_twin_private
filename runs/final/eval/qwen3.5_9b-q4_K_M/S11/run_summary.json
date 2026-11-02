@@ -1,0 +1,20 @@
+{
+  "run_id": "S11",
+  "status": "escalated",
+  "phase": "P0",
+  "engine": "llm+policy_fallback",
+  "input_mode": "assume",
+  "selected_candidate": null,
+  "verdict": null,
+  "approval": null,
+  "loop_count": 0,
+  "excluded_candidates": [],
+  "llm_fallbacks": 0,
+  "conflicts": [],
+  "assumptions_and_answers": [],
+  "decision_records": [],
+  "tool_calls": 1,
+  "stub_tool_calls": 0,
+  "final_summary": "Escalated to a human in P0 Intake: step budget exceeded in P0 (3 steps). Used 3 steps, 1 tool calls, 6804 tokens in this phase.",
+  "escalation_reason": "step budget exceeded in P0 (3 steps)"
+}
