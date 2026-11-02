@@ -16,7 +16,7 @@ Keep it ≤ 20 KB; it is the hand-off between sessions. Old detail: merged PRs a
 | WP-08 | Economics, CO₂, exergy, scaling | merged (66acde7) | [#12](https://github.com/Amaechi/gemini_digital_twin_private/pull/12) | TL-14/22/23; C0 LCOH 137 $/MWh ≈ ACM cap |
 | WP-09 | Verifier, memory, logging | merged (901e110) | [#9](https://github.com/Amaechi/gemini_digital_twin_private/pull/9) | 41-check DesignVerifier |
 | WP-10 | Agents, runner, CLI | merged (2285460; review a9083b7) | [#4](https://github.com/Amaechi/gemini_digital_twin_private/pull/4), [#6](https://github.com/Amaechi/gemini_digital_twin_private/pull/6) | policy P0–P10 on stubs |
-| WP-10 L-1 | LLM-path hardening from L-1 | in review | (this PR) | kind coercion, call limits, dup guard, DR criteria |
+| WP-10 L-1 | LLM-path hardening from L-1 | in review | [#19](https://github.com/Amaechi/gemini_digital_twin_private/pull/19) | kind coercion, call limits, dup guard, DR criteria |
 | WP-11 | Optimisation & uncertainty | merged (78491fe) | [#18](https://github.com/Amaechi/gemini_digital_twin_private/pull/18) | TL-13/15 |
 | WP-12 | Model gap & Model Builder | merged (b81cfa9) | [#15](https://github.com/Amaechi/gemini_digital_twin_private/pull/15) | TL-17/18; S7 demo |
 | WP-13 | Eval suite & submission checks | merged (a622551) | [#16](https://github.com/Amaechi/gemini_digital_twin_private/pull/16) | S1–S11; SUB-01…24 |
@@ -163,7 +163,7 @@ One line per decision, grouped by WP; dated 11-01 (WP-00: 10-31). Why: the `conf
 **L-1 / L-2**
 - Confirm tags with `ollama show <tag>` (must list `tools`). Set `OLLAMA_CONTEXT_LENGTH=65536` before `cli run --engine llm` (`num_ctx` ignored); `--model TAG` overrides orchestrator and coder.
 - Act/format split (spec §5.4.3) not implemented: add it if L-1 shows tool-call problems. Paused LLM runs from before a9083b7 may not reload.
-- **Re-run L-1** (S11, 5 models) after the L-1 follow-up PR: fallbacks, `kind_coercions`, `step_rejections`, tokens/phase; no "Thinking Process" in content, no call > `request_timeout_s`. gpt-oss can't disable reasoning; `thinking: true` needs more `max_output_tokens`.
+- **Re-run L-1** (S11, 5 models) after [#19](https://github.com/Amaechi/gemini_digital_twin_private/pull/19): fallbacks, `kind_coercions`, `step_rejections`, tokens/phase; no "Thinking Process" in content, no call > `request_timeout_s`. gpt-oss can't disable reasoning; `thinking: true` needs more `max_output_tokens`.
 
 **WP-15**
 - Header audit of adapted Plant Debugger files (`NOTICE`).
