@@ -448,9 +448,25 @@ def plot_tokens(view: RunView, out_dir: Path, files: list[str]) -> None:
 
 
 # =========================================================================== tables
+def _short_reason(reason: str | None) -> str | None:
+    """Short form of a DesignGuard / verifier pre-check reason for the table."""
+    if not reason:
+        return None
+    for marker in ("PH-19", "PH-30", "DB-"):
+        if marker in reason:
+            return f"excluded ({marker})" if marker != "DB-" else "excluded (hard limit)"
+    return "excluded"
+
+
 def candidates_table(view: RunView) -> tuple[str, pd.DataFrame]:
     """Candidate comparison (C0–C8 + sized optima): structure and KPIs from TL-12/13/14."""
     eco = view.economics_rows()
+    guard = latest_tool_data(view.run_dir, "design_guard") or {}
+    excluded = {
+        c["candidate_id"]: (c.get("violations") or ["DesignGuard"])[0]
+        for c in guard.get("checks") or []
+        if not c.get("passed")
+    }
     records = []
     for c in view.candidates:
         k = view.kpis.get(c.id)
@@ -472,6 +488,7 @@ def candidates_table(view: RunView) -> tuple[str, pd.DataFrame]:
                 "co2_t_yr": k.co2_t_per_yr,
                 "co2_cut_vs_c0": k.co2_reduction_vs_c0_frac,
                 "exergy_eff": k.exergy_efficiency_frac,
+                "excluded": _short_reason(excluded.get(c.id)),
             }
         )
     frame = pd.DataFrame(records)
@@ -505,7 +522,7 @@ def sizing_table(view: RunView) -> str:
     rows = [
         ["Design", c.id, c.description],
         ["Doublets", str(c.doublets), "DB-10: 1–3"],
-        ["Reservoir depth", _num(c.depth_m, ".0f") + " m", "TL-13 (flash-safe options)"],
+        ["Reservoir depth", _num(c.depth_m, ".0f") + " m", "TL-13 (verifiable depth options)"],
         ["Design flow per doublet", _num(c.design_flow_m3h, ".0f") + " m³/h", "DB-11: 50–300"],
         ["Gas handling", str(c.gas_handling.value if c.gas_handling else "–"), "DR-07"],
         ["Heating return (DB-31)", _num(c.heating_return_degc, ".0f") + " °C", "supply 100 °C"],
@@ -517,24 +534,51 @@ def sizing_table(view: RunView) -> str:
         rows.append(["Outage start days (0-based)", str(sized["outage_start_indices"]), "DR-06"])
     if sized.get("excluded_depths_m"):
         rows.append(
-            ["Depths excluded (PH-30)", str(sized["excluded_depths_m"]), "flash at letdown"]
+            ["Depths excluded", str(sized["excluded_depths_m"]), "PH-19 NPSH / PH-30 letdown"]
         )
     if k is not None:
         rows += [
             ["Installed heating", _num(k.installed_heating_mw, ".1f") + " MW", "TL-12"],
             ["Installed cooling", _num(k.installed_cooling_mw, ".1f") + " MW", "TL-12"],
-            ["Doublet capacity factors", ", ".join(_num(v, ".2f") for v in
-                                                   k.doublet_capacity_factors_frac), "TL-12"],
-            ["Thermal breakthrough", _num(k.thermal_breakthrough_yr, ".1f") + " yr", "TL-07"],
+            ["Doublet capacity factors (flow-based)", ", ".join(
+                _num(v, ".2f") for v in k.doublet_capacity_factors_frac), "TL-12 mean/design"],
+            ["Thermal breakthrough (annual-mean flow)", _num(k.thermal_breakthrough_yr, ".1f")
+             + " yr", "TL-12 end of life via TL-07"],
         ]  # fmt: skip
+    sub = view.json_file(f"session/subsurface_{c.id}.json") or {}
+    point = sub.get("operating_point") or {}
+    for label, value, spec, unit, basis in (
+        ("Wellhead temperature (design flow)", point.get("wellhead_temperature_degc"), ".1f",
+         "°C", "TL-05"),
+        ("ESP frequency", point.get("esp_frequency_hz"), ".1f", "Hz", "TL-05"),
+        ("ESP electric power per doublet", (point.get("esp_electric_power_w") or 0) / 1e6,
+         ".3f", "MW", "TL-05 QΔp/0.70/(0.93·0.97)"),
+        ("ESP intake margin over 1.2 · p_b", point.get("intake_margin_bar"), ".2f", "bar",
+         "TL-05 (SUB-PBUB basis)"),
+        ("Injector wellhead pressure", point.get("injector_wellhead_pressure_barg"), ".1f",
+         "bar(g)", "TL-05"),
+        ("Injection pump electric power per doublet",
+         (point.get("injection_pump_electric_power_w") or 0) / 1e6, ".3f", "MW", "TL-05"),
+        ("Thermal breakthrough (design flow)", sub.get("breakthrough_time_yr"), ".1f", "yr",
+         "TL-07, ≥ 30 yr (ENG-06)"),
+        ("Doublet separation", sub.get("doublet_separation_m"), ".0f", "m",
+         "TL-08 minimum for ≤ 1 bar"),
+        ("Well spacing", sub.get("well_spacing_m"), ".0f", "m", "SUB-SPACING (≥ 1.2 km)"),
+    ):  # fmt: skip
+        if point or sub:
+            rows.append([label, f"{_num(value, spec)} {unit}", basis])
+    if sub.get("scaling_status"):
+        rows.append(
+            ["Scaling screen (TL-22)", sub["scaling_status"], ", ".join(sub["scaling_mitigations"])]
+        )
     report = view.verification() or {}
     for check in report.get("checks") or []:
-        if check.get("check_id") in {"PH-25", "PH-27", "PH-18", "PD-04", "PD-05", "PH-30"}:
+        if check.get("check_id") in {"PH-02", "PH-18", "PD-04", "PD-05", "PH-30"}:
             rows.append(
                 [
                     f"{check['check_id']} {check['name']}",
-                    f"{_num(check.get('value'), '.3g')} {check.get('unit', '')}",
-                    f"margin {_num(check.get('margin'), '.3g')}",
+                    f"worst {_num(check.get('value'), '.3g')} {check.get('unit', '')}",
+                    f"margin {_num(check.get('margin'), '.3g')} (verifier)",
                 ]
             )
     return _md_table(["Item", "Value", "Basis"], rows)
@@ -680,10 +724,29 @@ def report_markdown(view: RunView, figure_dir: str = "figures/") -> tuple[str, l
                 f"({k.exergy_dead_state or 'dead state n/a'})"
             ),
         ]
+        uq = view.uncertainty() or {}
+        if uq.get("probability_demand_met") is not None:
+            lines.append(
+                f"- Robustness (TL-15, {len(uq.get('samples') or [])} samples): demand met in "
+                f"{uq['probability_demand_met']:.0%} of samples with the installed backups; "
+                f"backups {uq.get('robust_backup_mw')} MW → "
+                f"{_num(uq.get('probability_demand_met_robust'), '.0%')} (not installed: "
+                "decision for the review)"
+            )
     else:
         lines.append("No design selected.")
+    opt = latest_tool_data(view.run_dir, "optimise_design") or {}
+    notes = "".join(
+        f"\n- TL-13 {d['candidate_id']} (from {d['from']}): depths excluded "
+        f"{d.get('excluded_depths_m') or 'none'} (verifier PH-19/PH-30, `depth_check`)"
+        for d in opt.get("designs") or []
+    ) + "".join(f"\n- {cid}: {why}" for cid, why in (opt.get("skipped") or {}).items())
+    alternatives = candidates_table(view)[0] + (
+        "\nRows `C*-Nd` are the spec §3.4 screening points (TL-12 fast year); `*-opt` rows are "
+        "the TL-13 optima (P6); `*` marks the selected design." + notes + "\n"
+    )
     for title, body in (
-        ("Alternatives compared (C0–C8)", candidates_table(view)[0]),
+        ("Alternatives compared (C0–C8)", alternatives),
         ("Final design sizing", sizing_table(view)),
         ("Verification", verification_table(view)),
         ("Uncertainty", uncertainty_table(view)),
@@ -698,6 +761,15 @@ def report_markdown(view: RunView, figure_dir: str = "figures/") -> tuple[str, l
         "fig_tornado.png", "fig_tokens.png",
     ):  # fmt: skip
         lines.append(f"![{name}]({figure_dir}{name})")
+    gaps = latest_tool_data(view.run_dir, "model_gap_analysis") or {}
+    if gaps.get("limitations") or gaps.get("missing_component_types"):
+        sections.append("Model gaps and limitations")
+        lines += ["", "## Model gaps and limitations (TL-17)", ""]
+        lines.append(f"- Missing component types: {gaps.get('missing_component_types') or 'none'}")
+        lines += [
+            f"- {lim.get('id')} {lim.get('title')}: {lim.get('impact', '')}"
+            for lim in gaps.get("limitations") or []
+        ]
     sections.append("Decision Records")
     lines += ["", "## Decision Records", ""]
     for r in view.decision_records:

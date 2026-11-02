@@ -82,8 +82,35 @@ def _view(run_dir: Path) -> plots.RunView:
     (run_dir / "tool_results" / "TR-020_verify_design.json").write_text(
         json.dumps({"data": report}), "utf-8"
     )
+    guard = {
+        "checks": [
+            {"candidate_id": "C0-0d", "passed": True, "violations": []},
+            {"candidate_id": "C4-2d", "passed": False,
+             "violations": ["verifier pre-check: depth 3200 m — NPSH (SUB-NPSH, PH-19)"]},
+        ]
+    }  # fmt: skip
+    (run_dir / "tool_results" / "TR-010_design_guard.json").write_text(
+        json.dumps({"data": guard}), "utf-8"
+    )
+    (run_dir / "session").mkdir()
+    sub = {
+        "operating_point": {"wellhead_temperature_degc": 85.2, "esp_frequency_hz": 58.9},
+        "doublet_separation_m": 1141.0,
+        "breakthrough_time_yr": 34.4,
+        "scaling_status": "insufficient data",
+        "scaling_mitigations": ["calcite_inhibitor"],
+    }
+    (run_dir / "session" / "subsurface_C1-opt.json").write_text(json.dumps(sub), "utf-8")
+    gaps = {
+        "missing_component_types": [],
+        "limitations": [{"id": "LIM-SUB-01", "title": "ESP has no flow affinity", "impact": "x"}],
+    }
+    (run_dir / "tool_results" / "TR-011_model_gap_analysis.json").write_text(
+        json.dumps({"data": gaps}), "utf-8"
+    )
     kpis = {
         "C0-0d": KPISet(candidate_id="C0-0d", lcoh_per_mwh=137.0, lcoc_per_mwh=36.0),
+        "C4-2d": KPISet(candidate_id="C4-2d", lcoh_per_mwh=29.4, lcoc_per_mwh=38.7),
         "C1-opt": KPISet(
             candidate_id="C1-opt",
             lcoh_per_mwh=33.0,
@@ -97,7 +124,11 @@ def _view(run_dir: Path) -> plots.RunView:
     return plots.RunView(
         run_id="r1",
         run_dir=run_dir,
-        candidates=[_candidate("C0-0d", "C0", 0), _candidate("C1-opt", "C1", 3)],
+        candidates=[
+            _candidate("C0-0d", "C0", 0),
+            _candidate("C1-opt", "C1", 3),
+            _candidate("C4-2d", "C4", 2),
+        ],
         kpis=kpis,
         selected_id="C1-opt",
         decision_records=[
@@ -125,7 +156,10 @@ def test_render_all_writes_every_figure_and_table(tmp_path):
         assert (tmp_path / "out" / name).stat().st_size > 0
     table = (tmp_path / "out" / "candidates.md").read_text("utf-8")
     assert "C1-opt *" in table and "85%" in table
-    assert "PH-30" in (tmp_path / "out" / "sizing.md").read_text("utf-8")
+    assert "excluded (PH-19)" in table  # verifier pre-check reason travels to the table
+    sizing = (tmp_path / "out" / "sizing.md").read_text("utf-8")
+    assert "Doublet separation | 1141 m" in sizing and "Wellhead temperature" in sizing
+    assert "Thermal breakthrough (design flow) | 34.4 yr" in sizing
     assert "Verdict: ACCEPTED" in (tmp_path / "out" / "verification.md").read_text("utf-8")
 
 
@@ -142,3 +176,4 @@ def test_report_puts_the_answer_first(tmp_path):
     assert sections[0] == "Answer" and "Figures" in sections
     assert "**C1-opt**" in text and "LCOH 33.0 USD/MWh" in text and "85% below" in text
     assert "![fig_daily_heat.png](fig_daily_heat.png)" in text
+    assert "LIM-SUB-01 ESP has no flow affinity" in text  # WP-12 limitations reported

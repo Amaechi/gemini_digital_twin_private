@@ -121,6 +121,21 @@ def test_design_guard_reports_failed_ids_as_checks(tmp_path):
     assert any("DB-10" in v or "doublet" in v for v in checks["C1-4d"].violations)
 
 
+def test_guard_excludes_unverifiable_depths_but_keeps_them_for_screening(tmp_path):
+    """P3 verifier pre-check: C4 at 3.2 km fails (PH-19/PH-30), is excluded from ranking and the
+    DRs (``guard_failed``) yet stays in the P5 screening for the comparison table."""
+    c2, c4 = _candidate(), _candidate(id="C4-2d", concept="C4", depth_m=3200.0)
+    box = real_toolbox("smoke")
+    context = _context(tmp_path, candidates=(c2, c4))
+    checks = {c.candidate_id: c for c in box.execute("design_guard", {}, context).data.checks}
+    assert checks["C2-2d"].passed and not checks["C4-2d"].passed
+    assert "verifier pre-check: depth 3200 m" in checks["C4-2d"].violations[-1]
+    assert "PH-19" in checks["C4-2d"].violations[-1]
+    later = _context(tmp_path, candidates=(c2, c4), guard_failed=("C4-2d",))
+    assert [c.id for c in box.session.select(later, "all")] == ["C2-2d", "C4-2d"]
+    assert "C4-2d" in later.excluded_ids
+
+
 def test_depth_check_keeps_only_depths_the_verifier_can_accept(tmp_path):
     """TL-05 at 300 m³/h: T_res 87 °C at 2.5 km (kept); 3.0 km has brine above 100 °C at the ESP
     (NPSH not evaluable, PH-19); 3.2 km also flashes at the letdown (T_wh 105 °C, PH-30)."""

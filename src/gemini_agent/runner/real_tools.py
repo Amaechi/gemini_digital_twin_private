@@ -393,6 +393,8 @@ class _RunMemo:
     points: dict[tuple[float, float], OperatingPoint] = field(default_factory=dict)
     subsurface: dict[str, dict[str, Any]] = field(default_factory=dict)
     scaling: dict[str, tl22.ScalingReport] = field(default_factory=dict)
+    unverifiable: dict[str, str] = field(default_factory=dict)
+    """Candidates excluded at P3 only by the verifier pre-check (screened for comparison)."""
     climate: ClimateProfile | None = None
     c0_co2_t_per_yr: float | None = None
 
@@ -478,9 +480,16 @@ class ToolSession:
         raise ValueError(f"unknown candidate_id '{candidate_id}' (known: {known})")
 
     def select(self, context: ToolContext, candidate_id: str) -> list[Candidate]:
-        """``all`` → every candidate not excluded by DesignGuard; else the one asked for."""
+        """``all`` → every candidate not excluded by DesignGuard; else the one asked for.
+
+        Candidates excluded only by the verifier pre-check (``depth_check``) are still screened,
+        so the comparison table shows them; ranking and Decision Records exclude them.
+        """
         if candidate_id == "all":
-            return [c for c in context.candidates if c.id not in context.guard_failed]
+            keep = set(self.memo(context).unverifiable)
+            return [
+                c for c in context.candidates if c.id not in context.guard_failed or c.id in keep
+            ]
         return [self.candidate(context, candidate_id)]
 
     def parent_concept(self, context: ToolContext, candidate: Candidate) -> ConceptId | None:
@@ -742,6 +751,21 @@ class ToolSession:
             "interference": tl08,
             "spacing_m": load_subsurface_basis(cfg_dir).well_spacing_m,
         }
+        _write_json(  # TL-05/07/08/22 design-point summary for the sizing table (TL-21)
+            memo.run_dir / SESSION_DIR / f"subsurface_{candidate.id}.json",
+            {
+                "operating_point": point.model_dump(
+                    mode="json", exclude={"esp_evidence", "notes", "reasons"}
+                ),
+                "well_spacing_m": memo.subsurface[candidate.id]["spacing_m"],
+                "breakthrough_time_yr": tb.breakthrough_time_yr,
+                "breakthrough_horizon_yr": tb.horizon_yr,
+                "interference_max_bar": tl08.max_abs_pressure_change_bar if tl08 else None,
+                "doublet_separation_m": tl08.separation_m if tl08 else None,
+                "scaling_status": scaling.status,
+                "scaling_mitigations": [m.value for m in scaling.evidence.mitigations],
+            },
+        )
         return memo.subsurface[candidate.id]
 
     # ------------------------------------------------------------------ verifier evidence
@@ -1000,17 +1024,36 @@ class RealTools:
             )
             for r in results
         ]
+        # Verifier pre-check (WP-14): a design at a depth the DesignVerifier can never accept
+        # (PH-19 NPSH not evaluable, PH-30 flash at the letdown) is not proposed; it is still
+        # screened for the comparison (``select``), but ranking and the DRs exclude it.
+        memo = self.session.memo(context)
+        by_id = {c.id: c for c in targets}
+        for check in checks:
+            candidate = by_id[check.candidate_id]
+            if not check.passed or candidate.doublets == 0 or candidate.depth_m is None:
+                continue
+            degas = candidate.gas_handling == GasHandling.DEGAS_USE
+            why = self.session.depth_check(context, candidate.depth_m, degas)
+            if why:
+                check.passed = False
+                check.violations.append(
+                    f"verifier pre-check: depth {candidate.depth_m:g} m — {why}"
+                )
+                memo.unverifiable[candidate.id] = why
         failed = [c.candidate_id for c in checks if not c.passed]
         summary = f"TL-10: {len(checks) - len(failed)}/{len(checks)} approved"
         if failed:
-            first = next(r for r in results if not r.approved)
-            summary += f"; rejected {', '.join(failed)} — {first.candidate_id}: {first.reason}"
+            first = next(c for c in checks if not c.passed)
+            summary += (
+                f"; rejected {', '.join(failed)} — {first.candidate_id}: {first.violations[0]}"
+            )
         return ToolResult[GuardToolOutput](
             data=GuardToolOutput(checks=checks, results=results),
             summary=_short(summary),
             warnings=[w for r in results for w in r.warnings][:10],
             assumption_ids=["DB-40"],
-            sources=["config/limits.yaml", "DB-10…DB-17", "DB-36"],
+            sources=["config/limits.yaml", "DB-10…DB-17", "DB-36", "SUB-NPSH", "SUB-PSUC"],
         )
 
     # ---------------------------------------------------------------- P5 / P7
