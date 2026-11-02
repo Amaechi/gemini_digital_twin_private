@@ -198,6 +198,7 @@ def test_criteria_rank_rule_first_then_discriminating_kpis(tmp_path):
     paths = write_records([record], tmp_path / "dr")
     markdown = next(p for p in paths if p.name == "DR-01.md").read_text()
     assert "Decisive criterion: lowest co2_t_per_yr" in markdown and "TR-002" in markdown
+    assert "differs from the workflow-recommended option 2-doublets" in markdown
     # ... but not contradict it.
     contradicting = co2.model_copy(update={"option_id": "2-doublets"})
     assert "contradicts" in check_choice(choice_deps(question), contradicting)
@@ -219,3 +220,11 @@ def test_every_policy_record_of_a_stub_run_has_a_grounded_criterion(tmp_path):
     assert criteria["DR-06"] == "db30-non-overlapping" and criteria["DR-08"] == "db31-answer"
     assert criteria["DR-10"] == "selected-not-rejected"
     assert criteria["DR-01"] == "generation-order-passed"  # stubs: no cost evidence yet
+
+
+def test_kpi_criterion_needs_values_for_two_options(tmp_path):
+    """Fix 4 (review): an option without data cannot lose, so one value decides nothing."""
+    state = _with_economics(_state(tmp_path))
+    state.kpis["C1-3d"] = KPISet(candidate_id="C1-3d")  # 3-doublets: no KPI values
+    question = build_question("DR-01", state, Phase.P5, None)
+    assert [c.id for c in question.criteria] == ["ranking-lowest-lcoh_per_mwh"]

@@ -68,6 +68,7 @@ class PhaseProgress(StrictModel):
     tokens_used: int = 0
     decisions: int = 0
     fallbacks: int = 0
+    duplicate_rejections: int = 0
     completed_tools: list[str] = Field(default_factory=list)
     started: bool = False
     engine_done: bool = False

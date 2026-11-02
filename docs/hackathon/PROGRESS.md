@@ -26,7 +26,7 @@ Keep it ≤ 20 KB; it is the hand-off between sessions. Old detail: merged PRs a
 | WP-15 | Final review & packaging | todo | | |
 
 Status: todo · in progress · in review · merged · blocked (say why).
-Latest full suite (WP-11 branch, 2026-11-01): `PYTHONPATH=src python -m pytest -q unit_test/gemini_model unit_test/gemini_simulator unit_test/gemini_agent -x` → **1247 passed**.
+Latest full suite (L-1 follow-up, 11-02): `PYTHONPATH=src python -m pytest -q unit_test/gemini_model unit_test/gemini_simulator unit_test/gemini_agent -x` → **1273 passed**.
 Next: Batch 7 (WP-14).
 
 ## Decisions log (newest first)
@@ -79,8 +79,8 @@ One line per decision, grouped by WP; dated 11-01 (WP-00: 10-31). Why: the `conf
 - COOL-ELC η 0.508 [D] (COP 4.39 @ 7.2/32.2 °C), COP cap 8; COOL-HR `include_heat_rejection_auxiliaries`; cooling = `StaticModel`s, `power_th` = useful cooling, 20/26 °C.
 - COOL-ABS-B 1.15; 85 °C drive → COP 0.64; COOL-ABS-DRV ≈ 13.9 m³/h per MW; PL 0.65 → 0.47 at 10 %; AUX 2.2 %; COOL-FC T_db + 8 K; HEX per-side ρ/c_p.
 **WP-10 L-1 follow-up** (11-02)
-- kind repaired from tool before validation (`validation_context` hook, `KIND_COERCED`); prompt STEP_KINDS + 2nd example. `llm.yaml calls`: `reasoning_effort` "none", `max_tokens` (profile flag), `request_timeout`; Ollama leaves thinking outside the JSON grammar.
-- dup guard: engine steps, tool + normalised args, same loop; a phase's open required tool may repeat once. DR: workflow criteria (best options computed) + `evidence_keys`; choice ∈ best, rationale names key. Touched `schemas/config.py`, `eval/harness.py`.
+- kind set from tool before validation (`validation_context` hook, `KIND_COERCED`); prompt STEP_KINDS + 2nd example. `llm.yaml calls`: `reasoning_effort` "none", `max_tokens` (profile flag), `request_timeout`; Ollama's grammar skips thinking.
+- dup guard: engine steps; tool + normalised args + `ToolContext` hash, same loop; open required tool may repeat once; 2nd repeat closes phase; reviewer sees its rejections. DR: criteria + `evidence_keys`; choice ∈ best, rationale names key. Touched `schemas/config.py`, `llm.yaml`, `eval/harness.py`.
 **WP-10 review**
 - AG-02 refuses digits outside an id; AG-06 needs a design word; DB-30 'B' = no outage; DR-10 never offers REJECTED.
 
@@ -124,7 +124,7 @@ One line per decision, grouped by WP; dated 11-01 (WP-00: 10-31). Why: the `conf
 - WP-13: none.
 - WP-12: none (limitations are gap-analysis entries, not register values).
 - WP-11: OPT-SPACE, OPT-OBJ, OPT-DE, UQ-RANGES, UQ-CASES, UQ-MC.
-- WP-10 L-1 follow-up: none (`llm.yaml calls` are LLM settings).
+- WP-10 L-1 follow-up: none.
 
 ## Open follow-ups (grouped by the WP that must act)
 **WP-07** (old items done)
@@ -178,4 +178,4 @@ One line per decision, grouped by WP; dated 11-01 (WP-00: 10-31). Why: the `conf
 See spec §17. Answers: —
 
 ## Hand-off notes (latest session writes here, replace previous)
-2026-11-02, WP-10 L-1 follow-up: tests offline (Ollama wire body via httpx2 MockTransport). Next: L-1 re-run; WP-14.
+2026-11-02, WP-10 L-1 follow-up (Ollama wire body tested via httpx2 MockTransport). Next: L-1 re-run; WP-14.

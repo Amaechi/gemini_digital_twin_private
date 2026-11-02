@@ -377,7 +377,7 @@ class CallSettings(StrictModel):
         default=2048, ge=256, description="Cap per call, sent as max_tokens (Ollama num_predict)."
     )
     request_timeout_s: float = Field(
-        default=180.0, gt=0, description="Deadline per model request (pydantic-ai)."
+        default=300.0, gt=0, description="Deadline per model request (pydantic-ai)."
     )
 
 

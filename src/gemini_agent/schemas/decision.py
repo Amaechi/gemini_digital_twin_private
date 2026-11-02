@@ -2,6 +2,7 @@
 # file services/plant-debugger/plant_debugger/agent/schemas.py @ d69507a. Modified by GeoAgent team,
 # 2026-11-01: incident kinds/tools replaced by the GeoAgent phase/step kinds of spec §5.3; added
 # Decision Records (AG-07), option choices, missing-input requests (AG-05) and run status enums.
+# 2026-11-02 (L-1 follow-up): pre-validation hook for step kinds; DR criteria and evidence keys.
 """Typed decisions exchanged between the workflow runner and the decision engines (spec §5.3).
 
 The runner owns the phase order (P0–P10); an engine (deterministic policy or an LLM agent) only
@@ -12,7 +13,7 @@ produce engineering numbers: every number comes from a tool result (CLAUDE.md go
 from __future__ import annotations
 
 import re
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from enum import StrEnum
 from typing import Any, Literal
 
@@ -157,13 +158,25 @@ _LLM_NUMBER = re.compile(
 """A number an LLM wrote in free text (not a digit inside an identifier)."""
 
 
-_KEY_TOKEN = re.compile(r"(?<![\w.#:])[A-Za-z][A-Za-z0-9]*(?:_[A-Za-z0-9]+)+(?![\w])")
+_KEY_TOKEN = re.compile(r"(?<![A-Za-z0-9_])[A-Za-z][A-Za-z0-9]*(?:_[A-Za-z0-9]+)+(?![A-Za-z0-9_])")
 """A snake_case identifier in free text — how a rationale cites a tool-result key or tool."""
 
 
-def key_tokens(text: str) -> list[str]:
-    """Snake_case identifiers in ``text`` (the evidence keys and tool names it cites)."""
+def key_tokens(text: str, ignore: Iterable[str] = ()) -> list[str]:
+    """Snake_case identifiers in ``text`` (the evidence keys and tool names it cites).
+
+    ``ignore`` strings (evidence ids such as ``config:design_basis.yaml#DB-01``) are removed
+    first, so a reference is not read as a key.
+    """
+    for item in sorted(ignore, key=len, reverse=True):
+        if item:
+            text = text.replace(item, " ")
     return _KEY_TOKEN.findall(text)
+
+
+def names_key(text: str, key: str) -> bool:
+    """Return True if ``text`` names ``key`` as a whole word (``passed`` is not ``bypassed``)."""
+    return re.search(rf"(?<![A-Za-z0-9_]){re.escape(key)}(?![A-Za-z0-9_])", text) is not None
 
 
 def states_numbers(text: str) -> bool:
@@ -395,21 +408,27 @@ class DecisionQuestion(StrictModel):
         criterion_ids = [criterion.id for criterion in self.criteria]
         if len(set(criterion_ids)) != len(criterion_ids):
             raise ValueError(f"duplicate criterion ids in {self.dr_id}: {criterion_ids}")
-        allowed = self.citable()
+        allowed, references = self.citable(), self.references()
         for criterion in self.criteria:
             if not set(criterion.best_option_ids) <= eligible:
                 raise ValueError(f"{criterion.id}: best options must be eligible options")
-            unknown = [k for k in [criterion.key, *key_tokens(criterion.text)] if k not in allowed]
+            cited = [criterion.key, *key_tokens(criterion.text, references)]
+            unknown = [k for k in cited if k not in allowed]
             if unknown:
                 raise ValueError(f"{criterion.id} cites keys outside evidence_keys: {unknown}")
         return self
 
+    def references(self) -> set[str]:
+        """Return the evidence ids of options and criteria (removed before keys are read)."""
+        ids = {e for option in self.options for e in option.evidence_ids}
+        return ids | {e for criterion in self.criteria for e in criterion.evidence_ids}
+
     def citable(self) -> set[str]:
-        """Return what a rationale may cite: evidence keys, option, criterion and evidence ids."""
-        allowed = set(self.evidence_keys)
+        """Return what a rationale may cite: evidence keys, ids and words of workflow text."""
+        allowed = set(self.evidence_keys) | self.references()
         for option in self.options:
             allowed.add(option.id)
-            allowed.update(option.evidence_ids)
+            allowed.update(key_tokens(f"{option.label} {option.notes}"))
         allowed.update(criterion.id for criterion in self.criteria)
         return allowed
 

@@ -46,6 +46,7 @@ from gemini_agent.schemas.decision import (
     Role,
     StepKind,
     key_tokens,
+    names_key,
 )
 
 os.environ.setdefault("PYDANTIC_AI_NO_BANNER", "1")
@@ -302,14 +303,16 @@ def check_choice(deps: AgentDeps, choice: OptionChoice) -> str | None:
             f"option '{choice.option_id}' contradicts your criterion '{criterion.id}' "
             f"({criterion.text}): its best options are {criterion.best_option_ids}"
         )
-    if criterion.key not in choice.rationale:
+    if not names_key(choice.rationale, criterion.key):
         return (
             f"rationale must name the decisive criterion and its evidence key '{criterion.key}', "
             f"e.g. '{criterion.text}'"
         )
-    allowed = question.citable()
+    allowed, references = question.citable(), question.references()
     texts = [choice.rationale, *(item.reason for item in choice.rejected)]
-    cited = sorted({key for text in texts for key in key_tokens(text) if key not in allowed})
+    cited = sorted(
+        {key for text in texts for key in key_tokens(text, references) if key not in allowed}
+    )
     if cited:
         return f"cited keys {cited} are not in the evidence; cite only question.evidence_keys"
     return None

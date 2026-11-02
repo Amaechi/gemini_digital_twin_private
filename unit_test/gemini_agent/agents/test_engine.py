@@ -564,9 +564,25 @@ def _criteria_question() -> DecisionQuestion:
             {
                 "criterion": "ranking-lowest-lcoh_per_mwh",
                 "option_id": "2-doublets",
+                "rationale": "lowest lcoh_per_mwh_total in economics",
+            },
+            "evidence key 'lcoh_per_mwh'",
+        ),
+        (
+            {
+                "criterion": "ranking-lowest-lcoh_per_mwh",
+                "option_id": "2-doublets",
                 "rationale": "lowest lcoh_per_mwh and best npv_usd in economics",
             },
             "npv_usd",
+        ),
+        (
+            {
+                "criterion": "ranking-lowest-lcoh_per_mwh",
+                "option_id": "2-doublets",
+                "rationale": "lowest lcoh_per_mwh, see economics.fake_key",
+            },
+            "fake_key",
         ),
     ],
 )

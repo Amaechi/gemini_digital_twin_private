@@ -15,6 +15,8 @@ Decision Records. ``--engine policy`` runs the whole pipeline without an LLM (AG
 
 from __future__ import annotations
 
+import dataclasses
+import hashlib
 import json
 import math
 from collections.abc import Callable
@@ -76,6 +78,11 @@ MAX_VERIFICATION_LOOPS = 3
 """Spec §5.2 P7: FAIL ⇒ violations back to P6 (≤ 3 loops), then escalate."""
 HISTORY_EVENTS = 12
 """Working memory: last 12–14 compacted events (spec §10.2)."""
+MAX_DUPLICATE_REJECTIONS = 2
+"""Duplicate tool calls rejected in one phase pass before the runner ends the engine's turn
+(rule 4; the phase then closes deterministically, running any required tool still open)."""
+_CONSTANT_CONTEXT = frozenset({"run_id", "run_dir", "config_dir"})
+"""``ToolContext`` fields that never change within a run (left out of the fingerprint)."""
 APPROVAL_ID = "APPROVAL"
 LOOP_BACK_PHASES = (Phase.P6, Phase.P7, Phase.P8, Phase.P9, Phase.P10)
 """Phases re-run after a REJECTED verification."""
@@ -418,32 +425,60 @@ class DesignRunner:
         assert step.tool is not None  # guaranteed by NextStep validation
         duplicate = self._duplicate_of(state, spec, step.tool, dict(step.args))
         if duplicate is not None:
-            return self._reject_step(
-                state,
-                step,
-                f"duplicate call: {step.tool} already ran with these arguments as "
-                f"{duplicate.id} in {duplicate.phase.value}; use that result from the history "
-                "or choose another step (rule 4)",
+            prog = state.phase_progress(spec.phase)
+            prog.duplicate_rejections += 1
+            reason = (
+                f"duplicate call: {step.tool} already ran with these arguments on the same run "
+                f"state as {duplicate.id} in {duplicate.phase.value}; use that result from the "
+                "history or choose another step (rule 4)"
             )
+            if prog.duplicate_rejections >= MAX_DUPLICATE_REJECTIONS:
+                self._reject_step(
+                    state, step, f"{reason}; repeated, so the runner closes the phase"
+                )
+                return "finalise"
+            return self._reject_step(state, step, reason)
         return self._call_tool(state, spec, step.tool, dict(step.args), source)
 
+    def _context_fingerprint(self, state: RunState) -> str:
+        """Hash of the run state a tool can read (``ToolContext`` minus its constant fields)."""
+        context = self._tool_context(state)
+        payload = {
+            item.name: getattr(context, item.name)
+            for item in dataclasses.fields(context)
+            if item.name not in _CONSTANT_CONTEXT
+        }
+
+        def encode(value: Any) -> Any:
+            return value.model_dump(mode="json") if hasattr(value, "model_dump") else str(value)
+
+        text = json.dumps(payload, sort_keys=True, default=encode)
+        return hashlib.sha256(text.encode("utf-8")).hexdigest()[:16]
+
     def _signature(self, state: RunState, tool: str, args: dict[str, ArgValue]) -> str:
-        """Tool name + arguments normalised by the tool's own schema (defaults filled in)."""
+        """Tool + arguments normalised by its own schema + fingerprint of the state it reads.
+
+        Tools are deterministic in (arguments, ``ToolContext``): the same signature gives the
+        same result, while a call after the state changed (new candidates, KPIs, answers, …) is
+        a new call.
+        """
         resolved = self._resolve_args(state, args)
         try:
             normalised = self.toolbox.validate_args(tool, resolved).model_dump(mode="json")
         except (KeyError, ValueError):
             normalised = resolved
-        return f"{tool}:{json.dumps(normalised, sort_keys=True, default=str)}"
+        arguments = json.dumps(normalised, sort_keys=True, default=str)
+        return f"{tool}:{arguments}@{self._context_fingerprint(state)}"
 
     def _duplicate_of(
         self, state: RunState, spec: PhaseSpec, tool: str, args: dict[str, ArgValue]
     ) -> ToolRecord | None:
-        """Earlier call of this loop with the same signature, if the step repeats it (rule 4).
+        """Earlier call with the same signature, if the step repeats it (rule 4).
 
-        Only engine-proposed steps are checked. Calls from an earlier verification loop do not
-        count (the design changed). A required tool of the phase that has not completed in this
-        pass may repeat a call of an earlier phase once (P9 re-runs verify_design after P7).
+        Only engine-proposed steps are checked; a failed call counts too (same inputs, same
+        failure). Calls from an earlier verification loop do not count. A required tool of the
+        phase that has not completed in this pass may repeat an earlier phase's call once (P9
+        re-runs verify_design after P7 on an unchanged state).
         """
         signature = self._signature(state, tool, args)
         earlier = [
@@ -985,12 +1020,15 @@ class DesignRunner:
         )
 
     def _history(self, state: RunState, role: Role | None = None) -> list[dict[str, Any]]:
-        # AG-08: the Independent Reviewer sees tool evidence only, not earlier decisions.
-        types = _REVIEWER_HISTORY_TYPES if role == Role.REVIEWER else _HISTORY_TYPES
+        # AG-08: the Independent Reviewer sees tool evidence only, not earlier decisions — plus
+        # the rejections of its own steps in this phase, so it gets the runner's feedback.
+        reviewer = role == Role.REVIEWER
+        types = _REVIEWER_HISTORY_TYPES if reviewer else _HISTORY_TYPES
         events = [
             event
             for event in self.store(state.run_id).list_events(state.run_id)
             if event.type in types
+            or (reviewer and event.type == "STEP_REJECTED" and event.phase == state.phase.value)
         ]
         if self.history_events is not None:
             events = events[-self.history_events :]

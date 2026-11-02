@@ -5,10 +5,16 @@ import json
 import pytest
 from pydantic_ai.messages import ModelResponse, TextPart
 
-from gemini_agent.agents.engine import LLMEngine, PolicyEngine, ResilientEngine
+from gemini_agent.agents.engine import (
+    EngineResult,
+    LLMEngine,
+    PolicyEngine,
+    ResilientEngine,
+)
 from gemini_agent.logging.llm_logger import LLMLogger
 from gemini_agent.runner.design_runner import DesignRunner, InvalidAnswer
 from gemini_agent.runner.phases import PHASE_SPECS, PhaseBudget
+from gemini_agent.runner.state import ToolRecord
 from gemini_agent.runner.tool_stubs import VerificationOutput
 from gemini_agent.runner.toolbox import CandidateArgs, ToolSpec, default_toolbox
 from gemini_agent.schemas.common import ToolResult
@@ -22,6 +28,7 @@ from gemini_agent.schemas.decision import (
     Role,
     RunStatus,
 )
+from gemini_agent.schemas.results import KPISet
 from unit_test.gemini_agent.llm_fakes import (
     Counting,
     always_invalid,
@@ -484,16 +491,25 @@ def test_kind_errors_are_coerced_and_counted_not_fallbacks(tmp_path):
 
 
 def test_duplicate_tool_calls_are_rejected_without_using_tool_budget(tmp_path):
-    """Fix 3 (rule 4): L-1 re-ran read_results with the same arguments until P9's budget ran out."""
+    """Fix 3 (rule 4): L-1 re-ran read_results with the same arguments until P9's budget ran out.
+
+    The fake reviewer ignores the feedback: the first repeat is rejected with feedback it can
+    see in its history; the second ends its turn and the runner closes P9 deterministically.
+    """
+    p9_contexts = []
 
     def repeat_read_results(messages, info):
         if output_name(info) == "Decision":
             context = json.loads(user_prompt(messages).split("CONTEXT:\n", 1)[1])
-            if context["phase"] == "P9" and context["budget_left"]["steps"] > 2:
-                selected = context["default_args"].get("read_results", {}).get("candidate_id")
-                args = {"candidate_id": selected or "C1-3d"}
-                step = NextStep(kind="call_tool", tool="read_results", args=args, rationale="x")
-                body = Decision(phase=Phase.P9, steps=[step] * 3).model_dump_json()
+            if context["phase"] == "P9":
+                p9_contexts.append(context)
+                step = NextStep(
+                    kind="call_tool",
+                    tool="read_results",
+                    args={"candidate_id": "C1-3d"},
+                    rationale="read the results",
+                )
+                body = Decision(phase=Phase.P9, steps=[step]).model_dump_json()
                 return ModelResponse(parts=[TextPart(body)])
         return policy_like(messages, info)
 
@@ -503,22 +519,60 @@ def test_duplicate_tool_calls_are_rejected_without_using_tool_budget(tmp_path):
     assert result.status == RunStatus.COMPLETED  # was: tool-call budget exceeded in P9
     state = runner.load_state("d1")
     p9 = [r for r in state.tool_results if r.phase == Phase.P9]
-    assert [r.tool for r in p9] == ["read_results", "verify_design"]
+    assert [(r.tool, r.source) for r in p9] == [
+        ("read_results", "llm"),
+        ("verify_design", "workflow"),  # the runner closes the phase
+    ]
     assert state.progress["P9"].tool_calls_used == 2
+    assert state.progress["P9"].duplicate_rejections == 2 and len(p9_contexts) == 3
     rejected = [
         e.payload["message"]
         for e in runner.store("d1").list_events("d1")
         if e.type == "STEP_REJECTED"
     ]
-    assert len(rejected) >= 5 and all("duplicate call: read_results" in m for m in rejected)
-    assert p9[0].id in rejected[0]
+    assert len(rejected) == 2 and all("duplicate call: read_results" in m for m in rejected)
+    assert p9[0].id in rejected[0] and "closes the phase" in rejected[1]
+    # AG-08 keeps decisions out of the reviewer's history, but it sees its own rejection.
+    seen = [h for h in p9_contexts[2]["history"] if h["type"] == "STEP_REJECTED"]
+    assert seen and "duplicate call" in seen[0]["message"]
+    assert not [h for h in p9_contexts[2]["history"] if h["type"] == "DECISION"]
+
+
+def test_a_tool_may_rerun_once_the_state_it_reads_changed(tmp_path):
+    """Fix 3 (review): design_guard before and after generate_candidates is not a duplicate."""
+
+    class GuardFirst(PolicyEngine):
+        def __init__(self):
+            self.script = [
+                NextStep(
+                    kind="verify", tool="design_guard", args={"candidate_id": "all"}, rationale="x"
+                ),
+                NextStep(kind="propose_candidates", tool="generate_candidates", rationale="x"),
+                NextStep(
+                    kind="verify", tool="design_guard", args={"candidate_id": "all"}, rationale="x"
+                ),
+            ]
+
+        def decide(self, context):
+            if context.phase == Phase.P3 and self.script:
+                step = self.script.pop(0)
+                return EngineResult(Decision(phase=Phase.P3, steps=[step]), source="policy")
+            return super().decide(context)
+
+    runner = _runner(tmp_path, engine=GuardFirst())
+    assert runner.start("", run_id="s3").status == RunStatus.COMPLETED
+    state = runner.load_state("s3")
+    guards = [r for r in state.tool_results if r.tool == "design_guard"]
+    assert len(guards) == 2 and guards[0].signature != guards[1].signature
+    assert not guards[0].candidate_ids and guards[1].candidate_ids  # the second one checked them
+    assert not [e for e in runner.store("s3").list_events("s3") if e.type == "STEP_REJECTED"]
 
 
 def test_duplicate_guard_scope(tmp_path):
-    """Fix 3: duplicate scope — normalised args, required-tool exemption, verification loops.
+    """Fix 3: what counts as the same call — normalised args, same state, same loop.
 
-    A required tool may repeat an earlier phase's call once (P9 re-verifies after P7); a new
-    verification loop starts a fresh signature set.
+    A failed call counts (same inputs, same failure). A required tool not yet completed in the
+    phase pass may repeat an earlier phase's call once (P9 re-verifies after P7).
     """
     runner = _runner(tmp_path)
     result = runner.start("", run_id="g1")
@@ -526,19 +580,43 @@ def test_duplicate_guard_scope(tmp_path):
     state = runner.load_state("g1")
     verify = [r for r in state.tool_results if r.tool == "verify_design"]
     assert [(r.phase, r.source) for r in verify] == [(Phase.P7, "policy"), (Phase.P9, "policy")]
-    assert verify[0].signature == verify[1].signature
+    assert verify[0].signature == verify[1].signature  # same args, same state: exempt in P9
     assert not [e for e in runner.store("g1").list_events("g1") if e.type == "STEP_REJECTED"]
 
+    def record(tool, args, phase, ok=True):
+        state.tool_results.append(
+            ToolRecord(
+                id=f"TR-{len(state.tool_results) + 1:03d}",
+                tool=tool,
+                phase=phase,
+                args=args,
+                ok=ok,
+                source="llm",
+                signature=runner._signature(state, tool, args),
+                loop=state.loop_count,
+            )
+        )
+        return state.tool_results[-1]
+
+    state.progress.clear()
     p7, p9 = PHASE_SPECS[Phase.P7], PHASE_SPECS[Phase.P9]
-    # simulate_annual {'candidate_id': 'all'} ran in P5 with mode 'fast' (default filled in)
-    assert runner._duplicate_of(state, p7, "simulate_annual", {"candidate_id": "all"})
-    assert runner._duplicate_of(state, p7, "simulate_annual", {"mode": "full"}) is None  # 'all'
-    full = {"candidate_id": "C1-3d", "mode": "full"}  # P7's own call, already completed
-    assert runner._duplicate_of(state, p7, "simulate_annual", full).phase == Phase.P7
-    assert runner._duplicate_of(state, p9, "verify_design", {"candidate_id": "C1-3d"})
-    # Before P9 ran in this pass, its required verify_design may repeat P7's call once.
-    state.progress.pop("P9")
-    state.tool_results = [r for r in state.tool_results if r.phase != Phase.P9]
-    assert runner._duplicate_of(state, p9, "verify_design", {"candidate_id": "$selected"}) is None
-    state.loop_count += 1  # loop-back: earlier calls no longer count
-    assert runner._duplicate_of(state, p7, "simulate_annual", {"candidate_id": "all"}) is None
+    sim = record("simulate_annual", {}, Phase.P7)
+    # defaults filled in: {} == {'candidate_id': 'all', 'mode': 'fast'}
+    assert runner._duplicate_of(state, p7, "simulate_annual", {"mode": "fast"}) == sim
+    assert runner._duplicate_of(state, p7, "simulate_annual", {"mode": "full"}) is None
+    failed = record("knowledge_search", {"query": "plate HEX"}, Phase.P7, ok=False)
+    assert runner._duplicate_of(state, p7, "knowledge_search", {"query": "plate HEX"}) == failed
+    # P9 has not run verify_design in this pass: it may repeat P7's call once, then not again.
+    state.tool_results = [r for r in state.tool_results if r.tool != "verify_design"]
+    record("verify_design", {"candidate_id": "$selected"}, Phase.P7)
+    assert runner._duplicate_of(state, p9, "verify_design", {"candidate_id": "C1-3d"}) is None
+    p9_verify = record("verify_design", {"candidate_id": "C1-3d"}, Phase.P9)
+    assert runner._duplicate_of(state, p9, "verify_design", {"candidate_id": "C1-3d"}) == p9_verify
+    # Changed state (new KPI evidence) or a new verification loop: no longer the same call.
+    kpis = dict(state.kpis)
+    state.kpis["C1-3d"] = KPISet(candidate_id="C1-3d", lcoh_per_mwh=50.0)
+    assert runner._duplicate_of(state, p7, "simulate_annual", {}) is None
+    state.kpis = kpis
+    assert runner._duplicate_of(state, p7, "simulate_annual", {}) == sim
+    state.loop_count += 1
+    assert runner._duplicate_of(state, p7, "simulate_annual", {}) is None

@@ -15,6 +15,7 @@ from gemini_agent.schemas.decision import (
     Phase,
     Role,
     key_tokens,
+    names_key,
 )
 
 
@@ -217,6 +218,16 @@ def test_key_tokens_find_snake_case_citations_only():
     """Snake_case identifiers are cited keys; option ids, evidence refs and words are not."""
     text = (
         "lowest lcoh_per_mwh in economics via design_guard; 3-doublets wins; "
-        "see config:design_basis.yaml#DB-01 and TR-012"
+        "see config:design_basis.yaml#DB-01 and TR-012, not economics.fake_key"
     )
-    assert key_tokens(text) == ["lcoh_per_mwh", "design_guard"]
+    refs = ["config:design_basis.yaml#DB-01", "TR-012"]
+    assert key_tokens(text, refs) == ["lcoh_per_mwh", "design_guard", "fake_key"]
+    assert "design_basis" in key_tokens(text)  # unless the reference is removed first
+
+
+def test_names_key_matches_whole_words_only():
+    """A criterion key must be named as a word: 'passed' is not in 'bypassed'."""
+    assert names_key("candidates passed the guard", "passed")
+    assert not names_key("the guard was bypassed", "passed")
+    assert not names_key("lowest lcoh_per_mwh_total", "lcoh_per_mwh")
+    assert names_key("register default (DB-31)", "DB-31")

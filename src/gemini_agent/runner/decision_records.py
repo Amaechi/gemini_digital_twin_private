@@ -406,13 +406,25 @@ def _rule_criterion(
             )
             return make("ranking-lowest-lcoh_per_mwh", "lcoh_per_mwh", source, text)
     if dr_id in _CANDIDATE_DRS and "passed" in keys:
-        text = "first option in generation order whose candidates passed the guard; no cost yet"
+        if not recommended:
+            text = "first eligible option in the offered order; its candidates passed the guard"
+            return make("first-eligible-passed", "passed", "design_guard", text)
+        if ranking.has_kpi_evidence(state.kpis):
+            text = "option holding the top-ranked candidate that passed the guard"
+            return make("top-ranked-passed", "passed", "design_guard", text)
+        text = (
+            "option holding the first candidate in generation order that passed the guard; "
+            "costs not computed yet"
+        )
         return make("generation-order-passed", "passed", "design_guard", text)
     key = next(iter(keys), None)
     if key is None:
         return None
-    text = f"first eligible option in the offered order ({key})"
-    return make("offered-order", key, key, text)
+    if recommended:
+        return make(
+            "workflow-recommended", key, key, f"option the workflow rule recommends ({key})"
+        )
+    return make("offered-order", key, key, f"first eligible option in the offered order ({key})")
 
 
 _CANDIDATE_DRS = frozenset({"DR-01", "DR-02", "DR-03", "DR-04", "DR-05", "DR-07"})
@@ -443,8 +455,8 @@ def _kpi_criteria(
             ]
             if found:
                 values[option.id] = choose(found)
-        if not values:
-            continue
+        if len(values) < 2:
+            continue  # an option without data cannot lose: nothing to compare
         target = choose(values.values())
         best = [option_id for option_id, value in values.items() if value == target]
         if len(best) == len(eligible):
@@ -561,6 +573,12 @@ def render_markdown(record: DecisionRecord) -> str:
             f"{record.criterion.source}; evidence {evidence})"
         )
     lines += [f"- Why: {record.rationale}"]
+    recommended = [o.id for o in record.options if o.recommended]
+    if recommended and record.choice not in recommended:
+        lines.append(
+            f"- Note: differs from the workflow-recommended option {', '.join(recommended)}; the "
+            "selected design follows the workflow ranking."
+        )
     if record.stub_evidence:
         lines.append("- WARNING: evidence includes stub tool results; not a final decision.")
     lines += ["", "| Option | Label | Eligible | Recommended | Evidence |", "|---|---|---|---|---|"]
