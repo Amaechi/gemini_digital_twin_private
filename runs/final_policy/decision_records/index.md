@@ -11,4 +11,5 @@
 | [DR-07](DR-07.md) | Gas handling (degas + CHP vs pressurised reinjection) | degas-use | policy | no |
 | [DR-08](DR-08.md) | Return temperature | dh-return-55 | policy | no |
 | [DR-09](DR-09.md) | Materials | titanium-plates-no-cu | policy | no |
-| [DR-10](DR-10.md) | Final selection | C2-opt | policy | no |
+| [DR-10](DR-10.md) | Final selection | C2-opt-robust | policy | no |
+| [DR-11](DR-11.md) | Backup capacity (robustness) | p90-robust-backup | policy | no |

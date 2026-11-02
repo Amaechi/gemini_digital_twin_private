@@ -34,6 +34,10 @@ Choice: District-heating return 55 degC
 
 Choice: Outages placed by the optimiser in the lowest-load windows, never overlapping (DB-30)
 
+## DR-11 Backup capacity (robustness)
+
+Choice: Install the TL-15 P90 robust backups (electric_chiller_mw 8.20, peak_boiler_mw 10.90 MW) as C2-opt-robust
+
 ## DR-10 Final selection
 
-Choice: C2-opt (TL-13 optimum of C2 (sized from C2-2d))
+Choice: C2-opt-robust (C2-opt with the TL-15 P90 robust backups (OPT-ROBUST-BACKUP))

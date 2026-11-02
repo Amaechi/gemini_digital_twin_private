@@ -1,3 +1,5 @@
+TL-15 on C2-opt (base-year backups); the selected C2-opt-robust installs its robust backups (DR-11, OPT-ROBUST-BACKUP).
+
 | KPI | P10 | P50 | P90 |
 |---|---|---|---|
 | capex_million | 23.58 | 27.03 | 30.52 |

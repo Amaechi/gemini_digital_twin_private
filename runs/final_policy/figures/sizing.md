@@ -1,6 +1,6 @@
 | Item | Value | Basis |
 |---|---|---|
-| Design | C2-opt | TL-13 optimum of C2 (sized from C2-2d) |
+| Design | C2-opt-robust | C2-opt with the TL-15 P90 robust backups (OPT-ROBUST-BACKUP) |
 | Doublets | 2 | DB-10: 1–3 |
 | Reservoir depth | 2500 m | TL-13 (verifiable depth options) |
 | Design flow per doublet | 296 m³/h | DB-11: 50–300 |
@@ -9,10 +9,10 @@
 | Cooling return (DB-32) | 26 °C | supply 20 °C |
 | electric_chiller_mw | 8.20 | TL-13 size / right-sized backup |
 | hthp_heating_mw | 4.10 | TL-13 size / right-sized backup |
-| peak_boiler_mw | 5.00 | TL-13 size / right-sized backup |
+| peak_boiler_mw | 10.90 | TL-15 robust backup (DR-11, OPT-ROBUST-BACKUP); C2-opt: 5.00 |
 | Outage start days (0-based) | [119, 238] | DR-06 |
 | Depths excluded | [3000.0, 3200.0, 3500.0] | PH-19 NPSH / PH-30 letdown |
-| Installed heating | 30.4 MW | TL-12 |
+| Installed heating | 36.3 MW | TL-12 |
 | Installed cooling | 16.8 MW | TL-12 |
 | Doublet capacity factors (flow-based) | 0.52, 0.47 | TL-12 mean/design |
 | Thermal breakthrough (annual-mean flow) | 66.1 yr | TL-12 end of life via TL-07 |

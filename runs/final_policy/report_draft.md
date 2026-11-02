@@ -2,13 +2,14 @@
 
 ## Answer
 
-- Recommended design: **C2-opt** — TL-13 optimum of C2 (sized from C2-2d)
+- Recommended design: **C2-opt-robust** — C2-opt with the TL-15 P90 robust backups (OPT-ROBUST-BACKUP)
 - Verifier verdict: **ACCEPTED**
 - Unmet demand: heating 0 d / 0 MWh, cooling 0 d / 0 MWh
-- LCOH 42.5 USD/MWh, LCOC 26.3 USD/MWh (30 yr, TL-14); CAPEX 27.9 MUSD
+- LCOH 44.6 USD/MWh, LCOC 26.3 USD/MWh (30 yr, TL-14); CAPEX 30.1 MUSD
 - CO₂ 7360 t/yr, 72% below the C0 counterfactual
 - Exergy efficiency 0.44 (T0 = daily dry-bulb (DB-34d), De Bilt (KNMI) 2027: mean 10.5 °C, range 3.6–18.2 °C)
-- Robustness (TL-15, 200 samples): demand met in 46% of samples with the installed backups; backups {'peak_boiler_mw': 10.9, 'electric_chiller_mw': 8.2} MW → 90% (not installed: decision for the review)
+- Robustness (TL-15 on C2-opt, 200 samples): demand met in 46% of samples with the base-year backups {'peak_boiler_mw': 5.0, 'electric_chiller_mw': 8.2} MW; robust backups {'peak_boiler_mw': 10.9, 'electric_chiller_mw': 8.2} MW → 90% (installed by DR-11, policy)
+- Backup capacity (DR-11): C2-opt-robust vs C2-opt: ΔLCOH +2.05, ΔLCOC +0.00 USD/MWh, ΔCAPEX +2.21 MUSD (full year, TL-12 + TL-14)
 
 ## Alternatives compared (C0–C8)
 
@@ -23,11 +24,12 @@
 | C6-2d | C6 | 2 | 2500 | 300 | 0 | 0 | 34.3 | 50.3 | 26.3 | 6522 | 75% | 0.54 | – |
 | C7-2d | C7 | 2 | 2500 | 300 | 0 | 0 | 34.8 | 62.1 | 27.3 | 6218 | 76% | 0.52 | – |
 | C8-3d | C8 | 3 | 2500 | 300 | 0 | 0 | 41.4 | 57.0 | 26.3 | 6513 | 75% | 0.55 | – |
-| C2-opt * | C2 | 2 | 2500 | 296 | 0 | 0 | 27.9 | 42.5 | 26.3 | 7360 | 72% | 0.44 | – |
+| C2-opt | C2 | 2 | 2500 | 296 | 0 | 0 | 27.9 | 42.5 | 26.3 | 7360 | 72% | 0.44 | – |
 | C6-opt | C6 | 2 | 2500 | 296 | 0 | 0 | 27.9 | 42.6 | 26.3 | 7361 | 72% | 0.44 | – |
 | C1-opt | C1 | 3 | 2500 | 265 | 0 | 0 | 28.2 | 53.8 | 23.5 | 13284 | 50% | 0.27 | – |
+| C2-opt-robust * | C2 | 2 | 2500 | 296 | 0 | 0 | 30.1 | 44.6 | 26.3 | 7360 | 72% | 0.44 | – |
 
-Rows `C*-Nd` are the spec §3.4 screening points (TL-12 fast year); `*-opt` rows are the TL-13 optima (P6); `*` marks the selected design.
+Rows `C*-Nd` are the spec §3.4 screening points (TL-12 fast year); `*-opt` rows are the TL-13 optima (P6); a `*-robust` row is an optimum with its TL-15 robust backups (P8, DR-11); `*` marks the selected design.
 - TL-13 C2-opt (from C2-2d): depths excluded [3000.0, 3200.0, 3500.0] (verifier PH-19/PH-30, `depth_check`)
 - TL-13 C6-opt (from C6-2d): depths excluded [3000.0, 3200.0, 3500.0] (verifier PH-19/PH-30, `depth_check`)
 - TL-13 C1-opt (from C1-3d): depths excluded [3000.0, 3200.0, 3500.0] (verifier PH-19/PH-30, `depth_check`)
@@ -37,7 +39,7 @@ Rows `C*-Nd` are the spec §3.4 screening points (TL-12 fast year); `*-opt` rows
 
 | Item | Value | Basis |
 |---|---|---|
-| Design | C2-opt | TL-13 optimum of C2 (sized from C2-2d) |
+| Design | C2-opt-robust | C2-opt with the TL-15 P90 robust backups (OPT-ROBUST-BACKUP) |
 | Doublets | 2 | DB-10: 1–3 |
 | Reservoir depth | 2500 m | TL-13 (verifiable depth options) |
 | Design flow per doublet | 296 m³/h | DB-11: 50–300 |
@@ -46,10 +48,10 @@ Rows `C*-Nd` are the spec §3.4 screening points (TL-12 fast year); `*-opt` rows
 | Cooling return (DB-32) | 26 °C | supply 20 °C |
 | electric_chiller_mw | 8.20 | TL-13 size / right-sized backup |
 | hthp_heating_mw | 4.10 | TL-13 size / right-sized backup |
-| peak_boiler_mw | 5.00 | TL-13 size / right-sized backup |
+| peak_boiler_mw | 10.90 | TL-15 robust backup (DR-11, OPT-ROBUST-BACKUP); C2-opt: 5.00 |
 | Outage start days (0-based) | [119, 238] | DR-06 |
 | Depths excluded | [3000.0, 3200.0, 3500.0] | PH-19 NPSH / PH-30 letdown |
-| Installed heating | 30.4 MW | TL-12 |
+| Installed heating | 36.3 MW | TL-12 |
 | Installed cooling | 16.8 MW | TL-12 |
 | Doublet capacity factors (flow-based) | 0.52, 0.47 | TL-12 mean/design |
 | Thermal breakthrough (annual-mean flow) | 66.1 yr | TL-12 end of life via TL-07 |
@@ -72,7 +74,7 @@ Rows `C*-Nd` are the spec §3.4 screening points (TL-12 fast year); `*-opt` rows
 
 ## Verification
 
-**Verdict: ACCEPTED** (DesignVerifier) — DesignVerifier C2-opt: ACCEPTED; all 46 checks pass; tightest PH-02 margin 0 K
+**Verdict: ACCEPTED** (DesignVerifier) — DesignVerifier C2-opt-robust: ACCEPTED; all 46 checks pass; tightest PH-02 margin 0 K
 
 Violations: none; not evaluated: none
 
@@ -131,6 +133,8 @@ Violations: none; not evaluated: none
 
 
 ## Uncertainty
+
+TL-15 on C2-opt (base-year backups); the selected C2-opt-robust installs its robust backups (DR-11, OPT-ROBUST-BACKUP).
 
 | KPI | P10 | P50 | P90 |
 |---|---|---|---|
@@ -202,7 +206,8 @@ Samples 200 (failed 0); P(demand met) at installed backups 0.46; robust backups 
 - DR-07 Gas handling (degas + CHP vs pressurised reinjection): Gas handling: degas_use (policy; criterion ranking-lowest-lcoh_per_mwh)
 - DR-08 Return temperature: District-heating return 55 degC (policy; criterion db31-answer)
 - DR-06 Maintenance windows: Outages placed by the optimiser in the lowest-load windows, never overlapping (DB-30) (policy; criterion db30-non-overlapping)
-- DR-10 Final selection: C2-opt (TL-13 optimum of C2 (sized from C2-2d)) (policy; criterion selected-not-rejected)
+- DR-11 Backup capacity (robustness): Install the TL-15 P90 robust backups (electric_chiller_mw 8.20, peak_boiler_mw 10.90 MW) as C2-opt-robust (policy; criterion opt-robust-backup)
+- DR-10 Final selection: C2-opt-robust (C2-opt with the TL-15 P90 robust backups (OPT-ROBUST-BACKUP)) (policy; criterion selected-not-rejected)
 
 ## Assumptions and answers
 
