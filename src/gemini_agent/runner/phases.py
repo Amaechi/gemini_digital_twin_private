@@ -7,7 +7,9 @@ them) and the Decision Records made at the end of the phase (AG-07). DR-02 (dept
 in P5. WP-14 added ``sensitivity`` to P8 (SUB-11 needs a sensitivity result) and ``plot_figures``
 to P10 (TL-21 figures from tool outputs). Pre-L-2 added workflow tools — run by the runner itself
 after the required tools and before the Decision Records, never offered to the agent — and the
-P8 ``robust_backup`` step with DR-11 (OPT-ROBUST-BACKUP).
+P8 ``robust_backup`` step with DR-11 (OPT-ROBUST-BACKUP). The L-1 P0 follow-up made P0 a pure
+intake check: its only valid steps are ``finalise`` (in scope) and ``refuse`` (off-topic), and the
+runner closes it from the deterministic scope check when the step budget runs out.
 """
 
 from __future__ import annotations
@@ -55,7 +57,10 @@ PHASE_SPECS: dict[Phase, PhaseSpec] = {
             Phase.P0,
             Role.LEAD_ENGINEER,
             "Check the request is about designing the geothermal district heating (100 degC) and "
-            "cooling (20 degC) system; refuse and redirect off-topic requests.",
+            "cooling (20 degC) system; refuse and redirect off-topic requests. The runner's "
+            "intake scope check already ran (CONTEXT in_scope, scope_reason): reply with exactly "
+            "one step, finalise if in_scope is true or refuse if it is false. No tool and no "
+            "other step kind is valid in P0.",
             budget=PhaseBudget(max_steps=3, max_tool_calls=2, max_tokens=20_000),
         ),
         PhaseSpec(

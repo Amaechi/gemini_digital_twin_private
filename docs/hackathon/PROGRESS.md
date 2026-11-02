@@ -17,6 +17,7 @@ Keep it ≤ 20 KB; it is the hand-off between sessions. Old detail: merged PRs a
 | WP-09 | Verifier, memory, logging | merged (901e110) | [#9](https://github.com/Amaechi/gemini_digital_twin_private/pull/9) | 41-check DesignVerifier |
 | WP-10 | Agents, runner, CLI | merged (2285460; review a9083b7) | [#4](https://github.com/Amaechi/gemini_digital_twin_private/pull/4), [#6](https://github.com/Amaechi/gemini_digital_twin_private/pull/6) | policy P0–P10 on stubs |
 | WP-10 L-1 | LLM-path hardening from L-1 | merged (3304f48) | [#19](https://github.com/Amaechi/gemini_digital_twin_private/pull/19) | kinds, call limits, dup guard, DR criteria |
+| WP-10 P0 | P0 intake cannot escalate an in-scope request | in review | | finalise/refuse only; `INTAKE_CLOSED` |
 | WP-11 | Optimisation & uncertainty | merged (78491fe) | [#18](https://github.com/Amaechi/gemini_digital_twin_private/pull/18) | TL-13/15 |
 | WP-12 | Model gap & Model Builder | merged (b81cfa9) | [#15](https://github.com/Amaechi/gemini_digital_twin_private/pull/15) | TL-17/18; S7 demo |
 | WP-13 | Eval suite & submission checks | merged (a622551) | [#16](https://github.com/Amaechi/gemini_digital_twin_private/pull/16) | S1–S11; SUB-01…24 |
@@ -27,8 +28,8 @@ Keep it ≤ 20 KB; it is the hand-off between sessions. Old detail: merged PRs a
 | WP-15 | Final review & packaging | todo | | |
 
 Status: todo · in progress · in review · merged · blocked (say why).
-Latest full suite (pre-L-2, 11-02): `PYTHONPATH=src python -m pytest -q unit_test/gemini_model unit_test/gemini_simulator unit_test/gemini_agent -x` → **1315 passed** (here 6 min 18 s). CLI smoke `--budget smoke`: CI 22.8 s.
-Next: L-1/L-2 (CLOUD_SETUP §7), then WP-15.
+Latest full suite (WP-10 P0, 11-02): `PYTHONPATH=src python -m pytest -q unit_test/gemini_model unit_test/gemini_simulator unit_test/gemini_agent -x` → **1326 passed** (here 8 min 16 s; the working-tree snapshot check failed only because files were edited during the run and passed when re-run). CLI smoke `--budget smoke`: CI 22.8 s.
+Next: re-run L-1 (CLOUD_SETUP §7.3) with this fix, L-2, then WP-15.
 
 ## Decisions log (newest first)
 One line per decision, grouped by WP; dated 11-01 (WP-00: 10-31). Why: the `config/assumptions.yaml` entry or the module docstring.
@@ -91,6 +92,11 @@ One line per decision, grouped by WP; dated 11-01 (WP-00: 10-31). Why: the `conf
 **WP-02**
 - COOL-ELC η 0.508 [D] (COP 4.39 @ 7.2/32.2 °C), COP cap 8; COOL-HR `include_heat_rejection_auxiliaries`; cooling = `StaticModel`s, `power_th` = useful cooling, 20/26 °C.
 - COOL-ABS-B 1.15; 85 °C drive → COP 0.64; COOL-ABS-DRV ≈ 13.9 m³/h per MW; PL 0.65 → 0.47 at 10 %; AUX 2.2 %; COOL-FC T_db + 8 K; HEX per-side ρ/c_p.
+**WP-10 P0 follow-up** (11-02; evidence `origin/l1-p0-evidence`, never merged)
+- Cause: #19's STEP_KINDS line named `delegate` first (never in the prompt before #19); qwen3.6:35b-a3b, gemma4:26b-a4b, qwen3.5:9b answered P0 with `delegate` (9b: one `knowledge_search` first); `DELEGATE` was not in the history ⇒ 3 steps ⇒ "step budget exceeded in P0".
+- P0 = pure intake: `P0_STEP_KINDS` {finalise, refuse}; any other kind or tool ⇒ STEP_REJECTED (in the history); P0 context offers no tool, objective says finalise if `in_scope` else refuse.
+- P0 step budget used up ⇒ `_out_of_steps` writes `INTAKE_CLOSED` and `_close_phase` decides from the deterministic intake: in scope → P1, off-topic → REFUSE (S3 never depended on the model). Other phases still escalate (AG-04); budgets, token-budget and `EngineBudgetExceeded` paths unchanged.
+- Prompt: no-tool kinds with their meaning, `finalise` first, `delegate` "never ends a phase". `check_decision` unchanged (a tool in P0 fails "not in your tool list" and is retried).
 **WP-10 L-1 follow-up** (11-02)
 - kind set from tool before validation (`validation_context` hook, `KIND_COERCED`); prompt STEP_KINDS + 2nd example. `llm.yaml calls`: `reasoning_effort` "none", `max_tokens` (profile flag), `request_timeout`; Ollama's grammar skips thinking.
 - dup guard: engine steps; tool + normalised args + `ToolContext` hash, same loop; open required tool may repeat once; 2nd repeat closes phase; reviewer sees its rejections. DR: criteria + `evidence_keys`; choice ∈ best, rationale names key. Touched `schemas/config.py`, `llm.yaml`, `eval/harness.py`.
@@ -140,6 +146,7 @@ One line per decision, grouped by WP; dated 11-01 (WP-00: 10-31). Why: the `conf
 - WP-11: OPT-SPACE, OPT-OBJ, OPT-DE, UQ-RANGES, UQ-CASES, UQ-MC.
 - WP-14: none (applies SUB-NPSH, SUB-PSUC, OPT-*, UQ-* as registered).
 - WP-10 L-1 follow-up: none.
+- WP-10 P0 follow-up: none.
 
 ## Open follow-ups (grouped by the WP that must act)
 **WP-07** (old items done)
@@ -171,7 +178,9 @@ One line per decision, grouped by WP; dated 11-01 (WP-00: 10-31). Why: the `conf
 **L-1 / L-2**
 - Server settings and tag checks: CLOUD_SETUP §7.1–7.2 (`OLLAMA_CONTEXT_LENGTH=65536` on `ollama serve`; `num_ctx` ignored).
 - Act/format split (spec §5.4.3) not implemented: add it if L-1 shows tool-call problems. Paused LLM runs from before a9083b7 may not reload.
-- **Re-run L-1** after [#19](https://github.com/Amaechi/gemini_digital_twin_private/pull/19) (§7.3): check fallbacks, `kind_coercions`, `step_rejections`, tokens/phase, no call > `request_timeout_s`, no "Thinking Process" in content; gpt-oss can't disable reasoning (`thinking: true` needs more `max_output_tokens`).
+- **Re-run L-1** after [#19](https://github.com/Amaechi/gemini_digital_twin_private/pull/19) and the WP-10 P0 follow-up (§7.3): check fallbacks, `kind_coercions`, `step_rejections`, tokens/phase, no call > `request_timeout_s`, no "Thinking Process" in content; gpt-oss can't disable reasoning (`thinking: true` needs more `max_output_tokens`).
+- WP-13/15: the eval harness counts STEP_REJECTED/ESCALATE only; add an `intake_closed` metric if L-1 should show how often the deterministic P0 close was needed (grep `INTAKE_CLOSED` in events.jsonl meanwhile).
+- L-1 re-run (11-02, before the P0 fix): qwen3.6:35b-a3b, gemma4:26b-a4b, qwen3.5:9b escalated in P0 (`delegate` ×3, 10–16 s); gemma4:12b, qwen3.6:27b passed P0. Expect `INTAKE_CLOSED` / P0 `step_rejections` in the eval metrics now; a model that answers `finalise` costs one P0 call.
 
 **Pre-L-2 → WP-15**
 - CLI: `resume` hint omits `--runs-dir`; budget not stored in the run (resume repeats `--budget`); `run_eval` rewrites `eval_results.json` per call (S11 folder replaced by S1–S11). `docs/results/eval_policy_quick` predates DR-11.
@@ -190,4 +199,5 @@ One line per decision, grouped by WP; dated 11-01 (WP-00: 10-31). Why: the `conf
 See spec §17. Answers: —
 
 ## Hand-off notes (latest session writes here, replace previous)
-2026-11-02, Pre-L-2: `build_results.py` (full) 528 s. P8 `robust_backup` → DR-11 (policy) installs **C2-opt-robust** (boiler 5.0 → 10.9 MW); P9 **ACCEPTED** 46/46, 0/23 stubs, 11 DRs. Before → after: LCOH 42.54 → 44.59, LCOC 26.31 → 26.31 USD/MWh, CAPEX 27.86 → 30.07 MUSD, P(demand met) 0.46 → 0.90; CO₂ −72 %, unmet 0 d unchanged. `validate_submission`: FAIL only LLM-only 12, 15–17 (WARN 02, 14, 22). §7 dry-run verified (ask mode needs a TTY; DB-30/31/32 asked before the approval). Next: L-1/L-2 (§7), WP-15.
+2026-11-02, WP-10 P0 follow-up: runner/agent files only (`design_runner.py`, `phases.py` objective text, `prompts/system.py`); 9 new tests replay the three models' recorded P0 answers (each reaches P1), S3 refused, S5/S9 conflicts identical to the policy run, policy P0 unchanged, P1 budget still escalates. Evidence read from `origin/l1-p0-evidence` (not merged). Next: user re-runs L-1 (§7.3), then L-2, WP-15.
+Previous (Pre-L-2): `build_results.py` (full) 528 s. P8 `robust_backup` → DR-11 (policy) installs **C2-opt-robust** (boiler 5.0 → 10.9 MW); P9 **ACCEPTED** 46/46, 0/23 stubs, 11 DRs. Before → after: LCOH 42.54 → 44.59, LCOC 26.31 → 26.31 USD/MWh, CAPEX 27.86 → 30.07 MUSD, P(demand met) 0.46 → 0.90; CO₂ −72 %, unmet 0 d unchanged. `validate_submission`: FAIL only LLM-only 12, 15–17 (WARN 02, 14, 22). §7 dry-run verified (ask mode needs a TTY; DB-30/31/32 asked before the approval). Next: L-1/L-2 (§7), WP-15.

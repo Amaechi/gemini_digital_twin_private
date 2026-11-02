@@ -6,7 +6,8 @@
 # _compact_payload / _prior_action_signatures ideas. 2026-11-02 (L-1 follow-up): duplicate
 # tool calls rejected by signature, step-kind coercions logged, DR choices checked on criteria.
 # 2026-11-02 (pre-L-2): phase workflow tools (P8 robust_backup) and DR-11, whose choice selects
-# the installed design for P9.
+# the installed design for P9. 2026-11-02 (L-1 P0 follow-up): P0 accepts only finalise/refuse and
+# closes from the deterministic intake when its step budget runs out (never escalates in scope).
 """Workflow runner: deterministic phases P0–P10 (spec §4.1, §5.2).
 
 The runner decides WHICH phase runs, enforces budgets (AG-04), executes every tool call,
@@ -93,6 +94,11 @@ MAX_DUPLICATE_REJECTIONS = 2
 _CONSTANT_CONTEXT = frozenset({"run_id", "run_dir", "config_dir"})
 """``ToolContext`` fields that never change within a run (left out of the fingerprint)."""
 APPROVAL_ID = "APPROVAL"
+P0_STEP_KINDS = frozenset({"finalise", "refuse"})
+"""The only step kinds P0 accepts (L-1 P0 follow-up): the runner's intake already decided scope,
+so an agent can only confirm it (``finalise``) or refuse an off-topic request. Any tool or other
+kind is rejected with STEP_REJECTED feedback, and when the step budget runs out the phase closes
+from the intake result (``INTAKE_CLOSED``) instead of escalating."""
 LOOP_BACK_PHASES = (Phase.P6, Phase.P7, Phase.P8, Phase.P9, Phase.P10)
 """Phases re-run after a REJECTED verification."""
 _HISTORY_TYPES = frozenset(
@@ -318,9 +324,10 @@ class DesignRunner:
                 self._intake(state)
         while not prog.engine_done:
             if prog.steps_used >= budget.max_steps:
-                return self._escalate(
-                    state, f"step budget exceeded in {spec.phase.value} ({budget.max_steps} steps)"
-                )
+                outcome = self._out_of_steps(state, spec, budget)
+                if outcome is not None:
+                    return outcome
+                break
             context = self._context(state, spec)
             try:
                 result = self.engine.decide(context)
@@ -362,10 +369,10 @@ class DesignRunner:
                 )
             for step in result.value.steps:
                 if prog.steps_used >= budget.max_steps:
-                    return self._escalate(
-                        state,
-                        f"step budget exceeded in {spec.phase.value} ({budget.max_steps} steps)",
-                    )
+                    outcome = self._out_of_steps(state, spec, budget)
+                    if outcome is not None:
+                        return outcome
+                    break
                 prog.steps_used += 1
                 outcome = self._execute_step(state, spec, step, result.source)
                 if outcome in ("paused", "stopped"):
@@ -376,6 +383,35 @@ class DesignRunner:
                     break
             self._save(state)
         return self._close_phase(state, spec)
+
+    def _out_of_steps(
+        self, state: RunState, spec: PhaseSpec, budget: PhaseBudget
+    ) -> Outcome | None:
+        """Step budget used up: escalate (AG-04), except in P0, which closes from the intake.
+
+        L-1 P0 follow-up: three of five models spent P0's steps on ``delegate`` or a tool call and
+        were escalated although the deterministic scope check had passed. The intake result, not
+        the agent's wording, decides P0: the runner records ``INTAKE_CLOSED``, ends the engine's
+        turn and ``_close_phase`` continues to P1 (in scope) or refuses (off-topic). Returns None
+        when the phase was closed this way.
+        """
+        reason = f"step budget exceeded in {spec.phase.value} ({budget.max_steps} steps)"
+        if spec.phase != Phase.P0:
+            return self._escalate(state, reason)
+        prog = state.phase_progress(spec.phase)
+        prog.engine_done = True
+        verdict = "in scope, the workflow continues" if state.in_scope else "off-topic, refused"
+        self._event(
+            state,
+            "INTAKE_CLOSED",
+            {
+                "in_scope": state.in_scope,
+                "steps_used": prog.steps_used,
+                "message": f"{reason} without finalise or refuse; the intake scope check "
+                f"decides: {verdict} ({state.scope_reason})",
+            },
+        )
+        return None
 
     def _close_phase(self, state: RunState, spec: PhaseSpec) -> Outcome:
         """Deterministic completion (spec §5.4.6) and Decision Records of the phase."""
@@ -418,6 +454,14 @@ class DesignRunner:
     def _execute_step(
         self, state: RunState, spec: PhaseSpec, step: NextStep, source: DecisionSource
     ) -> Outcome:
+        if spec.phase == Phase.P0 and step.kind not in P0_STEP_KINDS:
+            expected = "finalise" if state.in_scope else "refuse"
+            return self._reject_step(
+                state,
+                step,
+                "in P0 the only valid steps are finalise (in scope) or refuse (off-topic); the "
+                f"intake scope check expects {expected} here; no tool runs in intake",
+            )
         role_tools = ROLES[spec.role].tools
         if step.tool is not None and step.tool not in role_tools:
             return self._reject_step(state, step, f"tool not in the {spec.role.value} tool list")
@@ -1056,7 +1100,10 @@ class DesignRunner:
         prog = state.phase_progress(spec.phase)
         budget = self._budget(spec)
         role = role or spec.role
+        # P0 is a pure intake check (finalise or refuse): no tool is offered there.
         tools = [tool for tool in ROLES[role].tools if tool in self.toolbox]
+        if spec.phase == Phase.P0:
+            tools = []
         remaining = [tool for tool in spec.required_tools if tool not in prog.completed_tools]
         return DecisionContext(
             run_id=state.run_id,
