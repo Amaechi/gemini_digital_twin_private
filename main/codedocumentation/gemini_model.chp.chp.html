@@ -181,7 +181,9 @@ unit. If either flow is shared with other consumers (e.g. a
 co-located Boiler), use a <code class="docutils literal notranslate"><span class="pre">Splitter</span></code> component to allocate it
 before feeding it into this model. <code class="docutils literal notranslate"><span class="pre">water_flow_rate</span></code> is echoed
 back as an output so it can be passed on, in series, to a
-downstream component on the same water flow path.</p>
+downstream component on the same water flow path. The optional
+<code class="docutils literal notranslate"><span class="pre">electrical_fraction</span></code> parameter (default 1/3) splits the useful
+output into electricity and heat.</p>
 </dd></dl>
 
 <dl class="py method">
