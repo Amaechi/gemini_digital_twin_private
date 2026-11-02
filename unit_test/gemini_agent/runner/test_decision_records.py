@@ -4,18 +4,19 @@ import json
 
 import pytest
 
-from gemini_agent.agents.engine import PolicyEngine
+from gemini_agent.agents.engine import PolicyEngine, check_choice, choice_deps
 from gemini_agent.runner.decision_records import (
     build_options,
     build_question,
     make_record,
+    result_keys,
     write_records,
 )
 from gemini_agent.runner.state import RunState, ToolRecord, Verification
-from gemini_agent.runner.tool_stubs import stub_toolbox
+from gemini_agent.runner.tool_stubs import KPIBatch, stub_toolbox
 from gemini_agent.runner.toolbox import ToolContext
 from gemini_agent.schemas.config import load_config
-from gemini_agent.schemas.decision import DesignVerdict, Phase
+from gemini_agent.schemas.decision import DesignVerdict, OptionChoice, Phase
 from gemini_agent.schemas.results import KPISet
 
 pytestmark = pytest.mark.usefixtures("stub_tools")
@@ -160,3 +161,99 @@ def test_dr01_quotes_the_productivity_basis(tmp_path):
     )
     state.tool_results[-1] = state.tool_results[-1].model_copy(update={"stub": True})
     assert not any("permeability" in o.notes for o in build_options("DR-01", state, None))
+
+
+# --------------------------------------------------------------------------- L-1 follow-up
+def _with_economics(state: RunState) -> RunState:
+    """Add an economics record whose result holds KPISet fields (the citable keys)."""
+    batch = KPIBatch(mode="economics", kpis=[KPISet(candidate_id="C1-3d")])
+    state.tool_results.append(
+        ToolRecord(
+            id="TR-002",
+            tool="economics",
+            phase=Phase.P5,
+            args={},
+            ok=True,
+            candidate_ids=[c.id for c in state.candidates],
+            source="policy",
+            data_keys=result_keys(batch),
+        )
+    )
+    state.kpis = {
+        "C3-2d": KPISet(candidate_id="C3-2d", lcoh_per_mwh=40.0, co2_t_per_yr=900.0),
+        "C1-3d": KPISet(candidate_id="C1-3d", lcoh_per_mwh=60.0, co2_t_per_yr=500.0),
+    }
+    return state
+
+
+def test_result_keys_walk_nested_models_not_equipment_names():
+    """Evidence keys are field names (nested models too), not keys of nested mappings."""
+    kpi = KPISet(candidate_id="C1-3d", heat_by_source_mwh={"hex": 1.0})
+    keys = result_keys(KPIBatch(mode="economics", kpis=[kpi]))
+    assert {"mode", "kpis", "lcoh_per_mwh", "heat_by_source_mwh"} <= set(keys)
+    assert "hex" not in keys
+    assert result_keys({"verdict": "UNVERIFIED", "nested": {"inner": 1}}) == ["verdict", "nested"]
+
+
+def test_criteria_rank_rule_first_then_discriminating_kpis(tmp_path):
+    """Fix 4: the recommendation rule is criterion one; KPI criteria only where options differ."""
+    state = _with_economics(_state(tmp_path))
+    question = build_question("DR-01", state, Phase.P5, None)
+    assert {"economics", "simulate_annual", "lcoh_per_mwh", "co2_t_per_yr"} <= set(
+        question.evidence_keys
+    )
+    by_id = {c.id: c for c in question.criteria}
+    assert question.criteria[0].id == "ranking-lowest-lcoh_per_mwh"
+    assert by_id["ranking-lowest-lcoh_per_mwh"].best_option_ids == ["2-doublets"]
+    assert by_id["lowest-co2_t_per_yr"].best_option_ids == ["3-doublets"]
+    assert by_id["lowest-co2_t_per_yr"].evidence_ids == ["TR-002"]
+    assert "lowest-lcoh_per_mwh" not in by_id  # same key and winner as the rule: not repeated
+    assert "lowest-unmet_heating_mwh" not in by_id  # no values: cannot decide
+
+    policy = PolicyEngine().choose(question, None).value  # type: ignore[arg-type]
+    assert (policy.criterion, policy.option_id) == ("ranking-lowest-lcoh_per_mwh", "2-doublets")
+    assert check_choice(choice_deps(question), policy) is None
+
+    # Another criterion may decide, if the choice follows it ...
+    co2 = OptionChoice(
+        dr_id="DR-01",
+        criterion="lowest-co2_t_per_yr",
+        option_id="3-doublets",
+        rationale="lowest co2_t_per_yr among the eligible options in economics",
+    )
+    assert check_choice(choice_deps(question), co2) is None
+    record = make_record(question, co2, "llm", state)
+    assert record.criterion.key == "co2_t_per_yr"
+    paths = write_records([record], tmp_path / "dr")
+    markdown = next(p for p in paths if p.name == "DR-01.md").read_text()
+    assert "Decisive criterion: lowest co2_t_per_yr" in markdown and "TR-002" in markdown
+    assert "differs from the workflow-recommended option 2-doublets" in markdown
+    # ... but not contradict it.
+    contradicting = co2.model_copy(update={"option_id": "2-doublets"})
+    assert "contradicts" in check_choice(choice_deps(question), contradicting)
+
+
+def test_every_policy_record_of_a_stub_run_has_a_grounded_criterion(tmp_path):
+    """Fix 4: no hollow rationale — each DR names a criterion whose key the evidence holds."""
+    from gemini_agent.runner.design_runner import DesignRunner
+
+    runner = DesignRunner(PolicyEngine(), runs_root=tmp_path)
+    runner.start("", run_id="c1")
+    state = runner.load_state("c1")
+    assert len(state.decision_records) == 10
+    for record in state.decision_records:
+        assert record.criterion is not None, record.dr_id
+        assert record.criterion.key in record.rationale, record.dr_id
+        assert "because it is recommended" not in record.rationale
+    criteria = {r.dr_id: r.criterion.id for r in state.decision_records}
+    assert criteria["DR-06"] == "db30-non-overlapping" and criteria["DR-08"] == "db31-answer"
+    assert criteria["DR-10"] == "selected-not-rejected"
+    assert criteria["DR-01"] == "generation-order-passed"  # stubs: no cost evidence yet
+
+
+def test_kpi_criterion_needs_values_for_two_options(tmp_path):
+    """Fix 4 (review): an option without data cannot lose, so one value decides nothing."""
+    state = _with_economics(_state(tmp_path))
+    state.kpis["C1-3d"] = KPISet(candidate_id="C1-3d")  # 3-doublets: no KPI values
+    question = build_question("DR-01", state, Phase.P5, None)
+    assert [c.id for c in question.criteria] == ["ranking-lowest-lcoh_per_mwh"]

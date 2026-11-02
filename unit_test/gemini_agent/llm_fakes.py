@@ -47,6 +47,15 @@ def policy_like(messages: list[Any], info: AgentInfo) -> ModelResponse:
     return ModelResponse(parts=[TextPart(policy_answer(messages, info))])
 
 
+def kinds_as_call_tool(messages: list[Any], info: AgentInfo) -> ModelResponse:
+    """Answer like the policy, but send every tool step as ``call_tool`` (the L-1 kind error)."""
+    answer = json.loads(policy_answer(messages, info))
+    for step in answer.get("steps", []):
+        if step.get("tool"):
+            step["kind"] = "call_tool"
+    return ModelResponse(parts=[TextPart(json.dumps(answer))])
+
+
 def always_invalid(messages: list[Any], info: AgentInfo) -> ModelResponse:
     """Answer with output that never validates."""
     return ModelResponse(parts=[TextPart('{"unexpected": "json"}')])

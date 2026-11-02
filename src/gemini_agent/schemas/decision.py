@@ -2,6 +2,7 @@
 # file services/plant-debugger/plant_debugger/agent/schemas.py @ d69507a. Modified by GeoAgent team,
 # 2026-11-01: incident kinds/tools replaced by the GeoAgent phase/step kinds of spec §5.3; added
 # Decision Records (AG-07), option choices, missing-input requests (AG-05) and run status enums.
+# 2026-11-02 (L-1 follow-up): pre-validation hook for step kinds; DR criteria and evidence keys.
 """Typed decisions exchanged between the workflow runner and the decision engines (spec §5.3).
 
 The runner owns the phase order (P0–P10); an engine (deterministic policy or an LLM agent) only
@@ -12,10 +13,11 @@ produce engineering numbers: every number comes from a tool result (CLAUDE.md go
 from __future__ import annotations
 
 import re
+from collections.abc import Iterable, Mapping
 from enum import StrEnum
 from typing import Any, Literal
 
-from pydantic import Field, JsonValue, field_validator, model_validator
+from pydantic import Field, JsonValue, ValidationInfo, field_validator, model_validator
 
 from gemini_agent.schemas.common import StrictModel
 
@@ -104,6 +106,17 @@ RESERVED_TOOLS: frozenset[str] = frozenset(
     tool for tools in KIND_TOOLS.values() if tools is not None for tool in tools
 )
 
+NO_TOOL_KINDS: frozenset[str] = frozenset(
+    kind for kind, tools in KIND_TOOLS.items() if tools is None
+)
+"""Kinds whose meaning does not come from a tool (finalise, escalate, delegate, refuse)."""
+
+PRE_VALIDATE_HOOK = "decision_pre_validate"
+"""Pydantic validation-context key: a callable ``(raw Decision data) -> raw data`` that runs before
+``Decision`` is validated. The LLM engine sets it (``agents.engine.coerce_step_kinds``) to repair
+step kinds from tool names before the kind ↔ tool rule is checked; direct construction (policy,
+tests) has no context and is unchanged."""
+
 DecisionSource = Literal["policy", "llm", "policy_fallback", "workflow", "user", "assumption"]
 """Who made a decision: ``policy`` (PolicyEngine run), ``llm`` (validated LLM output),
 ``policy_fallback`` (LLM failed after ≤ 2 retries, AG-03), ``workflow`` (deterministic runner
@@ -143,6 +156,27 @@ _LLM_NUMBER = re.compile(
     r"(?!\d|[.,]\d|-[^\W\d_])"
 )
 """A number an LLM wrote in free text (not a digit inside an identifier)."""
+
+
+_KEY_TOKEN = re.compile(r"(?<![A-Za-z0-9_])[A-Za-z][A-Za-z0-9]*(?:_[A-Za-z0-9]+)+(?![A-Za-z0-9_])")
+"""A snake_case identifier in free text — how a rationale cites a tool-result key or tool."""
+
+
+def key_tokens(text: str, ignore: Iterable[str] = ()) -> list[str]:
+    """Snake_case identifiers in ``text`` (the evidence keys and tool names it cites).
+
+    ``ignore`` strings (evidence ids such as ``config:design_basis.yaml#DB-01``) are removed
+    first, so a reference is not read as a key.
+    """
+    for item in sorted(ignore, key=len, reverse=True):
+        if item:
+            text = text.replace(item, " ")
+    return _KEY_TOKEN.findall(text)
+
+
+def names_key(text: str, key: str) -> bool:
+    """Return True if ``text`` names ``key`` as a whole word (``passed`` is not ``bypassed``)."""
+    return re.search(rf"(?<![A-Za-z0-9_]){re.escape(key)}(?![A-Za-z0-9_])", text) is not None
 
 
 def states_numbers(text: str) -> bool:
@@ -217,6 +251,13 @@ class Decision(StrictModel):
     phase: Phase
     steps: list[NextStep] = Field(min_length=1, max_length=MAX_STEPS_PER_DECISION)
     open_questions: list[str] = Field(default_factory=list, max_length=5)
+
+    @model_validator(mode="before")
+    @classmethod
+    def _pre_validate_hook(cls, data: Any, info: ValidationInfo) -> Any:
+        context = info.context
+        hook = context.get(PRE_VALIDATE_HOOK) if isinstance(context, Mapping) else None
+        return hook(data) if callable(hook) else data
 
 
 class ToolBrief(StrictModel):
@@ -305,6 +346,39 @@ class DecisionOption(StrictModel):
     notes: str = ""
 
 
+class DecisionCriterion(StrictModel):
+    """A decisive criterion the workflow offers for a Decision Record (AG-07, golden rule 1).
+
+    The workflow evaluates it on tool results, so the LLM never compares numbers:
+    ``best_option_ids`` are the eligible options that win under it. A choice names one criterion
+    and its option must be one of them (a choice may not contradict its own stated reason).
+    """
+
+    id: str = Field(pattern=r"^[A-Za-z0-9][A-Za-z0-9_.\-]*$", max_length=64)
+    key: str = Field(
+        description="Evidence key it rests on: a tool-result field (e.g. 'lcoh_per_mwh') or an "
+        "assumption id (e.g. 'DB-31')."
+    )
+    source: str = Field(description="Tool or register the key comes from, e.g. 'economics'.")
+    text: str = Field(
+        max_length=200,
+        description="No-number statement, e.g. 'lowest lcoh_per_mwh among eligible options'.",
+    )
+    best_option_ids: list[str] = Field(min_length=1)
+    evidence_ids: list[str] = Field(default_factory=list, description="Tool-result IDs.")
+
+    @field_validator("text")
+    @classmethod
+    def _no_quantities(cls, text: str) -> str:
+        return reject_llm_quantities(text)
+
+    @model_validator(mode="after")
+    def _text_names_key(self) -> DecisionCriterion:
+        if self.key not in self.text:
+            raise ValueError(f"criterion {self.id}: text must name its key '{self.key}'")
+        return self
+
+
 class DecisionQuestion(StrictModel):
     """A bounded choice the workflow offers an engine (spec §4.1 'LLMs choose within options')."""
 
@@ -314,6 +388,14 @@ class DecisionQuestion(StrictModel):
     phase: Phase
     role: Role
     options: list[DecisionOption] = Field(min_length=1)
+    criteria: list[DecisionCriterion] = Field(
+        default_factory=list, description="Decisive criteria offered by the workflow."
+    )
+    evidence_keys: list[str] = Field(
+        default_factory=list,
+        description="Keys a rationale may cite: field names in the evidence tool results, the "
+        "tools themselves and assumption ids.",
+    )
 
     @model_validator(mode="after")
     def _check_options(self) -> DecisionQuestion:
@@ -322,7 +404,37 @@ class DecisionQuestion(StrictModel):
             raise ValueError(f"duplicate option ids in {self.dr_id}: {ids}")
         if not any(option.eligible for option in self.options):
             raise ValueError(f"{self.dr_id} has no eligible option")
+        eligible = {option.id for option in self.options if option.eligible}
+        criterion_ids = [criterion.id for criterion in self.criteria]
+        if len(set(criterion_ids)) != len(criterion_ids):
+            raise ValueError(f"duplicate criterion ids in {self.dr_id}: {criterion_ids}")
+        allowed, references = self.citable(), self.references()
+        for criterion in self.criteria:
+            if not set(criterion.best_option_ids) <= eligible:
+                raise ValueError(f"{criterion.id}: best options must be eligible options")
+            cited = [criterion.key, *key_tokens(criterion.text, references)]
+            unknown = [k for k in cited if k not in allowed]
+            if unknown:
+                raise ValueError(f"{criterion.id} cites keys outside evidence_keys: {unknown}")
         return self
+
+    def references(self) -> set[str]:
+        """Return the evidence ids of options and criteria (removed before keys are read)."""
+        ids = {e for option in self.options for e in option.evidence_ids}
+        return ids | {e for criterion in self.criteria for e in criterion.evidence_ids}
+
+    def citable(self) -> set[str]:
+        """Return what a rationale may cite: evidence keys, ids and words of workflow text."""
+        allowed = set(self.evidence_keys) | self.references()
+        for option in self.options:
+            allowed.add(option.id)
+            allowed.update(key_tokens(f"{option.label} {option.notes}"))
+        allowed.update(criterion.id for criterion in self.criteria)
+        return allowed
+
+    def criterion(self, criterion_id: str | None) -> DecisionCriterion | None:
+        """Return the offered criterion with this id (None if not offered)."""
+        return next((c for c in self.criteria if c.id == criterion_id), None)
 
 
 class RejectedOption(StrictModel):
@@ -338,11 +450,24 @@ class RejectedOption(StrictModel):
 
 
 class OptionChoice(StrictModel):
-    """Structured output of an engine for a Decision Record question."""
+    """Structured output of an engine for a Decision Record question.
+
+    ``criterion`` comes before ``option_id`` so a constrained decoder states the reason first.
+    """
 
     dr_id: DR_IDS
+    criterion: str | None = Field(
+        default=None,
+        max_length=64,
+        description="id of the decisive criterion in question.criteria (required when offered).",
+    )
     option_id: str
-    rationale: str = Field(min_length=1, max_length=600, description="≤ 60 words.")
+    rationale: str = Field(
+        min_length=1,
+        max_length=600,
+        description="≤ 60 words, no numbers; names the criterion's key (e.g. 'lowest "
+        "lcoh_per_mwh among guard-passed options in economics').",
+    )
     rejected: list[RejectedOption] = Field(default_factory=list)
 
     @field_validator("rationale")
@@ -366,6 +491,9 @@ class DecisionRecord(StrictModel):
     evidence_ids: list[str]
     choice: str
     choice_label: str
+    criterion: DecisionCriterion | None = Field(
+        default=None, description="The decisive criterion the choice rests on."
+    )
     rationale: str
     rejected: list[RejectedOption]
     decision_source: DecisionSource

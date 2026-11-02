@@ -34,3 +34,23 @@ temperatures:
 
 max_output_retries: 2 # structured-output retries before falling back to the PolicyEngine (WP-10)
 seed: 42
+
+# Per-call limits for every structured-output call (Decision / OptionChoice), added after the L-1
+# eval: reasoning landed in the output content and used up the P0/P1 budgets; one call hung 30 min.
+# Checked against pydantic-ai 2.64.0 / openai 3.42.0 and Ollama main (openai/openai.go):
+#   thinking: false  -> openai_reasoning_effort "none" -> reasoning_effort "none" -> think=false.
+#                       Needed: Ollama leaves the leading thinking span outside the JSON grammar
+#                       (CompletionRequest.ThinkingClose), so with thinking on the content can hold
+#                       free text before the JSON. pydantic-ai's unified `thinking` setting is NOT
+#                       sent for Ollama profiles (supports_thinking false).
+#   max_output_tokens -> body max_tokens (Ollama num_predict; it ignores max_completion_tokens, so
+#                       the engine sets the profile flag openai_chat_supports_max_completion_tokens
+#                       false). Thinking tokens count against it.
+#   request_timeout_s -> pydantic-ai request_timeout (one deadline per model request, all SDK
+#                       retries included) + the HTTP client timeout; a timeout is a policy
+#                       fallback. The first call of a run also loads the model: raise it if L-1
+#                       shows first-call timeouts.
+calls:
+  thinking: false
+  max_output_tokens: 2048
+  request_timeout_s: 300

@@ -16,6 +16,7 @@ Keep it ≤ 20 KB; it is the hand-off between sessions. Old detail: merged PRs a
 | WP-08 | Economics, CO₂, exergy, scaling | merged (66acde7) | [#12](https://github.com/Amaechi/gemini_digital_twin_private/pull/12) | TL-14/22/23; C0 LCOH 137 $/MWh ≈ ACM cap |
 | WP-09 | Verifier, memory, logging | merged (901e110) | [#9](https://github.com/Amaechi/gemini_digital_twin_private/pull/9) | 41-check DesignVerifier |
 | WP-10 | Agents, runner, CLI | merged (2285460; review a9083b7) | [#4](https://github.com/Amaechi/gemini_digital_twin_private/pull/4), [#6](https://github.com/Amaechi/gemini_digital_twin_private/pull/6) | policy P0–P10 on stubs |
+| WP-10 L-1 | LLM-path hardening from L-1 | merged (3304f48) | [#19](https://github.com/Amaechi/gemini_digital_twin_private/pull/19) | kinds, call limits, dup guard, DR criteria |
 | WP-11 | Optimisation & uncertainty | merged (78491fe) | [#18](https://github.com/Amaechi/gemini_digital_twin_private/pull/18) | TL-13/15 |
 | WP-12 | Model gap & Model Builder | merged (b81cfa9) | [#15](https://github.com/Amaechi/gemini_digital_twin_private/pull/15) | TL-17/18; S7 demo |
 | WP-13 | Eval suite & submission checks | merged (a622551) | [#16](https://github.com/Amaechi/gemini_digital_twin_private/pull/16) | S1–S11; SUB-01…24 |
@@ -85,6 +86,9 @@ One line per decision, grouped by WP; dated 11-01 (WP-00: 10-31). Why: the `conf
 **WP-02**
 - COOL-ELC η 0.508 [D] (COP 4.39 @ 7.2/32.2 °C), COP cap 8; COOL-HR `include_heat_rejection_auxiliaries`; cooling = `StaticModel`s, `power_th` = useful cooling, 20/26 °C.
 - COOL-ABS-B 1.15; 85 °C drive → COP 0.64; COOL-ABS-DRV ≈ 13.9 m³/h per MW; PL 0.65 → 0.47 at 10 %; AUX 2.2 %; COOL-FC T_db + 8 K; HEX per-side ρ/c_p.
+**WP-10 L-1 follow-up** (11-02)
+- kind set from tool before validation (`validation_context` hook, `KIND_COERCED`); prompt STEP_KINDS + 2nd example. `llm.yaml calls`: `reasoning_effort` "none", `max_tokens` (profile flag), `request_timeout`; Ollama's grammar skips thinking.
+- dup guard: engine steps; tool + normalised args + `ToolContext` hash, same loop; open required tool may repeat once; 2nd repeat closes phase; reviewer sees its rejections. DR: criteria + `evidence_keys`; choice ∈ best, rationale names key. Touched `schemas/config.py`, `llm.yaml`, `eval/harness.py`.
 **WP-10 review**
 - AG-02 refuses digits outside an id; AG-06 needs a design word; DB-30 'B' = no outage; DR-10 never offers REJECTED.
 
@@ -129,6 +133,7 @@ One line per decision, grouped by WP; dated 11-01 (WP-00: 10-31). Why: the `conf
 - WP-12: none (limitations are gap-analysis entries, not register values).
 - WP-11: OPT-SPACE, OPT-OBJ, OPT-DE, UQ-RANGES, UQ-CASES, UQ-MC.
 - WP-14: none (applies SUB-NPSH, SUB-PSUC, OPT-*, UQ-* as registered).
+- WP-10 L-1 follow-up: none.
 
 ## Open follow-ups (grouped by the WP that must act)
 **WP-07** (old items done)
@@ -142,6 +147,7 @@ One line per decision, grouped by WP; dated 11-01 (WP-00: 10-31). Why: the `conf
 - WP-15: DR-06 cites TL-13, not the outage days by value; `robust_backup_mw` not in a DR; TL-13 `rejected` not → `guard_failed` (REJECTED `-opt` designs are skipped).
 - WP-08/15: no HT-ATES capex on RC-10 ⇒ C6 unpriced; WACC view (ECO-06) missing.
 - Done (WP-14): flash/NPSH ⇒ `depth_check`. WP-15: saturation data > 100 °C (RC-01) or a pressurised degasser re-opens ≥ 3 km.
+- C2 optimum/MC numbers: [#18](https://github.com/Amaechi/gemini_digital_twin_private/pull/18) hand-off, `runs/wp11-c2/`.
 - Treat as API: `FastPlant._model`, `.carries`, `.run` (TL-13/15 `ScenarioPlant` hooks: overrides + memo).
 **WP-12**
 - Done: PROGRESS gaps → LIM-SUB-01…08, LIM-PLT-01…05, LIM-GEM-01, LIM-TOOL-01.
@@ -158,11 +164,13 @@ One line per decision, grouped by WP; dated 11-01 (WP-00: 10-31). Why: the `conf
 - `AbsorptionPoint` not collected ⇒ C3/C4 UNVERIFIED (ranked last); `HeatPumpPoint` lacks max sink T.
 - Physics check: ESP intake 0.86 bar over 1.2·p_b (sea-water basis; pure water fails ⇒ ESP ≈ 65 m deeper); free cooling 87 % on smoothed normals (optimistic); HTHP COP = VER-HP-ETA cap (DEA 4–7 % lower); installed-heating KPI rates the HEX at 300 m³/h; boiler 5.0 MW has 0.03 MW spare (robust 10.9 MW).
 - Final run: assume mode (SUB-02 WARN); L-2 reruns in ask mode.
+- Done (WP-14, from #19): DR KPI criteria get real KPIs; result field names kept (`lcoh_per_mwh`, `verdict` in `data_keys`).
 - Full suite ≈ 7 min (smoke pipeline ≈ 75 s).
 
 **L-1 / L-2**
 - Confirm tags with `ollama show <tag>` (must list `tools`). Set `OLLAMA_CONTEXT_LENGTH=65536` before `cli run --engine llm` (`num_ctx` ignored); `--model TAG` overrides orchestrator and coder.
 - Act/format split (spec §5.4.3) not implemented: add it if L-1 shows tool-call problems. Paused LLM runs from before a9083b7 may not reload.
+- **Re-run L-1** (S11, 5 models) after [#19](https://github.com/Amaechi/gemini_digital_twin_private/pull/19): fallbacks, `kind_coercions`, `step_rejections`, tokens/phase; no "Thinking Process" in content, no call > `request_timeout_s`. gpt-oss can't disable reasoning; `thinking: true` needs more `max_output_tokens`.
 
 **WP-15**
 - Header audit of adapted Plant Debugger files (`NOTICE`).
@@ -178,3 +186,4 @@ See spec §17. Answers: —
 
 ## Hand-off notes (latest session writes here, replace previous)
 2026-11-02, WP-14: `PYTHONPATH=src python scripts/build_results.py` (policy run → `runs/final_policy/` → `docs/results/`; `--skip-run` re-renders) took **808 s** (full profile, 4 vCPU). Result: **C2-opt** 2 × 2500 m, 296 m³/h, HTHP 4.1 MW, boiler 5.0 MW, e-chiller 8.2 MW, outages d119/d238; **ACCEPTED** (0/22 stub calls, DR-01…10 agree; C4-2d at 3.2 km excluded at P3 by the PH-19/PH-30 pre-check); unmet 0 d; LCOH 42.5 + LCOC 26.3 USD/MWh, CAPEX 27.9 MUSD, CO₂ 7360 t/yr (−72 % vs C0), η_ex 0.44; free cooling 20.6 of 23.7 GWh. MC P10/P50/P90 LCOH 33.8/47.3/66.1; P(demand met) 0.46 → 0.90 with a 10.9 MW boiler (`robust_backup_mw`, WP-15 DR). Submission check: only SUB-12/15/16/17 fail (LLM-only, L-1/L-2); SUB-02 approval pending (assume mode). Real-tool eval (`run_eval.py --scenarios S1,S6,S7,S8`, quick): S1, S6 pass; S7, S8 checks pass (1 pending each), `docs/results/eval_policy_quick/`. L-2: `cli run --engine llm` in ask mode.
+2026-11-02, WP-10 L-1 follow-up (wire body tested via MockTransport). Next: L-1 re-run; WP-14.

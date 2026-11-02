@@ -193,6 +193,7 @@ def test_compare_evals_writes_the_model_comparison(policy_results, testmodel_res
     assert set(models) == {"policy", "testmodel"}
     assert models["testmodel"]["fallbacks"] > 0 and models["policy"]["total_tokens"] == 0
     assert models["policy"]["outcomes"]["skipped"] == 2
+    assert models["policy"]["kind_coercions"] == 0  # KIND_COERCED events (LLM engines only)
     stored = json.loads((tmp_path / "model_comparison.json").read_text())
     assert stored["models"] == comparison["models"]
     table = (tmp_path / "model_comparison.md").read_text()

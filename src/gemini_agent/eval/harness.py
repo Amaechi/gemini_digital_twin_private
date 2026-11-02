@@ -2,7 +2,8 @@
 # file scripts/run_eval.py @ d69507a. Modified by GeoAgent team, 2026-11-01: HTTP incident polling
 # replaced by in-process DesignRunner runs of the spec §12 scenarios (evals/scenarios.yaml) with
 # policy / TestModel / Ollama engines; EvalRun metrics (tool calls, retries, fallbacks, tokens,
-# runtime), declarative checks + pending items, naive-vs-optimised tokens, model comparison.
+# runtime), declarative checks + pending items, naive-vs-optimised tokens, model comparison;
+# 2026-11-02 (WP-10 L-1 follow-up): kind_coercions metric.
 """Evaluation harness for scenarios S1–S11 (spec §12 EV-01, EV-04; WP-13).
 
 Engines:
@@ -89,6 +90,9 @@ class RunMetrics(StrictModel):
     retries: int = 0
     fallbacks: int = 0
     step_rejections: int = 0
+    kind_coercions: int = Field(
+        default=0, description="LLM step kinds repaired from the tool name (KIND_COERCED)."
+    )
     input_tokens: int = 0
     output_tokens: int = 0
 
@@ -287,6 +291,7 @@ def _metrics(runner: DesignRunner, run_id: str, runtime_s: float) -> RunMetrics:
         retries=sum(record.retries for record in records),
         fallbacks=state.fallback_count(),
         step_rejections=sum(1 for event in events if event.type == "STEP_REJECTED"),
+        kind_coercions=sum(1 for event in events if event.type == "KIND_COERCED"),
         input_tokens=sum(record.input_tokens for record in records),
         output_tokens=sum(record.output_tokens for record in records),
     )
@@ -618,6 +623,7 @@ def compare_evals(eval_dirs: Sequence[Path | str], out_dir: Path | str = EVAL_RO
                 "retries": total.retries,
                 "fallbacks": total.fallbacks,
                 "step_rejections": total.step_rejections,
+                "kind_coercions": total.kind_coercions,
                 "total_tokens": total.total_tokens,
                 "runtime_s": round(total.runtime_s, 3),
             }
