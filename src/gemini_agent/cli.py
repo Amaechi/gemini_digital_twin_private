@@ -74,6 +74,12 @@ def _add_engine_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "--runs-dir", type=Path, default=None, help=f"runs directory (default {RUNS_ROOT})"
     )
+    parser.add_argument(
+        "--tool-profile",
+        choices=["full", "quick", "smoke"],
+        default="full",
+        help="TL-13/TL-15 search effort of the real tools (full = register OPT-DE/UQ-MC)",
+    )
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -166,7 +172,7 @@ def _runner(args: argparse.Namespace, run_id: str, *, resuming: bool = False) ->
     engine_name = args.engine or stored_engine or llm_config.engine
     if engine_name == "llm":
         print(OLLAMA_CONTEXT_HINT.format(num_ctx=llm_config.ollama.num_ctx), file=sys.stderr)
-    toolbox = default_toolbox()
+    toolbox = default_toolbox(getattr(args, "tool_profile", "full"))
     engine = create_decision_engine(
         engine_name,
         llm_config,

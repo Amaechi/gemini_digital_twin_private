@@ -36,6 +36,8 @@ from gemini_agent.schemas.decision import DesignVerdict, Phase
 from gemini_agent.schemas.results import KPISet
 from gemini_agent.verify.design_verifier import VERIFIER_NAME
 
+pytestmark = pytest.mark.usefixtures("stub_tools")
+
 FOLLOW_UPS = ("SUB-03", "SUB-04", "SUB-05", "SUB-13")
 """PROGRESS 'Open follow-ups → WP-13': verdict, stub calls, stub evidence, cost placeholders."""
 
@@ -179,7 +181,7 @@ def _repo_root(root: Path) -> Path:
 
 
 @pytest.fixture(scope="module")
-def stub_run(tmp_path_factory) -> Path:
+def stub_run(tmp_path_factory, stub_tools) -> Path:
     """Return today's real run: policy engine on stub tools."""
     return _stub_run(tmp_path_factory.mktemp("runs"))
 

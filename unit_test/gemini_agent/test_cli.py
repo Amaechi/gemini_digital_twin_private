@@ -21,6 +21,8 @@ from gemini_agent.cli import (
 from gemini_agent.schemas.config import REPO_ROOT
 from unit_test.gemini_agent.llm_fakes import fake_model
 
+pytestmark = pytest.mark.usefixtures("stub_tools")
+
 
 def test_module_help_runs_as_subprocess():
     """`python -m gemini_agent.cli --help` works (WP-00 acceptance)."""

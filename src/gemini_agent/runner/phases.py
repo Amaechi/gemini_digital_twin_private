@@ -4,7 +4,8 @@ Each phase has a budget (AG-04), the agent role that decides in it, the tools th
 run before the phase may close (spec §5.4.6: the runner calls them itself if the agent skips
 them) and the Decision Records made at the end of the phase (AG-07). DR-02 (depth) and DR-07
 (gas handling) are taken in P5 rather than P2 because their options are candidates screened
-in P5.
+in P5. WP-14 added ``sensitivity`` to P8 (SUB-11 needs a sensitivity result) and ``plot_figures``
+to P10 (TL-21 figures from tool outputs).
 """
 
 from __future__ import annotations
@@ -122,9 +123,13 @@ PHASE_SPECS: dict[Phase, PhaseSpec] = {
         PhaseSpec(
             Phase.P8,
             Role.ECONOMICS,
-            "Run the Monte Carlo uncertainty analysis on the selected design.",
-            required_tools=("uncertainty",),
-            default_args={"uncertainty": {"candidate_id": SELECTED}},
+            "Run the Monte Carlo uncertainty analysis and the cost sensitivity on the selected "
+            "design.",
+            required_tools=("uncertainty", "sensitivity"),
+            default_args={
+                "uncertainty": {"candidate_id": SELECTED},
+                "sensitivity": {"candidate_id": SELECTED},
+            },
             budget=PhaseBudget(max_steps=8, max_tool_calls=6),
         ),
         PhaseSpec(
@@ -142,8 +147,9 @@ PHASE_SPECS: dict[Phase, PhaseSpec] = {
         PhaseSpec(
             Phase.P10,
             Role.REPORTER,
-            "Build the report draft, Decision Records and token summary; then ask for approval.",
-            required_tools=("build_report",),
+            "Plot the figures, build the report draft, Decision Records and token summary; then "
+            "ask for approval.",
+            required_tools=("plot_figures", "build_report"),
             budget=PhaseBudget(max_steps=6, max_tool_calls=4),
         ),
     )

@@ -13,6 +13,7 @@ build
 # Added for SPE GeoHackathon 2026 (GeoAgent, WP-00): run outputs (only the final submitted run is committed)
 runs/*
 !runs/final/
+!runs/final_policy/
 .venv/
 .ruff_cache/
 .pytest_cache/

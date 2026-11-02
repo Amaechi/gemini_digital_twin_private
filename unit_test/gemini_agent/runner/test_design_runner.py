@@ -9,8 +9,8 @@ from gemini_agent.agents.engine import LLMEngine, PolicyEngine, ResilientEngine
 from gemini_agent.logging.llm_logger import LLMLogger
 from gemini_agent.runner.design_runner import DesignRunner, InvalidAnswer
 from gemini_agent.runner.phases import PHASE_SPECS, PhaseBudget
-from gemini_agent.runner.tool_stubs import VerificationOutput
-from gemini_agent.runner.toolbox import CandidateArgs, ToolSpec, default_toolbox
+from gemini_agent.runner.tool_stubs import VerificationOutput, stub_toolbox
+from gemini_agent.runner.toolbox import CandidateArgs, ToolSpec
 from gemini_agent.schemas.common import ToolResult
 from gemini_agent.schemas.config import load_config
 from gemini_agent.schemas.decision import (
@@ -30,6 +30,8 @@ from unit_test.gemini_agent.llm_fakes import (
     policy_like,
     user_prompt,
 )
+
+pytestmark = pytest.mark.usefixtures("stub_tools")
 
 
 def _runner(tmp_path, engine=None, **kwargs) -> DesignRunner:
@@ -171,7 +173,7 @@ def test_constraint_conflicts_are_recorded(tmp_path):
 
 def test_rejected_verification_loops_three_times_then_escalates(tmp_path):
     """P7 FAIL ⇒ back to P6 (≤ 3 loops), then escalate; violations reach the context."""
-    toolbox = default_toolbox()
+    toolbox = stub_toolbox()
     toolbox.register(_verifier(DesignVerdict.REJECTED))
     runner = _runner(tmp_path, toolbox=toolbox)
     result = runner.start("", run_id="v1")
@@ -199,7 +201,7 @@ def test_guard_failed_candidates_are_never_selected(tmp_path):
         ]
         return ToolResult[GuardOutput](data=GuardOutput(checks=checks), summary="fake guard")
 
-    toolbox = default_toolbox()
+    toolbox = stub_toolbox()
     toolbox.register(ToolSpec("design_guard", "fake", CandidateArgs, guard, owner="test"))
     runner = _runner(tmp_path, toolbox=toolbox)
     result = runner.start("", run_id="g1")
@@ -273,7 +275,7 @@ def test_only_a_real_verifier_can_accept(tmp_path):
     """AG-11: ACCEPTED comes from a real verifier on real evidence; otherwise it is downgraded."""
     import dataclasses
 
-    toolbox = default_toolbox()
+    toolbox = stub_toolbox()
     toolbox.register(_verifier(DesignVerdict.ACCEPTED))
     result = _runner(tmp_path, toolbox=toolbox).start("", run_id="stub_evidence")
     assert result.status == RunStatus.COMPLETED and result.verdict == "UNVERIFIED"
@@ -292,7 +294,7 @@ def test_real_verifier_unverified_escalates_only_without_stubs(tmp_path):
     """WP-09 decision: UNVERIFIED never loops back; it escalates at P9 once no tool is a stub."""
     import dataclasses
 
-    toolbox = default_toolbox()
+    toolbox = stub_toolbox()
     toolbox.register(_verifier(DesignVerdict.UNVERIFIED))
     result = _runner(tmp_path, toolbox=toolbox).start("", run_id="stubs")
     assert result.status == RunStatus.COMPLETED and result.verdict == "UNVERIFIED"
@@ -314,7 +316,7 @@ def _llm_engine(tmp_path, run_id, func):
         model=fake_model(func),
         logger=logger,
         run_id=run_id,
-        validate_args=default_toolbox().validate_args,
+        validate_args=stub_toolbox().validate_args,
     )
     return ResilientEngine(llm), logger
 
@@ -381,7 +383,7 @@ def test_db30_interpretation_b_answer_is_consistent(tmp_path):
 def test_llm_fallbacks_survive_verification_loop_backs(tmp_path):
     """run_summary counts the fallbacks of P6–P10 passes that a loop-back discarded (AG-03)."""
     engine, logger = _llm_engine(tmp_path, "fl", always_invalid)
-    toolbox = default_toolbox()
+    toolbox = stub_toolbox()
     toolbox.register(_verifier(DesignVerdict.REJECTED))
     runner = _runner(tmp_path, engine=engine, toolbox=toolbox)
     result = runner.start("", run_id="fl")
@@ -407,7 +409,7 @@ def test_a_rejected_design_never_gets_a_final_selection_record(tmp_path):
             summary=f"fake verifier: {verdict}",
         )
 
-    toolbox = default_toolbox()
+    toolbox = stub_toolbox()
     toolbox.register(ToolSpec("verify_design", "fake", CandidateArgs, func, owner="test"))
     runner = _runner(tmp_path, toolbox=toolbox)
     result = runner.start("", run_id="dr10")

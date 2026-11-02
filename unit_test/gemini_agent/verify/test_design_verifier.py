@@ -13,6 +13,7 @@ import pytest
 from gemini_agent.agents.engine import PolicyEngine
 from gemini_agent.runner import toolbox
 from gemini_agent.runner.design_runner import DesignRunner
+from gemini_agent.runner.tool_stubs import stub_toolbox
 from gemini_agent.runner.toolbox import CandidateArgs, ToolContext
 from gemini_agent.schemas.common import SUMMARY_MAX_CHARS, GasHandling
 from gemini_agent.schemas.decision import DesignVerdict, RunStatus
@@ -39,6 +40,8 @@ from gemini_agent.verify.design_verifier import (
     verify_design_spec,
 )
 from unit_test.gemini_agent.verify import evidence_factory as ef
+
+pytestmark = pytest.mark.usefixtures("stub_tools")
 
 VERIFIER = DesignVerifier.from_config()
 
@@ -135,8 +138,11 @@ def test_good_design_is_accepted_with_margins_and_short_summary():
     assert report.check("PH-13").margin == pytest.approx(376.15 / 60.0 - 3.5)  # Carnot
     assert report.check("PH-22").value == pytest.approx(0.0, abs=1e-9)  # brine balance closes
     assert report.check("PD-09").limit == pytest.approx(87.0)  # DB-20: 12 + 0.03 × 2500
+    assert report.check("PH-30").margin == pytest.approx(100.0 - 86.0)  # SUB-NPSH bound
     assert set(report.assumption_ids) == {
         "DB-33",
+        "SUB-NPSH",  # PH-30: water boils above 100 °C at the 1 atm letdown
+        "SUB-PSUC",  # PH-30: letdown pressure 0 bar(g) (CFG-SURFACE)
         ESP_RELEASE_PRESSURE_ID,  # no computed p_b: register setpoint 60 bar(a)
         HP_CARNOT_FRACTION_ID,
         HP_MAX_LIFT_ID,
@@ -326,6 +332,32 @@ FAILING_CASES: list[tuple[str, Callable[[], dict[str, Any]]]] = [
             co2_release_pressure_barg=15.0, **_hex(min_brine_pressure_barg=16.0)
         ),
     ),
+]
+
+
+def _subsurface(**changes: Any) -> dict[str, Any]:
+    return {"subsurface": ef.good_evidence().subsurface.model_copy(update=changes)}
+
+
+FAILING_CASES += [  # WP-14: closed evidence gaps (TL-05, TL-07/08, model warnings, flags)
+    ("PH-25", lambda: _first("doublet_points", feasible=False, reasons=["ESP above 70 Hz"])),
+    ("PH-26", lambda: _first("doublet_points", flow_error_frac=0.02)),
+    ("PH-27", lambda: _first("doublet_points", intake_margin_bar=-0.3)),
+    ("PD-11", lambda: _subsurface(interference_within_limit=False)),
+    ("PD-12", lambda: _subsurface(breakthrough_after_horizon=False)),
+    (
+        "PH-28",
+        lambda: {
+            "model_warnings": [
+                "free_cooling: tower water -1.2 °C <= 0 °C: freeze protection not modelled"
+            ]
+        },
+    ),
+    (
+        "PH-29",
+        lambda: _days(flags=["hthp_1 (running): OUTSIDE RC-04 limits (COP 0.90, lift 70 K)"]),
+    ),
+    ("PH-30", lambda: _days(production_temperature_degc=[105.1, 86.0])),
 ]
 
 
@@ -752,7 +784,7 @@ def test_only_the_real_verifier_on_real_evidence_makes_accepted_stick(tmp_path):
     """AG-11 end to end: ACCEPTED stands only from a stub=False verifier in a stub-free run."""
     spec = verify_design_spec(_good_provider, VERIFIER)
     assert spec.stub is False and spec.name == "verify_design"
-    box = toolbox.default_toolbox()
+    box = stub_toolbox()
     box.register(spec)
     result = _run(tmp_path, box, "stub_tools")  # upstream tools are still stubs
     assert result.status == RunStatus.COMPLETED and result.verdict == "UNVERIFIED"
@@ -764,3 +796,44 @@ def test_only_the_real_verifier_on_real_evidence_makes_accepted_stick(tmp_path):
 
     box.register(dataclasses.replace(spec, stub=True))
     assert _run(tmp_path, box, "stub_verifier").verdict == "UNVERIFIED"
+
+
+# --------------------------------------------------------------------------- WP-14 checks
+def test_wp14_gap_checks_need_evidence():
+    """Without TL-05 points or TL-07/08 flags the checks are not evaluated: UNVERIFIED."""
+    sub = SubsurfaceEvidence(
+        well_spacing_m=1200.0, interference_bar=0.6, thermal_breakthrough_yr=33.9
+    )
+    report = _verify(_with(doublet_points=[], subsurface=sub))
+    assert {"PH-25", "PH-26", "PH-27", "PD-11", "PD-12"} <= set(report.not_evaluated)
+    assert report.verdict == DesignVerdict.UNVERIFIED
+
+
+def test_wp14_informational_warnings_do_not_fail():
+    """Extrapolation warnings and MISSING-datasheet flags are reported, not failed."""
+    note = "electric_chiller: COP 9.10 capped at 8"
+    flag = "hthp_1 (running): HTHP datasheet MISSING ['max_lift_k']: RC-04 defaults"
+    report = _verify(_with(model_warnings=[note], **_days(flags=[flag])))
+    assert report.verdict == DesignVerdict.ACCEPTED
+    assert note in report.check("PH-28").warnings
+    assert report.check("PH-29").warnings == [f"{flag} [×1]"]
+
+
+def test_wp14_letdown_above_one_atmosphere_is_not_evaluated():
+    """PH-30: a pressurised degasser has no card saturation data → not evaluated."""
+    report = _verify(
+        _with(letdown_pressure_barg=2.0, **_days(production_temperature_degc=[105.0, 86.0]))
+    )
+    assert report.check("PH-30").status == CheckStatus.NOT_EVALUATED
+
+
+def test_npsh_required_missing_uses_the_sub_npsh_rule():
+    """SUB-NPSH: without NPSH_R (no pump selected) PH-19 checks NPSH_A ≥ 15 m, with a warning."""
+    ok = _verify(_with(**_first("esps", npsh_available_m=40.0, npsh_required_m=None)))
+    assert ok.check("PH-19").status == CheckStatus.PASS
+    assert ok.check("PH-19").margin == pytest.approx(40.0 - 15.0)
+    assert "NPSH_R not given" in ok.check("PH-19").warnings[0]
+    low = _verify(_with(**_first("esps", npsh_available_m=12.0, npsh_required_m=None)))
+    assert low.check("PH-19").status == CheckStatus.FAIL
+    missing = _verify(_with(**_first("esps", npsh_available_m=None)))
+    assert "PH-19" in missing.not_evaluated

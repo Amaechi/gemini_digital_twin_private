@@ -43,8 +43,9 @@ def test_pending_items_state_needs_and_reason():
     """Nothing is stubbed silently: each pending item names the WPs it needs and why."""
     suite = load_scenarios()
     pending = {s.id: s.pending for s in suite.scenarios}
-    assert pending["S1"] and pending["S1"][0].check.type == "verdict"
-    assert pending["S1"][0].check.equals == "ACCEPTED" and "WP-14" in pending["S1"][0].needs
+    assert not pending["S1"]  # WP-14 promoted ACCEPTED + 0 stub calls to checks
+    s1 = {check.type: check for check in suite.get("S1").checks}
+    assert s1["verdict"].equals == "ACCEPTED" and s1["stub_tool_calls_max"].value == 0
     for scenario in suite.scenarios:
         for item in scenario.pending:
             assert item.needs and item.reason and item.expect

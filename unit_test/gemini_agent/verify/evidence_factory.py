@@ -18,6 +18,7 @@ from gemini_agent.schemas.results import AnnualResult, DayResult, KPISet
 from gemini_agent.tools.design_basis import brine_heat_mw
 from gemini_agent.verify.design_verifier import (
     AbsorptionPoint,
+    DoubletPointEvidence,
     EspPoint,
     HeatPumpPoint,
     HexPoint,
@@ -201,8 +202,23 @@ def good_evidence(candidate_id: str = CANDIDATE_ID, **overrides: Any) -> Verific
             )
         ],
         "subsurface": SubsurfaceEvidence(
-            well_spacing_m=1200.0, interference_bar=0.6, thermal_breakthrough_yr=33.9
+            well_spacing_m=1200.0,
+            interference_bar=0.6,
+            thermal_breakthrough_yr=33.9,
+            interference_within_limit=True,
+            breakthrough_after_horizon=True,
+            horizon_yr=30.0,
         ),
+        "doublet_points": [
+            DoubletPointEvidence(
+                name=f"doublet_{i}",
+                flow_m3h=300.0,
+                feasible=True,
+                flow_error_frac=1e-12,
+                intake_margin_bar=0.46,
+            )
+            for i in (1, 2)
+        ],
         "scaling": ScalingEvidence(
             status="insufficient data",
             mitigations=[

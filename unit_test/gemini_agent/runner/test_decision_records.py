@@ -2,6 +2,8 @@
 
 import json
 
+import pytest
+
 from gemini_agent.agents.engine import PolicyEngine
 from gemini_agent.runner.decision_records import (
     build_options,
@@ -10,13 +12,16 @@ from gemini_agent.runner.decision_records import (
     write_records,
 )
 from gemini_agent.runner.state import RunState, ToolRecord, Verification
-from gemini_agent.runner.toolbox import ToolContext, default_toolbox
+from gemini_agent.runner.tool_stubs import stub_toolbox
+from gemini_agent.runner.toolbox import ToolContext
 from gemini_agent.schemas.decision import DesignVerdict, Phase
 from gemini_agent.schemas.results import KPISet
 
+pytestmark = pytest.mark.usefixtures("stub_tools")
+
 
 def _state(tmp_path) -> RunState:
-    toolbox = default_toolbox()
+    toolbox = stub_toolbox()
     context = ToolContext(run_id="t", run_dir=tmp_path, config_dir=None)
     candidates = toolbox.execute("generate_candidates", {}, context).data.candidates
     state = RunState(run_id="t", user_prompt="design", engine="policy", input_mode="assume")

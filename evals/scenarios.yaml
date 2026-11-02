@@ -22,15 +22,8 @@ scenarios:
       - {type: selected_candidate, expect: "a candidate is selected that was neither guard-failed nor REJECTED"}
       - {type: decision_records, expect: "DR-01…DR-10 are written"}
       - {type: files, files: [run_summary.json, events.jsonl, token_summary.json, report_draft.md], expect: "run artefacts are written"}
-    pending:
-      - expect: "the verifier ACCEPTs the selected design"
-        needs: [WP-07, WP-14]
-        reason: "the runner still uses stub tools (annual simulation WP-07; real tools bound in WP-14); a stub verdict is UNVERIFIED by design (golden rule 3)"
-        check: {type: verdict, equals: ACCEPTED, expect: "verdict ACCEPTED"}
-      - expect: "no stub tool call in the run"
-        needs: [WP-07, WP-14]
-        reason: "WP-14 binds the real tools under the same names with stub=False"
-        check: {type: stub_tool_calls_max, value: 0, expect: "0 stub tool calls"}
+      - {type: verdict, equals: ACCEPTED, expect: "the verifier ACCEPTs the selected design (promoted WP-14)"}
+      - {type: stub_tool_calls_max, value: 0, expect: "0 stub tool calls (promoted WP-14: real tools bound)"}
 
   - id: S2
     situation: "\"Design a geothermal heating system for 30 MW\" (no CSVs/cooling/reservoir)"
@@ -89,10 +82,7 @@ scenarios:
     checks:
       - {type: assumption_or_question, id: DB-31, expect: "asks for, or records, the DB-31 heating return temperature"}
       - {type: status, equals: completed, expect: "continues on the labelled assumption"}
-    pending:
-      - expect: "runs a sensitivity on DB-31"
-        needs: [WP-11, WP-14]
-        reason: "sensitivity runs arrive with WP-11 (optimisation and uncertainty) and are bound to the runner in WP-14"
+      - {type: tool_output_mentions, tool: uncertainty, path: data.cases, words: [DB-31], expect: "runs a sensitivity on DB-31 (TL-15 cases, promoted WP-14)"}
 
   - id: S7
     situation: "Cooling model removed from registry"
@@ -103,14 +93,11 @@ scenarios:
     checks:
       - {type: tool_called, tool: model_gap_analysis, phase: P4, expect: "runs the model-gap analysis in P4"}
       - {type: status, equals: completed, expect: "the run completes"}
+      - {type: gap_reported, contains: absorption_chiller, expect: "the missing absorption chiller is reported as a gap (promoted WP-14)"}
     pending:
-      - expect: "the missing absorption chiller is reported as a gap"
-        needs: [WP-12, WP-14]
-        reason: "model_gap_analysis is a stub until WP-12; WP-14 binds it"
-        check: {type: gap_reported, contains: absorption_chiller, expect: "gap absorption_chiller reported"}
       - expect: "the Model Builder writes the model from its reference card and it passes the reference-example test"
-        needs: [WP-12]
-        reason: "the Model Builder agent and its tools are WP-12"
+        needs: [L-2]
+        reason: "the policy engine's P4 runs the gap analysis only (WP-12 decision); the LLM Model Builder writes and tests the model in the local Ollama run (python -m gemini_agent.agents.model_builder --sandbox runs/s7_demo)"
 
   - id: S8
     situation: "Permeability 50 mD"
@@ -122,14 +109,11 @@ scenarios:
     checks:
       - {type: design_basis_value, path: reservoir.permeability_md, value: 50.0, expect: "the design basis carries 50 mD"}
       - {type: status, equals: completed, expect: "the run completes on the changed basis"}
+      - {type: dr_mentions, id: DR-01, words: [permeability, "50 mD"], expect: "explains the change in the Decision Records: DR-01 quotes the permeability and TL-04 (promoted WP-14)"}
     pending:
       - expect: "re-sizes the doublets for the lower productivity"
-        needs: [WP-07, WP-14]
-        reason: "doublet sizing (TL-03…08, WP-05) and the annual simulation are not bound to the runner yet; the stub candidates do not depend on permeability"
-      - expect: "explains the change in the Decision Records"
-        needs: [WP-14]
-        reason: "DR evidence quotes stub tool results until WP-14"
-        check: {type: dr_mentions, id: DR-01, words: [permeability], expect: "DR-01 mentions permeability"}
+        needs: [WP-15]
+        reason: "the real TL-05…TL-13 now size on the 50 mD basis (lower PI → ESP limits the flow), but no scenario check compares the S8 design with S1's yet (needs a cross-run check type)"
 
   - id: S9
     situation: "Gradient 30 °C/km but \"reservoir 150 °C at 2.5 km\""

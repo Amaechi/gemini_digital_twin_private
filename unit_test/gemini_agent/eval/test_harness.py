@@ -31,30 +31,39 @@ from gemini_agent.schemas.config import load_config
 from gemini_simulator.registry import COMPONENT_REGISTRY
 from unit_test.gemini_agent.llm_fakes import fake_model
 
-EXPECTED_POLICY = {
-    "S1": Outcome.PENDING,
+pytestmark = pytest.mark.usefixtures("stub_tools")
+
+EXPECTED_POLICY = {  # on the stub catalogue (``stub_tools``): fast CI of the harness itself
+    "S1": Outcome.FAIL,
     "S2": Outcome.PENDING,
     "S3": Outcome.PASS,
     "S4": Outcome.PASS,
     "S5": Outcome.PENDING,
-    "S6": Outcome.PENDING,
+    "S6": Outcome.FAIL,
     "S7": Outcome.PENDING,
-    "S8": Outcome.PENDING,
+    "S8": Outcome.FAIL,
     "S9": Outcome.PASS,
     "S10": Outcome.SKIPPED,
     "S11": Outcome.SKIPPED,
 }
+STUB_ONLY_FAILURES = {
+    "S1": {"verdict", "stub_tool_calls_max"},
+    "S6": {"tool_output_mentions"},
+    "S8": {"dr_mentions"},
+}
+"""WP-14 promoted these checks; they need the real tools (``scripts/run_eval.py``), so on the
+stub catalogue exactly they fail — every other active check passes."""
 
 
 @pytest.fixture(scope="module")
-def policy_results(tmp_path_factory) -> EvalResults:
+def policy_results(tmp_path_factory, stub_tools) -> EvalResults:
     """Run the full suite on the deterministic policy engine (CI)."""
     root = tmp_path_factory.mktemp("eval")
     return run_suite(load_scenarios(), engine="policy", eval_root=root)
 
 
 @pytest.fixture(scope="module")
-def testmodel_results(tmp_path_factory) -> EvalResults:
+def testmodel_results(tmp_path_factory, stub_tools) -> EvalResults:
     """Run the full suite through the Pydantic AI agents with TestModel (CI)."""
     root = tmp_path_factory.mktemp("eval")
     return run_suite(load_scenarios(), engine="testmodel", eval_root=root)
@@ -64,16 +73,20 @@ def _run(results: EvalResults, scenario: str):
     return next(run for run in results.runs if run.scenario == scenario)
 
 
+def _failed_checks(results: EvalResults) -> dict[str, set[str]]:
+    return {
+        run.scenario: {check.type for check in run.checks if not check.passed}
+        for run in results.runs
+        if any(not check.passed for check in run.checks)
+    }
+
+
 def test_policy_suite_outcomes(policy_results):
-    """Every scenario's active checks pass; S1 is pending on WP-07/WP-14, not ACCEPTED."""
-    assert policy_results.ok
+    """On stubs only the WP-14 real-tool checks fail; S1 stays UNVERIFIED (golden rule 3)."""
     assert {run.scenario: run.outcome for run in policy_results.runs} == EXPECTED_POLICY
+    assert _failed_checks(policy_results) == STUB_ONLY_FAILURES
     s1 = _run(policy_results, "S1")
     assert s1.verdict == "UNVERIFIED" and s1.metrics.stub_tool_calls > 0
-    verdict = s1.pending[0]
-    assert verdict.now_passes is False and verdict.currently == "verdict UNVERIFIED"
-    assert "WP-07" in verdict.needs and "WP-14" in verdict.needs
-    assert all(check.passed for run in policy_results.runs for check in run.checks)
     assert all(run.metrics.llm_calls == 0 for run in policy_results.runs)
     s10 = _run(policy_results, "S10")
     assert s10.note.startswith("needs an LLM engine") and not s10.run_dirs
@@ -88,7 +101,7 @@ def test_policy_suite_artefacts_and_report(policy_results):
     report = (eval_dir / "EVAL_REPORT.md").read_text()
     for column in ("Success", "Tool calls", "Retries", "Fallbacks", "Tokens", "Runtime s"):
         assert column in report
-    assert "PENDING (WP-07, WP-14): the verifier ACCEPTs" in report
+    assert "PENDING (L-2): the Model Builder writes the model" in report
     for scenario in ("S1", "S3", "S9"):
         assert (eval_dir / scenario / "events.jsonl").exists()
     s8 = _run(policy_results, "S8")  # config override applied to a copy, not to config/
@@ -102,7 +115,8 @@ def test_policy_suite_artefacts_and_report(policy_results):
 
 def test_testmodel_suite_exercises_retries_fallbacks_and_tokens(testmodel_results):
     """Every TestModel call is retried, logged and falls back to policy (it never validates)."""
-    assert testmodel_results.ok and testmodel_results.model == "testmodel"
+    assert testmodel_results.model == "testmodel"
+    assert _failed_checks(testmodel_results) == STUB_ONLY_FAILURES
     outcomes = {run.scenario: run.outcome for run in testmodel_results.runs}
     assert outcomes == {**EXPECTED_POLICY, "S10": Outcome.PENDING, "S11": Outcome.PENDING}
     s1 = _run(testmodel_results, "S1").metrics
@@ -145,7 +159,8 @@ def test_llm_engine_records_to_the_model_directory(tmp_path, monkeypatch):
         scenario_ids=["S1", "S3", "S11"],
         model_tag="qwen3.5:9b",
     )
-    assert results.ok and results.model == "qwen3.5:9b" and set(tags) == {"qwen3.5:9b"}
+    assert results.model == "qwen3.5:9b" and set(tags) == {"qwen3.5:9b"}
+    assert _failed_checks(results) == {"S1": STUB_ONLY_FAILURES["S1"]}  # stub catalogue
     eval_dir = tmp_path / "qwen3.5_9b"
     assert Path(results.eval_dir) == eval_dir
     assert (eval_dir / "S1" / "llm_calls.jsonl").exists()

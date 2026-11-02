@@ -5,13 +5,14 @@ owning WP and whether the current binding is a stub.
 
 Reducer contract (``DesignRunner``): the runner reads these ``ToolResult.data`` fields by tool
 name — ``load_design_basis.open_gaps``, ``generate_candidates.candidates``,
-``design_guard.checks``, ``simulate_annual.kpis`` / ``economics.kpis`` (``KPISet`` list),
-``optimise_design.shortlist``, ``verify_design.verdict`` / ``violations`` / ``verifier``.
+``design_guard.checks``, ``simulate_annual.kpis`` / ``economics.kpis`` / ``uncertainty.kpis``
+(``KPISet`` list), ``optimise_design.shortlist`` (+ optional ``candidates``: sized designs that
+join the run, and ``kpis``), ``verify_design.verdict`` / ``violations`` / ``verifier``.
 Real tools keep these field names.
 
-Until WP-04…WP-09, WP-11 and WP-12 land, most entries are bound to labelled stubs in
-``runner/tool_stubs.py`` that use the shared schemas. To wire a real tool, call
-``Toolbox.register(ToolSpec(..., stub=False))`` with the same name (WP-14 integration).
+``default_toolbox`` binds the real tools (WP-14, ``runner/real_tools.py``, ``stub=False``);
+the labelled stubs in ``runner/tool_stubs.py`` (``stub_toolbox``) remain for tests that exercise
+the workflow mechanics without the engineering tools.
 """
 
 from __future__ import annotations
@@ -196,8 +197,8 @@ class Toolbox:
         return spec.func(parsed, context)
 
 
-def default_toolbox() -> Toolbox:
-    """Catalogue with the current bindings (stubs until the owning WPs land)."""
-    from gemini_agent.runner import tool_stubs
+def default_toolbox(profile: str = "full") -> Toolbox:
+    """Catalogue bound to the real tools (WP-14); ``profile`` = TL-13/TL-15 effort (real_tools)."""
+    from gemini_agent.runner import real_tools
 
-    return Toolbox(tool_stubs.stub_specs())
+    return real_tools.real_toolbox(profile)

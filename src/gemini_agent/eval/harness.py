@@ -292,6 +292,11 @@ def _metrics(runner: DesignRunner, run_id: str, runtime_s: float) -> RunMetrics:
     )
 
 
+TOOL_PROFILE = "quick"
+"""WP-14: search effort of the real tools in evals (``runner/real_tools.make_profile``); the
+scenarios check behaviour, not optimisation depth (``run_eval.py --tool-profile``)."""
+
+
 def _run_once(
     scenario: Scenario,
     run_id: str,
@@ -304,7 +309,7 @@ def _run_once(
     naive: bool,
 ) -> tuple[Observation, RunMetrics]:
     _clear_run_dir(eval_dir / run_id)
-    toolbox = default_toolbox()
+    toolbox = default_toolbox(TOOL_PROFILE)
     decision_engine = build_engine(
         engine,
         run_dir=eval_dir / run_id,

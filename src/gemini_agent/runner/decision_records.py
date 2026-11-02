@@ -121,6 +121,20 @@ def _tool_evidence(state: RunState, *tools: str) -> list[str]:
     return [r.id for r in state.evidence_for(tools=set(tools))]
 
 
+def _resource_note(state: RunState, config_dir: Path | None) -> str:
+    """Productivity basis of DR-01: reservoir permeability (design basis) + the TL-04 summary."""
+    record = next(
+        (r for r in reversed(state.tool_results) if r.tool == "productivity_index" and r.ok), None
+    )
+    if record is None or record.stub:
+        return ""
+    basis = load_config("design_basis", config_dir)
+    return (
+        f"resource: permeability {basis.reservoir.permeability_md:g} mD (design basis); "
+        f"{record.id} {record.summary}"
+    )
+
+
 def build_options(dr_id: str, state: RunState, config_dir: Path | None) -> list[DecisionOption]:
     """Options for one Decision Record from the current run state."""
     by_id = {c.id: c for c in state.candidates}
@@ -128,6 +142,10 @@ def build_options(dr_id: str, state: RunState, config_dir: Path | None) -> list[
         options, _ = _group_options(
             state, lambda c: (f"{c.doublets}-doublets", f"{c.doublets} doublet(s)")
         )
+        # WP-14: the doublet count rests on the well productivity; quote TL-04's own summary.
+        resource = _resource_note(state, config_dir)
+        for option in options:
+            option.notes = f"{option.notes}; {resource}"[:500] if resource else option.notes
         return sorted(options, key=lambda o: o.id)
     if dr_id == "DR-02":
         basis = load_config("design_basis", config_dir)

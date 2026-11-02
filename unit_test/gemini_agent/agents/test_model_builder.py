@@ -36,6 +36,8 @@ from unit_test.gemini_agent.agents.s7_scripted_model import (
 )
 from unit_test.gemini_agent.llm_fakes import always_invalid, fake_model
 
+pytestmark = pytest.mark.usefixtures("stub_tools")
+
 NAME = "free_cooling_rc07"
 
 
