@@ -19,7 +19,7 @@ Keep it ≤ 20 KB; it is the hand-off between sessions. Old detail: merged PRs a
 | WP-11 | Optimisation & uncertainty | merged (78491fe) | [#18](https://github.com/Amaechi/gemini_digital_twin_private/pull/18) | TL-13/15 |
 | WP-12 | Model gap & Model Builder | merged (b81cfa9) | [#15](https://github.com/Amaechi/gemini_digital_twin_private/pull/15) | TL-17/18; S7 demo |
 | WP-13 | Eval suite & submission checks | merged (a622551) | [#16](https://github.com/Amaechi/gemini_digital_twin_private/pull/16) | S1–S11; SUB-01…24 |
-| WP-14 | Integration run & figures | in review | | real tools; `runs/final_policy` |
+| WP-14 | Integration run & figures | in review | [#20](https://github.com/Amaechi/gemini_digital_twin_private/pull/20) | real tools; `runs/final_policy` |
 | L-1 | Local: pick LLM via S11 eval | todo | | user, local Ollama |
 | L-2 | Local: final LLM run + eval transcripts | todo | | user, local Ollama |
 | WP-15 | Final review & packaging | todo | | |
