@@ -40,6 +40,13 @@ class ToolRecord(StrictModel):
     candidate_ids: list[str] = Field(default_factory=list)
     source: DecisionSource
     path: str | None = Field(default=None, description="Full output, relative to the run dir.")
+    signature: str = Field(
+        default="", description="Tool name + normalised arguments (duplicate-call guard)."
+    )
+    loop: int = Field(default=0, ge=0, description="Verification loop the call ran in.")
+    data_keys: list[str] = Field(
+        default_factory=list, description="Field names of the result data (citable evidence keys)."
+    )
 
 
 class Verification(StrictModel):

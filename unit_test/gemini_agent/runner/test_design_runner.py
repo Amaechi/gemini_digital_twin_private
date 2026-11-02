@@ -26,6 +26,7 @@ from unit_test.gemini_agent.llm_fakes import (
     Counting,
     always_invalid,
     fake_model,
+    kinds_as_call_tool,
     output_name,
     policy_like,
     user_prompt,
@@ -457,3 +458,87 @@ def test_llm_gap_question_with_numbers_is_not_shown(tmp_path):
     assert request.question == title
     request = runner._gap_request(state, Phase.P1, "DB-31", "Which DH return temperature?")
     assert request.question == "Which DH return temperature?"
+
+
+# --------------------------------------------------------------------------- L-1 follow-up
+def test_kind_errors_are_coerced_and_counted_not_fallbacks(tmp_path):
+    """Fix 1: reserved tools sent as call_tool run as their kind; each repair is an event."""
+    engine, logger = _llm_engine(tmp_path, "k1", kinds_as_call_tool)
+    runner = _runner(tmp_path, engine=engine)
+    result = runner.start("", run_id="k1")
+    assert result.status == RunStatus.COMPLETED
+    state = runner.load_state("k1")
+    assert state.fallback_count() == 0
+    assert {r.decision_source for r in logger.records()} == {"llm"}
+    events = runner.store("k1").list_events("k1")
+    coerced = [e.payload for e in events if e.type == "KIND_COERCED"]
+    assert {(c["tool"], c["to_kind"]) for c in coerced} == {
+        ("request_missing_input", "request_input"),
+        ("generate_candidates", "propose_candidates"),
+        ("design_guard", "verify"),
+        ("optimise_design", "run_optimisation"),
+        ("verify_design", "verify"),
+    }
+    assert all(c["from_kind"] == "call_tool" for c in coerced)
+    assert not [e for e in events if e.type == "STEP_REJECTED"]
+
+
+def test_duplicate_tool_calls_are_rejected_without_using_tool_budget(tmp_path):
+    """Fix 3 (rule 4): L-1 re-ran read_results with the same arguments until P9's budget ran out."""
+
+    def repeat_read_results(messages, info):
+        if output_name(info) == "Decision":
+            context = json.loads(user_prompt(messages).split("CONTEXT:\n", 1)[1])
+            if context["phase"] == "P9" and context["budget_left"]["steps"] > 2:
+                selected = context["default_args"].get("read_results", {}).get("candidate_id")
+                args = {"candidate_id": selected or "C1-3d"}
+                step = NextStep(kind="call_tool", tool="read_results", args=args, rationale="x")
+                body = Decision(phase=Phase.P9, steps=[step] * 3).model_dump_json()
+                return ModelResponse(parts=[TextPart(body)])
+        return policy_like(messages, info)
+
+    engine, _ = _llm_engine(tmp_path, "d1", repeat_read_results)
+    runner = _runner(tmp_path, engine=engine)
+    result = runner.start("", run_id="d1")
+    assert result.status == RunStatus.COMPLETED  # was: tool-call budget exceeded in P9
+    state = runner.load_state("d1")
+    p9 = [r for r in state.tool_results if r.phase == Phase.P9]
+    assert [r.tool for r in p9] == ["read_results", "verify_design"]
+    assert state.progress["P9"].tool_calls_used == 2
+    rejected = [
+        e.payload["message"]
+        for e in runner.store("d1").list_events("d1")
+        if e.type == "STEP_REJECTED"
+    ]
+    assert len(rejected) >= 5 and all("duplicate call: read_results" in m for m in rejected)
+    assert p9[0].id in rejected[0]
+
+
+def test_duplicate_guard_scope(tmp_path):
+    """Fix 3: duplicate scope — normalised args, required-tool exemption, verification loops.
+
+    A required tool may repeat an earlier phase's call once (P9 re-verifies after P7); a new
+    verification loop starts a fresh signature set.
+    """
+    runner = _runner(tmp_path)
+    result = runner.start("", run_id="g1")
+    assert result.status == RunStatus.COMPLETED
+    state = runner.load_state("g1")
+    verify = [r for r in state.tool_results if r.tool == "verify_design"]
+    assert [(r.phase, r.source) for r in verify] == [(Phase.P7, "policy"), (Phase.P9, "policy")]
+    assert verify[0].signature == verify[1].signature
+    assert not [e for e in runner.store("g1").list_events("g1") if e.type == "STEP_REJECTED"]
+
+    p7, p9 = PHASE_SPECS[Phase.P7], PHASE_SPECS[Phase.P9]
+    # simulate_annual {'candidate_id': 'all'} ran in P5 with mode 'fast' (default filled in)
+    assert runner._duplicate_of(state, p7, "simulate_annual", {"candidate_id": "all"})
+    assert runner._duplicate_of(state, p7, "simulate_annual", {"mode": "full"}) is None  # 'all'
+    full = {"candidate_id": "C1-3d", "mode": "full"}  # P7's own call, already completed
+    assert runner._duplicate_of(state, p7, "simulate_annual", full).phase == Phase.P7
+    assert runner._duplicate_of(state, p9, "verify_design", {"candidate_id": "C1-3d"})
+    # Before P9 ran in this pass, its required verify_design may repeat P7's call once.
+    state.progress.pop("P9")
+    state.tool_results = [r for r in state.tool_results if r.phase != Phase.P9]
+    assert runner._duplicate_of(state, p9, "verify_design", {"candidate_id": "$selected"}) is None
+    state.loop_count += 1  # loop-back: earlier calls no longer count
+    assert runner._duplicate_of(state, p7, "simulate_annual", {"candidate_id": "all"}) is None

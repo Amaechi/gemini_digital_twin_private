@@ -3,7 +3,8 @@
 # GeoAgent team, 2026-11-01: incident loop replaced by the deterministic phase machine P0–P10 with
 # per-phase step/tool/token budgets, verifier-gated loops (<= 3), request_missing_input
 # pause/resume, Decision Records and run artefacts; synchronous; kept _build_context /
-# _compact_payload / _prior_action_signatures ideas.
+# _compact_payload / _prior_action_signatures ideas. 2026-11-02 (L-1 follow-up): duplicate
+# tool calls rejected by signature, step-kind coercions logged, DR choices checked on criteria.
 """Workflow runner: deterministic phases P0–P10 (spec §4.1, §5.2).
 
 The runner decides WHICH phase runs, enforces budgets (AG-04), executes every tool call,
@@ -22,11 +23,11 @@ from pathlib import Path
 from typing import Any, Literal
 
 from gemini_agent.agents.engine import (
-    AgentDeps,
     DecisionEngine,
     EngineBudgetExceeded,
     PolicyEngine,
     check_choice,
+    choice_deps,
 )
 from gemini_agent.agents.roles import ROLES
 from gemini_agent.agents.scope import (
@@ -40,6 +41,7 @@ from gemini_agent.memory.event_store import SQLiteEventStore
 from gemini_agent.runner.decision_records import (
     build_question,
     make_record,
+    result_keys,
     write_records,
 )
 from gemini_agent.runner.phases import (
@@ -324,6 +326,17 @@ class DesignRunner:
                     "error": result.error,
                 },
             )
+            for coercion in result.kind_coercions:
+                # Counted by the eval harness (kind_coercions) like STEP_REJECTED.
+                self._event(
+                    state,
+                    "KIND_COERCED",
+                    {
+                        **coercion,
+                        "message": f"{coercion['tool']}: step kind {coercion['from_kind']} "
+                        f"coerced to {coercion['to_kind']}",
+                    },
+                )
             if prog.tokens_used > budget.max_tokens:
                 return self._escalate(
                     state,
@@ -403,7 +416,51 @@ class DesignRunner:
             request = self._gap_request(state, spec.phase, gap, question)
             return self._handle_request(state, request)
         assert step.tool is not None  # guaranteed by NextStep validation
+        duplicate = self._duplicate_of(state, spec, step.tool, dict(step.args))
+        if duplicate is not None:
+            return self._reject_step(
+                state,
+                step,
+                f"duplicate call: {step.tool} already ran with these arguments as "
+                f"{duplicate.id} in {duplicate.phase.value}; use that result from the history "
+                "or choose another step (rule 4)",
+            )
         return self._call_tool(state, spec, step.tool, dict(step.args), source)
+
+    def _signature(self, state: RunState, tool: str, args: dict[str, ArgValue]) -> str:
+        """Tool name + arguments normalised by the tool's own schema (defaults filled in)."""
+        resolved = self._resolve_args(state, args)
+        try:
+            normalised = self.toolbox.validate_args(tool, resolved).model_dump(mode="json")
+        except (KeyError, ValueError):
+            normalised = resolved
+        return f"{tool}:{json.dumps(normalised, sort_keys=True, default=str)}"
+
+    def _duplicate_of(
+        self, state: RunState, spec: PhaseSpec, tool: str, args: dict[str, ArgValue]
+    ) -> ToolRecord | None:
+        """Earlier call of this loop with the same signature, if the step repeats it (rule 4).
+
+        Only engine-proposed steps are checked. Calls from an earlier verification loop do not
+        count (the design changed). A required tool of the phase that has not completed in this
+        pass may repeat a call of an earlier phase once (P9 re-runs verify_design after P7).
+        """
+        signature = self._signature(state, tool, args)
+        earlier = [
+            record
+            for record in state.tool_results
+            if record.signature == signature and record.loop == state.loop_count
+        ]
+        if not earlier:
+            return None
+        this_pass = [record for record in earlier if record.phase == spec.phase]
+        required_open = (
+            tool in spec.required_tools
+            and tool not in state.phase_progress(spec.phase).completed_tools
+        )
+        if required_open and not this_pass:
+            return None
+        return (this_pass or earlier)[-1]
 
     def _reject_step(self, state: RunState, step: NextStep, reason: str) -> Outcome:
         self._event(
@@ -457,6 +514,7 @@ class DesignRunner:
                 f"tool-call budget exceeded in {spec.phase.value} ({budget.max_tool_calls} calls)",
             )
         prog.tool_calls_used += 1
+        signature = self._signature(state, tool, args)
         args = self._resolve_args(state, args)
         tool_spec = self.toolbox.spec(tool)
         try:
@@ -473,6 +531,8 @@ class DesignRunner:
                     error=error,
                     stub=tool_spec.stub,
                     source=source,
+                    signature=signature,
+                    loop=state.loop_count,
                 )
             )
             self._event(state, "TOOL_ERROR", {"id": tr_id, "tool": tool, "error": error})
@@ -492,6 +552,9 @@ class DesignRunner:
                 candidate_ids=candidate_ids,
                 source=source,
                 path=path,
+                signature=signature,
+                loop=state.loop_count,
+                data_keys=result_keys(result.data),
             )
         )
         if tool not in prog.completed_tools:
@@ -730,14 +793,7 @@ class DesignRunner:
             return self._escalate(state, f"LLM usage limit exceeded for {dr_id}: {exc}")
         prog.tokens_used += result.input_tokens + result.output_tokens
         choice, source = result.value, result.source
-        deps = AgentDeps(
-            phase=question.phase,
-            allowed_tools=(),
-            dr_id=question.dr_id,
-            option_ids=tuple(o.id for o in question.options),
-            eligible_ids=tuple(o.id for o in question.options if o.eligible),
-        )
-        error = check_choice(deps, choice)
+        error = check_choice(choice_deps(question), choice)
         if error:
             self._event(state, "STEP_REJECTED", {"message": f"{dr_id} choice rejected: {error}"})
             choice, source = self._policy.choose(question, context).value, "policy_fallback"

@@ -361,6 +361,26 @@ class Temperatures(StrictModel):
     planning: float = Field(ge=0, le=2)
 
 
+class CallSettings(StrictModel):
+    """Per-call limits of every structured-output LLM call (``Decision`` / ``OptionChoice``).
+
+    Added after the L-1 eval (reasoning in the content used up the phase budgets; one call hung
+    for 30 min). How each value reaches Ollama's ``/v1`` endpoint: ``agents.engine``.
+    """
+
+    thinking: bool = Field(
+        default=False,
+        description="False sends reasoning_effort 'none' (Ollama: think=false), so the JSON "
+        "grammar applies from the first token; True keeps the model's default.",
+    )
+    max_output_tokens: int = Field(
+        default=2048, ge=256, description="Cap per call, sent as max_tokens (Ollama num_predict)."
+    )
+    request_timeout_s: float = Field(
+        default=180.0, gt=0, description="Deadline per model request (pydantic-ai)."
+    )
+
+
 class LLMConfig(StrictModel):
     """LLM engine selection (``config/llm.yaml``)."""
 
@@ -372,6 +392,7 @@ class LLMConfig(StrictModel):
     temperatures: Temperatures
     max_output_retries: int = Field(ge=0, le=5)
     seed: int
+    calls: CallSettings = Field(default_factory=CallSettings)
 
     @model_validator(mode="after")
     def _check_profile(self) -> LLMConfig:

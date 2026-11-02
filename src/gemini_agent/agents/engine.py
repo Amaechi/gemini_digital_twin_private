@@ -2,7 +2,9 @@
 # file services/plant-debugger/plant_debugger/agent/decision_engine.py @ d69507a. Modified by
 # GeoAgent team, 2026-11-01: ADK engine replaced by Pydantic AI role agents on a local Ollama model
 # (NativeOutput + output validators, <= 2 retries, UsageLimits); PolicyEngine covers phases
-# P0–P10 and Decision Record choices; every LLM call goes through the LLM logger.
+# P0–P10 and Decision Record choices; every LLM call goes through the LLM logger. 2026-11-02
+# (L-1 follow-up): step kinds coerced from tool names, per-call thinking/max-token/timeout settings,
+# Decision Record choices tied to a workflow-offered criterion.
 """Decision engines: deterministic policy, Pydantic AI role agents and a resilient fallback.
 
 ``PolicyEngine``, ``LLMEngine`` and ``ResilientEngine`` (which falls back to the policy) follow
@@ -19,7 +21,9 @@ import time
 from abc import ABC, abstractmethod
 from collections.abc import Callable
 from dataclasses import dataclass, field
+from functools import partial
 from typing import Any, Generic, Literal, TypeVar
+from urllib.parse import urlparse
 
 from pydantic import BaseModel
 
@@ -29,6 +33,8 @@ from gemini_agent.prompts.system import choice_prompt, decision_prompt, system_p
 from gemini_agent.schemas.config import LLMConfig
 from gemini_agent.schemas.decision import (
     KIND_TOOLS,
+    NO_TOOL_KINDS,
+    PRE_VALIDATE_HOOK,
     Decision,
     DecisionContext,
     DecisionQuestion,
@@ -39,6 +45,7 @@ from gemini_agent.schemas.decision import (
     RejectedOption,
     Role,
     StepKind,
+    key_tokens,
 )
 
 os.environ.setdefault("PYDANTIC_AI_NO_BANNER", "1")
@@ -56,6 +63,8 @@ class EngineResult(Generic[T]):
     output_tokens: int = 0
     retries: int = 0
     error: str | None = None
+    kind_coercions: list[dict[str, str]] = field(default_factory=list)
+    """Step kinds repaired from tool names in the accepted output (the runner logs each)."""
 
 
 class EngineFailure(RuntimeError):
@@ -84,6 +93,32 @@ def kind_for_tool(tool: str) -> StepKind:
         if tools is not None and tool in tools:
             return kind  # type: ignore[return-value]
     return "call_tool"
+
+
+def coerce_step_kinds(data: Any, log: list[dict[str, str]]) -> Any:
+    """Set each step's kind from its tool name (``kind_for_tool``) before ``Decision`` validation.
+
+    L-1: every policy fallback was a kind error (``design_guard``, ``optimise_design``,
+    ``request_missing_input`` sent as ``call_tool``; ``generate_candidates`` as ``generate_model``).
+    The tool name is unambiguous, so the kind is repaired instead of retried. Kinds that take no
+    tool (finalise, escalate, delegate, refuse) keep their meaning: a tool there stays an error.
+    ``log`` is replaced with this attempt's coercions (one dict per repaired step).
+    """
+    log.clear()
+    if not isinstance(data, dict) or not isinstance(data.get("steps"), list):
+        return data
+    steps = []
+    for step in data["steps"]:
+        if isinstance(step, dict):
+            tool, kind = step.get("tool"), step.get("kind")
+            keeps_meaning = isinstance(kind, str) and kind in NO_TOOL_KINDS
+            if isinstance(tool, str) and tool and not keeps_meaning:
+                expected = kind_for_tool(tool)
+                if kind != expected:
+                    log.append({"tool": tool, "from_kind": str(kind), "to_kind": expected})
+                    step = {**step, "kind": expected}
+        steps.append(step)
+    return {**data, "steps": steps}
 
 
 class DecisionEngine(ABC):
@@ -151,25 +186,44 @@ class PolicyEngine(DecisionEngine):
     def choose(
         self, question: DecisionQuestion, context: DecisionContext
     ) -> EngineResult[OptionChoice]:
-        """Return the recommended eligible option, else the first eligible one."""
+        """Return the recommended eligible option, else the first eligible one.
+
+        The rationale is the first offered criterion under which the option is best (the workflow
+        lists its own recommendation rule first), naming its evidence key and evidence ids.
+        """
         eligible = [option for option in question.options if option.eligible]
         chosen = next((option for option in eligible if option.recommended), eligible[0])
-        if chosen.recommended:
+        criterion = next((c for c in question.criteria if chosen.id in c.best_option_ids), None)
+        if criterion is not None:
+            cited = ", ".join(criterion.evidence_ids[:3]) or criterion.source
+            why = f"Decisive criterion: {criterion.text}; it selects {chosen.id} ({cited})."
+            other = f"Not a best option under {criterion.id}."
+            tie = f"Ties under {criterion.id}; the workflow ranking placed it lower."
+        elif chosen.recommended:
             why = "Recommended by the deterministic tool ranking or the register default."
-            other = "Ranked below the recommended option."
+            other = tie = "Ranked below the recommended option."
         else:
             why = "No ranking evidence yet; first eligible option in the offered order."
-            other = "Not first in the offered order; no ranking evidence to prefer it."
+            other = tie = "Not first in the offered order; no ranking evidence to prefer it."
+        best = set(criterion.best_option_ids) if criterion is not None else set()
         rejected = [
             RejectedOption(
                 option_id=option.id,
-                reason=(f"Not eligible: {option.notes}" if not option.eligible else other)[:300],
+                reason=(
+                    f"Not eligible: {option.notes}"
+                    if not option.eligible
+                    else (tie if option.id in best else other)
+                )[:300],
             )
             for option in question.options
             if option.id != chosen.id
         ]
         choice = OptionChoice(
-            dr_id=question.dr_id, option_id=chosen.id, rationale=why, rejected=rejected
+            dr_id=question.dr_id,
+            criterion=criterion.id if criterion is not None else None,
+            option_id=chosen.id,
+            rationale=why,
+            rejected=rejected,
         )
         return EngineResult(choice, source="policy")
 
@@ -187,6 +241,20 @@ class AgentDeps:
     dr_id: str | None = None
     option_ids: tuple[str, ...] = ()
     eligible_ids: tuple[str, ...] = ()
+    question: DecisionQuestion | None = None
+    kind_coercions: list[dict[str, str]] = field(default_factory=list)
+
+
+def choice_deps(question: DecisionQuestion) -> AgentDeps:
+    """Return validator data for a Decision Record question (LLM agent and runner re-check)."""
+    return AgentDeps(
+        phase=question.phase,
+        allowed_tools=(),
+        dr_id=question.dr_id,
+        option_ids=tuple(option.id for option in question.options),
+        eligible_ids=tuple(option.id for option in question.options if option.eligible),
+        question=question,
+    )
 
 
 def check_decision(deps: AgentDeps, decision: Decision) -> str | None:
@@ -221,23 +289,67 @@ def check_choice(deps: AgentDeps, choice: OptionChoice) -> str | None:
     unknown = [r.option_id for r in choice.rejected if r.option_id not in deps.option_ids]
     if unknown:
         return f"rejected option ids {unknown} are not offered"
+    question = deps.question
+    if question is None or not question.criteria:
+        return None
+    # The rationale must rest on a workflow-evaluated criterion and cite real evidence keys.
+    criterion = question.criterion(choice.criterion)
+    if criterion is None:
+        offered = [c.id for c in question.criteria]
+        return f"criterion must be one of the offered criterion ids {offered}"
+    if choice.option_id not in criterion.best_option_ids:
+        return (
+            f"option '{choice.option_id}' contradicts your criterion '{criterion.id}' "
+            f"({criterion.text}): its best options are {criterion.best_option_ids}"
+        )
+    if criterion.key not in choice.rationale:
+        return (
+            f"rationale must name the decisive criterion and its evidence key '{criterion.key}', "
+            f"e.g. '{criterion.text}'"
+        )
+    allowed = question.citable()
+    texts = [choice.rationale, *(item.reason for item in choice.rejected)]
+    cited = sorted({key for text in texts for key in key_tokens(text) if key not in allowed})
+    if cited:
+        return f"cited keys {cited} are not in the evidence; cite only question.evidence_keys"
     return None
 
 
 def build_ollama_model(
-    llm_config: LLMConfig, kind: Literal["orchestrator", "coder"] = "orchestrator", tag: str = ""
+    llm_config: LLMConfig,
+    kind: Literal["orchestrator", "coder"] = "orchestrator",
+    tag: str = "",
+    *,
+    openai_client: Any = None,
 ) -> Any:
     """Pydantic AI model for a local Ollama tag via its OpenAI-compatible endpoint.
 
     Constructing the model makes no network call; requests only happen on ``run``.
+    ``openai_client`` replaces the HTTP client (tests pass one with a mock transport).
+
+    Profile override: Ollama's ``/v1`` reads ``max_tokens`` (→ ``num_predict``) and ignores
+    ``max_completion_tokens``, which pydantic-ai sends by default (Ollama ``openai/openai.go``
+    ``ChatCompletionRequest``). A user profile switches off ``OllamaModel``'s Ollama Cloud check,
+    so it is repeated here: Cloud accepts a JSON schema without enforcing it, so NativeOutput is
+    refused there instead of running unconstrained.
     """
     from pydantic_ai.models.ollama import OllamaModel
+    from pydantic_ai.profiles.openai import OpenAIModelProfile
     from pydantic_ai.providers.ollama import OllamaProvider
 
-    profile = llm_config.active()
-    model_tag = tag or (profile.coder if kind == "coder" else profile.orchestrator)
-    provider = OllamaProvider(base_url=llm_config.ollama.base_url)
-    return OllamaModel(model_tag, provider=provider)
+    hardware = llm_config.active()
+    model_tag = tag or (hardware.coder if kind == "coder" else hardware.orchestrator)
+    base_url = llm_config.ollama.base_url
+    provider = (
+        OllamaProvider(openai_client=openai_client)
+        if openai_client is not None
+        else OllamaProvider(base_url=base_url)
+    )
+    profile = OpenAIModelProfile(openai_chat_supports_max_completion_tokens=False)
+    host = urlparse(base_url).hostname or ""
+    if model_tag.endswith("-cloud") or host == "ollama.com" or host.endswith(".ollama.com"):
+        profile["supports_json_schema_output"] = False
+    return OllamaModel(model_tag, provider=provider, profile=profile)
 
 
 def _last_feedback(messages: list[Any]) -> str:
@@ -294,6 +406,10 @@ class LLMEngine(DecisionEngine):
             deps_type=AgentDeps,
             retries=self.llm_config.max_output_retries,
             name=f"{role.value}.{kind}",
+            # Repair step kinds from tool names before the kind <-> tool rule is checked.
+            validation_context=lambda ctx: {
+                PRE_VALIDATE_HOOK: partial(coerce_step_kinds, log=ctx.deps.kind_coercions)
+            },
         )
 
         @agent.output_validator
@@ -330,23 +446,17 @@ class LLMEngine(DecisionEngine):
             request_limit=self.llm_config.max_output_retries + 2,
             total_tokens_limit=tokens_left,
         )
-        ollama = self.llm_config.ollama
-        settings = {
-            "temperature": self.llm_config.temperatures.planning,
-            "seed": self.llm_config.seed,
-            # Best effort: Ollama's OpenAI endpoint may ignore these; the server must also run
-            # with OLLAMA_CONTEXT_LENGTH >= num_ctx (spec §5.4.7, PROGRESS L-1 note).
-            "extra_body": {
-                "keep_alive": ollama.keep_alive,
-                "options": {"num_ctx": ollama.num_ctx},
-            },
-        }
+        model_settings = self._settings()
         model_name = str(getattr(model, "model_name", type(model).__name__))
         start = time.perf_counter()
         with capture_run_messages() as messages:
             try:
                 result = agent.run_sync(
-                    prompt, model=model, deps=deps, usage_limits=limits, model_settings=settings
+                    prompt,
+                    model=model,
+                    deps=deps,
+                    usage_limits=limits,
+                    model_settings=model_settings,
                 )
             except UsageLimitExceeded as exc:
                 _, tok_in, tok_out = self._log(
@@ -380,7 +490,38 @@ class LLMEngine(DecisionEngine):
             input_tokens=int(usage.input_tokens or 0),
             output_tokens=int(usage.output_tokens or 0),
             retries=retries,
+            kind_coercions=list(deps.kind_coercions),
         )
+
+    def _settings(self) -> dict[str, Any]:
+        """Model settings of every structured-output call (``config/llm.yaml``).
+
+        Verified against pydantic-ai 2.64.0 / openai 3.42.0 (request body) and Ollama main
+        ``openai/openai.go``: ``openai_reasoning_effort`` 'none' → ``reasoning_effort`` → Ollama
+        ``think=false`` (the unified ``thinking`` setting is not sent for Ollama profiles);
+        ``max_tokens`` → ``max_tokens`` (profile override in ``build_ollama_model``);
+        ``request_timeout`` is a pydantic-ai deadline per model request, SDK retries included,
+        and ``timeout`` the HTTP timeout of one attempt. ``keep_alive`` is read by ``/v1``;
+        ``options.num_ctx`` is ignored there (set ``OLLAMA_CONTEXT_LENGTH``, spec §5.4.7).
+        """
+        calls = self.llm_config.calls
+        ollama = self.llm_config.ollama
+        settings: dict[str, Any] = {
+            "temperature": self.llm_config.temperatures.planning,
+            "seed": self.llm_config.seed,
+            "max_tokens": calls.max_output_tokens,
+            "request_timeout": calls.request_timeout_s,
+            "timeout": calls.request_timeout_s,
+            "extra_body": {
+                "keep_alive": ollama.keep_alive,
+                "options": {"num_ctx": ollama.num_ctx},
+            },
+        }
+        if not calls.thinking:
+            # Ollama leaves the leading thinking span outside the JSON grammar (ThinkingClose):
+            # with thinking off the reply starts in content and is schema-constrained throughout.
+            settings["openai_reasoning_effort"] = "none"
+        return settings
 
     def _log(
         self,
@@ -428,13 +569,7 @@ class LLMEngine(DecisionEngine):
         self, question: DecisionQuestion, context: DecisionContext
     ) -> EngineResult[OptionChoice]:
         """Run the DR role's choice agent on the workflow-offered options."""
-        deps = AgentDeps(
-            phase=question.phase,
-            allowed_tools=(),
-            dr_id=question.dr_id,
-            option_ids=tuple(option.id for option in question.options),
-            eligible_ids=tuple(option.id for option in question.options if option.eligible),
-        )
+        deps = choice_deps(question)
         return self._run(
             question.role, "choice", choice_prompt(question, context), deps, context.budget_left
         )

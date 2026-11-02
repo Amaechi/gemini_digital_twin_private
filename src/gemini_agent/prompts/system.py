@@ -1,39 +1,53 @@
 # Adapted from marcosanyo/PlantDebugger (Apache-2.0), Copyright 2026 Plant Debugger contributors,
 # file services/plant-debugger/plant_debugger/agent/prompt.py @ d69507a (structure and rule style
-# only). Modified by GeoAgent team, 2026-11-01: GeoAgent roles, phases, tools and rules.
+# only). Modified by GeoAgent team, 2026-11-01: GeoAgent roles, phases, tools and rules;
+# 2026-11-02 (L-1 follow-up): step-kind map per role, second few-shot, DR criteria.
 """System prompts and per-call prompts for the role agents (spec §5.1, §5.4).
 
-Prompts are short on purpose (spec §5.4.4, MEM-06): role, numbered rules, one few-shot example.
-The Independent Reviewer prompt never mentions a designer (AG-08).
+Prompts are short on purpose (spec §5.4.4, MEM-06): role, numbered rules, the step kind of each
+of the role's tools, two few-shot examples. The Independent Reviewer prompt never mentions a
+designer (AG-08).
 """
 
 from __future__ import annotations
 
 import json
 
-from gemini_agent.schemas.decision import DecisionContext, DecisionQuestion, Role
+from gemini_agent.agents.roles import ROLES
+from gemini_agent.schemas.decision import (
+    KIND_TOOLS,
+    DecisionContext,
+    DecisionQuestion,
+    Role,
+)
 
 BASE_RULES = """
 Rules:
 1. You work inside a deterministic workflow. The runner, not you, owns phase order, state,
    budgets and tool execution. You only choose the next step(s) of the current phase.
 2. Never compute or invent numbers. Every number comes from a tool result.
-3. Use only tools from ALLOWED_TOOLS, with flat arguments matching their argument list.
+3. Use only tools from ALLOWED_TOOLS, with flat arguments matching their argument list, and
+   the step kind STEP_KINDS gives for that tool.
 4. Call each REQUIRED tool once; do not repeat a tool call with the same arguments.
 5. Use request_input only for an id listed in OPEN_GAPS.
 6. Choose finalise when the phase objective is met; escalate if no safe path remains.
 7. Hard limits are fixed: 1–3 doublets; 50–300 m3/h per active doublet; brine cooling <= 40 K;
    pump efficiency 70 %; injection = production; heating supply 100 degC; cooling supply 20 degC.
 8. Keep each rationale under 60 words. Write no numbers in rationales, reasons or questions:
-   cite option ids (not their labels), evidence or assumption ids instead.
+   cite option ids (not their labels), evidence keys, evidence or assumption ids instead.
 9. Return only data matching the output schema.
 """.strip()
 
 FEW_SHOT = (
-    'Example: {"phase": "P2", "steps": [{"kind": "call_tool", "tool": "reservoir_conditions", '
+    'Example 1: {"phase": "P2", "steps": [{"kind": "call_tool", "tool": "reservoir_conditions", '
     '"args": {"depth_m": null}, "rationale": "Reservoir temperature is needed before doublet '
     'sizing.", "expected_outcome": "Temperature and pressure at the design depth."}], '
-    '"open_questions": []}'
+    '"open_questions": []}\n'
+    'Example 2: {"phase": "P3", "steps": [{"kind": "propose_candidates", "tool": '
+    '"generate_candidates", "args": {}, "rationale": "Candidates are needed before any '
+    'screening.", "expected_outcome": "Candidate set with ids."}, {"kind": "verify", "tool": '
+    '"design_guard", "args": {"candidate_id": "all"}, "rationale": "Every candidate must pass '
+    'the hard limits.", "expected_outcome": "Pass or fail per candidate."}], "open_questions": []}'
 )
 
 ROLE_BRIEFS: dict[Role, str] = {
@@ -75,9 +89,24 @@ ROLE_BRIEFS: dict[Role, str] = {
 }
 
 
+def step_kinds(role: Role) -> str:
+    """STEP_KINDS block: the kind each of the role's tools needs, then the kinds without a tool.
+
+    Built from ``KIND_TOOLS`` (the rule ``NextStep`` enforces), so prompt and validator agree.
+    """
+    tool_kind = {tool: kind for kind, tools in KIND_TOOLS.items() if tools for tool in tools}
+    pairs = ", ".join(f"{tool}={tool_kind.get(tool, 'call_tool')}" for tool in ROLES[role].tools)
+    no_tool = ", ".join(
+        f"{kind} (P0 only)" if kind == "refuse" else kind
+        for kind, tools in KIND_TOOLS.items()
+        if tools is None
+    )
+    return f"STEP_KINDS (tool=kind): {pairs}. Steps with tool null: {no_tool}."
+
+
 def system_prompt(role: Role) -> str:
     """System instructions for one role agent."""
-    return f"{ROLE_BRIEFS[role]}\n\n{BASE_RULES}\n\n{FEW_SHOT}"
+    return f"{ROLE_BRIEFS[role]}\n\n{BASE_RULES}\n\n{step_kinds(role)}\n\n{FEW_SHOT}"
 
 
 def _compact_json(payload: object) -> str:
@@ -93,15 +122,25 @@ def decision_prompt(context: DecisionContext) -> str:
     )
 
 
+CHOICE_RULES = (
+    "Pick the decisive criterion from question.criteria and put its id in 'criterion'; "
+    "option_id must be one of that criterion's best_option_ids (the workflow evaluated the tool "
+    "results, do not compare numbers yourself). The rationale names the criterion and its key, "
+    "e.g. 'lowest lcoh_per_mwh among guard-passed options in economics', and may cite only "
+    "question.evidence_keys, option ids and evidence ids. Give each other option a reason."
+)
+
+
 def choice_prompt(question: DecisionQuestion, context: DecisionContext) -> str:
-    """User prompt for a Decision Record: choose one eligible option."""
+    """User prompt for a Decision Record: choose one criterion and one eligible option."""
     payload = {
         "question": question.model_dump(mode="json"),
         "history": context.history[-6:],
         "user_prompt": context.user_prompt,
     }
+    rules = CHOICE_RULES if question.criteria else "Base the choice on the evidence ids only."
     return (
         f"{question.dr_id} {question.title}: {question.question}\n"
         "Choose exactly one eligible option id; explain briefly why and why each other option "
-        f"was rejected. Base the choice on the evidence ids only. DATA:\n{_compact_json(payload)}"
+        f"was rejected. {rules} DATA:\n{_compact_json(payload)}"
     )
