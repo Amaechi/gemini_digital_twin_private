@@ -35,7 +35,19 @@
   ],
   "choice": "titanium-plates-no-cu",
   "choice_label": "Titanium HEX plates, no copper alloys in contact with brine",
-  "rationale": "Recommended by the deterministic tool ranking or the register default.",
+  "criterion": {
+    "id": "spec-materials-check",
+    "key": "brine",
+    "source": "load_design_basis",
+    "text": "materials check of spec \u00a710.1 for saline brine (brine)",
+    "best_option_ids": [
+      "titanium-plates-no-cu"
+    ],
+    "evidence_ids": [
+      "TR-001"
+    ]
+  },
+  "rationale": "Decisive criterion: materials check of spec \u00a710.1 for saline brine (brine); it selects titanium-plates-no-cu (TR-001).",
   "rejected": [
     {
       "option_id": "stainless-plates",

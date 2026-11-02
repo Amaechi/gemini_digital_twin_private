@@ -56,7 +56,20 @@
   ],
   "choice": "depth-2500m",
   "choice_label": "Reservoir at 2500 m TVD",
-  "rationale": "Recommended by the deterministic tool ranking or the register default.",
+  "criterion": {
+    "id": "ranking-lowest-lcoh_per_mwh",
+    "key": "lcoh_per_mwh",
+    "source": "economics",
+    "text": "lowest lcoh_per_mwh + lcoc_per_mwh among guard-passed candidates without unmet demand in economics",
+    "best_option_ids": [
+      "depth-2500m"
+    ],
+    "evidence_ids": [
+      "TR-012",
+      "TR-013"
+    ]
+  },
+  "rationale": "Decisive criterion: lowest lcoh_per_mwh + lcoc_per_mwh among guard-passed candidates without unmet demand in economics; it selects depth-2500m (TR-012, TR-013).",
   "rejected": [
     {
       "option_id": "depth-3200m",
@@ -64,7 +77,7 @@
     },
     {
       "option_id": "depth-1500m",
-      "reason": "Ranked below the recommended option."
+      "reason": "Not a best option under ranking-lowest-lcoh_per_mwh."
     }
   ],
   "decision_source": "policy",

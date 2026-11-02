@@ -27,7 +27,7 @@
    "nfev": 50,
    "nit": 4,
    "message": "Optimization terminated successfully.",
-   "elapsed_s": 60.97176223800034
+   "elapsed_s": 37.74585256599994
   },
   {
    "stage": "outage",
@@ -55,7 +55,7 @@
    "nfev": 40,
    "nit": 3,
    "message": "Optimization terminated successfully.",
-   "elapsed_s": 14.91224757100008
+   "elapsed_s": 10.413003652000043
   },
   {
    "stage": "size",
@@ -81,7 +81,7 @@
    "nfev": 40,
    "nit": 3,
    "message": "Optimization terminated successfully.",
-   "elapsed_s": 50.01840523900046
+   "elapsed_s": 35.282938147000095
   },
   {
    "stage": "outage",
@@ -115,7 +115,7 @@
    "nfev": 45,
    "nit": 2,
    "message": "Optimization terminated successfully.",
-   "elapsed_s": 18.81566576900059
+   "elapsed_s": 14.360027723999792
   }
  ],
  "best": {
@@ -240,7 +240,7 @@
    "thermal_breakthrough_yr": 66.1398685725736,
    "percentiles": {}
   },
-  "elapsed_s": 2.504844385999604
+  "elapsed_s": 2.068891970000095
  },
  "default_outage": {
   "key": "6ec64abed2c64151",
@@ -362,7 +362,7 @@
    "thermal_breakthrough_yr": 66.68029037047833,
    "percentiles": {}
   },
-  "elapsed_s": 4.057523571999809
+  "elapsed_s": 2.354477058000157
  },
  "dispatch_variants": [
   {
@@ -491,7 +491,7 @@
      "thermal_breakthrough_yr": 66.1398685725736,
      "percentiles": {}
     },
-    "elapsed_s": 4.039185835999888
+    "elapsed_s": 2.6119035699998676
    },
    "delta_objective_per_mwh": 0.0
   },
@@ -621,7 +621,7 @@
      "thermal_breakthrough_yr": 66.1398685725736,
      "percentiles": {}
     },
-    "elapsed_s": 3.6472318349997295
+    "elapsed_s": 2.4060284950001005
    },
    "delta_objective_per_mwh": 0.0
   },
@@ -751,7 +751,7 @@
      "thermal_breakthrough_yr": 66.1398685725736,
      "percentiles": {}
     },
-    "elapsed_s": 3.9240676250001343
+    "elapsed_s": 2.195311309999852
    },
    "delta_objective_per_mwh": 0.0
   },
@@ -881,7 +881,7 @@
      "thermal_breakthrough_yr": 66.1398685725736,
      "percentiles": {}
     },
-    "elapsed_s": 2.8861173089999284
+    "elapsed_s": 2.4697394979998535
    },
    "delta_objective_per_mwh": 0.0
   }
@@ -890,7 +890,7 @@
  "n_evaluations": 189,
  "n_rejected": 0,
  "n_infeasible": 0,
- "elapsed_s": 167.50537741599965,
+ "elapsed_s": 115.72547133599983,
  "outputs": {},
  "warnings": [],
  "n_screening": 9

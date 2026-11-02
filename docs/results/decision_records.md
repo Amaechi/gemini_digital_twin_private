@@ -4,7 +4,8 @@
 - Decision source: **policy**
 - Question: How many doublets should the plant have?
 - **Choice: 2-doublets** — 2 doublet(s)
-- Why: Recommended by the deterministic tool ranking or the register default.
+- Decisive criterion: lowest lcoh_per_mwh + lcoc_per_mwh among guard-passed candidates without unmet demand in economics (key `lcoh_per_mwh` from economics; evidence TR-012, TR-013)
+- Why: Decisive criterion: lowest lcoh_per_mwh + lcoc_per_mwh among guard-passed candidates without unmet demand in economics; it selects 2-doublets (TR-012, TR-013).
 
 | Option | Label | Eligible | Recommended | Evidence |
 |---|---|---|---|---|
@@ -12,7 +13,7 @@
 | 3-doublets | 3 doublet(s) | yes | no | TR-009, TR-010, TR-012, TR-013 |
 
 Rejected options:
-- 3-doublets: Ranked below the recommended option.
+- 3-doublets: Not a best option under ranking-lowest-lcoh_per_mwh.
 
 
 # DR-02 Well depth
@@ -21,7 +22,8 @@ Rejected options:
 - Decision source: **policy**
 - Question: At which reservoir depth should the wells be drilled?
 - **Choice: depth-2500m** — Reservoir at 2500 m TVD
-- Why: Recommended by the deterministic tool ranking or the register default.
+- Decisive criterion: lowest lcoh_per_mwh + lcoc_per_mwh among guard-passed candidates without unmet demand in economics (key `lcoh_per_mwh` from economics; evidence TR-012, TR-013)
+- Why: Decisive criterion: lowest lcoh_per_mwh + lcoc_per_mwh among guard-passed candidates without unmet demand in economics; it selects depth-2500m (TR-012, TR-013).
 
 | Option | Label | Eligible | Recommended | Evidence |
 |---|---|---|---|---|
@@ -31,7 +33,7 @@ Rejected options:
 
 Rejected options:
 - depth-3200m: Not eligible: candidates: none; excluded by DesignGuard/verifier: C4-2d
-- depth-1500m: Ranked below the recommended option.
+- depth-1500m: Not a best option under ranking-lowest-lcoh_per_mwh.
 
 
 # DR-03 Heat top-up technology
@@ -40,7 +42,8 @@ Rejected options:
 - Decision source: **policy**
 - Question: Which technology lifts heat to the 100 degC supply?
 - **Choice: hthp-series** — Plate HEX + HTHP in series + CHP + peak boiler (C2/C3)
-- Why: Recommended by the deterministic tool ranking or the register default.
+- Decisive criterion: lowest lcoh_per_mwh + lcoc_per_mwh among guard-passed candidates without unmet demand in economics (key `lcoh_per_mwh` from economics; evidence TR-012, TR-013)
+- Why: Decisive criterion: lowest lcoh_per_mwh + lcoc_per_mwh among guard-passed candidates without unmet demand in economics; it selects hthp-series (TR-012, TR-013).
 
 | Option | Label | Eligible | Recommended | Evidence |
 |---|---|---|---|---|
@@ -50,9 +53,9 @@ Rejected options:
 | shallow-large-hp | Shallow wells + large heat pumps (C5) | yes | no | TR-009, TR-010, TR-012, TR-013 |
 
 Rejected options:
-- gas-boiler-chp-topup: Ranked below the recommended option.
+- gas-boiler-chp-topup: Not a best option under ranking-lowest-lcoh_per_mwh.
 - deeper-direct-hex: Not eligible: candidates: none; excluded by DesignGuard/verifier: C4-2d
-- shallow-large-hp: Ranked below the recommended option.
+- shallow-large-hp: Not a best option under ranking-lowest-lcoh_per_mwh.
 
 
 # DR-04 Cooling technology mix
@@ -61,7 +64,8 @@ Rejected options:
 - Decision source: **policy**
 - Question: Which cooling technology mix supplies 20 degC?
 - **Choice: free-cooling-electric** — Free cooling + electric chillers (C2, C5)
-- Why: Recommended by the deterministic tool ranking or the register default.
+- Decisive criterion: lowest lcoh_per_mwh + lcoc_per_mwh among guard-passed candidates without unmet demand in economics (key `lcoh_per_mwh` from economics; evidence TR-012, TR-013)
+- Why: Decisive criterion: lowest lcoh_per_mwh + lcoc_per_mwh among guard-passed candidates without unmet demand in economics; it selects free-cooling-electric (TR-012, TR-013).
 
 | Option | Label | Eligible | Recommended | Evidence |
 |---|---|---|---|---|
@@ -70,8 +74,8 @@ Rejected options:
 | free-cooling-absorption | Free cooling + absorption + electric peak (C3, C4) | yes | no | TR-009, TR-010, TR-012, TR-013 |
 
 Rejected options:
-- electric-chillers: Ranked below the recommended option.
-- free-cooling-absorption: Ranked below the recommended option.
+- electric-chillers: Not a best option under ranking-lowest-lcoh_per_mwh.
+- free-cooling-absorption: Not a best option under ranking-lowest-lcoh_per_mwh.
 
 
 # DR-05 Storage yes/no
@@ -80,7 +84,8 @@ Rejected options:
 - Decision source: **policy**
 - Question: Should the plant include thermal storage?
 - **Choice: no-storage** — No seasonal storage
-- Why: Recommended by the deterministic tool ranking or the register default.
+- Decisive criterion: lowest lcoh_per_mwh + lcoc_per_mwh among guard-passed candidates without unmet demand in economics (key `lcoh_per_mwh` from economics; evidence TR-012, TR-013)
+- Why: Decisive criterion: lowest lcoh_per_mwh + lcoc_per_mwh among guard-passed candidates without unmet demand in economics; it selects no-storage (TR-012, TR-013).
 
 | Option | Label | Eligible | Recommended | Evidence |
 |---|---|---|---|---|
@@ -88,7 +93,7 @@ Rejected options:
 | seasonal-ht-ates | Seasonal HT-ATES storage (C6) | yes | no | TR-009, TR-010, TR-012, TR-013 |
 
 Rejected options:
-- seasonal-ht-ates: Ranked below the recommended option.
+- seasonal-ht-ates: Not a best option under ranking-lowest-lcoh_per_mwh.
 
 
 # DR-06 Maintenance windows
@@ -97,7 +102,8 @@ Rejected options:
 - Decision source: **policy**
 - Question: How are doublet maintenance windows scheduled?
 - **Choice: optimiser-lowest-load** — Outages placed by the optimiser in the lowest-load windows, never overlapping (DB-30)
-- Why: Recommended by the deterministic tool ranking or the register default.
+- Decisive criterion: only option meeting DB-30: non-overlapping outages in the lowest-load windows (key `DB-30` from assumptions register; evidence TR-014, config:assumptions.yaml#DB-30)
+- Why: Decisive criterion: only option meeting DB-30: non-overlapping outages in the lowest-load windows; it selects optimiser-lowest-load (TR-014, config:assumptions.yaml#DB-30).
 
 | Option | Label | Eligible | Recommended | Evidence |
 |---|---|---|---|---|
@@ -114,7 +120,8 @@ Rejected options:
 - Decision source: **policy**
 - Question: How is the associated gas handled?
 - **Choice: degas-use** — Gas handling: degas_use
-- Why: Recommended by the deterministic tool ranking or the register default.
+- Decisive criterion: lowest lcoh_per_mwh + lcoc_per_mwh among guard-passed candidates without unmet demand in economics (key `lcoh_per_mwh` from economics; evidence TR-012, TR-013)
+- Why: Decisive criterion: lowest lcoh_per_mwh + lcoc_per_mwh among guard-passed candidates without unmet demand in economics; it selects degas-use (TR-012, TR-013).
 
 | Option | Label | Eligible | Recommended | Evidence |
 |---|---|---|---|---|
@@ -122,7 +129,7 @@ Rejected options:
 | pressurised-reinject | Gas handling: pressurised_reinject | yes | no | TR-009, TR-010, TR-012, TR-013 |
 
 Rejected options:
-- pressurised-reinject: Ranked below the recommended option.
+- pressurised-reinject: Not a best option under ranking-lowest-lcoh_per_mwh.
 
 
 # DR-08 Return temperature
@@ -131,7 +138,8 @@ Rejected options:
 - Decision source: **policy**
 - Question: Which district-heating return temperature is designed for?
 - **Choice: dh-return-55** — District-heating return 55 degC
-- Why: Recommended by the deterministic tool ranking or the register default.
+- Decisive criterion: register default kept for the district-heating return temperature (DB-31) (key `DB-31` from assumptions register; evidence TR-012, config:assumptions.yaml#DB-31)
+- Why: Decisive criterion: register default kept for the district-heating return temperature (DB-31); it selects dh-return-55 (TR-012, config:assumptions.yaml#DB-31).
 
 | Option | Label | Eligible | Recommended | Evidence |
 |---|---|---|---|---|
@@ -141,9 +149,9 @@ Rejected options:
 | dh-return-75 | District-heating return 75 degC | yes | no | config:assumptions.yaml#DB-31, TR-012 |
 
 Rejected options:
-- dh-return-45: Ranked below the recommended option.
-- dh-return-65: Ranked below the recommended option.
-- dh-return-75: Ranked below the recommended option.
+- dh-return-45: Not a best option under db31-answer.
+- dh-return-65: Not a best option under db31-answer.
+- dh-return-75: Not a best option under db31-answer.
 
 
 # DR-09 Materials
@@ -152,7 +160,8 @@ Rejected options:
 - Decision source: **policy**
 - Question: Which materials are used in the brine loop?
 - **Choice: titanium-plates-no-cu** — Titanium HEX plates, no copper alloys in contact with brine
-- Why: Recommended by the deterministic tool ranking or the register default.
+- Decisive criterion: materials check of spec §10.1 for saline brine (brine) (key `brine` from load_design_basis; evidence TR-001)
+- Why: Decisive criterion: materials check of spec §10.1 for saline brine (brine); it selects titanium-plates-no-cu (TR-001).
 
 | Option | Label | Eligible | Recommended | Evidence |
 |---|---|---|---|---|
@@ -169,7 +178,8 @@ Rejected options:
 - Decision source: **policy**
 - Question: Which design is recommended?
 - **Choice: C2-opt** — C2-opt (TL-13 optimum of C2 (sized from C2-2d))
-- Why: Recommended by the deterministic tool ranking or the register default.
+- Decisive criterion: selected design whose latest verifier verdict is not REJECTED (key `verdict` from verify_design; evidence TR-016, TR-020)
+- Why: Decisive criterion: selected design whose latest verifier verdict is not REJECTED; it selects C2-opt (TR-016, TR-020).
 
 | Option | Label | Eligible | Recommended | Evidence |
 |---|---|---|---|---|

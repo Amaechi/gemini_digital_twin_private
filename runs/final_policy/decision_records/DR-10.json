@@ -54,7 +54,20 @@
   ],
   "choice": "C2-opt",
   "choice_label": "C2-opt (TL-13 optimum of C2 (sized from C2-2d))",
-  "rationale": "Recommended by the deterministic tool ranking or the register default.",
+  "criterion": {
+    "id": "selected-not-rejected",
+    "key": "verdict",
+    "source": "verify_design",
+    "text": "selected design whose latest verifier verdict is not REJECTED",
+    "best_option_ids": [
+      "C2-opt"
+    ],
+    "evidence_ids": [
+      "TR-016",
+      "TR-020"
+    ]
+  },
+  "rationale": "Decisive criterion: selected design whose latest verifier verdict is not REJECTED; it selects C2-opt (TR-016, TR-020).",
   "rejected": [
     {
       "option_id": "C6-opt",

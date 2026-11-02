@@ -35,7 +35,20 @@
   ],
   "choice": "optimiser-lowest-load",
   "choice_label": "Outages placed by the optimiser in the lowest-load windows, never overlapping (DB-30)",
-  "rationale": "Recommended by the deterministic tool ranking or the register default.",
+  "criterion": {
+    "id": "db30-non-overlapping",
+    "key": "DB-30",
+    "source": "assumptions register",
+    "text": "only option meeting DB-30: non-overlapping outages in the lowest-load windows",
+    "best_option_ids": [
+      "optimiser-lowest-load"
+    ],
+    "evidence_ids": [
+      "TR-014",
+      "config:assumptions.yaml#DB-30"
+    ]
+  },
+  "rationale": "Decisive criterion: only option meeting DB-30: non-overlapping outages in the lowest-load windows; it selects optimiser-lowest-load (TR-014, config:assumptions.yaml#DB-30).",
   "rejected": [
     {
       "option_id": "common-summer-block",

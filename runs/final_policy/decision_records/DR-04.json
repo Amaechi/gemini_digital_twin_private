@@ -54,15 +54,28 @@
   ],
   "choice": "free-cooling-electric",
   "choice_label": "Free cooling + electric chillers (C2, C5)",
-  "rationale": "Recommended by the deterministic tool ranking or the register default.",
+  "criterion": {
+    "id": "ranking-lowest-lcoh_per_mwh",
+    "key": "lcoh_per_mwh",
+    "source": "economics",
+    "text": "lowest lcoh_per_mwh + lcoc_per_mwh among guard-passed candidates without unmet demand in economics",
+    "best_option_ids": [
+      "free-cooling-electric"
+    ],
+    "evidence_ids": [
+      "TR-012",
+      "TR-013"
+    ]
+  },
+  "rationale": "Decisive criterion: lowest lcoh_per_mwh + lcoc_per_mwh among guard-passed candidates without unmet demand in economics; it selects free-cooling-electric (TR-012, TR-013).",
   "rejected": [
     {
       "option_id": "electric-chillers",
-      "reason": "Ranked below the recommended option."
+      "reason": "Not a best option under ranking-lowest-lcoh_per_mwh."
     },
     {
       "option_id": "free-cooling-absorption",
-      "reason": "Ranked below the recommended option."
+      "reason": "Not a best option under ranking-lowest-lcoh_per_mwh."
     }
   ],
   "decision_source": "policy",

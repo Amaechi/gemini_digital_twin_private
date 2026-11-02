@@ -193,16 +193,16 @@ Samples 200 (failed 0); P(demand met) at installed backups 0.46; robust backups 
 
 ## Decision Records
 
-- DR-09 Materials: Titanium HEX plates, no copper alloys in contact with brine (policy)
-- DR-01 Number of doublets: 2 doublet(s) (policy)
-- DR-02 Well depth: Reservoir at 2500 m TVD (policy)
-- DR-03 Heat top-up technology: Plate HEX + HTHP in series + CHP + peak boiler (C2/C3) (policy)
-- DR-04 Cooling technology mix: Free cooling + electric chillers (C2, C5) (policy)
-- DR-05 Storage yes/no: No seasonal storage (policy)
-- DR-07 Gas handling (degas + CHP vs pressurised reinjection): Gas handling: degas_use (policy)
-- DR-08 Return temperature: District-heating return 55 degC (policy)
-- DR-06 Maintenance windows: Outages placed by the optimiser in the lowest-load windows, never overlapping (DB-30) (policy)
-- DR-10 Final selection: C2-opt (TL-13 optimum of C2 (sized from C2-2d)) (policy)
+- DR-09 Materials: Titanium HEX plates, no copper alloys in contact with brine (policy; criterion spec-materials-check)
+- DR-01 Number of doublets: 2 doublet(s) (policy; criterion ranking-lowest-lcoh_per_mwh)
+- DR-02 Well depth: Reservoir at 2500 m TVD (policy; criterion ranking-lowest-lcoh_per_mwh)
+- DR-03 Heat top-up technology: Plate HEX + HTHP in series + CHP + peak boiler (C2/C3) (policy; criterion ranking-lowest-lcoh_per_mwh)
+- DR-04 Cooling technology mix: Free cooling + electric chillers (C2, C5) (policy; criterion ranking-lowest-lcoh_per_mwh)
+- DR-05 Storage yes/no: No seasonal storage (policy; criterion ranking-lowest-lcoh_per_mwh)
+- DR-07 Gas handling (degas + CHP vs pressurised reinjection): Gas handling: degas_use (policy; criterion ranking-lowest-lcoh_per_mwh)
+- DR-08 Return temperature: District-heating return 55 degC (policy; criterion db31-answer)
+- DR-06 Maintenance windows: Outages placed by the optimiser in the lowest-load windows, never overlapping (DB-30) (policy; criterion db30-non-overlapping)
+- DR-10 Final selection: C2-opt (TL-13 optimum of C2 (sized from C2-2d)) (policy; criterion selected-not-rejected)
 
 ## Assumptions and answers
 

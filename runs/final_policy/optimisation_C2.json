@@ -27,7 +27,7 @@
    "nfev": 50,
    "nit": 4,
    "message": "Optimization terminated successfully.",
-   "elapsed_s": 59.636334025
+   "elapsed_s": 40.74147225899969
   },
   {
    "stage": "outage",
@@ -55,7 +55,7 @@
    "nfev": 40,
    "nit": 3,
    "message": "Optimization terminated successfully.",
-   "elapsed_s": 17.04309949799972
+   "elapsed_s": 11.966272582000329
   },
   {
    "stage": "size",
@@ -81,7 +81,7 @@
    "nfev": 40,
    "nit": 3,
    "message": "Optimization terminated successfully.",
-   "elapsed_s": 53.93500237899934
+   "elapsed_s": 37.35271356600015
   },
   {
    "stage": "outage",
@@ -115,7 +115,7 @@
    "nfev": 45,
    "nit": 2,
    "message": "Optimization terminated successfully.",
-   "elapsed_s": 18.548483190999832
+   "elapsed_s": 12.813666161000128
   }
  ],
  "best": {
@@ -239,7 +239,7 @@
    "thermal_breakthrough_yr": 66.1398685725736,
    "percentiles": {}
   },
-  "elapsed_s": 2.260321273000045
+  "elapsed_s": 2.0840420059998905
  },
  "default_outage": {
   "key": "bfb0804b3ecc88af",
@@ -360,7 +360,7 @@
    "thermal_breakthrough_yr": 66.68029037047833,
    "percentiles": {}
   },
-  "elapsed_s": 3.3084088350005914
+  "elapsed_s": 2.4554367870000533
  },
  "dispatch_variants": [
   {
@@ -488,7 +488,7 @@
      "thermal_breakthrough_yr": 66.1398685725736,
      "percentiles": {}
     },
-    "elapsed_s": 3.76555215100052
+    "elapsed_s": 2.5720774260003054
    },
    "delta_objective_per_mwh": 0.0
   },
@@ -617,7 +617,7 @@
      "thermal_breakthrough_yr": 66.1398685725736,
      "percentiles": {}
     },
-    "elapsed_s": 3.6256579030005014
+    "elapsed_s": 2.917642137999792
    },
    "delta_objective_per_mwh": 0.0
   },
@@ -746,7 +746,7 @@
      "thermal_breakthrough_yr": 66.1398685725736,
      "percentiles": {}
     },
-    "elapsed_s": 4.255441524999696
+    "elapsed_s": 2.655429698000262
    },
    "delta_objective_per_mwh": 0.0
   },
@@ -875,7 +875,7 @@
      "thermal_breakthrough_yr": 66.1398685725736,
      "percentiles": {}
     },
-    "elapsed_s": 3.1054834300002767
+    "elapsed_s": 2.544718821999595
    },
    "delta_objective_per_mwh": 0.0
   }
@@ -1006,7 +1006,7 @@
     "thermal_breakthrough_yr": 62.1028006729818,
     "percentiles": {}
    },
-   "elapsed_s": 2.557954038999924
+   "elapsed_s": 2.734465196999736
   },
   {
    "key": "60682416ea905be1",
@@ -1133,13 +1133,13 @@
     "thermal_breakthrough_yr": 60.50332069269875,
     "percentiles": {}
    },
-   "elapsed_s": 3.3988422570000694
+   "elapsed_s": 2.6717949460003183
   }
  ],
  "n_evaluations": 191,
  "n_rejected": 0,
  "n_infeasible": 0,
- "elapsed_s": 177.49079109800005,
+ "elapsed_s": 125.52665425899977,
  "outputs": {},
  "warnings": [
   "C6 storage sizes scanned but not optimised: RC-10/cost_assumptions have no HT-ATES cost (follow-up WP-08/WP-15)"

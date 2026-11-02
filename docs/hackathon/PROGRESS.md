@@ -26,20 +26,19 @@ Keep it ≤ 20 KB; it is the hand-off between sessions. Old detail: merged PRs a
 | WP-15 | Final review & packaging | todo | | |
 
 Status: todo · in progress · in review · merged · blocked (say why).
-Latest full suite (WP-14 branch, 2026-11-02): `PYTHONPATH=src python -m pytest -q unit_test/gemini_model unit_test/gemini_simulator unit_test/gemini_agent -x` → **1278 passed** (≈ 7 min).
-Next: L-1/L-2 (local LLM), then WP-15.
+Latest full suite (WP-14 + #19 merge, 11-02): `PYTHONPATH=src python -m pytest -q unit_test/gemini_model unit_test/gemini_simulator unit_test/gemini_agent -x` → **1306 passed** (here 6 min 39 s; CI 3 min 58 s). CLI smoke `--budget smoke`: CI 22.8 s, here 41 s on 2 cores.
+Next: L-1/L-2, then WP-15.
 
 ## Decisions log (newest first)
 One line per decision, grouped by WP; dated 11-01 (WP-00: 10-31). Why: the `config/assumptions.yaml` entry or the module docstring.
 
 **WP-14**
-- `runner/real_tools.py`: `default_toolbox(profile)` = real tools (stub=False) via a per-run `ToolSession` (sized designs in `runs/<id>/session/`); `verify_design` registered first on `ToolSession.evidence`; `stub_toolbox()` only for mechanics tests (`stub_tools` fixture).
-- P3 guard + verifier pre-check (`depth_check`); P5 `Evaluator.run` + TL-14 (C0 CO₂ first, exergy); P6 TL-13 on the top-3 concepts → `<concept>-opt`; P7 full year + TL-14; P8 TL-15 (percentiles only) + `sensitivity` (SUB-11); P10 `plot_figures` + report.
-- ranking = LCOH + LCOC (OPT-OBJ; unknown LCOC = 0); DR-01 quotes permeability + TL-04 summary (S8).
-- verifier +8: PH-25/26/27 TL-05 point; PH-28 model warnings (fail: freeze, zero capacity, OUTSIDE RC-04); PH-29 day flags (fail: OUTSIDE RC-04, full mode invalid); PH-30 letdown flash (100 °C at ≤ 1 atm); PD-11 TL-08; PD-12 TL-07 horizon. PH-19: no NPSH_R ⇒ NPSH_A ≥ 15 m (SUB-NPSH).
-- TL-13 depths = verifiable (NPSH_A evaluable ≤ 100 °C, no flash) ⇒ ≤ 2.5 km; absorption designs rank last.
-- profiles full / quick (evals) / smoke (tests): `--tool-profile` on cli and run_eval.
-- touched outside WP-14: design_runner `_apply_result` only; phases P8/P10; toolbox; tool_stubs; ranking; decision_records; simulate_day/annual `model_warnings`; cli; eval harness/scenarios; run_eval; tests opt into `stub_tools` (incl. agents/test_engine.py).
+- `runner/real_tools.py`: `default_toolbox()` = real tools (stub=False) via a per-run `ToolSession`; `verify_design` registered first (`ToolSession.evidence`); `stub_toolbox()` for mechanics tests only.
+- P3 guard + `depth_check`; P5 fast year + TL-14 (C0 first); P6 TL-13 → `<concept>-opt`; P7 full year; P8 TL-15 (percentiles only) + `sensitivity`; P10 figures + report.
+- rank = LCOH + LCOC (OPT-OBJ); DR-01 quotes k + TL-04 (S8).
+- verifier: PH-25…30, PD-11/12; PH-19 no NPSH_R ⇒ NPSH_A ≥ 15 m (SUB-NPSH). Depth ≤ 2.5 km (NPSH, flash); absorption ranks last.
+- register RUN-BUDGET: full / quick (evals) / smoke (CI: 1 concept, DE x0, 2 MC, 13 d, no pool) via `--budget` or `GEOAGENT_BUDGET`; CI smoke step 8 min cap; pools terminate on error; CLI SIGTERM → SystemExit.
+- also touched: design_runner `_apply_result` only; phases, toolbox, tool_stubs, ranking, decision_records, simulate_day/annual, optimise pool, cli, eval, CI.
 **WP-11**
 - TL-13: screen doublets × depth → per `top_k` combo seeded DE (`deferred` ⇒ serial = pool): sizes (flow, HTHP, absorption) then outages (sorted-gap, x0 = SIM-OUTAGE, plant reused + memoised).
 - boiler/e-chiller cap-only ⇒ right-sized (largest daily output; chiller also the DB-19 peak at DB-34b ambient), priced, optimum re-run with them (`best` = None if that fails); free-cooling tower beyond the chiller plant's priced (`cooling_tower_mw`).
@@ -81,7 +80,7 @@ One line per decision, grouped by WP; dated 11-01 (WP-00: 10-31). Why: the `conf
 - maps 50–300 m³/h cached `runs/cache/doublet_maps/`; TL-07 ±6 K: t_b 33.9 yr @ 1.2 km; TL-08 ≤ 1 bar: 1141 m (2) / 1787 m (3).
 **WP-09**
 - REJECTED iff any fail; UNVERIFIED if a required check is `not_evaluated` or stub; 41 checks; margin ≥ 0 passes; no p_b ⇒ VER-ESP-PB 60 bar(a).
-- PH-22 via `brine_heat_drawn_mw` + first law; runner: real UNVERIFIED never loops, any stub ⇒ not ACCEPTED; `verify_design_spec` not in `default_toolbox`.
+- PH-22 via `brine_heat_drawn_mw` + first law; runner: real UNVERIFIED never loops, any stub ⇒ not ACCEPTED (bound in WP-14).
 - append-only events + `replay`; cache key SHA-256 + `<tool>:<mode>:v<N>`; knowledge = durable `USER_ANSWER`s; one `LLMCallRecord.from_messages`.
 **WP-02**
 - COOL-ELC η 0.508 [D] (COP 4.39 @ 7.2/32.2 °C), COP cap 8; COOL-HR `include_heat_rejection_auxiliaries`; cooling = `StaticModel`s, `power_th` = useful cooling, 20/26 °C.
@@ -144,28 +143,26 @@ One line per decision, grouped by WP; dated 11-01 (WP-00: 10-31). Why: the `conf
 
 **WP-11**
 - Done: all former WP-11 items (UQ-RANGES, UQ-CASES incl. DB-31 45/65/75, ECO-CO2-GAS 51.53, CHP-EL-FRAC 0.50; tornado; levers).
-- WP-15: DR-06 cites TL-13, not the outage days by value; `robust_backup_mw` not in a DR; TL-13 `rejected` not → `guard_failed` (REJECTED `-opt` designs are skipped).
+- WP-15: DR-06 cites TL-13, not the outage days; `robust_backup_mw` not in a DR; TL-13 `rejected` ↛ `guard_failed`.
 - WP-08/15: no HT-ATES capex on RC-10 ⇒ C6 unpriced; WACC view (ECO-06) missing.
-- Done (WP-14): flash/NPSH ⇒ `depth_check`. WP-15: saturation data > 100 °C (RC-01) or a pressurised degasser re-opens ≥ 3 km.
+- Done (WP-14): `depth_check`. WP-15: saturation data > 100 °C or a pressurised degasser re-opens ≥ 3 km.
 - C2 optimum/MC numbers: [#18](https://github.com/Amaechi/gemini_digital_twin_private/pull/18) hand-off, `runs/wp11-c2/`.
 - Treat as API: `FastPlant._model`, `.carries`, `.run` (TL-13/15 `ScenarioPlant` hooks: overrides + memo).
 **WP-12**
 - Done: PROGRESS gaps → LIM-SUB-01…08, LIM-PLT-01…05, LIM-GEM-01, LIM-TOOL-01.
-- Done (WP-14): the report lists TL-17 limitations. LLM P4 calls the tools directly (no `check_draft`) and `register_model` mutates the live registry; use `ModelBuilder.close_gaps` if a gap appears.
+- Done (WP-14): report lists TL-17 limitations. LLM P4 calls the tools directly (no `check_draft`) and `register_model` mutates the live registry; use `ModelBuilder.close_gaps` if a gap appears.
 - L-2: `python -m gemini_agent.agents.model_builder --sandbox runs/s7_demo [--model TAG]` runs generated tests locally (review first). WP-15: promotion = copy folders + registry + `.rst` via PR.
 
 **WP-13**
 - Done: SUB-03 (verdict), SUB-04 (stub calls), SUB-05 (DR stub evidence), SUB-13 (placeholders) fail; SUB-14 flags `cost_items[].verify` (RC-05).
-- Done (WP-14): S1 ACCEPTED + 0 stubs, S6 DB-31 cases, S7 gap, S8 DR-01 promoted (stub CI: they fail by design, `STUB_ONLY_FAILURES`). WP-15: S5 confirm-basis InputRequest; S2 inputs missing from the request; S8 "re-sizes" needs a cross-run check; S7 Model Builder needs the LLM (L-2).
+- Done (WP-14): S1, S6, S7 gap, S8 DR-01 promoted (fail on stubs by design). WP-15: S5 confirm-basis request; S2 missing inputs; S8 re-size check; S7 builder needs the LLM.
 - L-1/L-2: `run_eval.py --engine llm --model <tag> --eval-root runs/final/eval` per model, then `--compare runs/final/eval/<a> runs/final/eval/<b> --eval-root runs/final/eval`; final run in `runs/final/<id>/` in ask mode (SUB-02 approval).
 - WP-15: README must document API placeholders (SUB-22 warns); CI ruff skips `scripts/`; GEMINI non-.py edits (e.g. `pyproject.toml` notice ≈ line 90) checked by hand (SUB-21 warns if any).
 
 **WP-14 → WP-15**
-- `AbsorptionPoint` not collected ⇒ C3/C4 UNVERIFIED (ranked last); `HeatPumpPoint` lacks max sink T.
-- Physics check: ESP intake 0.86 bar over 1.2·p_b (sea-water basis; pure water fails ⇒ ESP ≈ 65 m deeper); free cooling 87 % on smoothed normals (optimistic); HTHP COP = VER-HP-ETA cap (DEA 4–7 % lower); installed-heating KPI rates the HEX at 300 m³/h; boiler 5.0 MW has 0.03 MW spare (robust 10.9 MW).
-- Final run: assume mode (SUB-02 WARN); L-2 reruns in ask mode.
-- Done (WP-14, from #19): DR KPI criteria get real KPIs; result field names kept (`lcoh_per_mwh`, `verdict` in `data_keys`).
-- Full suite ≈ 7 min (smoke pipeline ≈ 75 s).
+- No `AbsorptionPoint` ⇒ C3/C4 UNVERIFIED; `HeatPumpPoint` lacks max sink T.
+- Physics check: ESP intake +0.86 bar over 1.2·p_b (pure water fails: ESP ≈ 65 m deeper); free cooling 87 % on smoothed normals; HTHP COP at cap; HEX rated at 300 m³/h in installed MW; boiler spare 0.03 MW.
+- Final run: assume mode (SUB-02 WARN).
 
 **L-1 / L-2**
 - Confirm tags with `ollama show <tag>` (must list `tools`). Set `OLLAMA_CONTEXT_LENGTH=65536` before `cli run --engine llm` (`num_ctx` ignored); `--model TAG` overrides orchestrator and coder.
@@ -178,12 +175,12 @@ One line per decision, grouped by WP; dated 11-01 (WP-00: 10-31). Why: the `conf
 - Nits: negative `gas_water_ratio` accepted; DPDT stores params before a bad `pvt` raises; kpi `plant_thermal_power_w` default 1050 kg/m³, unsuffixed `fluid_density`/`specific_heat`; PH-17 checks pump triples, not daily power; dissolved-gas NPSH margin unquantified; DB-30 fact stores the coerced value; SY-01, SE-02 both build the project; `resume <unknown id>` creates `runs/<id>/`; `--run-id` unsanitised; `resource.py:235` reads `costs.items[...].value`; `heat_pump_1987_usd_per_kw` unescalated.
 
 **All WPs**
-- Lint with GEMINI's pins (black 25.11.0, isort 7.0.0, flake8 7.3.0 + flake8-docstrings 1.7.0, `--max-line-length=100`): `uv pip install --python /opt/geo-venv/bin/python isort==7.0.0 black==25.11.0 flake8==7.3.0 flake8-docstrings==1.7.0`. WP-15: 42 pre-existing flake8 findings (WP-04 climate/demand/design_basis + tests) fail `run_linter.sh`.
+- Lint with GEMINI's pins (black 25.11.0, isort 7.0.0, flake8 7.3.0 + flake8-docstrings 1.7.0, `--max-line-length=100`): `uv pip install --python /opt/geo-venv/bin/python` these pins. WP-15: 42 pre-existing flake8 findings (WP-04 climate/demand/design_basis + tests) fail `run_linter.sh`.
 - Many GEMINI files are CRLF: keep line endings (no `read_text`/`write_text` round trip).
 
 ## Open questions for organisers (Discord)
 See spec §17. Answers: —
 
 ## Hand-off notes (latest session writes here, replace previous)
-2026-11-02, WP-14: `PYTHONPATH=src python scripts/build_results.py` (policy run → `runs/final_policy/` → `docs/results/`; `--skip-run` re-renders) took **808 s** (full profile, 4 vCPU). Result: **C2-opt** 2 × 2500 m, 296 m³/h, HTHP 4.1 MW, boiler 5.0 MW, e-chiller 8.2 MW, outages d119/d238; **ACCEPTED** (0/22 stub calls, DR-01…10 agree; C4-2d at 3.2 km excluded at P3 by the PH-19/PH-30 pre-check); unmet 0 d; LCOH 42.5 + LCOC 26.3 USD/MWh, CAPEX 27.9 MUSD, CO₂ 7360 t/yr (−72 % vs C0), η_ex 0.44; free cooling 20.6 of 23.7 GWh. MC P10/P50/P90 LCOH 33.8/47.3/66.1; P(demand met) 0.46 → 0.90 with a 10.9 MW boiler (`robust_backup_mw`, WP-15 DR). Submission check: only SUB-12/15/16/17 fail (LLM-only, L-1/L-2); SUB-02 approval pending (assume mode). Real-tool eval (`run_eval.py --scenarios S1,S6,S7,S8`, quick): S1, S6 pass; S7, S8 checks pass (1 pending each), `docs/results/eval_policy_quick/`. L-2: `cli run --engine llm` in ask mode.
+2026-11-02, WP-14 (post-#19): `scripts/build_results.py` (full budget) 554 s. **C2-opt** 2 × 2500 m, 296 m³/h, HTHP 4.1, boiler 5.0, e-chiller 8.2 MW: **ACCEPTED**, 0/22 stubs, DR-01…10 agree (#19 criteria); unmet 0 d; LCOH 42.5 + LCOC 26.3 USD/MWh, CAPEX 27.9 MUSD, CO₂ −72 %; P(demand met) 0.46 (0.90 with a 10.9 MW boiler). `validate_submission.py --run-dir runs/final_policy`: PASS 01, 03–11, 13, 18–21; WARN 02, 14, 22; MANUAL 23–24; FAIL (LLM-only) 12, 15–17.
 2026-11-02, WP-10 L-1 follow-up (wire body tested via MockTransport). Next: L-1 re-run; WP-14.
