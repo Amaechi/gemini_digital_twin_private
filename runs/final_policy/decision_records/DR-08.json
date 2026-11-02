@@ -1,0 +1,77 @@
+{
+  "dr_id": "DR-08",
+  "title": "Return temperature",
+  "run_id": "final_policy",
+  "phase": "P5",
+  "role": "system_architect",
+  "question": "Which district-heating return temperature is designed for?",
+  "options": [
+    {
+      "id": "dh-return-55",
+      "label": "District-heating return 55 degC",
+      "evidence_ids": [
+        "config:assumptions.yaml#DB-31",
+        "TR-012"
+      ],
+      "recommended": true,
+      "eligible": true,
+      "notes": ""
+    },
+    {
+      "id": "dh-return-45",
+      "label": "District-heating return 45 degC",
+      "evidence_ids": [
+        "config:assumptions.yaml#DB-31",
+        "TR-012"
+      ],
+      "recommended": false,
+      "eligible": true,
+      "notes": ""
+    },
+    {
+      "id": "dh-return-65",
+      "label": "District-heating return 65 degC",
+      "evidence_ids": [
+        "config:assumptions.yaml#DB-31",
+        "TR-012"
+      ],
+      "recommended": false,
+      "eligible": true,
+      "notes": ""
+    },
+    {
+      "id": "dh-return-75",
+      "label": "District-heating return 75 degC",
+      "evidence_ids": [
+        "config:assumptions.yaml#DB-31",
+        "TR-012"
+      ],
+      "recommended": false,
+      "eligible": true,
+      "notes": ""
+    }
+  ],
+  "evidence_ids": [
+    "TR-012",
+    "config:assumptions.yaml#DB-31"
+  ],
+  "choice": "dh-return-55",
+  "choice_label": "District-heating return 55 degC",
+  "rationale": "Recommended by the deterministic tool ranking or the register default.",
+  "rejected": [
+    {
+      "option_id": "dh-return-45",
+      "reason": "Ranked below the recommended option."
+    },
+    {
+      "option_id": "dh-return-65",
+      "reason": "Ranked below the recommended option."
+    },
+    {
+      "option_id": "dh-return-75",
+      "reason": "Ranked below the recommended option."
+    }
+  ],
+  "decision_source": "policy",
+  "stub_evidence": false
+}

@@ -1,0 +1,70 @@
+{
+  "dr_id": "DR-04",
+  "title": "Cooling technology mix",
+  "run_id": "final_policy",
+  "phase": "P5",
+  "role": "system_architect",
+  "question": "Which cooling technology mix supplies 20 degC?",
+  "options": [
+    {
+      "id": "electric-chillers",
+      "label": "Electric chillers (C1)",
+      "evidence_ids": [
+        "TR-009",
+        "TR-010",
+        "TR-012",
+        "TR-013"
+      ],
+      "recommended": false,
+      "eligible": true,
+      "notes": "candidates: C1-3d"
+    },
+    {
+      "id": "free-cooling-electric",
+      "label": "Free cooling + electric chillers (C2, C5)",
+      "evidence_ids": [
+        "TR-009",
+        "TR-010",
+        "TR-012",
+        "TR-013"
+      ],
+      "recommended": true,
+      "eligible": true,
+      "notes": "candidates: C2-2d, C5-3d, C6-2d, C7-2d, C8-3d; top-ranked (LCOH ranking)"
+    },
+    {
+      "id": "free-cooling-absorption",
+      "label": "Free cooling + absorption + electric peak (C3, C4)",
+      "evidence_ids": [
+        "TR-009",
+        "TR-010",
+        "TR-012",
+        "TR-013"
+      ],
+      "recommended": false,
+      "eligible": true,
+      "notes": "candidates: C3-2d; excluded by DesignGuard/verifier: C4-2d"
+    }
+  ],
+  "evidence_ids": [
+    "TR-009",
+    "TR-010",
+    "TR-012",
+    "TR-013"
+  ],
+  "choice": "free-cooling-electric",
+  "choice_label": "Free cooling + electric chillers (C2, C5)",
+  "rationale": "Recommended by the deterministic tool ranking or the register default.",
+  "rejected": [
+    {
+      "option_id": "electric-chillers",
+      "reason": "Ranked below the recommended option."
+    },
+    {
+      "option_id": "free-cooling-absorption",
+      "reason": "Ranked below the recommended option."
+    }
+  ],
+  "decision_source": "policy",
+  "stub_evidence": false
+}
