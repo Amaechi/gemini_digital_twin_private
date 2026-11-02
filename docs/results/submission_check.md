@@ -1,6 +1,6 @@
 # GeoAgent submission check (spec §18)
 
-Generated: 2026-11-02T16:51:10.427093+00:00
+Generated: 2026-11-02T17:22:46.752370+00:00
 Final run: `/home/user/gemini_digital_twin_private/runs/final_policy`  
 Eval root: `/home/user/gemini_digital_twin_private/runs/final/eval`
 

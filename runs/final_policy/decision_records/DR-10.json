@@ -75,11 +75,10 @@
       "C2-opt-robust"
     ],
     "evidence_ids": [
-      "TR-016",
       "TR-021"
     ]
   },
-  "rationale": "Decisive criterion: selected design whose latest verifier verdict is not REJECTED; it selects C2-opt-robust (TR-016, TR-021).",
+  "rationale": "Decisive criterion: selected design whose latest verifier verdict is not REJECTED; it selects C2-opt-robust (TR-021).",
   "rejected": [
     {
       "option_id": "C2-opt",

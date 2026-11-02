@@ -133,7 +133,7 @@
   "injection_pump_2": "shared",
   "peak_boiler": "heat"
  },
- "elapsed_s": 8.623449132999895,
+ "elapsed_s": 7.806749451000087,
  "warnings": [
   "hthp_1: MISSING HTHP datasheet values ['max_lift_k', 'max_sink_temperature_degc', 'max_carnot_fraction']: RC-04 defaults VER-HP-ETA, VER-HP-LIFT; max sink temperature not checked [\u00d71160]",
   "hthp_1: COP 5.30 capped at 0.6 x Carnot = 4.48 (RC-04) [\u00d71160]",

@@ -21,7 +21,7 @@
    "nfev": 20,
    "nit": 3,
    "message": "Optimization terminated successfully.",
-   "elapsed_s": 7.220894660000113
+   "elapsed_s": 7.181590719999804
   },
   {
    "stage": "outage",
@@ -53,7 +53,7 @@
    "nfev": 30,
    "nit": 1,
    "message": "Optimization terminated successfully.",
-   "elapsed_s": 6.619121066999924
+   "elapsed_s": 5.6227279600002475
   },
   {
    "stage": "size",
@@ -73,7 +73,7 @@
    "nfev": 20,
    "nit": 3,
    "message": "Optimization terminated successfully.",
-   "elapsed_s": 6.109331212999905
+   "elapsed_s": 5.345353913000054
   },
   {
    "stage": "outage",
@@ -99,7 +99,7 @@
    "nfev": 30,
    "nit": 2,
    "message": "Optimization terminated successfully.",
-   "elapsed_s": 6.522219407999955
+   "elapsed_s": 5.803901291999864
   }
  ],
  "best": {
@@ -213,7 +213,7 @@
    "thermal_breakthrough_yr": 48.593521556362106,
    "percentiles": {}
   },
-  "elapsed_s": 1.1409322649999467
+  "elapsed_s": 0.918231576999915
  },
  "default_outage": null,
  "dispatch_variants": [],
@@ -334,7 +334,7 @@
     "thermal_breakthrough_yr": 48.52183516846906,
     "percentiles": {}
    },
-   "elapsed_s": 1.084475078000196
+   "elapsed_s": 1.1798453549999977
   },
   {
    "key": "0ec2b85592bbbd50",
@@ -452,13 +452,13 @@
     "thermal_breakthrough_yr": 48.52183516846906,
     "percentiles": {}
    },
-   "elapsed_s": 0.9576301900001454
+   "elapsed_s": 0.8407117639999342
   }
  ],
  "n_evaluations": 109,
  "n_rejected": 0,
  "n_infeasible": 0,
- "elapsed_s": 34.22147753399986,
+ "elapsed_s": 31.269975364999937,
  "outputs": {},
  "warnings": [
   "C6 storage sizes scanned but not optimised: RC-10/cost_assumptions have no HT-ATES cost (follow-up WP-08/WP-15)"

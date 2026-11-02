@@ -27,7 +27,7 @@ Keep it ≤ 20 KB; it is the hand-off between sessions. Old detail: merged PRs a
 | WP-15 | Final review & packaging | todo | | |
 
 Status: todo · in progress · in review · merged · blocked (say why).
-Latest full suite (pre-L-2, 11-02): `PYTHONPATH=src python -m pytest -q unit_test/gemini_model unit_test/gemini_simulator unit_test/gemini_agent -x` → **1313 passed** (here 6 min 5 s). CLI smoke `--budget smoke`: CI 22.8 s.
+Latest full suite (pre-L-2, 11-02): `PYTHONPATH=src python -m pytest -q unit_test/gemini_model unit_test/gemini_simulator unit_test/gemini_agent -x` → **1315 passed** (here 6 min 18 s). CLI smoke `--budget smoke`: CI 22.8 s.
 Next: L-1/L-2 (CLOUD_SETUP §7), then WP-15.
 
 ## Decisions log (newest first)
@@ -175,7 +175,7 @@ One line per decision, grouped by WP; dated 11-01 (WP-00: 10-31). Why: the `conf
 
 **Pre-L-2 → WP-15**
 - CLI: `resume` hint omits `--runs-dir`; budget not stored in the run (resume repeats `--budget`); `run_eval` rewrites `eval_results.json` per call (S11 folder replaced by S1–S11). `docs/results/eval_policy_quick` predates DR-11.
-- DR-11 variant priced on the base year only; its own MC (percentiles at the robust nameplates) not run.
+- DR-11 variant priced on the base year only; no own MC: report percentiles are TL-15 on C2-opt (variant ≈ +2 USD/MWh LCOH; say so in WP-15). `robust_backup` never escalates: no TL-15 for the selection / failed variant ⇒ DR-11 installed only.
 
 **WP-15**
 - Header audit of adapted Plant Debugger files (`NOTICE`).
@@ -190,4 +190,4 @@ One line per decision, grouped by WP; dated 11-01 (WP-00: 10-31). Why: the `conf
 See spec §17. Answers: —
 
 ## Hand-off notes (latest session writes here, replace previous)
-2026-11-02, Pre-L-2: `build_results.py` (full) 545 s. P8 `robust_backup` → DR-11 (policy) installs **C2-opt-robust** (boiler 5.0 → 10.9 MW); P9 **ACCEPTED** 46/46, 0/23 stubs, 11 DRs. Before → after: LCOH 42.54 → 44.59, LCOC 26.31 → 26.31 USD/MWh, CAPEX 27.86 → 30.07 MUSD, P(demand met) 0.46 → 0.90; CO₂ −72 %, unmet 0 d unchanged. `validate_submission`: FAIL only LLM-only 12, 15–17 (WARN 02, 14, 22). §7 dry-run verified (ask mode needs a TTY; DB-30/31/32 asked before the approval). Next: L-1/L-2 (§7), WP-15.
+2026-11-02, Pre-L-2: `build_results.py` (full) 528 s. P8 `robust_backup` → DR-11 (policy) installs **C2-opt-robust** (boiler 5.0 → 10.9 MW); P9 **ACCEPTED** 46/46, 0/23 stubs, 11 DRs. Before → after: LCOH 42.54 → 44.59, LCOC 26.31 → 26.31 USD/MWh, CAPEX 27.86 → 30.07 MUSD, P(demand met) 0.46 → 0.90; CO₂ −72 %, unmet 0 d unchanged. `validate_submission`: FAIL only LLM-only 12, 15–17 (WARN 02, 14, 22). §7 dry-run verified (ask mode needs a TTY; DB-30/31/32 asked before the approval). Next: L-1/L-2 (§7), WP-15.

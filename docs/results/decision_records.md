@@ -178,8 +178,8 @@ Rejected options:
 - Decision source: **policy**
 - Question: Which design is recommended?
 - **Choice: C2-opt-robust** — C2-opt-robust (C2-opt with the TL-15 P90 robust backups (OPT-ROBUST-BACKUP))
-- Decisive criterion: selected design whose latest verifier verdict is not REJECTED (key `verdict` from verify_design; evidence TR-016, TR-021)
-- Why: Decisive criterion: selected design whose latest verifier verdict is not REJECTED; it selects C2-opt-robust (TR-016, TR-021).
+- Decisive criterion: selected design whose latest verifier verdict is not REJECTED (key `verdict` from verify_design; evidence TR-021)
+- Why: Decisive criterion: selected design whose latest verifier verdict is not REJECTED; it selects C2-opt-robust (TR-021).
 
 | Option | Label | Eligible | Recommended | Evidence |
 |---|---|---|---|---|
