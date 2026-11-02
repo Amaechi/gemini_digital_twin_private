@@ -178,4 +178,4 @@ One line per decision, grouped by WP; dated 11-01 (WP-00: 10-31). Why: the `conf
 See spec §17. Answers: —
 
 ## Hand-off notes (latest session writes here, replace previous)
-2026-11-02, WP-10 L-1 follow-up (Ollama wire body tested via httpx2 MockTransport). Next: L-1 re-run; WP-14.
+2026-11-02, WP-10 L-1 follow-up (wire body tested via MockTransport). Next: L-1 re-run; WP-14.
