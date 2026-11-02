@@ -16,7 +16,8 @@ Keep it ≤ 20 KB; it is the hand-off between sessions. Old detail: merged PRs a
 | WP-08 | Economics, CO₂, exergy, scaling | merged (66acde7) | [#12](https://github.com/Amaechi/gemini_digital_twin_private/pull/12) | TL-14/22/23; C0 LCOH 137 $/MWh ≈ ACM cap |
 | WP-09 | Verifier, memory, logging | merged (901e110) | [#9](https://github.com/Amaechi/gemini_digital_twin_private/pull/9) | 41-check DesignVerifier |
 | WP-10 | Agents, runner, CLI | merged (2285460; review a9083b7) | [#4](https://github.com/Amaechi/gemini_digital_twin_private/pull/4), [#6](https://github.com/Amaechi/gemini_digital_twin_private/pull/6) | policy P0–P10 on stubs |
-| WP-11 | Optimisation & uncertainty | in review | [#18](https://github.com/Amaechi/gemini_digital_twin_private/pull/18) | TL-13/15 |
+| WP-10 L-1 | LLM-path hardening from L-1 | in review | [#19](https://github.com/Amaechi/gemini_digital_twin_private/pull/19) | kinds, call limits, dup guard, DR criteria |
+| WP-11 | Optimisation & uncertainty | merged (78491fe) | [#18](https://github.com/Amaechi/gemini_digital_twin_private/pull/18) | TL-13/15 |
 | WP-12 | Model gap & Model Builder | merged (b81cfa9) | [#15](https://github.com/Amaechi/gemini_digital_twin_private/pull/15) | TL-17/18; S7 demo |
 | WP-13 | Eval suite & submission checks | merged (a622551) | [#16](https://github.com/Amaechi/gemini_digital_twin_private/pull/16) | S1–S11; SUB-01…24 |
 | WP-14 | Integration run & figures | todo | | Batch 7 |
@@ -25,7 +26,7 @@ Keep it ≤ 20 KB; it is the hand-off between sessions. Old detail: merged PRs a
 | WP-15 | Final review & packaging | todo | | |
 
 Status: todo · in progress · in review · merged · blocked (say why).
-Latest full suite (WP-11 branch, 2026-11-01): `PYTHONPATH=src python -m pytest -q unit_test/gemini_model unit_test/gemini_simulator unit_test/gemini_agent -x` → **1247 passed**.
+Latest full suite (L-1 follow-up, 11-02): `PYTHONPATH=src python -m pytest -q unit_test/gemini_model unit_test/gemini_simulator unit_test/gemini_agent -x` → **1273 passed**.
 Next: Batch 7 (WP-14).
 
 ## Decisions log (newest first)
@@ -77,6 +78,9 @@ One line per decision, grouped by WP; dated 11-01 (WP-00: 10-31). Why: the `conf
 **WP-02**
 - COOL-ELC η 0.508 [D] (COP 4.39 @ 7.2/32.2 °C), COP cap 8; COOL-HR `include_heat_rejection_auxiliaries`; cooling = `StaticModel`s, `power_th` = useful cooling, 20/26 °C.
 - COOL-ABS-B 1.15; 85 °C drive → COP 0.64; COOL-ABS-DRV ≈ 13.9 m³/h per MW; PL 0.65 → 0.47 at 10 %; AUX 2.2 %; COOL-FC T_db + 8 K; HEX per-side ρ/c_p.
+**WP-10 L-1 follow-up** (11-02)
+- kind set from tool before validation (`validation_context` hook, `KIND_COERCED`); prompt STEP_KINDS + 2nd example. `llm.yaml calls`: `reasoning_effort` "none", `max_tokens` (profile flag), `request_timeout`; Ollama's grammar skips thinking.
+- dup guard: engine steps; tool + normalised args + `ToolContext` hash, same loop; open required tool may repeat once; 2nd repeat closes phase; reviewer sees its rejections. DR: criteria + `evidence_keys`; choice ∈ best, rationale names key. Touched `schemas/config.py`, `llm.yaml`, `eval/harness.py`.
 **WP-10 review**
 - AG-02 refuses digits outside an id; AG-06 needs a design word; DB-30 'B' = no outage; DR-10 never offers REJECTED.
 
@@ -120,6 +124,7 @@ One line per decision, grouped by WP; dated 11-01 (WP-00: 10-31). Why: the `conf
 - WP-13: none.
 - WP-12: none (limitations are gap-analysis entries, not register values).
 - WP-11: OPT-SPACE, OPT-OBJ, OPT-DE, UQ-RANGES, UQ-CASES, UQ-MC.
+- WP-10 L-1 follow-up: none.
 
 ## Open follow-ups (grouped by the WP that must act)
 **WP-07** (old items done)
@@ -130,18 +135,16 @@ One line per decision, grouped by WP; dated 11-01 (WP-00: 10-31). Why: the `conf
 - Treat as API: `simulate_day._flag_text/_heat_pump_margins/_heat_pump_screening`, `Mixer._MIN_TOTAL_FLOW`
 
 **WP-11**
-- Done: all former WP-11 items (UQ-RANGES, UQ-CASES incl. DB-31 45/65/75, ECO-CO2-GAS 51.53, CHP-EL-FRAC 0.50; tornado; levers).
 - WP-14: bind `optimise_design` / `uncertainty` (stub names); SUB-11 needs a `*sensitivity*` tool (WP-08 `cost_sensitivity`); S6 from `UncertaintyReport.cases` (`DB-31=…`); DR-06 = `best.outage_start_indices`; TL-13 `rejected` → `ToolContext.guard_failed`.
 - WP-08/15: no HT-ATES capex on RC-10 ⇒ C6 unpriced; WACC view (ECO-06) missing.
 - WP-14: 3.2 km optimum has T_wh ≈ 105 °C: ≈ 1 % flashes in the 0 bar(g) degasser, NPSH unchecked ⇒ separator p ≥ p_sat + margin or take 3000 m. Install TL-15 `robust_backup_mw` (DR). C2 at ≥ 3 km = C1 + inert HTHP ⇒ optimise C1/C3/C4 too.
+- C2 optimum/MC numbers: [#18](https://github.com/Amaechi/gemini_digital_twin_private/pull/18) hand-off, `runs/wp11-c2/`.
 - Treat as API: `FastPlant._model`, `.carries`, `.run` (TL-13/15 `ScenarioPlant` hooks: overrides + memo).
 **WP-12**
-- Done: PROGRESS gaps → LIM-SUB-01…08, LIM-PLT-01…05, LIM-GEM-01, LIM-TOOL-01.
 - WP-14: report `limitations` from `TR-*_model_gap_analysis.json`; LLM P4 calls the tools directly (no `check_draft`) and `register_model` mutates the live registry; use `ModelBuilder.close_gaps` if a gap appears.
 - L-2: `python -m gemini_agent.agents.model_builder --sandbox runs/s7_demo [--model TAG]` runs generated tests locally (review first). WP-15: promotion = copy folders + registry + `.rst` via PR.
 
 **WP-13**
-- Done: SUB-03 (verdict), SUB-04 (stub calls), SUB-05 (DR stub evidence), SUB-13 (placeholders) fail; SUB-14 flags `cost_items[].verify` (RC-05).
 - WP-14: promote pending checks once they pass (S1 ACCEPTED + 0 stubs; S7 gap via WP-12; S8 re-size + DR explains; S6 DB-31 sensitivity via WP-11); S5 confirm-basis InputRequest; S2 detect inputs missing from the request (DB-30 question names demand, not cooling/reservoir).
 - L-1/L-2: `run_eval.py --engine llm --model <tag> --eval-root runs/final/eval` per model, then `--compare runs/final/eval/<a> runs/final/eval/<b> --eval-root runs/final/eval`; final run in `runs/final/<id>/` in ask mode (SUB-02 approval).
 - WP-15: README must document API placeholders (SUB-22 warns); CI ruff skips `scripts/`; GEMINI non-.py edits (e.g. `pyproject.toml` notice ≈ line 90) checked by hand (SUB-21 warns if any).
@@ -154,11 +157,13 @@ One line per decision, grouped by WP; dated 11-01 (WP-00: 10-31). Why: the `conf
 - WP-08: `economics(EconomicsRequest, annual)`, `co2_emissions(Co2Request, annual)`, `exergy_kpi(annual, climate=, base_kpis=)`, `cost_sensitivity`, `scaling_check(ScalingRequest)` (C7 `co2_release_pressure_barg` from TL-05), `pipe_heat_loss`; C0 CO₂ first (`c0_co2_t_per_yr`).
 - Register `verify_design_spec(collector)` before stubs go off (else P9 escalates); collector = `verification_evidence(candidate, days)` + `EspPoint(**point.esp_evidence.model_dump())`, `bubble_point.release_pressure_barg` (bare, gauge), `AbsorptionPoint`, subsurface, scaling, `stub_evidence`.
 - Verifier gaps: unchecked TL-05 `feasible`, `flow_error_frac ≤ 0.01`, `intake_margin_bar ≥ 0`, TL-08 `within_limit`, TL-07 `breakthrough_after_horizon` (ENG-06); unread cooling `validity_warnings`, `DayResult.flags` (margins carry them, PH-21); `HeatPumpPoint` lacks max sink T.
+- DR KPI criteria need real KPIs; keep result field names (`lcoh_per_mwh`, `verdict`: `data_keys`).
 - Wire `DesignCache` (versioned), `JsonProjectKnowledgeStore(runs_root).ingest_events(...)` (may pre-fill P1 gaps). WP-12 gaps = report limitations.
 
 **L-1 / L-2**
 - Confirm tags with `ollama show <tag>` (must list `tools`). Set `OLLAMA_CONTEXT_LENGTH=65536` before `cli run --engine llm` (`num_ctx` ignored); `--model TAG` overrides orchestrator and coder.
 - Act/format split (spec §5.4.3) not implemented: add it if L-1 shows tool-call problems. Paused LLM runs from before a9083b7 may not reload.
+- **Re-run L-1** (S11, 5 models) after [#19](https://github.com/Amaechi/gemini_digital_twin_private/pull/19): fallbacks, `kind_coercions`, `step_rejections`, tokens/phase; no "Thinking Process" in content, no call > `request_timeout_s`. gpt-oss can't disable reasoning; `thinking: true` needs more `max_output_tokens`.
 
 **WP-15**
 - Header audit of adapted Plant Debugger files (`NOTICE`).
@@ -173,4 +178,4 @@ One line per decision, grouped by WP; dated 11-01 (WP-00: 10-31). Why: the `conf
 See spec §17. Answers: —
 
 ## Hand-off notes (latest session writes here, replace previous)
-2026-11-01, WP-11: TL-13/15 real (WP-14 binds). `PYTHONPATH=src python scripts/run_optimisation.py --run-id wp11-c2 --workers 4` (4 vCPU): optimisation **407 s** (162 evals; target < 15 min), uncertainty **951 s** (200 MC + 34 OAT + 8 cases). C2 optimum 2×3200 m, 300 m³/h, HTHP 0.5 (inert), boiler 0.05, e-chiller 8.2 MW, outages d154/d239: LCOH 30.2 + LCOC 24.7 = 54.9 USD/MWh, CO₂ 3790 t/yr. MC P10/P50/P90 LCOH 25.8/33.3/44.6, LCOC 19.5/25.3/32.4; P(demand met) 56 % → 90 % with boiler 2.05 MW (+0.7 USD/MWh LCOH). Outputs (19dde76; unchanged since) in `runs/wp11-c2/`.
+2026-11-02, WP-10 L-1 follow-up (wire body tested via MockTransport). Next: L-1 re-run; WP-14.

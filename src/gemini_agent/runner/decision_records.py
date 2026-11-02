@@ -5,13 +5,22 @@ only by a deterministic rule: the option holding the top candidate of
 ``ranking.rank_candidates`` (the optimiser's rule, so DRs agree with the selected design), a
 register default (DR-06, DR-08) or a spec rule (DR-09). Evidence ids are
 tool-result ids (``TR-…``) or config references (``config:…``).
+
+Criteria (L-1 follow-up): each question also offers decisive criteria evaluated here on the tool
+results — the recommendation rule first, then KPI criteria that discriminate between the
+eligible options — and the evidence keys a rationale may cite (field names of the evidence tool
+results, the tools, assumption ids). A choice names one criterion and must be one of its best
+options, so its rationale is grounded and cannot contradict itself.
 """
 
 from __future__ import annotations
 
 import json
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from pathlib import Path
+from typing import Any, Literal
+
+from pydantic import BaseModel
 
 from gemini_agent.runner import ranking
 from gemini_agent.runner.state import RunState
@@ -19,6 +28,7 @@ from gemini_agent.schemas.candidate import Candidate
 from gemini_agent.schemas.config import load_config
 from gemini_agent.schemas.decision import (
     DR_TITLES,
+    DecisionCriterion,
     DecisionOption,
     DecisionQuestion,
     DecisionRecord,
@@ -28,6 +38,7 @@ from gemini_agent.schemas.decision import (
     Phase,
     RejectedOption,
     Role,
+    key_tokens,
 )
 
 DR_QUESTIONS: dict[str, tuple[str, Role]] = {
@@ -68,10 +79,60 @@ def _base_concept(candidate: Candidate, by_id: dict[str, Candidate]) -> str:
     return candidate.concept
 
 
+Members = dict[str, list[str]]
+"""Option id → candidate ids it stands for (usable ones only; empty for non-candidate DRs)."""
+
+KPI_CRITERIA: tuple[tuple[str, Literal["lowest", "highest"]], ...] = (
+    ("lcoh_per_mwh", "lowest"),
+    ("lcoc_per_mwh", "lowest"),
+    ("unmet_heating_mwh", "lowest"),
+    ("unmet_cooling_mwh", "lowest"),
+    ("co2_t_per_yr", "lowest"),
+    ("capex_million", "lowest"),
+    ("exergy_efficiency_frac", "highest"),
+)
+"""``KPISet`` fields offered as decisive criteria when they discriminate between options."""
+
+_KPI_TOOLS = ("economics", "simulate_annual")
+"""Tools whose ``KPISet`` results fill ``RunState.kpis`` (preferred source first)."""
+
+
+def result_keys(data: Any) -> list[str]:
+    """Field names in a tool result's data, nested models included (the citable evidence keys).
+
+    Lists and mappings are sampled by their first item (results are homogeneous); keys of a
+    top-level mapping count, keys of nested mappings (equipment names) do not.
+    """
+    keys: dict[str, None] = {}
+
+    def walk(value: Any, depth: int) -> None:
+        if depth > 5:
+            return
+        if isinstance(value, BaseModel):
+            for name in type(value).model_fields:
+                keys[name] = None
+                walk(getattr(value, name), depth + 1)
+        elif isinstance(value, Mapping):
+            for name, item in list(value.items())[: 1 if depth else None]:
+                if depth == 0 and isinstance(name, str):
+                    keys[name] = None
+                walk(item, depth + 1)
+        elif isinstance(value, list | tuple) and value:
+            walk(value[0], depth + 1)
+
+    walk(data, 0)
+    return list(keys)
+
+
 def _group_options(
-    state: RunState, key_fn: Callable[[Candidate], tuple[str, str] | None]
+    state: RunState,
+    key_fn: Callable[[Candidate], tuple[str, str] | None],
+    usable_by_option: Members | None = None,
 ) -> tuple[list[DecisionOption], str | None]:
-    """Group geothermal candidates into options; return the options and the top-ranked key."""
+    """Group geothermal candidates into options; return the options and the top-ranked key.
+
+    ``usable_by_option`` (if given) receives option id → usable candidate ids.
+    """
     groups: dict[str, tuple[str, list[str]]] = {}
     for candidate in state.candidates:
         if candidate.concept == "C0":
@@ -99,6 +160,8 @@ def _group_options(
         evidence = [r.id for r in state.evidence_for(candidate_ids=set(members))]
         usable = [m for m in members if m not in excluded]
         dropped = [m for m in members if m in excluded]
+        if usable_by_option is not None:
+            usable_by_option[option_id] = usable
         notes = f"candidates: {', '.join(usable) or 'none'}"
         if dropped:
             notes += f"; excluded by DesignGuard/verifier: {', '.join(dropped)}"
@@ -123,16 +186,25 @@ def _tool_evidence(state: RunState, *tools: str) -> list[str]:
 
 def build_options(dr_id: str, state: RunState, config_dir: Path | None) -> list[DecisionOption]:
     """Options for one Decision Record from the current run state."""
+    return _build_options(dr_id, state, config_dir, {})
+
+
+def _build_options(
+    dr_id: str, state: RunState, config_dir: Path | None, members: Members
+) -> list[DecisionOption]:
+    """``build_options``; ``members`` receives option id → usable candidate ids."""
     by_id = {c.id: c for c in state.candidates}
     if dr_id == "DR-01":
         options, _ = _group_options(
-            state, lambda c: (f"{c.doublets}-doublets", f"{c.doublets} doublet(s)")
+            state, lambda c: (f"{c.doublets}-doublets", f"{c.doublets} doublet(s)"), members
         )
         return sorted(options, key=lambda o: o.id)
     if dr_id == "DR-02":
         basis = load_config("design_basis", config_dir)
         options, _ = _group_options(
-            state, lambda c: (f"depth-{c.depth_m:g}m", f"Reservoir at {c.depth_m:g} m TVD")
+            state,
+            lambda c: (f"depth-{c.depth_m:g}m", f"Reservoir at {c.depth_m:g} m TVD"),
+            members,
         )
         default = f"depth-{basis.reservoir.mid_depth_m:g}m"
         for option in options:
@@ -140,9 +212,9 @@ def build_options(dr_id: str, state: RunState, config_dir: Path | None) -> list[
                 option.evidence_ids.append("config:design_basis.yaml#DB-01")
         return options
     if dr_id == "DR-03":
-        return _group_options(state, lambda c: _HEAT_TOPUP.get(_base_concept(c, by_id)))[0]
+        return _group_options(state, lambda c: _HEAT_TOPUP.get(_base_concept(c, by_id)), members)[0]
     if dr_id == "DR-04":
-        return _group_options(state, lambda c: _COOLING.get(_base_concept(c, by_id)))[0]
+        return _group_options(state, lambda c: _COOLING.get(_base_concept(c, by_id)), members)[0]
     if dr_id == "DR-05":
         return _group_options(
             state,
@@ -151,6 +223,7 @@ def build_options(dr_id: str, state: RunState, config_dir: Path | None) -> list[
                 if c.concept == "C6"
                 else ("no-storage", "No seasonal storage")
             ),
+            members,
         )[0]
     if dr_id == "DR-07":
         return _group_options(
@@ -160,6 +233,7 @@ def build_options(dr_id: str, state: RunState, config_dir: Path | None) -> list[
                 if c.gas_handling
                 else None
             ),
+            members,
         )[0]
     if dr_id == "DR-06":
         evidence = _tool_evidence(state, "optimise_design") + ["config:assumptions.yaml#DB-30"]
@@ -251,11 +325,190 @@ def build_options(dr_id: str, state: RunState, config_dir: Path | None) -> list[
     raise KeyError(dr_id)
 
 
+def evidence_keys(state: RunState, options: list[DecisionOption]) -> list[str]:
+    """Citable keys of the options' evidence: result field names, tools and assumption ids."""
+    records = {record.id: record for record in state.tool_results}
+    keys: dict[str, None] = {}
+    for option in options:
+        for evidence_id in option.evidence_ids:
+            record = records.get(evidence_id)
+            if record is not None:
+                keys[record.tool] = None
+                keys.update(dict.fromkeys(record.data_keys))
+            elif evidence_id.startswith("config:") and "#" in evidence_id:
+                keys[evidence_id.rsplit("#", 1)[1]] = None
+    return sorted(keys)
+
+
+def _evidence_with(state: RunState, options: list[DecisionOption], key: str) -> list[str]:
+    """Evidence ids of the options whose tool result holds ``key`` (or is the tool ``key``)."""
+    wanted = {e for option in options for e in option.evidence_ids}
+    return [
+        r.id for r in state.tool_results if r.id in wanted and (key in r.data_keys or r.tool == key)
+    ]
+
+
+def _rule_criterion(
+    dr_id: str,
+    state: RunState,
+    options: list[DecisionOption],
+    keys: list[str],
+) -> DecisionCriterion | None:
+    """Return the workflow's recommendation rule as a criterion (best = recommended option)."""
+    best = [o.id for o in options if o.eligible and o.recommended]
+    if not best:
+        best = [next(o.id for o in options if o.eligible)]
+        recommended = False
+    else:
+        recommended = True
+
+    def pick(*preferred: str) -> str | None:
+        return next((key for key in preferred if key in keys), None)
+
+    def make(cid: str, key: str, source: str, text: str) -> DecisionCriterion:
+        evidence = _evidence_with(state, options, key) or sorted(
+            {e for o in options if o.id in best for e in o.evidence_ids}
+        )
+        return DecisionCriterion(
+            id=cid, key=key, source=source, text=text, best_option_ids=best, evidence_ids=evidence
+        )
+
+    if dr_id == "DR-06" and recommended and "DB-30" in keys:
+        text = "only option meeting DB-30: non-overlapping outages in the lowest-load windows"
+        return make("db30-non-overlapping", "DB-30", "assumptions register", text)
+    if dr_id == "DR-08" and "DB-31" in keys:
+        answered = any(a.assumption_id == "DB-31" and a.source == "user" for a in state.answers)
+        how = "user answer" if answered else "register default kept"
+        text = f"{how} for the district-heating return temperature (DB-31)"
+        return make("db31-answer", "DB-31", "assumptions register", text)
+    if dr_id == "DR-09":
+        key = pick("brine", "load_design_basis")
+        if key is not None:
+            text = f"materials check of spec §10.1 for saline brine ({key})"
+            return make("spec-materials-check", key, "load_design_basis", text)
+    if dr_id == "DR-10":
+        key = pick("verdict")
+        if key is not None:
+            text = "selected design whose latest verifier verdict is not REJECTED"
+            return make("selected-not-rejected", key, "verify_design", text)
+        key = next(iter(keys), None)
+        if key is None:
+            return None
+        return make(
+            "selected-design", key, key, f"only eligible option: the selected design ({key})"
+        )
+    if dr_id in _CANDIDATE_DRS and recommended and ranking.has_kpi_evidence(state.kpis):
+        source = pick(*_KPI_TOOLS)
+        if source is not None and "lcoh_per_mwh" in keys:
+            text = (
+                f"lowest lcoh_per_mwh among guard-passed candidates without unmet demand "
+                f"in {source}"
+            )
+            return make("ranking-lowest-lcoh_per_mwh", "lcoh_per_mwh", source, text)
+    if dr_id in _CANDIDATE_DRS and "passed" in keys:
+        if not recommended:
+            text = "first eligible option in the offered order; its candidates passed the guard"
+            return make("first-eligible-passed", "passed", "design_guard", text)
+        if ranking.has_kpi_evidence(state.kpis):
+            text = "option holding the top-ranked candidate that passed the guard"
+            return make("top-ranked-passed", "passed", "design_guard", text)
+        text = (
+            "option holding the first candidate in generation order that passed the guard; "
+            "costs not computed yet"
+        )
+        return make("generation-order-passed", "passed", "design_guard", text)
+    key = next(iter(keys), None)
+    if key is None:
+        return None
+    if recommended:
+        return make(
+            "workflow-recommended", key, key, f"option the workflow rule recommends ({key})"
+        )
+    return make("offered-order", key, key, f"first eligible option in the offered order ({key})")
+
+
+_CANDIDATE_DRS = frozenset({"DR-01", "DR-02", "DR-03", "DR-04", "DR-05", "DR-07"})
+"""DRs whose options group screened candidates (DR-10 offers the shortlist itself)."""
+
+
+def _kpi_criteria(
+    state: RunState,
+    options: list[DecisionOption],
+    members: Members,
+    keys: list[str],
+) -> list[DecisionCriterion]:
+    """KPI criteria that discriminate between the eligible options (values from ``state.kpis``)."""
+    eligible = [o for o in options if o.eligible]
+    if len(eligible) < 2:
+        return []
+    criteria = []
+    for key, direction in KPI_CRITERIA:
+        if key not in keys:
+            continue
+        choose = min if direction == "lowest" else max
+        values: dict[str, float] = {}
+        for option in eligible:
+            found = [
+                getattr(state.kpis[c], key)
+                for c in members.get(option.id, [])
+                if c in state.kpis and getattr(state.kpis[c], key) is not None
+            ]
+            if found:
+                values[option.id] = choose(found)
+        if len(values) < 2:
+            continue  # an option without data cannot lose: nothing to compare
+        target = choose(values.values())
+        best = [option_id for option_id, value in values.items() if value == target]
+        if len(best) == len(eligible):
+            continue  # every option ties: the criterion cannot decide
+        source = next(
+            (r.tool for r in reversed(state.tool_results) if r.tool in _KPI_TOOLS and r.ok), None
+        )
+        where = f" in {source}" if source in keys else ""
+        criteria.append(
+            DecisionCriterion(
+                id=f"{direction}-{key}",
+                key=key,
+                source=source or "tool results",
+                text=f"{direction} {key} among the eligible options{where}",
+                best_option_ids=best,
+                evidence_ids=_evidence_with(state, options, key),
+            )
+        )
+    return criteria
+
+
+def build_criteria(
+    dr_id: str,
+    state: RunState,
+    options: list[DecisionOption],
+    members: Members,
+    keys: list[str],
+) -> list[DecisionCriterion]:
+    """Decisive criteria for a question: the recommendation rule first, then KPI criteria."""
+    rule = _rule_criterion(dr_id, state, options, keys)
+    criteria = [rule] if rule is not None else []
+    for criterion in _kpi_criteria(state, options, members, keys):
+        duplicate = any(
+            c.key == criterion.key and c.best_option_ids == criterion.best_option_ids
+            for c in criteria
+        )
+        if not duplicate:
+            criteria.append(criterion)
+    allowed = set(keys) | {o.id for o in options}
+    # A criterion may only cite keys the evidence holds (DecisionQuestion re-checks this).
+    return [c for c in criteria if all(k in allowed for k in [c.key, *key_tokens(c.text)])]
+
+
 def build_question(dr_id: str, state: RunState, phase: Phase, config_dir: Path | None):
     """``DecisionQuestion`` for a DR, or None if the run has no options for it yet."""
-    options = build_options(dr_id, state, config_dir)
+    members: Members = {}
+    options = _build_options(dr_id, state, config_dir, members)
     if not options or not any(option.eligible for option in options):
         return None
+    if dr_id == "DR-10":
+        members = {option.id: [option.id] for option in options}
+    keys = evidence_keys(state, options)
     question, role = DR_QUESTIONS[dr_id]
     return DecisionQuestion(
         dr_id=dr_id,  # type: ignore[arg-type]
@@ -264,6 +517,8 @@ def build_question(dr_id: str, state: RunState, phase: Phase, config_dir: Path |
         phase=phase,
         role=role,
         options=options,
+        criteria=build_criteria(dr_id, state, options, members, keys),
+        evidence_keys=keys,
     )
 
 
@@ -293,6 +548,7 @@ def make_record(
         evidence_ids=evidence,
         choice=chosen.id,
         choice_label=chosen.label,
+        criterion=question.criterion(choice.criterion),
         rationale=choice.rationale,
         rejected=rejected,
         decision_source=source,
@@ -309,8 +565,20 @@ def render_markdown(record: DecisionRecord) -> str:
         f"- Decision source: **{record.decision_source}**",
         f"- Question: {record.question}",
         f"- **Choice: {record.choice}** — {record.choice_label}",
-        f"- Why: {record.rationale}",
     ]
+    if record.criterion is not None:
+        evidence = ", ".join(record.criterion.evidence_ids) or "—"
+        lines.append(
+            f"- Decisive criterion: {record.criterion.text} (key `{record.criterion.key}` from "
+            f"{record.criterion.source}; evidence {evidence})"
+        )
+    lines += [f"- Why: {record.rationale}"]
+    recommended = [o.id for o in record.options if o.recommended]
+    if recommended and record.choice not in recommended:
+        lines.append(
+            f"- Note: differs from the workflow-recommended option {', '.join(recommended)}; the "
+            "selected design follows the workflow ranking."
+        )
     if record.stub_evidence:
         lines.append("- WARNING: evidence includes stub tool results; not a final decision.")
     lines += ["", "| Option | Label | Eligible | Recommended | Evidence |", "|---|---|---|---|---|"]

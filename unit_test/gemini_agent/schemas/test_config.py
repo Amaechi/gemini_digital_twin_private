@@ -344,6 +344,9 @@ def test_llm_config(configs):
     assert {"16gb", "36gb"} <= set(llm.profiles)
     assert llm.active().orchestrator
     assert llm.temperatures.extraction == 0.0
+    # L-1 follow-up: per-call limits for structured-output calls
+    assert llm.calls.thinking is False
+    assert llm.calls.max_output_tokens == 2048 and llm.calls.request_timeout_s == 300.0
 
 
 def test_loader_errors_and_env_override(tmp_path, monkeypatch):

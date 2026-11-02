@@ -5,13 +5,17 @@ from pydantic import ValidationError
 
 from gemini_agent.schemas.decision import (
     DR_TITLES,
+    PRE_VALIDATE_HOOK,
     Decision,
+    DecisionCriterion,
     DecisionOption,
     DecisionQuestion,
     NextStep,
     OptionChoice,
     Phase,
     Role,
+    key_tokens,
+    names_key,
 )
 
 
@@ -147,3 +151,83 @@ def test_escalation_reasons_must_not_state_numbers():
     NextStep(kind="escalate", rationale="No candidate passes DesignGuard; see TR-004.")
     # tool-step rationales stay in the trace only; they may quote tool numbers
     NextStep(kind="call_tool", tool="knowledge_search", rationale="Check the 40 K limit.")
+
+
+def test_decision_pre_validate_hook_runs_only_with_a_context():
+    """Fix 1: the LLM engine repairs raw data through the validation context; nobody else does."""
+    raw = {
+        "phase": "P3",
+        "steps": [{"kind": "call_tool", "tool": "design_guard", "rationale": "x"}],
+    }
+    with pytest.raises(ValidationError, match="its own step kind"):
+        Decision.model_validate(raw)
+
+    def fix(data):
+        return {**data, "steps": [{**step, "kind": "verify"} for step in data["steps"]]}
+
+    decision = Decision.model_validate(raw, context={PRE_VALIDATE_HOOK: fix})
+    assert decision.steps[0].kind == "verify"
+
+
+def _criterion(**kwargs) -> DecisionCriterion:
+    values = {
+        "id": "lowest-lcoh_per_mwh",
+        "key": "lcoh_per_mwh",
+        "source": "economics",
+        "text": "lowest lcoh_per_mwh among the eligible options",
+        "best_option_ids": ["a"],
+    }
+    return DecisionCriterion(**{**values, **kwargs})
+
+
+def test_decision_criterion_names_its_key_without_numbers():
+    """Fix 4: a criterion's text names its key and states no number."""
+    _criterion()
+    with pytest.raises(ValidationError, match="must name its key"):
+        _criterion(text="cheapest heat")
+    with pytest.raises(ValidationError, match="quantities"):
+        _criterion(text="lcoh_per_mwh below 50 USD")
+
+
+def test_decision_question_checks_criteria():
+    """Fix 4: best options must be eligible; a criterion cites only the question's evidence keys."""
+    options = [DecisionOption(id="a", label="A"), DecisionOption(id="b", label="B", eligible=False)]
+    kwargs = {"dr_id": "DR-01", "title": "t", "question": "q", "phase": "P5", "role": Role.REVIEWER}
+    keys = ["lcoh_per_mwh", "economics"]
+    question = DecisionQuestion(
+        options=options, criteria=[_criterion()], evidence_keys=keys, **kwargs
+    )
+    assert question.criterion("lowest-lcoh_per_mwh").key == "lcoh_per_mwh"
+    assert question.criterion("other") is None
+    with pytest.raises(ValidationError, match="must be eligible"):
+        DecisionQuestion(
+            options=options,
+            criteria=[_criterion(best_option_ids=["b"])],
+            evidence_keys=keys,
+            **kwargs,
+        )
+    with pytest.raises(ValidationError, match="outside evidence_keys"):
+        DecisionQuestion(
+            options=options, criteria=[_criterion()], evidence_keys=["economics"], **kwargs
+        )
+    with pytest.raises(ValidationError, match="duplicate criterion"):
+        DecisionQuestion(options=options, criteria=[_criterion()] * 2, evidence_keys=keys, **kwargs)
+
+
+def test_key_tokens_find_snake_case_citations_only():
+    """Snake_case identifiers are cited keys; option ids, evidence refs and words are not."""
+    text = (
+        "lowest lcoh_per_mwh in economics via design_guard; 3-doublets wins; "
+        "see config:design_basis.yaml#DB-01 and TR-012, not economics.fake_key"
+    )
+    refs = ["config:design_basis.yaml#DB-01", "TR-012"]
+    assert key_tokens(text, refs) == ["lcoh_per_mwh", "design_guard", "fake_key"]
+    assert "design_basis" in key_tokens(text)  # unless the reference is removed first
+
+
+def test_names_key_matches_whole_words_only():
+    """A criterion key must be named as a word: 'passed' is not in 'bypassed'."""
+    assert names_key("candidates passed the guard", "passed")
+    assert not names_key("the guard was bypassed", "passed")
+    assert not names_key("lowest lcoh_per_mwh_total", "lcoh_per_mwh")
+    assert names_key("register default (DB-31)", "DB-31")
