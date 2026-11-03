@@ -29,7 +29,7 @@ Keep it ≤ 20 KB; it is the hand-off between sessions. Old detail: merged PRs a
 | WP-15 | Final review & packaging | todo | | |
 
 Status: todo · in progress · in review · merged · blocked (say why).
-Latest full suite (WP-10 P0, 11-02): `PYTHONPATH=src python -m pytest -q unit_test/gemini_model unit_test/gemini_simulator unit_test/gemini_agent -x` → **1326 passed** (here 8 min 16 s; the working-tree snapshot check failed only because files were edited during the run and passed when re-run). CLI smoke `--budget smoke`: CI 22.8 s.
+Latest full suite (WP-12 follow-up, 11-03): `PYTHONPATH=src python -m pytest -q unit_test/gemini_model unit_test/gemini_simulator unit_test/gemini_agent -x` → **1332 passed** (6 min 40 s on a clean tree; a first run failed only the working-tree snapshot check because PROGRESS.md was edited during it). CLI smoke `--budget smoke`: CI 22.8 s.
 Next: re-run L-1 (CLOUD_SETUP §7.3) with this fix, L-2, then WP-15.
 
 ## Decisions log (newest first)
