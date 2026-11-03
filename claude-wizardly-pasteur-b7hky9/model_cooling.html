@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>5.8. Cooling &mdash; GEMINI Geothermal Digital Twin (claude/wizardly-pasteur-b7hky9)</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=19f00094" />
+
+  
+  <!--[if lt IE 9]>
+    <script src="_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="_static/jquery.js?v=5d32c60e"></script>
+        <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+        <script src="_static/documentation_options.js?v=f72906ec"></script>
+        <script src="_static/doctools.js?v=9a2dae69"></script>
+        <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+        <script async="async" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="5.9. Heat pump, electric boiler and thermal storage" href="model_heating.html" />
+    <link rel="prev" title="5.7. Surface Equipment" href="model_surface_equipment.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            GEMINI Geothermal Digital Twin
+          </a>
+              <div class="version">
+                claude/wizardly-pasteur-b7hky9
+              </div>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Table of Contents</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="index_about_gemini.html">1. About GEMINI</a></li>
+<li class="toctree-l1"><a class="reference internal" href="index_getting_started.html">2. Getting started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="index_setup.html">3. Set-up</a></li>
+<li class="toctree-l1"><a class="reference internal" href="index_applications.html">4. Applications</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index_models.html">5. Models</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="model_well_esp.html">5.1. Pump: Electrical Submersible Pump (ESP)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="model_well_hydraulics.html">5.2. Well: Pressure and Temperature Hydraulics</a></li>
+<li class="toctree-l2"><a class="reference internal" href="model_fluid_pvt.html">5.3. Fluid: PVT Properties</a></li>
+<li class="toctree-l2"><a class="reference internal" href="model_reservoir.html">5.4. Reservoir Performance Models</a></li>
+<li class="toctree-l2"><a class="reference internal" href="model_corrosion.html">5.5. Corrosion: CO2 Corrosion Rate</a></li>
+<li class="toctree-l2"><a class="reference internal" href="model_erosion.html">5.6. Erosion: Erosional Velocity/Rate</a></li>
+<li class="toctree-l2"><a class="reference internal" href="model_surface_equipment.html">5.7. Surface Equipment</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">5.8. Cooling</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#description">5.8.1. Description</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#absorption-chiller">5.8.2. Absorption chiller</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#electric-chiller">5.8.3. Electric chiller</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#heat-rejection">5.8.4. Heat rejection</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#free-cooling">5.8.5. Free cooling</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#example-project">5.8.6. Example project</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#references">5.8.7. References</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="model_heating.html">5.9. Heat pump, electric boiler and thermal storage</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="index_sourcecode.html">6. Source code documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="glossary.html">7. Glossary</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">GEMINI Geothermal Digital Twin</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="index_models.html"><span class="section-number">5. </span>Models</a></li>
+      <li class="breadcrumb-item active"><span class="section-number">5.8. </span>Cooling</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/model_cooling.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="cooling">
+<h1><span class="section-number">5.8. </span>Cooling<a class="headerlink" href="#cooling" title="Link to this heading"></a></h1>
+<section id="description">
+<h2><span class="section-number">5.8.1. </span>Description<a class="headerlink" href="#description" title="Link to this heading"></a></h2>
+<p>The cooling models describe how district cooling (20 °C supply, 26 °C return) can be produced
+next to a geothermal doublet: a hot-water driven <strong>absorption chiller</strong>, an <strong>electric
+(vapour-compression) chiller</strong>, <strong>heat rejection</strong> to ambient (wet cooling tower or dry cooler) and
+<strong>free cooling</strong> (a water-side economiser). All four are <strong>static models</strong>
+(<code class="docutils literal notranslate"><span class="pre">gemini_model.model_abstract.StaticModel</span></code>) registered for project JSON files as
+<code class="docutils literal notranslate"><span class="pre">absorption_chiller</span></code>, <code class="docutils literal notranslate"><span class="pre">electric_chiller</span></code>, <code class="docutils literal notranslate"><span class="pre">heat_rejection</span></code> and <code class="docutils literal notranslate"><span class="pre">free_cooling</span></code>.</p>
+<p>Units follow the GEMINI surface models: temperatures in °C, flows in m³/s, powers in W. New keys
+carry unit suffixes (<code class="docutils literal notranslate"><span class="pre">_degc</span></code>, <code class="docutils literal notranslate"><span class="pre">_m3s</span></code>, <code class="docutils literal notranslate"><span class="pre">_w</span></code>, <code class="docutils literal notranslate"><span class="pre">_k</span></code>). Every model outputs <code class="docutils literal notranslate"><span class="pre">power_el</span></code>
+(electricity used, W), <code class="docutils literal notranslate"><span class="pre">power_th</span></code> (useful cooling delivered, W; 0 for heat rejection) and
+<code class="docutils literal notranslate"><span class="pre">emission</span></code> (0 kg/s). Ambient dry-bulb and wet-bulb temperatures are <strong>inputs</strong>; the agent
+computes daily values from the KNMI normals (Stull wet-bulb) in <code class="docutils literal notranslate"><span class="pre">gemini_agent.tools.climate</span></code>.</p>
+<p>Each model folder holds a <code class="docutils literal notranslate"><span class="pre">REFERENCE.md</span></code> with the equations, defaults and citations (reference
+cards RC-05, RC-06, RC-07). The defaults are recorded in <code class="docutils literal notranslate"><span class="pre">config/assumptions.yaml</span></code>
+(<code class="docutils literal notranslate"><span class="pre">COOL-ABS-*</span></code>, <code class="docutils literal notranslate"><span class="pre">COOL-ELC</span></code>, <code class="docutils literal notranslate"><span class="pre">COOL-HR</span></code>, <code class="docutils literal notranslate"><span class="pre">COOL-FC</span></code>).</p>
+</section>
+<section id="absorption-chiller">
+<h2><span class="section-number">5.8.2. </span>Absorption chiller<a class="headerlink" href="#absorption-chiller" title="Link to this heading"></a></h2>
+<p><code class="docutils literal notranslate"><span class="pre">gemini_model.absorption_chiller.absorption_chiller.AbsorptionChiller</span></code> models a single-effect
+LiBr/H₂O chiller (Geo-Heat Center Guidebook 1989, Ch14 p.261–270). Two methods:</p>
+<p><strong>Method A</strong> (<code class="docutils literal notranslate"><span class="pre">method:</span> <span class="pre">&quot;ghc1989&quot;</span></code>), temperatures in °F:</p>
+<div class="math notranslate nohighlight">
+\[F_T = \frac{-239 + 1.65\,T_{hw} - 0.001\,T_{hw}^2}{100}, \qquad
+F_c = \frac{323 - 0.838\,T_{chw} - (3.77 - 0.0358\,T_{chw})\,T_{cw}}{100}\]</div>
+<div class="math notranslate nohighlight">
+\[Q_{avail} = F_T\,F_c\,Q_{nom}, \qquad COP = \frac{0.67\,(55.4 + 0.185\,T_{hw})}{100}\]</div>
+<p>valid for 40–50 °F chilled and 75–90 °F cooling water. Outside, Method A is a lower bound: by
+default chilled water above 50 °F is evaluated at 50 °F and cooling water below 75 °F at 75 °F.</p>
+<p><strong>Method B</strong> (<code class="docutils literal notranslate"><span class="pre">method:</span> <span class="pre">&quot;characteristic&quot;</span></code>, default), the characteristic equation:</p>
+<div class="math notranslate nohighlight">
+\[\Delta\Delta t = (\bar t_G - \bar t_{AC}) - B\,(\bar t_{AC} - \bar t_E), \qquad
+Q_E = s_E\,(\Delta\Delta t - \Delta\Delta t_{min}), \qquad
+Q_G = s_G\,(\Delta\Delta t - \Delta\Delta t_{min,G})\]</div>
+<p>with <span class="math notranslate nohighlight">\(B = 1.15\)</span> and coefficients calibrated to Method A at its rating points (44 °F chilled,
+85 °F cooling water, 180–240 °F hot water) by
+<code class="docutils literal notranslate"><span class="pre">gemini_model.absorption_chiller.characteristic.calibrate_to_ghc1989</span></code>:
+<span class="math notranslate nohighlight">\(s_E = 0.022260\)</span> and <span class="math notranslate nohighlight">\(s_G = 0.032491\)</span> per K (fractions of nominal capacity),
+<span class="math notranslate nohighlight">\(\Delta\Delta t_{min} = 9.503\)</span> K, <span class="math notranslate nohighlight">\(\Delta\Delta t_{min,G} = 7.453\)</span> K. On the rating
+points it reproduces Method A within 1.0 % (capacity) and 2.1 % (COP). Results at 20 °C chilled
+water are extrapolated and flagged in <code class="docutils literal notranslate"><span class="pre">validity_warnings</span></code>. Capacity never exceeds the nameplate.</p>
+<p>Energy balance: <span class="math notranslate nohighlight">\(Q_{reject} = Q_E + Q_G + P_{aux}\)</span> with <span class="math notranslate nohighlight">\(P_{aux}\)</span> = 0.077 kW/ton
+(≈ 2.2 % of <span class="math notranslate nohighlight">\(Q_E\)</span>, extra tower fan and pump) while <code class="docutils literal notranslate"><span class="pre">include_heat_rejection_auxiliaries</span></code> is
+true (default); set it to false when a <code class="docutils literal notranslate"><span class="pre">heat_rejection</span></code> component is connected, which counts the
+fan and pumps itself (<span class="math notranslate nohighlight">\(P_{aux} = 0\)</span>). Each external circuit (drive, cooling water,
+chilled water) has its own density and heat capacity; with a given flow its outlet temperature
+follows from <span class="math notranslate nohighlight">\(\rho c_p V \Delta T = Q\)</span>, otherwise a fixed ΔT is used (generator 7.2 K,
+cooling-water range 5 K) and the required flow is reported. With a given drive flow, Method B
+needs <span class="math notranslate nohighlight">\(\rho c_p V_G \ge s_G/2\)</span> (output <code class="docutils literal notranslate"><span class="pre">minimum_drive_flow_rate_m3s</span></code>; otherwise the drive
+outlet would fall below the minimum generator temperature and the machine is treated as off), and
+Method A keeps the drive outlet at or above its 71.4 °C zero-capacity temperature. At part load
+Method B lowers <span class="math notranslate nohighlight">\(\Delta\Delta t\)</span>, so the COP falls at low load.</p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 35.0%" />
+<col style="width: 65.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Input</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">drive_temperature_in_degc</span></code></p></td>
+<td><p>Hot-water (brine or clean loop) inlet temperature (°C)</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">cooling_water_temperature_in_degc</span></code></p></td>
+<td><p>Cooling-water inlet temperature (°C), e.g. a heat-rejection unit’s <code class="docutils literal notranslate"><span class="pre">water_temperature_out_degc</span></code></p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">cooling_load_w</span></code> <em>or</em> <code class="docutils literal notranslate"><span class="pre">chilled_water_flow_rate_m3s</span></code></p></td>
+<td><p>Cooling demand (W), or chilled-water flow (m³/s) with load <span class="math notranslate nohighlight">\(\rho c_p V (T_{return} - T_{supply})\)</span></p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">drive_flow_rate_m3s</span></code>, <code class="docutils literal notranslate"><span class="pre">cooling_water_flow_rate_m3s</span></code></p></td>
+<td><p><em>(optional)</em> circuit flows (m³/s)</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">chilled_water_temperature_in_degc</span></code> / <code class="docutils literal notranslate"><span class="pre">_out_degc</span></code></p></td>
+<td><p><em>(optional)</em> return temperature / supply set point (defaults 26 / 20 °C)</p></td>
+</tr>
+</tbody>
+</table>
+<p>Main outputs: <code class="docutils literal notranslate"><span class="pre">cooling_power_w</span></code>, <code class="docutils literal notranslate"><span class="pre">available_cooling_w</span></code>, <code class="docutils literal notranslate"><span class="pre">unmet_cooling_w</span></code>, <code class="docutils literal notranslate"><span class="pre">cop</span></code>,
+<code class="docutils literal notranslate"><span class="pre">drive_heat_w</span></code>, <code class="docutils literal notranslate"><span class="pre">heat_rejected_w</span></code>, <code class="docutils literal notranslate"><span class="pre">drive_temperature_out_degc</span></code>, <code class="docutils literal notranslate"><span class="pre">drive_flow_rate_m3s</span></code>,
+<code class="docutils literal notranslate"><span class="pre">cooling_water_temperature_out_degc</span></code>, <code class="docutils literal notranslate"><span class="pre">chilled_water_temperature_out_degc</span></code>,
+<code class="docutils literal notranslate"><span class="pre">validity_warnings</span></code>.</p>
+</section>
+<section id="electric-chiller">
+<h2><span class="section-number">5.8.3. </span>Electric chiller<a class="headerlink" href="#electric-chiller" title="Link to this heading"></a></h2>
+<p><code class="docutils literal notranslate"><span class="pre">gemini_model.electric_chiller.electric_chiller.ElectricChiller</span></code> (Guidebook p.257–258):</p>
+<div class="math notranslate nohighlight">
+\[COP = \eta\,\frac{T_{evap}}{T_{cond} - T_{evap}}, \qquad P_{el} = \frac{Q}{COP}, \qquad
+Q_{reject} = Q + P_{el}\]</div>
+<p>with <span class="math notranslate nohighlight">\(T_{evap} = T_{supply} - 4\)</span> K, <span class="math notranslate nohighlight">\(T_{cond} = T_{wb} + 4.5 + 5 + 3\)</span>
+(cooling tower) or <span class="math notranslate nohighlight">\(T_{db} + 8\)</span> (dry cooler), COP between 3 and 8. Inputs: <code class="docutils literal notranslate"><span class="pre">cooling_load_w</span></code>
+or <code class="docutils literal notranslate"><span class="pre">chilled_water_flow_rate_m3s</span></code>; <code class="docutils literal notranslate"><span class="pre">ambient_wet_bulb_degc</span></code> or <code class="docutils literal notranslate"><span class="pre">ambient_dry_bulb_degc</span></code>; optional
+<code class="docutils literal notranslate"><span class="pre">cooling_water_temperature_in_degc</span></code> (then <span class="math notranslate nohighlight">\(T_{cond} = T_{cw,in} + 5 + 3\)</span>). η is on this
+<strong>refrigerant basis</strong>: calibrated so that the Guidebook point (COP 4.39 at 7.2 °C chilled / 32.2 °C
+condenser leaving water) is reproduced, <span class="math notranslate nohighlight">\(\eta = 4.39 \times 32 / 276.35 = 0.508\)</span> (the
+Guidebook’s 0.39–0.40 is on the water basis; RC-06). With this η the COP cap of 8 binds at the
+Dutch design points. <span class="math notranslate nohighlight">\(P_{el}\)</span> is compressor power only.</p>
+</section>
+<section id="heat-rejection">
+<h2><span class="section-number">5.8.4. </span>Heat rejection<a class="headerlink" href="#heat-rejection" title="Link to this heading"></a></h2>
+<p><code class="docutils literal notranslate"><span class="pre">gemini_model.heat_rejection.heat_rejection.HeatRejection</span></code> (<code class="docutils literal notranslate"><span class="pre">technology</span></code>: <code class="docutils literal notranslate"><span class="pre">cooling_tower</span></code> or
+<code class="docutils literal notranslate"><span class="pre">dry_cooler</span></code>): leaving water <span class="math notranslate nohighlight">\(T_{wb} + 4.5\)</span> K (tower) or <span class="math notranslate nohighlight">\(T_{db} + 5\)</span> K (dry cooler),
+range 5 K, fan + pump power 2 % (tower) or 6 % (dry cooler) of <code class="docutils literal notranslate"><span class="pre">heat_load_w</span></code>, tower evaporation
+<span class="math notranslate nohighlight">\(Q / h_{fg}\)</span>. <code class="docutils literal notranslate"><span class="pre">chiller_heat_rejection_w</span></code> gives <span class="math notranslate nohighlight">\(Q_{reject} = Q_{cool}(1 + 1/COP)\)</span>.</p>
+</section>
+<section id="free-cooling">
+<h2><span class="section-number">5.8.5. </span>Free cooling<a class="headerlink" href="#free-cooling" title="Link to this heading"></a></h2>
+<p><code class="docutils literal notranslate"><span class="pre">gemini_model.free_cooling.free_cooling.FreeCooling</span></code>: the economiser delivers water at
+<span class="math notranslate nohighlight">\(T_{fc} = T_{wb} + 4.5 + 2\)</span> K. Full free cooling when <span class="math notranslate nohighlight">\(T_{fc} \le 20\)</span> °C
+(<span class="math notranslate nohighlight">\(T_{wb} \le 13.5\)</span> °C); partial pre-cooling of the 26 °C return while <span class="math notranslate nohighlight">\(T_{fc} &lt; 26\)</span> °C
+(fraction <span class="math notranslate nohighlight">\((26 - T_{fc})/6\)</span>, the rest goes to a chiller via <code class="docutils literal notranslate"><span class="pre">residual_cooling_w</span></code> and
+<code class="docutils literal notranslate"><span class="pre">chilled_water_temperature_out_degc</span></code>); power 2 % of the heat moved.</p>
+</section>
+<section id="example-project">
+<h2><span class="section-number">5.8.6. </span>Example project<a class="headerlink" href="#example-project" title="Link to this heading"></a></h2>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">"components"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nt">"economiser"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">"type"</span><span class="p">:</span><span class="w"> </span><span class="s2">"free_cooling"</span><span class="p">,</span><span class="w"> </span><span class="nt">"parameters"</span><span class="p">:</span><span class="w"> </span><span class="p">{}},</span>
+<span class="w">    </span><span class="nt">"chiller"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">"type"</span><span class="p">:</span><span class="w"> </span><span class="s2">"electric_chiller"</span><span class="p">,</span><span class="w"> </span><span class="nt">"parameters"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">"nominal_capacity_w"</span><span class="p">:</span><span class="w"> </span><span class="mf">5e6</span><span class="p">}},</span>
+<span class="w">    </span><span class="nt">"tower"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">"type"</span><span class="p">:</span><span class="w"> </span><span class="s2">"heat_rejection"</span><span class="p">,</span><span class="w"> </span><span class="nt">"parameters"</span><span class="p">:</span><span class="w"> </span><span class="p">{}}</span>
+<span class="w">  </span><span class="p">},</span>
+<span class="w">  </span><span class="nt">"boundary_inputs"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">    </span><span class="p">{</span><span class="nt">"component"</span><span class="p">:</span><span class="w"> </span><span class="s2">"economiser"</span><span class="p">,</span><span class="w"> </span><span class="nt">"key"</span><span class="p">:</span><span class="w"> </span><span class="s2">"ambient_wet_bulb_degc"</span><span class="p">,</span><span class="w"> </span><span class="nt">"value"</span><span class="p">:</span><span class="w"> </span><span class="mf">15.4</span><span class="p">},</span>
+<span class="w">    </span><span class="p">{</span><span class="nt">"component"</span><span class="p">:</span><span class="w"> </span><span class="s2">"economiser"</span><span class="p">,</span><span class="w"> </span><span class="nt">"key"</span><span class="p">:</span><span class="w"> </span><span class="s2">"cooling_load_w"</span><span class="p">,</span><span class="w"> </span><span class="nt">"value"</span><span class="p">:</span><span class="w"> </span><span class="mf">4e6</span><span class="p">},</span>
+<span class="w">    </span><span class="p">{</span><span class="nt">"component"</span><span class="p">:</span><span class="w"> </span><span class="s2">"chiller"</span><span class="p">,</span><span class="w"> </span><span class="nt">"key"</span><span class="p">:</span><span class="w"> </span><span class="s2">"ambient_wet_bulb_degc"</span><span class="p">,</span><span class="w"> </span><span class="nt">"value"</span><span class="p">:</span><span class="w"> </span><span class="mf">15.4</span><span class="p">},</span>
+<span class="w">    </span><span class="p">{</span><span class="nt">"component"</span><span class="p">:</span><span class="w"> </span><span class="s2">"tower"</span><span class="p">,</span><span class="w"> </span><span class="nt">"key"</span><span class="p">:</span><span class="w"> </span><span class="s2">"ambient_wet_bulb_degc"</span><span class="p">,</span><span class="w"> </span><span class="nt">"value"</span><span class="p">:</span><span class="w"> </span><span class="mf">15.4</span><span class="p">}</span>
+<span class="w">  </span><span class="p">],</span>
+<span class="w">  </span><span class="nt">"connections"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">    </span><span class="p">{</span><span class="nt">"predecessor"</span><span class="p">:</span><span class="w"> </span><span class="s2">"economiser"</span><span class="p">,</span><span class="w"> </span><span class="nt">"successor"</span><span class="p">:</span><span class="w"> </span><span class="s2">"chiller"</span><span class="p">,</span>
+<span class="w">     </span><span class="nt">"ports"</span><span class="p">:</span><span class="w"> </span><span class="p">[[</span><span class="s2">"residual_cooling_w"</span><span class="p">,</span><span class="w"> </span><span class="s2">"cooling_load_w"</span><span class="p">],</span>
+<span class="w">               </span><span class="p">[</span><span class="s2">"chilled_water_temperature_out_degc"</span><span class="p">,</span><span class="w"> </span><span class="s2">"chilled_water_temperature_in_degc"</span><span class="p">]]},</span>
+<span class="w">    </span><span class="p">{</span><span class="nt">"predecessor"</span><span class="p">:</span><span class="w"> </span><span class="s2">"chiller"</span><span class="p">,</span><span class="w"> </span><span class="nt">"successor"</span><span class="p">:</span><span class="w"> </span><span class="s2">"tower"</span><span class="p">,</span>
+<span class="w">     </span><span class="nt">"predecessor_output"</span><span class="p">:</span><span class="w"> </span><span class="s2">"heat_rejected_w"</span><span class="p">,</span><span class="w"> </span><span class="nt">"successor_input"</span><span class="p">:</span><span class="w"> </span><span class="s2">"heat_load_w"</span><span class="p">}</span>
+<span class="w">  </span><span class="p">]</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</section>
+<section id="references">
+<h2><span class="section-number">5.8.7. </span>References<a class="headerlink" href="#references" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p>Geothermal Direct Use Engineering &amp; Design Guidebook, Geo-Heat Center (1989): Ch14 absorption
+cooling p.261–270; p.257–258 (electric chiller COP).</p></li>
+<li><p>DiPippo, R., <em>Geothermal Power Plants</em>, 3rd ed., Ch23 p.11–12 (wet vs dry heat rejection).</p></li>
+<li><p>RTES data-centre cooling paper (dry-cooler approach, modern chiller COP); Stockholm ATES-GSHP
+paper (free-cooling seasonal performance factor 24–53).</p></li>
+<li><p>Stull, R. (2011), Wet-bulb temperature from relative humidity and air temperature, J. Appl.
+Meteor. Climatol. 50, 2267–2269 (used on the agent side).</p></li>
+</ul>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="model_surface_equipment.html" class="btn btn-neutral float-left" title="5.7. Surface Equipment" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="model_heating.html" class="btn btn-neutral float-right" title="5.9. Heat pump, electric boiler and thermal storage" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, TNO.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
