@@ -109,10 +109,14 @@ class CoderError(RuntimeError):
 
 
 def is_timeout(exc: BaseException) -> bool:
-    """Return True for a pydantic-ai request deadline or HTTP timeout (the loop retries)."""
+    """Return True for a pydantic-ai request deadline or HTTP timeout (the loop retries).
+
+    ``ModelRequestTimeout`` is the ``request_timeout`` deadline, ``ModelTimeoutError`` the HTTP
+    ``timeout`` of one attempt (pydantic-ai 2.64); neither subclasses ``TimeoutError``.
+    """
     from pydantic_ai.exceptions import ModelRequestTimeout, ModelTimeoutError
 
-    return isinstance(exc, (ModelRequestTimeout, ModelTimeoutError, TimeoutError))
+    return isinstance(exc, (ModelRequestTimeout, ModelTimeoutError))
 
 
 # --------------------------------------------------------------------------- schemas
@@ -396,14 +400,16 @@ class LLMCoder:
                     model_settings=settings,
                 )
             except Exception as exc:  # timeouts are retried by the loop; anything else ends it
-                error = f"{type(exc).__name__}: {exc}"[:500]
+                error = f"{type(exc).__name__}: {exc}"[:400]
                 timed_out = is_timeout(exc)
                 if timed_out:
                     error = (
                         f"{error} (after {time.perf_counter() - start:.0f} s; "
                         f"calls.model_builder.request_timeout_s = "
                         f"{self.call_limits.request_timeout_s:g})"
-                    )
+                    )[:500]
+                # No response was captured, so the record counts 0 tokens even though the
+                # server processed the prompt; the budget is charged on answered calls only.
                 record = self._log(model_name, messages, None, None, start, "failed", error)
                 self.tokens_used += record.total_tokens
                 raise CoderError(
@@ -529,6 +535,7 @@ class ModelBuilder:
                 break
             tokens[0] += reply.input_tokens
             tokens[1] += reply.output_tokens
+            status = "tests_failed"  # a draft arrived; a timed-out earlier attempt no longer counts
             attempt = BuildAttempt(
                 attempt=number,
                 decision_source=reply.source,

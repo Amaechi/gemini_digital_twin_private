@@ -10,6 +10,7 @@ import json
 import time
 
 import pytest
+import yaml
 
 from gemini_agent.agents import engine as engine_module
 from gemini_agent.agents import model_builder as mb
@@ -260,6 +261,23 @@ def test_timed_out_draft_then_valid_draft_is_registered(tmp_path):
     assert result.output_tokens == sum(a.output_tokens for a in result.attempts) > 0
 
 
+def test_timed_out_draft_then_failing_draft_is_tests_failed(tmp_path):
+    """A timeout followed by a draft whose tests fail is reported as tests_failed."""
+    scripted = HangingCoder(hangs=1)
+    scripted.broken_drafts = 99
+    coder = _coder(
+        tmp_path, scripted_model(scripted), llm_config=_builder_config(request_timeout_s=0.05)
+    )
+    registry = {k: v for k, v in COMPONENT_REGISTRY.items() if k != "free_cooling"}
+    builder = ModelBuilder(
+        ModelSandbox(tmp_path / "sandbox"), coder, registry=registry, max_attempts=2
+    )
+    result = builder.build(_gap(registry))
+    assert result.status == "tests_failed" and len(result.attempts) == 2
+    assert [a.timed_out for a in result.attempts] == [True, False]
+    assert result.attempts[1].pytest is not None and not result.attempts[1].pytest.passed
+
+
 def test_non_timeout_coder_error_still_ends_the_build(tmp_path):
     """Only timeouts are retried: a budget error stops after one recorded attempt."""
     coder = _coder(tmp_path, ScriptedCoder(), token_budget=10, tokens_used=10)
@@ -278,11 +296,10 @@ def test_main_reports_elapsed_time_and_timeout_on_failure(tmp_path, monkeypatch,
     )
     config_dir = tmp_path / "config"
     config_dir.mkdir()
-    for name in ("llm",):
-        text = (REPO_ROOT / "config" / f"{name}.yaml").read_text(encoding="utf-8")
-        (config_dir / f"{name}.yaml").write_text(
-            text.replace("request_timeout_s: 1200", "request_timeout_s: 0.05"), encoding="utf-8"
-        )
+    (config_dir / "llm.yaml").write_text(
+        yaml.safe_dump(_builder_config(request_timeout_s=0.05).model_dump(mode="json")),
+        encoding="utf-8",
+    )
     sandbox = tmp_path / "s7"
     code = mb.main(
         ["--sandbox", str(sandbox), "--config-dir", str(config_dir), "--max-attempts", "2"]
