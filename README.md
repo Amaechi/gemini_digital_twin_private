@@ -10,6 +10,19 @@ GEMINI simulator for a full year, verifies the design against 46 checks, quantif
 exergy and uncertainty, and logs every prompt, answer and token. The LLM is an open-weight model
 served locally by Ollama; nothing leaves the laptop.
 
+**At a glance** (numbers from the Results section below and its source files):
+
+- **Selected design C2-opt-robust**: two doublets at 2500 m, plate HEX + HTHP, CHP, peak boiler,
+  free cooling + electric chillers; verifier **ACCEPTED (46/46 checks)**, human approval **approved**.
+- **Economics and CO₂**: LCOH 44.6 / LCOC 26.3 USD/MWh, CAPEX 30.1 MUSD, CO₂ −72 % vs the gas
+  counterfactual C0.
+- **Demand**: 100 % of the heating and cooling demand met on all 365 days (0 unmet MWh);
+  P(demand met) 0.90 with the P90 peak boiler (TL-15, 200 samples).
+- **LLM**: gemma4:12b-it-q4_K_M (open-weight 12B, 4-bit) on a MacBook Pro M3 36 GB via Ollama;
+  34 calls, 99 301 tokens, ≈ 14.5 min wall time; every prompt, answer and token is logged.
+- **Reproduce offline in one command** (no GPU, no network, no LLM):
+  `PYTHONPATH=src python -m gemini_agent.cli run --engine policy`.
+
 ## Design principle: agents propose, tools compute, the verifier accepts, the human approves
 
 ```
@@ -52,6 +65,8 @@ served locally by Ollama; nothing leaves the laptop.
 Selected design **C2-opt-robust**: two doublets at 2500 m, plate HEX + high-temperature heat
 pump in series, CHP on the associated gas, peak boiler, free cooling + electric chillers, no
 seasonal storage; verifier verdict **ACCEPTED** (46/46 checks), human approval **approved**.
+The design meets 100 % of the heating and cooling demand on all 365 days of the simulated year
+(0 unmet MWh for heating and for cooling).
 Full tables with their source files: [`docs/results/REPORT.md`](docs/results/REPORT.md).
 
 | Item | Value | Source |
@@ -90,7 +105,8 @@ Figures: `docs/results/final_llm/` (copies of `runs/final/final_llm/figures/`), 
 ## Agent and LLM evidence
 
 **Final run** (`runs/final/final_llm/token_summary.json`, `run_summary.json`): 34 LLM calls,
-99 301 tokens (93 699 in / 5 602 out), 299 s of model latency, 2 policy fallbacks, 0 of 23 tool
+99 301 tokens (93 699 in / 5 602 out), 299 s of model latency (≈ 14.5 min wall time,
+`events.jsonl` 22:26:15 → 22:40:47), 2 policy fallbacks, 0 of 23 tool
 calls were stubs, 11 Decision Records (10 decided by the model, DR-10 by the policy fallback
 after the model twice named a criterion that was not offered), approval `approved` in ask mode.
 Hardware (operator's note, not recorded by the run): MacBook Pro M3, 36 GB, Ollama with
@@ -119,6 +135,9 @@ tool-result summaries.
 | gemma4:26b-a4b | 24–36 GB | escalated in P5 (DR-08 token limit) | 27 | 70 % | 7 | 101 871 | 176 s |
 | qwen3.5:9b-q4_K_M | 16 GB | escalated in P5 (tool-call budget) | 22 | 68 % | 7 | 83 724 | 203 s |
 
+(qwen3.6:27b eval outcome pending = the cross-model check is not automated; the row is read from
+its `eval_results.json`.)
+
 The gemma4:12b row is the S11 of its S1–S11 eval. Its earlier S11-only run (L-1, the basis of the
 model choice: completed, 100 % validity, 0 fallbacks, 79 k tokens, 328 s, recorded in
 `docs/hackathon/PROGRESS.md`) was overwritten by the full eval because `run_eval.py` rewrites
@@ -133,7 +152,8 @@ Python 3.12, no GPU, no network and no LLM are needed for the policy engine. Ins
 uv venv -p 3.12 .venv && source .venv/bin/activate && uv pip install -r requirements-hackathon.txt
 ```
 
-One command, deterministic (same decisions as the final run, ≈ 9 min with the full budget on a
+One command, deterministic (the policy engine reaches the same selected design and verdict;
+DR-10 in the LLM run was a policy fallback; ≈ 9 min with the full budget on a
 2–4-core machine; `--budget smoke` gives the CI-sized run, ≈ 23 s):
 
 ```bash
@@ -241,7 +261,7 @@ PYTHONPATH=src python -m gemini_agent.agents.model_builder --sandbox runs/s7_dem
 | `runs/final_policy/` | the same workflow on the deterministic policy engine (reference run, built by `scripts/build_results.py`) |
 | `docs/results/` | `REPORT.md` (report pack, generated), `DECK_OUTLINE.md` (slides + video script), figures (`final_llm/`), `s7_demo/` (Model Builder evidence), `submission_check.md`, `eval_policy_quick/`, WP-14 policy-run tables |
 | `docs/hackathon/` | `GEOAGENT_DESIGN_SPEC.md` (requirements), `WORK_PACKAGES.md`, `PROGRESS.md` (decisions, follow-ups, submission checklist), `CLOUD_SETUP.md` (laptop steps, submission) |
-| `config/` | `design_basis.yaml`, `climate.yaml`, `limits.yaml`, `cost_assumptions.yaml`, `assumptions.yaml` (register of every assumed value), `llm.yaml` |
+| `config/` | `design_basis.yaml`, `climate_nl.yaml`, `limits.yaml`, `cost_assumptions.yaml`, `assumptions.yaml` (register of every assumed value), `llm.yaml` |
 | `data/knowledge/reference_cards/` | RC-01…RC-10: the only engineering source for equations and values (books are not redistributed) |
 
 ## Repository map (what we added to GEMINI)
@@ -277,7 +297,7 @@ credential exists anywhere in the repository (`.env.template` is GEMINI's and un
 | GEMINI platform APIs | not used. GeoAgent drives `gemini_model` + `gemini_simulator` in-process; GEMINI's Flask app, Celery, MySQL/InfluxDB/Mongo/Chroma/Redis and the AI-chat assistant are untouched placeholders from the upstream repository (`docker-compose.yml`, `.env.template`). |
 | Model Builder sandbox | `python -m gemini_agent.agents.model_builder` writes LLM-generated model code into a sandbox folder outside `src/` and registers it in memory only; promotion into the registry is a reviewed PR, never automatic. |
 | Web UI ("Design Commander") | not built (spec MAY); the CLI is the user interface. |
-| Weather / price feeds | none; climate normals and prices are config and reference-card values (`config/climate.yaml`, `config/cost_assumptions.yaml`). |
+| Weather / price feeds | none; climate normals and prices are config and reference-card values (`config/climate_nl.yaml`, `config/cost_assumptions.yaml`). |
 
 ## Limitations (known, recorded, not hidden)
 
@@ -290,10 +310,14 @@ credential exists anywhere in the repository (`.env.template` is GEMINI's and un
   missing from the request itself (S2), records a basis conflict without a confirm-basis question
   (S5), and no cross-run check compares the S8 re-sizing with S1 (S8). The behaviour is in the
   transcripts; only the automatic check is missing.
-- **P5 DR-08 token-limit escalation on gemma4:26b-a4b**: the per-call usage limit for the
-  Decision Record choice was exceeded (`total_tokens_limit` 765 vs 1 900 used) and the run
-  escalated instead of falling back; that limit is the phase's remaining token budget (AG-04). Two
-  other models escalated on the tool-call budget (P5/P6). The chosen model never hit a budget.
+- **S7 in `runs/final/eval` reads "fail"**: every coder draft timed out before the Model Builder
+  fix [#23](https://github.com/Amaechi/gemini_digital_twin_private/pull/23); the post-#23 local
+  run closed the gap in 2 drafts, evidence in [`docs/results/s7_demo/`](docs/results/s7_demo/README.md).
+- **P5 DR-08 token-limit escalation on gemma4:26b-a4b**: the chosen model never hit a budget. On
+  gemma4:26b-a4b the per-call usage limit for the Decision Record choice was exceeded
+  (`total_tokens_limit` 765 vs 1 900 used) and the run escalated instead of falling back; that
+  limit is the phase's remaining token budget (AG-04). Two other models escalated on the
+  tool-call budget (P5/P6).
 - **Heat-exchanger fluid properties**: the GEMINI plate HEX takes one ρ/c_p per side (brine
   1030 kg/m³, 4100 J/kgK from DB-33; district water 1000 kg/m³, 4217 J/kgK), constant with
   temperature; `kpi.py` reads the producer PVT, GEMINI's boiler and CHP keep their water defaults
@@ -310,7 +334,8 @@ credential exists anywhere in the repository (`.env.template` is GEMINI's and un
   GEMINI's own Lint/Test/Docs workflows; the exact pin stops the next release racing CI. Bump it
   deliberately. The hackathon workflow uses `requirements-hackathon.txt`, not Poetry.
 - **Token figure of the run is a placeholder** (`runs/final/final_llm/figures/fig_tokens.png`):
-  P10 plots before `token_summary.json` is written at run end. The report pack draws
+  P10 plots before `token_summary.json` is written at run end; the same placeholder is drawn in
+  every run directory under `runs/final/eval` that reached P10. The report pack draws
   `docs/results/final_llm/fig_tokens_by_phase.png` from the summary instead.
 - **S11-only result of the chosen model overwritten**: `run_eval.py` rewrites `eval_results.json`
   on each call, so the L-1 S11-only line of gemma4:12b (79 k tokens, 100 % validity, 0 fallbacks)
