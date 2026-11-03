@@ -6,6 +6,8 @@
 # (L-1 follow-up): step kinds coerced from tool names, per-call thinking/max-token/timeout settings,
 # Decision Record choices tied to a workflow-offered criterion. 2026-11-03 (WP-15): engines close
 # their HTTP clients and event loop (``close``) so the CLI exits without a shutdown traceback.
+# 2026-11-03 (runner J): Decision Record choice calls get a usage-limit floor (the call's own
+# token ceiling) so a DR the workflow requires is never starved by the phase token budget.
 """Decision engines: deterministic policy, Pydantic AI role agents and a resilient fallback.
 
 ``PolicyEngine``, ``LLMEngine`` and ``ResilientEngine`` (which falls back to the policy) follow
@@ -55,6 +57,18 @@ from gemini_agent.schemas.decision import (
 os.environ.setdefault("PYDANTIC_AI_NO_BANNER", "1")
 
 T = TypeVar("T")
+
+CHARS_PER_TOKEN = 3
+"""Prompt-size estimate of the usage-limit floor of a Decision Record call. Measured on the two
+evidence runs (``runs/final/eval/gemma4_26b-a4b/S11`` and the qwen3.6:27b run on
+``origin/qwen27b-evidence``, first-try calls): instructions + prompt characters per logged input
+token 2.9–3.7, median 3.1–3.2 — the logged tokens include the output schema of every request,
+which :data:`REQUEST_OVERHEAD_TOKENS` covers, so 3 overestimates the prompt itself."""
+
+REQUEST_OVERHEAD_TOKENS = 1024
+"""Per-request allowance on top of the prompt estimate: the structured-output JSON schema sent
+with every request (``OptionChoice`` / ``Decision``: 1.4–1.8 k characters) and, on a retry, the
+validation feedback (the validators' messages plus pydantic's error list)."""
 
 
 @dataclass
@@ -513,6 +527,28 @@ class LLMEngine(DecisionEngine):
         self._agents[key] = agent
         return agent
 
+    def _request_limit(self) -> int:
+        """Requests one structured call may make: the first reply plus the bounded retries."""
+        return self.llm_config.max_output_retries + 2
+
+    def call_token_ceiling(self, prompt: str, role: Role) -> int:
+        """Most tokens one structured call can use within its own limits (retries included).
+
+        pydantic-ai's ``total_tokens_limit`` counts input + output over the whole run. Request k
+        (1-based) sends the role's instructions and ``prompt`` (p tokens at
+        :data:`CHARS_PER_TOKEN`), the output schema and, from k = 2, the validation feedback
+        (:data:`REQUEST_OVERHEAD_TOKENS` each) and the k−1 earlier replies; every reply is capped
+        at ``calls.max_output_tokens`` (o). Over the n = ``_request_limit`` requests the usage
+        limit allows: ``n·(p + overhead) + o·n(n+1)/2``. n is one request more than
+        ``max_output_retries`` can produce, so the bound keeps a surplus of about
+        ``p + overhead + n·o`` for tokeniser error; a call within its configured limits cannot
+        exceed it. If ``_request_limit`` ever changes, re-check this surplus.
+        """
+        n = self._request_limit()
+        prompt_tokens = (len(prompt) + len(system_prompt(role))) // CHARS_PER_TOKEN + 1
+        output_cap = self.llm_config.calls.max_output_tokens
+        return n * (prompt_tokens + REQUEST_OVERHEAD_TOKENS) + output_cap * n * (n + 1) // 2
+
     def _run(
         self,
         role: Role,
@@ -520,17 +556,31 @@ class LLMEngine(DecisionEngine):
         prompt: str,
         deps: AgentDeps,
         budget: dict[str, int],
+        floor_tokens: int | None = None,
     ) -> EngineResult[Any]:
+        """One structured call under the phase budget (AG-04).
+
+        ``floor_tokens`` (Decision Record choices) lifts the usage limit to at least the call's
+        own token ceiling: a DR the workflow requires completes even when the phase has fewer
+        tokens left, and the runner records the overrun (``TOKEN_BUDGET_OVERRUN``) instead of
+        escalating mid-DR; a call past even that ceiling raises ``EngineBudgetExceeded`` and the
+        runner lets the policy choose (a counted fallback). Decisions (``floor_tokens`` None)
+        keep the phase's remaining tokens as their limit and escalate at zero (runner J,
+        2026-11-03; evidence: qwen3.6:27b and gemma4:26b-a4b both escalated on DR-08 with ≈ 60 k
+        of P5's 60 k used).
+        """
         from pydantic_ai import UsageLimits, capture_run_messages
         from pydantic_ai.exceptions import UsageLimitExceeded
 
         model = self._model_for(role)
         agent = self._agent(role, kind)
         tokens_left = budget.get("tokens")
+        if tokens_left is not None and floor_tokens is not None:
+            tokens_left = max(tokens_left, floor_tokens)
         if tokens_left is not None and tokens_left <= 0:
             raise EngineBudgetExceeded(f"{role.value} {kind}: no tokens left in the phase budget")
         limits = UsageLimits(
-            request_limit=self.llm_config.max_output_retries + 2,
+            request_limit=self._request_limit(),
             total_tokens_limit=tokens_left,
         )
         model_settings = self._settings()
@@ -633,10 +683,20 @@ class LLMEngine(DecisionEngine):
     def choose(
         self, question: DecisionQuestion, context: DecisionContext
     ) -> EngineResult[OptionChoice]:
-        """Run the DR role's choice agent on the workflow-offered options."""
+        """Run the DR role's choice agent on the workflow-offered options.
+
+        The usage limit is floored at the call's token ceiling (:meth:`call_token_ceiling`): a
+        Decision Record is a phase-close step the workflow requires, never starved by the budget.
+        """
         deps = choice_deps(question)
+        prompt = choice_prompt(question, context)
         return self._run(
-            question.role, "choice", choice_prompt(question, context), deps, context.budget_left
+            question.role,
+            "choice",
+            prompt,
+            deps,
+            context.budget_left,
+            floor_tokens=self.call_token_ceiling(prompt, question.role),
         )
 
 

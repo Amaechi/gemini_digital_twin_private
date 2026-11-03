@@ -83,6 +83,7 @@ Full tables with their source files: [`docs/results/REPORT.md`](docs/results/REP
 | Robustness before → after DR-11 | P(demand met) 0.46 → 0.90 (TL-15, 200 samples) | same; `uncertainty_C2-opt.json` |
 | Cost of the robust backups (DR-11) | ΔLCOH +2.05, ΔLCOC +0.00 USD/MWh, ΔCAPEX +2.21 MUSD | same; `tool_results/TR-019_robust_backup.json` |
 | Monte Carlo LCOH P10 / P50 / P90 | 33.8 / 47.3 / 66.1 USD/MWh (C2-opt) | `figures/uncertainty.md` |
+| Sensitivity cases (TL-15 UQ-CASES, C2-opt base sizes) | DB-31 45/65/75 °C: LCOH 36.5 / 54.7 / 74.9; ECO-CO2-GAS 51.53: LCOH 42.5; CHP-EL-FRAC 0.50: LCOH 41.4, LCOC 25.8, CO₂ −245 t/yr, 23 MWh unmet heat (2 days); SUB-PBUB pure water, DB-34b warm, DB-30 B: 0 unmet | same; `uncertainty_C2-opt.json` → `cases` |
 
 Alternatives (fast-year screening points, TL-12 + TL-14; `runs/final/final_llm/figures/candidates.md`):
 
@@ -182,6 +183,15 @@ PYTHONPATH=src python scripts/build_results.py --run-id final_policy
 
 ```bash
 PYTHONPATH=src python scripts/build_report_pack.py
+```
+
+`--speak` on `run`, `resume` and `whatif` (post-submission) additionally reads each question
+with its default, the P10 summary with the verifier verdict, the DR-11 rationale and the what-if
+verdicts aloud through the macOS `say` command; elsewhere it prints one note and changes nothing
+(`src/gemini_agent/speech.py`; the subprocess is monkeypatched in the tests). Example:
+
+```bash
+PYTHONPATH=src python -m gemini_agent.cli run --engine policy --input-mode ask --speak
 ```
 
 ### What-if on a finished run
@@ -347,11 +357,17 @@ credential exists anywhere in the repository (`.env.template` is GEMINI's and un
 - **S7 in `runs/final/eval` reads "fail"**: every coder draft timed out before the Model Builder
   fix [#23](https://github.com/Amaechi/gemini_digital_twin_private/pull/23); the post-#23 local
   run closed the gap in 2 drafts, evidence in [`docs/results/s7_demo/`](docs/results/s7_demo/README.md).
-- **P5 DR-08 token-limit escalation on gemma4:26b-a4b**: the chosen model never hit a budget. On
-  gemma4:26b-a4b the per-call usage limit for the Decision Record choice was exceeded
-  (`total_tokens_limit` 765 vs 1 900 used) and the run escalated instead of falling back; that
-  limit is the phase's remaining token budget (AG-04). Two other models escalated on the
-  tool-call budget (P5/P6).
+- **P5 DR-08 token-limit escalation on gemma4:26b-a4b** (fixed on 2026-11-03; the submitted
+  runs in `runs/final*` and `runs/final/eval` predate the fix): the chosen model never hit a
+  budget. On gemma4:26b-a4b (and on qwen3.6:27b in a later full run) the per-call usage limit of
+  the Decision Record choice was the phase's remaining token budget (`total_tokens_limit` 765
+  vs 1 900 used) and the run escalated inside a DR the workflow requires. Now a DR choice call's
+  usage limit is floored at the call's own token ceiling (every allowed request at the prompt
+  size plus `calls.max_output_tokens`), a DR past the phase budget is recorded as a
+  `TOKEN_BUDGET_OVERRUN` event (an eval-harness metric, like the fallbacks), a call past even
+  its own ceiling is answered by the policy (a counted fallback, same event) and P5 has an
+  explicit 90 k token budget; ordinary decisions still escalate at the budget (AG-04). Two other
+  models escalated on the tool-call budget (P5/P6).
 - **Heat-exchanger fluid properties**: the GEMINI plate HEX takes one ρ/c_p per side (brine
   1030 kg/m³, 4100 J/kgK from DB-33; district water 1000 kg/m³, 4217 J/kgK), constant with
   temperature; `kpi.py` reads the producer PVT, GEMINI's boiler and CHP keep their water defaults
@@ -367,10 +383,21 @@ credential exists anywhere in the repository (`.env.template` is GEMINI's and un
   `poetry lock` fresh and resolved 7.17.1 while its wheels were mid-upload on PyPI, which broke
   GEMINI's own Lint/Test/Docs workflows; the exact pin stops the next release racing CI. Bump it
   deliberately. The hackathon workflow uses `requirements-hackathon.txt`, not Poetry.
-- **Token figure of the run is a placeholder** (`runs/final/final_llm/figures/fig_tokens.png`):
-  P10 plots before `token_summary.json` is written at run end; the same placeholder is drawn in
-  every run directory under `runs/final/eval` that reached P10. The report pack draws
-  `docs/results/final_llm/fig_tokens_by_phase.png` from the summary instead.
+- **Token figure of the run was a placeholder at submission** (`figures/fig_tokens.png`): P10
+  plotted before `token_summary.json` was written at run end. Fixed after submission (the runner
+  writes an interim summary before `plot_figures` and redraws the chart from the final summary at
+  run end, tested on the FunctionModel LLM path); the committed `fig_tokens.png` of
+  `runs/final/final_llm` and of the 10 `runs/final/eval` run folders that reached P10 were redrawn
+  from their existing `token_summary.json` with `scripts/regenerate_fig_tokens.py` (figures only,
+  no other run file changed). `docs/results/final_llm/fig_tokens_by_phase.png` is the report
+  pack's own stacked version.
+- **CHP-EL-FRAC 0.50 sensitivity case** (TL-15 UQ-CASES; `chp.py` takes an `electrical_fraction`
+  parameter since WP-11, default 1/3 unchanged): on C2-opt's base sizes the DEA gas-engine split
+  (half the useful output as electricity) lowers LCOH by 1.2 and LCOC by 0.5 USD/MWh and CO₂ by
+  245 t/yr (more electricity generated on site) but leaves 23 MWh of heat unmet on 2 days
+  (heating supply margin −0.87 K, DB-16): the case re-derives the plant at the selected sizes, not
+  the DR-11 P90 backups, so it is a sensitivity of the design, not a verified alternative. Not
+  rerun in the final runs (the case was already in `uncertainty_C2-opt.json`).
 - **S11-only result of the chosen model overwritten**: `run_eval.py` rewrites `eval_results.json`
   on each call, so the L-1 S11-only line of gemma4:12b (79 k tokens, 100 % validity, 0 fallbacks)
   survives only in `docs/hackathon/PROGRESS.md`; the S11 row above is from the S1–S11 eval.

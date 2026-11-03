@@ -93,6 +93,11 @@ class RunMetrics(StrictModel):
     kind_coercions: int = Field(
         default=0, description="LLM step kinds repaired from the tool name (KIND_COERCED)."
     )
+    token_budget_overruns: int = Field(
+        default=0,
+        description="Decision Record calls made past their phase token budget "
+        "(TOKEN_BUDGET_OVERRUN; runner J).",
+    )
     input_tokens: int = 0
     output_tokens: int = 0
 
@@ -292,6 +297,7 @@ def _metrics(runner: DesignRunner, run_id: str, runtime_s: float) -> RunMetrics:
         fallbacks=state.fallback_count(),
         step_rejections=sum(1 for event in events if event.type == "STEP_REJECTED"),
         kind_coercions=sum(1 for event in events if event.type == "KIND_COERCED"),
+        token_budget_overruns=sum(1 for e in events if e.type == "TOKEN_BUDGET_OVERRUN"),
         input_tokens=sum(record.input_tokens for record in records),
         output_tokens=sum(record.output_tokens for record in records),
     )
@@ -531,9 +537,9 @@ def render_markdown(results: EvalResults) -> str:
         "",
         (
             "| Scenario | Expected | Success | Status | Verdict | Tool calls (stub) | LLM calls | "
-            "Valid | Retries | Fallbacks | Tokens | Runtime s |"
+            "Valid | Retries | Fallbacks | Overruns | Tokens | Runtime s |"
         ),
-        "|---|---|---|---|---|---:|---:|---:|---:|---:|---:|---:|",
+        "|---|---|---|---|---|---:|---:|---:|---:|---:|---:|---:|---:|",
     ]
     for run in results.runs:
         m = run.metrics
@@ -541,7 +547,7 @@ def render_markdown(results: EvalResults) -> str:
             f"| {run.scenario} | {_cell(run.expected)} | {run.outcome.value} | "
             f"{run.status or '-'} | {run.verdict or '-'} | {m.tool_calls} ({m.stub_tool_calls}) | "
             f"{m.llm_calls} | {_pct(m.tool_call_validity_frac)} | {m.retries} | {m.fallbacks} | "
-            f"{m.total_tokens} | {m.runtime_s:.2f} |"
+            f"{m.token_budget_overruns} | {m.total_tokens} | {m.runtime_s:.2f} |"
         )
     lines += ["", "## Checks and pending items", ""]
     for run in results.runs:
@@ -624,6 +630,7 @@ def compare_evals(eval_dirs: Sequence[Path | str], out_dir: Path | str = EVAL_RO
                 "fallbacks": total.fallbacks,
                 "step_rejections": total.step_rejections,
                 "kind_coercions": total.kind_coercions,
+                "token_budget_overruns": total.token_budget_overruns,
                 "total_tokens": total.total_tokens,
                 "runtime_s": round(total.runtime_s, 3),
             }
@@ -645,9 +652,9 @@ def render_comparison(comparison: dict) -> str:
         "",
         (
             "| Model | Engine | Pass | Pending | Fail | Checks | Tool-call validity | Retries | "
-            "Fallbacks | Tokens | Runtime s |"
+            "Fallbacks | Overruns | Tokens | Runtime s |"
         ),
-        "|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|",
+        "|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|",
     ]
     for m in comparison["models"]:
         o = m["outcomes"]
@@ -655,6 +662,6 @@ def render_comparison(comparison: dict) -> str:
             f"| {m['model']} | {m['engine']} | {o.get('pass', 0)} | {o.get('pending', 0)} | "
             f"{o.get('fail', 0) + o.get('error', 0)} | {m['checks_passed']}/{m['checks_total']} | "
             f"{_pct(m['tool_call_validity_frac'])} | {m['retries']} | {m['fallbacks']} | "
-            f"{m['total_tokens']} | {m['runtime_s']:.1f} |"
+            f"{m.get('token_budget_overruns', 0)} | {m['total_tokens']} | {m['runtime_s']:.1f} |"
         )
     return "\n".join(lines) + "\n"

@@ -27,6 +27,11 @@ bad value, not a run), 5 refused (lever outside its bound, with the guard's reas
 ``serve`` (post-submission) is the web Design Commander view (``gemini_agent.ui``): a standard
 library HTTP server that shows the runs of a directory read-only and answers a paused run's
 question (or the P10 approval) through the same ``resume`` as the CLI.
+
+``--speak`` (``run``, ``resume``, ``whatif``; post-submission) reads the questions, the P10
+summary with the verifier verdict, the DR-11 rationale and the what-if verdicts aloud with the
+macOS ``say`` command (``gemini_agent.speech``); elsewhere it prints one note and is a no-op.
+Everything is printed exactly as without the flag.
 """
 
 from __future__ import annotations
@@ -57,6 +62,7 @@ from gemini_agent.runner.design_runner import (
 from gemini_agent.runner.toolbox import default_toolbox
 from gemini_agent.schemas.config import CONFIG_MODELS, load_config
 from gemini_agent.schemas.decision import InputRequest, RunStatus
+from gemini_agent.speech import Speaker, request_text, speaking_ask
 from gemini_agent.tools import whatif as whatif_tool
 from gemini_agent.ui import server as ui_server
 
@@ -78,7 +84,17 @@ STATUS_EXIT: dict[RunStatus, int] = {
 }
 
 
+def _add_speak_arg(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument(
+        "--speak",
+        action="store_true",
+        help="also read questions, the P10 summary + verdict and the DR-11 rationale aloud "
+        "(macOS `say`; a no-op with a note elsewhere)",
+    )
+
+
 def _add_engine_args(parser: argparse.ArgumentParser) -> None:
+    _add_speak_arg(parser)
     parser.add_argument(
         "--engine",
         choices=["policy", "llm"],
@@ -150,6 +166,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--runs-dir", type=Path, default=None, help=f"runs directory (default {RUNS_ROOT})"
     )
     what.add_argument("--config-dir", type=Path, default=None, help="override config/ directory")
+    _add_speak_arg(what)
     what.add_argument(
         "--set",
         dest="levers",
@@ -236,7 +253,13 @@ def _stored_engine(runs_root: Path, run_id: str) -> tuple[str | None, str]:
     return engine, str(record.state.get("model_tag", "") or "")
 
 
-def _runner(args: argparse.Namespace, run_id: str, *, resuming: bool = False) -> DesignRunner:
+def _speaker(args: argparse.Namespace) -> Speaker:
+    return Speaker(bool(getattr(args, "speak", False)))
+
+
+def _runner(
+    args: argparse.Namespace, run_id: str, *, resuming: bool = False, speaker: Speaker | None = None
+) -> DesignRunner:
     llm_config = load_config("llm", args.config_dir)
     runs_root = args.runs_dir or RUNS_ROOT
     stored_engine, stored_tag = _stored_engine(runs_root, run_id) if resuming else (None, "")
@@ -252,12 +275,15 @@ def _runner(args: argparse.Namespace, run_id: str, *, resuming: bool = False) ->
         model_tag=args.model or stored_tag,
         validate_args=toolbox.validate_args,
     )
+    ask_fn = ask_terminal if sys.stdin.isatty() else None
+    if ask_fn is not None and speaker is not None and speaker.enabled:
+        ask_fn = speaking_ask(speaker, ask_fn)
     return DesignRunner(
         engine,
         runs_root=runs_root,
         toolbox=toolbox,
         config_dir=args.config_dir,
-        ask_fn=ask_terminal if sys.stdin.isatty() else None,
+        ask_fn=ask_fn,
     )
 
 
@@ -282,7 +308,27 @@ def resume_runner(
     return _runner(args, run_id, resuming=True)
 
 
-def _report(result: RunResult) -> int:
+DR11_FILE = "DR-11.json"
+"""Decision Record whose rationale ``--speak`` reads (backup capacity, the last design choice)."""
+
+
+def _dr11_text(run_dir: Path) -> str | None:
+    """Spoken DR-11 line from ``runs/<id>/decision_records/DR-11.json`` (None if absent)."""
+    path = run_dir / "decision_records" / DR11_FILE
+    if not path.is_file():
+        return None
+    try:
+        record = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    return (
+        f"Decision record {record.get('dr_id', 'DR-11')}, {record.get('title', '')}: "
+        f"{record.get('choice_label', '')}. {record.get('rationale', '')}"
+    )
+
+
+def _report(result: RunResult, speaker: Speaker | None = None) -> int:
+    speaker = speaker or Speaker(False)
     print(f"run {result.run_id}: {result.status.value} (phase {result.phase.value})")
     if result.summary:
         print(result.summary)
@@ -292,9 +338,17 @@ def _report(result: RunResult) -> int:
             "resume with: python -m gemini_agent.cli resume "
             f"--run-id {result.run_id} --answer '<answer>'"
         )
+        speaker.say(request_text(result.pending))
+    else:
+        speaker.say(f"Run {result.run_id} {result.status.value}. {result.summary}")
     print(f"outputs: {result.run_dir}")
+    if result.status == RunStatus.COMPLETED:
+        rationale = _dr11_text(result.run_dir)
+        if rationale:
+            speaker.say(rationale)
     if result.status == RunStatus.COMPLETED and result.approval == "rejected":
         print("the recommended design was NOT approved by the user")
+        speaker.say("The recommended design was not approved by the user.")
         return EXIT_NOT_APPROVED
     return STATUS_EXIT[result.status]
 
@@ -315,7 +369,8 @@ def _run(args: argparse.Namespace) -> int:
             print(f"error: cannot read brief: {exc}", file=sys.stderr)
             return EXIT_USAGE
     input_mode = args.input_mode or ("ask" if sys.stdin.isatty() else "assume")
-    runner = _runner(args, run_id)
+    speaker = _speaker(args)
+    runner = _runner(args, run_id, speaker=speaker)
     try:
         result = runner.start(
             prompt, run_id=run_id, input_mode=input_mode, model_tag=args.model or ""
@@ -325,12 +380,13 @@ def _run(args: argparse.Namespace) -> int:
         return EXIT_USAGE
     finally:
         runner.close()
-    return _report(result)
+    return _report(result, speaker)
 
 
 def _resume(args: argparse.Namespace) -> int:
+    speaker = _speaker(args)
     try:
-        runner = _runner(args, args.run_id, resuming=True)
+        runner = _runner(args, args.run_id, resuming=True, speaker=speaker)
     except (OSError, yaml.YAMLError, ValidationError) as exc:
         print(f"config error: {exc}", file=sys.stderr)
         return EXIT_CONFIG_ERROR
@@ -344,10 +400,11 @@ def _resume(args: argparse.Namespace) -> int:
         return EXIT_USAGE
     finally:
         runner.close()
-    return _report(result)
+    return _report(result, speaker)
 
 
 def _whatif(args: argparse.Namespace) -> int:
+    speaker = _speaker(args)
     runs_root = args.runs_dir or RUNS_ROOT
     try:
         result = whatif_tool.whatif(
@@ -374,9 +431,11 @@ def _whatif(args: argparse.Namespace) -> int:
         if outcome.verifier_summary:
             line += f"; {outcome.verifier_summary}"
         print(line)
+        speaker.say(f"{outcome.label}: {outcome.status}. {outcome.verifier_summary}")
     for warning in result.warnings:
         print(f"warning: {warning}")
     print(f"record: {result.record.dr_id} ({result.record.title})")
+    speaker.say(f"Record {result.record.dr_id}, {result.record.title}: {result.record.rationale}")
     print(f"outputs: {runs_root / args.run_id / whatif_tool.WHATIF_DIR / str(result.index)}")
     return EXIT_OK
 

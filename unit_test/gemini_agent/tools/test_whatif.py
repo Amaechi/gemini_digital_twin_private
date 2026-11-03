@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -184,11 +185,24 @@ def test_out_of_limit_levers_are_refused_with_the_guard_reason(smoke_run):
     assert next_index(run_dir) == index  # nothing written
 
 
-def test_cli_whatif_prints_the_table_and_exit_codes(smoke_run, capsys):
-    """``cli whatif``: the before → after table on stdout and the folder; refused → 5, usage → 2."""
+def test_cli_whatif_prints_the_table_and_exit_codes(smoke_run, capsys, monkeypatch):
+    """``cli whatif``: the before → after table on stdout and the folder; refused → 5, usage → 2.
+
+    With ``--speak`` (post-submission) the before/after verdicts and the record's rationale are
+    also spoken through the (monkeypatched) ``say`` subprocess; the printed output is unchanged.
+    """
+    from gemini_agent import speech
+
+    spoken: list[str] = []
+    monkeypatch.setattr(speech.shutil, "which", lambda command: f"/usr/bin/{command}")
+    monkeypatch.setattr(
+        speech.subprocess,
+        "run",
+        lambda argv, **kw: spoken.append(argv[2]) or subprocess.CompletedProcess(argv, 0),
+    )
     run_dir, _ = smoke_run
     root = run_dir.parent
-    base = ["whatif", "--run-id", "smoke", "--runs-dir", str(root), "--budget", "smoke"]
+    base = ["whatif", "--run-id", "smoke", "--runs-dir", str(root), "--budget", "smoke", "--speak"]
     snapshot = load_run(run_dir)
     robust = snapshot.uncertainty is not None and bool(snapshot.uncertainty.robust_backup_mw)
     # (DB-30=B needs the full year: the smoke day subset holds days outside B's 330-day window)
@@ -205,6 +219,12 @@ def test_cli_whatif_prints_the_table_and_exit_codes(smoke_run, capsys):
     lcoh = next(r for r in result.table if r.metric == "lcoh_per_mwh")
     assert f"| {lcoh.before:.2f} | {lcoh.after:.2f} | {lcoh.delta:+.2f} |" in out  # 2 dp
     assert result.scenario.assumptions == {"DB-32": 24.0, "ECO-CO2-GAS": 51.53}
+    assert spoken[:2] == [
+        f"before: {result.before.status}. {result.before.verifier_summary}".strip(),
+        f"after: {result.after.status}. {result.after.verifier_summary}".strip(),
+    ]
+    assert spoken[2] == f"Record DR-W3, {result.record.title}: {result.record.rationale}"
+    assert len(spoken) == 3
     assert result.scenario.edits_config and result.after.candidate.cooling_return_degc == 24.0
     assert result.after.kpis is not None and result.after.status == "ok", result.after.reason
     assert result.after.verdict == DesignVerdict.ACCEPTED

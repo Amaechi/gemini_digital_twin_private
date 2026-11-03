@@ -10,7 +10,10 @@
 # closes from the deterministic intake when its step budget runs out (never escalates in scope).
 # 2026-11-03 (WP-13 follow-up, S2/S5): P1 intake requests — confirm a supply-temperature conflict
 # with the basis (CFG-BASIS-CONFIRM) and list the inputs the request does not provide
-# (CFG-INPUT-DEFAULTS) — asked once, before any tool runs or default is assumed.
+# (CFG-INPUT-DEFAULTS) — asked once, before any tool runs or default is assumed. 2026-11-03
+# (runner J): a Decision Record call past the phase token budget records TOKEN_BUDGET_OVERRUN
+# instead of escalating mid-DR (the engine floors its usage limit; past the call's own ceiling
+# the policy chooses, a counted fallback); decisions keep AG-04.
 """Workflow runner: deterministic phases P0–P10 (spec §4.1, §5.2).
 
 The runner decides WHICH phase runs, enforces budgets (AG-04), executes every tool call,
@@ -33,6 +36,7 @@ from typing import Any, Literal
 from gemini_agent.agents.engine import (
     DecisionEngine,
     EngineBudgetExceeded,
+    EngineResult,
     PolicyEngine,
     check_choice,
     choice_deps,
@@ -88,6 +92,9 @@ from gemini_agent.schemas.results import KPISet
 
 RUNS_ROOT = REPO_ROOT / "runs"
 STORE_FILE = "events.sqlite"
+TOKEN_FIGURE_TOOL = "plot_figures"
+"""P10 tool that draws ``figures/fig_tokens.png``; an interim ``token_summary.json`` precedes it."""
+TOKENS_FIGURE = "fig_tokens.png"
 MAX_VERIFICATION_LOOPS = 3
 """Spec §5.2 P7: FAIL ⇒ violations back to P6 (≤ 3 loops), then escalate."""
 HISTORY_EVENTS = 12
@@ -647,6 +654,11 @@ class DesignRunner:
         signature = self._signature(state, tool, args)
         args = self._resolve_args(state, args)
         tool_spec = self.toolbox.spec(tool)
+        if tool == TOKEN_FIGURE_TOOL:
+            # Post-submission fix: the P10 token chart reads token_summary.json, which used to
+            # be written only at run end (placeholder in every LLM run). Interim summary here;
+            # _write_outputs redraws the chart from the final summary.
+            LLMLogger(self.run_dir(state.run_id)).write_token_summary()
         try:
             result = self.toolbox.execute(tool, args, self._tool_context(state))
         except Exception as exc:  # noqa: BLE001 - a failing tool is evidence, not a crash
@@ -1021,11 +1033,22 @@ class DesignRunner:
             return "continue"
         prog = state.phase_progress(spec.phase)
         context = self._context(state, spec, role=question.role)
+        budget = self._budget(spec)
+        limit_error: str | None = None
         try:
             result = self.engine.choose(question, context)
         except EngineBudgetExceeded as exc:
-            prog.tokens_used += exc.input_tokens + exc.output_tokens
-            return self._escalate(state, f"LLM usage limit exceeded for {dr_id}: {exc}")
+            # Runner J: the call went past its own token ceiling (the engine floors its usage
+            # limit there), i.e. beyond the configured call limits. The DR is still required,
+            # so the policy chooses (a counted fallback) and the overrun is recorded below.
+            limit_error = f"LLM usage limit exceeded for {dr_id}: {exc}"[:500]
+            result = EngineResult(
+                self._policy.choose(question, context).value,
+                source="policy_fallback",
+                input_tokens=exc.input_tokens,
+                output_tokens=exc.output_tokens,
+                error=limit_error,
+            )
         prog.tokens_used += result.input_tokens + result.output_tokens
         choice, source = result.value, result.source
         error = check_choice(choice_deps(question), choice)
@@ -1062,12 +1085,33 @@ class DesignRunner:
                     f"{previous}; the P9 DesignVerifier verifies it",
                 },
             )
-        budget = self._budget(spec)
-        if prog.tokens_used > budget.max_tokens:
-            return self._escalate(
+        if limit_error is not None or prog.tokens_used > budget.max_tokens:
+            # Runner J: the DR is a phase-close step the workflow requires, so the engine floors
+            # its usage limit and the overrun is recorded (counted by the eval harness like the
+            # fallbacks) rather than escalated mid-DR. Ordinary decisions still escalate at the
+            # budget (AG-04).
+            overrun = max(prog.tokens_used - budget.max_tokens, 0)
+            message = (
+                f"{dr_id} written {overrun} tokens past the {spec.phase.value} token budget "
+                f"({prog.tokens_used} > {budget.max_tokens}); a required Decision Record is not "
+                "starved, ordinary decisions still escalate at the budget (AG-04)"
+            )
+            if limit_error is not None:
+                message = (
+                    f"{dr_id}: the LLM call exceeded its own usage ceiling, the policy chose "
+                    f"the option (policy_fallback); {limit_error}"
+                )
+            self._event(
                 state,
-                f"token budget exceeded in {spec.phase.value} "
-                f"({prog.tokens_used} > {budget.max_tokens})",
+                "TOKEN_BUDGET_OVERRUN",
+                {
+                    "dr_id": dr_id,
+                    "tokens_used": prog.tokens_used,
+                    "max_tokens": budget.max_tokens,
+                    "overrun": overrun,
+                    "error": limit_error,
+                    "message": message,
+                },
             )
         return "continue"
 
@@ -1190,6 +1234,11 @@ class DesignRunner:
         self._event(state, "REFUSE", {"message": state.final_summary, "reason": reason[:300]})
         return "stopped"
 
+    def token_budget_overruns(self, run_id: str) -> int:
+        """Decision Record calls made past their phase token budget (``TOKEN_BUDGET_OVERRUN``)."""
+        events = self.store(run_id).list_events(run_id)
+        return sum(1 for event in events if event.type == "TOKEN_BUDGET_OVERRUN")
+
     def _escalate(self, state: RunState, reason: str) -> Outcome:
         prog = state.phase_progress(state.phase)
         state.status = RunStatus.ESCALATED
@@ -1213,6 +1262,9 @@ class DesignRunner:
         )
         if state.engine != "policy":
             state.final_summary += f" LLM fallbacks to policy: {state.fallback_count()}."
+            overruns = self.token_budget_overruns(state.run_id)
+            if overruns:
+                state.final_summary += f" Decision Records past a phase token budget: {overruns}."
         self._event(state, "RUN_END", {"message": state.final_summary})
 
     # ------------------------------------------------------------------ context and storage
@@ -1296,3 +1348,12 @@ class DesignRunner:
             "".join(event.model_dump_json() + "\n" for event in events), "utf-8"
         )
         LLMLogger(run_dir).write_token_summary()
+        if (run_dir / "figures" / TOKENS_FIGURE).is_file():
+            # P10 plotted before the run's last LLM calls: redraw from the final summary. A
+            # drawing failure must not lose the run outputs written above (state is saved).
+            from gemini_agent.tools.plots import render_tokens_figure
+
+            try:
+                render_tokens_figure(run_dir)
+            except (OSError, ValueError) as exc:  # corrupt summary, unwritable figure
+                self._event(state, "WARNING", {"message": f"fig_tokens not redrawn: {exc}"})

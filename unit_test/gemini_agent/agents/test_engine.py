@@ -13,8 +13,11 @@ import pytest
 from pydantic_ai.messages import ModelResponse, TextPart
 from pydantic_ai.models import override_allow_model_requests
 from pydantic_ai.models.test import TestModel
+from pydantic_ai.usage import RequestUsage
 
 from gemini_agent.agents.engine import (
+    CHARS_PER_TOKEN,
+    REQUEST_OVERHEAD_TOKENS,
     EngineBudgetExceeded,
     EngineFailure,
     LLMEngine,
@@ -29,7 +32,12 @@ from gemini_agent.agents.engine import (
 )
 from gemini_agent.agents.roles import ROLES
 from gemini_agent.logging.llm_logger import LLMLogger
-from gemini_agent.prompts.system import FEW_SHOT, NO_TOOL_KIND_NOTES, system_prompt
+from gemini_agent.prompts.system import (
+    FEW_SHOT,
+    NO_TOOL_KIND_NOTES,
+    choice_prompt,
+    system_prompt,
+)
 from gemini_agent.runner.toolbox import default_toolbox
 from gemini_agent.schemas.config import load_config
 from gemini_agent.schemas.decision import (
@@ -706,3 +714,51 @@ def test_engines_close_without_error_and_a_later_call_still_runs(tmp_path):
     PolicyEngine().close()  # the default close is a no-op
     assert engine.decide(_context()).source == "llm"  # new event loop, same engine
     engine.close()
+
+
+# --------------------------------------------------------------------------- runner J: DR floor
+def _with_usage(input_tokens: int, output_tokens: int = 0):
+    """policy_like whose every reply reports a fixed usage (FunctionModel keeps a set usage)."""
+
+    def func(messages, info):
+        response = policy_like(messages, info)
+        response.usage = RequestUsage(input_tokens=input_tokens, output_tokens=output_tokens)
+        return response
+
+    return func
+
+
+def test_choice_call_is_floored_at_its_own_token_ceiling(tmp_path):
+    """Runner J: a Decision Record choice runs with no tokens left in the phase; its usage limit
+    is floored at the call's ceiling (retries included), so a call within ``calls`` completes."""
+    engine, logger = _llm(policy_like, tmp_path)
+    result = engine.choose(_question(), _context(tokens=0))
+    assert result.source == "llm" and result.value.option_id == "ates"
+    assert logger.records()[-1].decision_source == "llm"
+
+    prompt = choice_prompt(_question(), _context())
+    ceiling = engine.call_token_ceiling(prompt, Role.SYSTEM_ARCHITECT)
+    n = LLM_CONFIG.max_output_retries + 2
+    outputs = LLM_CONFIG.calls.max_output_tokens * n * (n + 1) // 2
+    prompt_tokens = (len(prompt) + len(system_prompt(Role.SYSTEM_ARCHITECT))) // CHARS_PER_TOKEN
+    assert ceiling == n * (prompt_tokens + 1 + REQUEST_OVERHEAD_TOKENS) + outputs
+    # A call that uses more than the phase has left but less than its ceiling completes …
+    engine, _ = _llm(_with_usage(ceiling - 100), tmp_path)
+    assert engine.choose(_question(), _context(tokens=5)).source == "llm"
+    # … while one past its own ceiling raises EngineBudgetExceeded through ResilientEngine too
+    # (the runner then lets the policy choose the DR and records the overrun).
+    engine, logger = _llm(_with_usage(ceiling + 1), tmp_path)
+    with pytest.raises(EngineBudgetExceeded, match="total_tokens_limit"):
+        ResilientEngine(engine).choose(_question(), _context(tokens=5))
+    assert logger.records()[-1].decision_source == "escalated"
+
+
+def test_decisions_keep_the_phase_budget_as_their_limit(tmp_path):
+    """The floor is for Decision Records only: a decision at the phase's last tokens escalates."""
+    engine, logger = _llm(_with_usage(2_000), tmp_path)
+    assert engine.decide(_context(tokens=2_500)).source == "llm"
+    with pytest.raises(EngineBudgetExceeded, match="total_tokens_limit"):
+        engine.decide(_context(tokens=1_500))
+    with pytest.raises(EngineBudgetExceeded, match="no tokens left"):
+        engine.decide(_context(tokens=0))
+    assert [r.decision_source for r in logger.records()] == ["llm", "escalated"]
