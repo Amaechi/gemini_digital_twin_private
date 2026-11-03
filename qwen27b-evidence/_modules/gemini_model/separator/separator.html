@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>gemini_model.separator.separator &mdash; GEMINI Geothermal Digital Twin (qwen27b-evidence)</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=19f00094" />
+
+  
+  <!--[if lt IE 9]>
+    <script src="../../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+        <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+        <script src="../../../_static/documentation_options.js?v=f840d949"></script>
+        <script src="../../../_static/doctools.js?v=9a2dae69"></script>
+        <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            GEMINI Geothermal Digital Twin
+          </a>
+              <div class="version">
+                qwen27b-evidence
+              </div>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Table of Contents</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../index_about_gemini.html">1. About GEMINI</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../index_getting_started.html">2. Getting started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../index_setup.html">3. Set-up</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../index_applications.html">4. Applications</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../index_models.html">5. Models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../index_sourcecode.html">6. Source code documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../glossary.html">7. Glossary</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">GEMINI Geothermal Digital Twin</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">gemini_model.separator.separator</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for gemini_model.separator.separator</h1><div class="highlight"><pre>
+<span></span><span class="sd">"""Surface separator model.</span>
+
+<span class="sd">Estimates the pressure and temperature drop across a surface separator</span>
+<span class="sd">vessel, given a linear flow-dependent pressure resistance and a fixed</span>
+<span class="sd">temperature drop.</span>
+
+<span class="sd">Optionally (GM-12) it also characterises the separated associated gas from</span>
+<span class="sd">its CH4/CO2 composition: gas density, fuel LHV, fuel power and the CO2 that</span>
+<span class="sd">the gas already contains ("inherent" CO2). Source: RC-08 "Associated gas"</span>
+<span class="sd">(Nm3 at 0 degC, 1.01325 bar; CH4 LHV 35.8 MJ/Nm3).</span>
+<span class="sd">"""</span>
+
+<span class="c1"># Modified by the GeoAgent team for SPE GeoHackathon 2026, 2026-11-01: gas composition parameters</span>
+<span class="c1"># (ch4_fraction, co2_fraction, fuel_lhv_j_kg; gas_density derived when not given) and outputs</span>
+<span class="c1"># (fuel_power_w, inherent_co2_kg_s, ...) for GM-12. Without the new parameters the outputs are</span>
+<span class="c1"># zero and every existing output is unchanged. WP-01 review: an explicit fuel_lhv_j_kg with gas</span>
+<span class="c1"># flow but no gas density (no gas_density, no composition) raises instead of giving 0 W fuel.</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">gemini_model.model_abstract</span><span class="w"> </span><span class="kn">import</span> <span class="n">StaticModel</span>
+
+<span class="n">MOLAR_VOLUME_NM3_PER_KMOL</span> <span class="o">=</span> <span class="mf">22.414</span>  <span class="c1"># ideal gas at 0 degC, 1.01325 bar (RC-08)</span>
+<span class="n">MOLAR_MASS_CH4_KG_PER_KMOL</span> <span class="o">=</span> <span class="mf">16.04</span>  <span class="c1"># RC-08</span>
+<span class="n">MOLAR_MASS_CO2_KG_PER_KMOL</span> <span class="o">=</span> <span class="mf">44.01</span>  <span class="c1"># RC-08</span>
+<span class="n">CH4_LHV_J_PER_NM3</span> <span class="o">=</span> <span class="mf">35.8e6</span>  <span class="c1"># lower heating value of methane (RC-08)</span>
+<span class="n">_FRACTION_SUM_TOLERANCE</span> <span class="o">=</span> <span class="mf">1e-6</span>
+
+
+<div class="viewcode-block" id="associated_gas_properties">
+<a class="viewcode-back" href="../../../codedocumentation/gemini_model.separator.separator.html#gemini_model.separator.separator.associated_gas_properties">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">associated_gas_properties</span><span class="p">(</span><span class="n">ch4_fraction</span><span class="p">,</span> <span class="n">co2_fraction</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Return the properties of a binary CH4/CO2 associated gas.</span>
+
+<span class="sd">    Source: RC-08 "Associated gas" [D]. Mole fractions equal volume</span>
+<span class="sd">    fractions for an ideal gas, and the two must add up to 1.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    ch4_fraction, co2_fraction: float</span>
+<span class="sd">        Mole (= Nm3) fractions of CH4 and CO2 (-).</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    dict</span>
+<span class="sd">        ``density_kg_nm3`` (kg/Nm3), ``lhv_j_nm3`` (J/Nm3), ``lhv_j_kg``</span>
+<span class="sd">        (J/kg), ``ch4_kg_per_nm3`` and ``co2_kg_per_nm3`` (kg of each species</span>
+<span class="sd">        per Nm3 of gas; the CO2 one is the inherent CO2) and</span>
+<span class="sd">        ``co2_if_burned_kg_per_nm3`` (inherent CO2 plus CO2 from burning the</span>
+<span class="sd">        CH4, kg/Nm3). For 80/20 mol %: 0.965 kg/Nm3, 29.7 MJ/kg and</span>
+<span class="sd">        1.964 kg/Nm3 (= 68.6 kg/GJ_LHV).</span>
+
+<span class="sd">    Raises</span>
+<span class="sd">    ------</span>
+<span class="sd">    ValueError</span>
+<span class="sd">        If a fraction is outside [0, 1] or the two do not add up to 1.</span>
+<span class="sd">    """</span>
+    <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="p">((</span><span class="s2">"ch4_fraction"</span><span class="p">,</span> <span class="n">ch4_fraction</span><span class="p">),</span> <span class="p">(</span><span class="s2">"co2_fraction"</span><span class="p">,</span> <span class="n">co2_fraction</span><span class="p">)):</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="mf">0.0</span> <span class="o">&lt;=</span> <span class="n">value</span> <span class="o">&lt;=</span> <span class="mf">1.0</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2"> must be in [0, 1], got </span><span class="si">{</span><span class="n">value</span><span class="si">!r}</span><span class="s2">."</span><span class="p">)</span>
+    <span class="k">if</span> <span class="nb">abs</span><span class="p">(</span><span class="n">ch4_fraction</span> <span class="o">+</span> <span class="n">co2_fraction</span> <span class="o">-</span> <span class="mf">1.0</span><span class="p">)</span> <span class="o">&gt;</span> <span class="n">_FRACTION_SUM_TOLERANCE</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="s2">"ch4_fraction + co2_fraction must equal 1 (binary CH4/CO2 gas), got "</span>
+            <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">ch4_fraction</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">co2_fraction</span><span class="si">!r}</span><span class="s2">; give gas_density and fuel_lhv_j_kg explicitly "</span>
+            <span class="s2">"for other compositions."</span>
+        <span class="p">)</span>
+    <span class="n">kmol_per_nm3</span> <span class="o">=</span> <span class="mf">1.0</span> <span class="o">/</span> <span class="n">MOLAR_VOLUME_NM3_PER_KMOL</span>
+    <span class="n">ch4_kg_per_nm3</span> <span class="o">=</span> <span class="n">ch4_fraction</span> <span class="o">*</span> <span class="n">kmol_per_nm3</span> <span class="o">*</span> <span class="n">MOLAR_MASS_CH4_KG_PER_KMOL</span>
+    <span class="n">co2_kg_per_nm3</span> <span class="o">=</span> <span class="n">co2_fraction</span> <span class="o">*</span> <span class="n">kmol_per_nm3</span> <span class="o">*</span> <span class="n">MOLAR_MASS_CO2_KG_PER_KMOL</span>
+    <span class="n">density_kg_nm3</span> <span class="o">=</span> <span class="n">ch4_kg_per_nm3</span> <span class="o">+</span> <span class="n">co2_kg_per_nm3</span>
+    <span class="n">lhv_j_nm3</span> <span class="o">=</span> <span class="n">ch4_fraction</span> <span class="o">*</span> <span class="n">CH4_LHV_J_PER_NM3</span>
+    <span class="c1"># One mole of CO2 per mole of CH4 burned, plus the CO2 already in the gas.</span>
+    <span class="n">co2_if_burned_kg_per_nm3</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="p">(</span><span class="n">ch4_fraction</span> <span class="o">+</span> <span class="n">co2_fraction</span><span class="p">)</span> <span class="o">*</span> <span class="n">kmol_per_nm3</span> <span class="o">*</span> <span class="n">MOLAR_MASS_CO2_KG_PER_KMOL</span>
+    <span class="p">)</span>
+    <span class="k">return</span> <span class="p">{</span>
+        <span class="s2">"density_kg_nm3"</span><span class="p">:</span> <span class="n">density_kg_nm3</span><span class="p">,</span>
+        <span class="s2">"lhv_j_nm3"</span><span class="p">:</span> <span class="n">lhv_j_nm3</span><span class="p">,</span>
+        <span class="s2">"lhv_j_kg"</span><span class="p">:</span> <span class="n">lhv_j_nm3</span> <span class="o">/</span> <span class="n">density_kg_nm3</span><span class="p">,</span>
+        <span class="s2">"ch4_kg_per_nm3"</span><span class="p">:</span> <span class="n">ch4_kg_per_nm3</span><span class="p">,</span>
+        <span class="s2">"co2_kg_per_nm3"</span><span class="p">:</span> <span class="n">co2_kg_per_nm3</span><span class="p">,</span>
+        <span class="s2">"co2_if_burned_kg_per_nm3"</span><span class="p">:</span> <span class="n">co2_if_burned_kg_per_nm3</span><span class="p">,</span>
+    <span class="p">}</span></div>
+
+
+
+<div class="viewcode-block" id="Separator">
+<a class="viewcode-back" href="../../../codedocumentation/gemini_model.separator.separator.html#gemini_model.separator.separator.Separator">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">Separator</span><span class="p">(</span><span class="n">StaticModel</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Surface separator pressure/temperature drop model."""</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">"""Model initialization."""</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">output</span> <span class="o">=</span> <span class="p">{}</span>
+
+<div class="viewcode-block" id="Separator.update_parameters">
+<a class="viewcode-back" href="../../../codedocumentation/gemini_model.separator.separator.html#gemini_model.separator.separator.Separator.update_parameters">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">update_parameters</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">parameters</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">"""Update model parameters.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        parameters: dict</span>
+<span class="sd">            Parameters dict as defined by the model.</span>
+<span class="sd">        """</span>
+        <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">parameters</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="n">value</span></div>
+
+
+<div class="viewcode-block" id="Separator.initialize_state">
+<a class="viewcode-back" href="../../../codedocumentation/gemini_model.separator.separator.html#gemini_model.separator.separator.Separator.initialize_state">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">initialize_state</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">"""Generate an initial state based on user parameters."""</span>
+        <span class="k">pass</span></div>
+
+
+<div class="viewcode-block" id="Separator.update_state">
+<a class="viewcode-back" href="../../../codedocumentation/gemini_model.separator.separator.html#gemini_model.separator.separator.Separator.update_state">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">update_state</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">u</span><span class="p">,</span> <span class="n">x</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">"""Update the state based on input u and state x."""</span>
+        <span class="k">pass</span></div>
+
+
+<div class="viewcode-block" id="Separator.calculate_output">
+<a class="viewcode-back" href="../../../codedocumentation/gemini_model.separator.separator.html#gemini_model.separator.separator.Separator.calculate_output">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">calculate_output</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">u</span><span class="p">,</span> <span class="n">x</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">"""Calculate output based on input u.</span>
+
+<span class="sd">        ``u["direction"]`` selects the calculation direction (defaults to</span>
+<span class="sd">        ``"forward"`` if not provided): ``"forward"``</span>
+<span class="sd">        computes the outlet state from the inlet state, ``"backward"``</span>
+<span class="sd">        computes the inlet state from the outlet state. All flow rates</span>
+<span class="sd">        (``flow_rate``, ``gas_flow_rate``) are in SI units (m3/s). In addition to the</span>
+<span class="sd">        liquid-phase pressure/temperature calculation, this also reports the</span>
+<span class="sd">        co-produced gas phase separated out of the flow: ``gas_flow_rate``</span>
+<span class="sd">        (volumetric, m3/s) and ``gas_mass_flow_rate`` (kg/s), using the</span>
+<span class="sd">        ``gas_water_ratio``/``gas_density`` parameters (both default to 0,</span>
+<span class="sd">        so existing configurations without a gas phase are unaffected). The</span>
+<span class="sd">        liquid-phase ``flow_rate`` itself is echoed back as an output so</span>
+<span class="sd">        it can be passed on unchanged to a downstream component; a further</span>
+<span class="sd">        output, ``flow_rate_m3h``, echoes the same liquid flow converted</span>
+<span class="sd">        to m3/h, for downstream components that expect that convention</span>
+<span class="sd">        (e.g. a well model).</span>
+
+<span class="sd">        Gas composition (GM-12, all optional): ``ch4_fraction`` and</span>
+<span class="sd">        ``co2_fraction`` (mole fractions, must add up to 1) give the gas</span>
+<span class="sd">        density and fuel LHV via :func:`associated_gas_properties`;</span>
+<span class="sd">        explicit ``gas_density`` (kg/Nm3) and ``fuel_lhv_j_kg`` (J/kg)</span>
+<span class="sd">        parameters override the derived values. ``gas_water_ratio`` is in</span>
+<span class="sd">        Nm3 gas per m3 liquid, so ``gas_flow_rate`` is in Nm3/s. Extra</span>
+<span class="sd">        outputs: ``gas_density_kg_nm3``, ``fuel_lhv_j_kg``,</span>
+<span class="sd">        ``fuel_power_w`` (W, LHV basis = gas mass flow x LHV),</span>
+<span class="sd">        ``ch4_mass_flow_kg_s``, ``inherent_co2_kg_s`` (CO2 contained in the</span>
+<span class="sd">        gas, kg/s) and ``co2_if_burned_kg_s`` (inherent plus combustion</span>
+<span class="sd">        CO2, kg/s). The species flows are the composition's mass fractions</span>
+<span class="sd">        times ``gas_mass_flow_rate``, so they always add up to it (also</span>
+<span class="sd">        with an explicit ``gas_density``). Without a composition the</span>
+<span class="sd">        species/CO2 outputs are 0, and ``fuel_power_w`` needs both</span>
+<span class="sd">        ``gas_density`` and ``fuel_lhv_j_kg``: it is 0 without an LHV,</span>
+<span class="sd">        and an LHV with ``gas_water_ratio`` &gt; 0 but no gas density raises</span>
+<span class="sd">        ``ValueError`` (the fuel would silently be 0 W). ``emission`` stays 0: the separator</span>
+<span class="sd">        does not emit; the CO2 is counted where the gas is burned (or</span>
+<span class="sd">        vented).</span>
+<span class="sd">        """</span>
+        <span class="n">pressure</span> <span class="o">=</span> <span class="n">u</span><span class="p">[</span><span class="s2">"pressure"</span><span class="p">]</span>
+        <span class="n">temperature</span> <span class="o">=</span> <span class="n">u</span><span class="p">[</span><span class="s2">"temperature"</span><span class="p">]</span>
+        <span class="n">flow_rate</span> <span class="o">=</span> <span class="n">u</span><span class="p">[</span><span class="s2">"flow_rate"</span><span class="p">]</span>
+        <span class="n">direction</span> <span class="o">=</span> <span class="n">u</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"direction"</span><span class="p">,</span> <span class="s2">"forward"</span><span class="p">)</span>
+
+        <span class="n">flow_resistance</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">"flow_resistance"</span><span class="p">]</span>
+        <span class="n">temperature_drop</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">"temperature_drop"</span><span class="p">]</span>
+        <span class="n">gas_water_ratio</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"gas_water_ratio"</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">)</span>
+        <span class="n">gas</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_gas_properties</span><span class="p">()</span>
+        <span class="n">gas_density</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="o">.</span><span class="n">get</span><span class="p">(</span>
+            <span class="s2">"gas_density"</span><span class="p">,</span> <span class="n">gas</span><span class="p">[</span><span class="s2">"density_kg_nm3"</span><span class="p">]</span> <span class="k">if</span> <span class="n">gas</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="mf">0.0</span>
+        <span class="p">)</span>
+        <span class="n">fuel_lhv_j_kg</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="o">.</span><span class="n">get</span><span class="p">(</span>
+            <span class="s2">"fuel_lhv_j_kg"</span><span class="p">,</span> <span class="n">gas</span><span class="p">[</span><span class="s2">"lhv_j_kg"</span><span class="p">]</span> <span class="k">if</span> <span class="n">gas</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="mf">0.0</span>
+        <span class="p">)</span>
+        <span class="k">if</span> <span class="n">fuel_lhv_j_kg</span> <span class="o">&gt;</span> <span class="mf">0.0</span> <span class="ow">and</span> <span class="n">gas_water_ratio</span> <span class="o">&gt;</span> <span class="mf">0.0</span> <span class="ow">and</span> <span class="n">gas_density</span> <span class="o">&lt;=</span> <span class="mf">0.0</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="s2">"Separator: the fuel LHV is &gt; 0 but the gas density is &lt;= 0, so fuel_power_w would "</span>
+                <span class="s2">"be 0 W; give gas_density (kg/Nm3) &gt; 0 or ch4_fraction/co2_fraction."</span>
+            <span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">direction</span> <span class="o">==</span> <span class="s2">"forward"</span><span class="p">:</span>
+            <span class="n">pressure_in</span> <span class="o">=</span> <span class="n">pressure</span>
+            <span class="n">pressure_out</span> <span class="o">=</span> <span class="n">pressure_in</span> <span class="o">-</span> <span class="n">flow_rate</span> <span class="o">*</span> <span class="n">flow_resistance</span>
+            <span class="n">temperature_in</span> <span class="o">=</span> <span class="n">temperature</span>
+            <span class="n">temperature_out</span> <span class="o">=</span> <span class="n">temperature_in</span> <span class="o">-</span> <span class="n">temperature_drop</span>
+        <span class="k">elif</span> <span class="n">direction</span> <span class="o">==</span> <span class="s2">"backward"</span><span class="p">:</span>
+            <span class="n">pressure_out</span> <span class="o">=</span> <span class="n">pressure</span>
+            <span class="n">pressure_in</span> <span class="o">=</span> <span class="n">pressure_out</span> <span class="o">+</span> <span class="n">flow_rate</span> <span class="o">*</span> <span class="n">flow_resistance</span>
+            <span class="n">temperature_out</span> <span class="o">=</span> <span class="n">temperature</span>
+            <span class="n">temperature_in</span> <span class="o">=</span> <span class="n">temperature_out</span> <span class="o">+</span> <span class="n">temperature_drop</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Unsupported direction '</span><span class="si">{</span><span class="n">direction</span><span class="si">}</span><span class="s2">'. Use 'forward' or 'backward'."</span><span class="p">)</span>
+
+        <span class="n">gas_flow_rate</span> <span class="o">=</span> <span class="n">gas_water_ratio</span> <span class="o">*</span> <span class="n">flow_rate</span>
+        <span class="n">gas_mass_flow_rate</span> <span class="o">=</span> <span class="n">gas_flow_rate</span> <span class="o">*</span> <span class="n">gas_density</span>
+        <span class="n">fuel_power_w</span> <span class="o">=</span> <span class="n">gas_mass_flow_rate</span> <span class="o">*</span> <span class="n">fuel_lhv_j_kg</span>
+        <span class="k">if</span> <span class="n">gas</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="c1"># Mass fractions from the composition; scaled to the (possibly explicit) density.</span>
+            <span class="n">ch4_mass_flow_kg_s</span> <span class="o">=</span> <span class="n">gas_mass_flow_rate</span> <span class="o">*</span> <span class="n">gas</span><span class="p">[</span><span class="s2">"ch4_kg_per_nm3"</span><span class="p">]</span> <span class="o">/</span> <span class="n">gas</span><span class="p">[</span><span class="s2">"density_kg_nm3"</span><span class="p">]</span>
+            <span class="n">inherent_co2_kg_s</span> <span class="o">=</span> <span class="n">gas_mass_flow_rate</span> <span class="o">*</span> <span class="n">gas</span><span class="p">[</span><span class="s2">"co2_kg_per_nm3"</span><span class="p">]</span> <span class="o">/</span> <span class="n">gas</span><span class="p">[</span><span class="s2">"density_kg_nm3"</span><span class="p">]</span>
+            <span class="c1"># Burning 1 kmol CH4 gives 1 kmol CO2.</span>
+            <span class="n">co2_if_burned_kg_s</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="n">inherent_co2_kg_s</span>
+                <span class="o">+</span> <span class="n">ch4_mass_flow_kg_s</span> <span class="o">*</span> <span class="n">MOLAR_MASS_CO2_KG_PER_KMOL</span> <span class="o">/</span> <span class="n">MOLAR_MASS_CH4_KG_PER_KMOL</span>
+            <span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">ch4_mass_flow_kg_s</span> <span class="o">=</span> <span class="n">inherent_co2_kg_s</span> <span class="o">=</span> <span class="n">co2_if_burned_kg_s</span> <span class="o">=</span> <span class="mf">0.0</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">output</span><span class="p">[</span><span class="s2">"pressure_in"</span><span class="p">]</span> <span class="o">=</span> <span class="n">pressure_in</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">output</span><span class="p">[</span><span class="s2">"pressure_out"</span><span class="p">]</span> <span class="o">=</span> <span class="n">pressure_out</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">output</span><span class="p">[</span><span class="s2">"temperature_in"</span><span class="p">]</span> <span class="o">=</span> <span class="n">temperature_in</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">output</span><span class="p">[</span><span class="s2">"temperature_out"</span><span class="p">]</span> <span class="o">=</span> <span class="n">temperature_out</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">output</span><span class="p">[</span><span class="s2">"flow_rate"</span><span class="p">]</span> <span class="o">=</span> <span class="n">flow_rate</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">output</span><span class="p">[</span><span class="s2">"flow_rate_m3h"</span><span class="p">]</span> <span class="o">=</span> <span class="n">flow_rate</span> <span class="o">*</span> <span class="mf">3600.0</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">output</span><span class="p">[</span><span class="s2">"gas_flow_rate"</span><span class="p">]</span> <span class="o">=</span> <span class="n">gas_flow_rate</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">output</span><span class="p">[</span><span class="s2">"gas_mass_flow_rate"</span><span class="p">]</span> <span class="o">=</span> <span class="n">gas_mass_flow_rate</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">output</span><span class="p">[</span><span class="s2">"gas_density_kg_nm3"</span><span class="p">]</span> <span class="o">=</span> <span class="n">gas_density</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">output</span><span class="p">[</span><span class="s2">"fuel_lhv_j_kg"</span><span class="p">]</span> <span class="o">=</span> <span class="n">fuel_lhv_j_kg</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">output</span><span class="p">[</span><span class="s2">"fuel_power_w"</span><span class="p">]</span> <span class="o">=</span> <span class="n">fuel_power_w</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">output</span><span class="p">[</span><span class="s2">"ch4_mass_flow_kg_s"</span><span class="p">]</span> <span class="o">=</span> <span class="n">ch4_mass_flow_kg_s</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">output</span><span class="p">[</span><span class="s2">"inherent_co2_kg_s"</span><span class="p">]</span> <span class="o">=</span> <span class="n">inherent_co2_kg_s</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">output</span><span class="p">[</span><span class="s2">"co2_if_burned_kg_s"</span><span class="p">]</span> <span class="o">=</span> <span class="n">co2_if_burned_kg_s</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">output</span><span class="p">[</span><span class="s2">"power_el"</span><span class="p">]</span> <span class="o">=</span> <span class="mf">0.0</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">output</span><span class="p">[</span><span class="s2">"power_th"</span><span class="p">]</span> <span class="o">=</span> <span class="mf">0.0</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">output</span><span class="p">[</span><span class="s2">"emission"</span><span class="p">]</span> <span class="o">=</span> <span class="mf">0.0</span></div>
+
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_gas_properties</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">"""Return :func:`associated_gas_properties` for the configured composition.</span>
+
+<span class="sd">        Returns ``None`` if neither ``ch4_fraction`` nor ``co2_fraction`` is</span>
+<span class="sd">        set (legacy configuration without a gas composition).</span>
+<span class="sd">        """</span>
+        <span class="k">if</span> <span class="s2">"ch4_fraction"</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span> <span class="ow">and</span> <span class="s2">"co2_fraction"</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">None</span>
+        <span class="k">return</span> <span class="n">associated_gas_properties</span><span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"ch4_fraction"</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">),</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"co2_fraction"</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">),</span>
+        <span class="p">)</span>
+
+<div class="viewcode-block" id="Separator.get_output">
+<a class="viewcode-back" href="../../../codedocumentation/gemini_model.separator.separator.html#gemini_model.separator.separator.Separator.get_output">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_output</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">"""Get output of the model."""</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">output</span></div>
+</div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, TNO.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

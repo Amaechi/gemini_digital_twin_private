@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>6.1.9.1. gemini_model.electric_chiller.electric_chiller &mdash; GEMINI Geothermal Digital Twin (qwen27b-evidence)</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=19f00094" />
+
+  
+  <!--[if lt IE 9]>
+    <script src="../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="../_static/jquery.js?v=5d32c60e"></script>
+        <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+        <script src="../_static/documentation_options.js?v=f840d949"></script>
+        <script src="../_static/doctools.js?v=9a2dae69"></script>
+        <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="6.1.10. gemini_model.erosion" href="gemini_model.erosion.html" />
+    <link rel="prev" title="6.1.9. gemini_model.electric_chiller" href="gemini_model.electric_chiller.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            GEMINI Geothermal Digital Twin
+          </a>
+              <div class="version">
+                qwen27b-evidence
+              </div>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Table of Contents</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../index_about_gemini.html">1. About GEMINI</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../index_getting_started.html">2. Getting started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../index_setup.html">3. Set-up</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../index_applications.html">4. Applications</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../index_models.html">5. Models</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../index_sourcecode.html">6. Source code documentation</a><ul class="current">
+<li class="toctree-l2 current"><a class="reference internal" href="gemini_model.html">6.1. gemini_model</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="gemini_model.absorption_chiller.html">6.1.1. gemini_model.absorption_chiller</a></li>
+<li class="toctree-l3"><a class="reference internal" href="gemini_model.adder.html">6.1.2. gemini_model.adder</a></li>
+<li class="toctree-l3"><a class="reference internal" href="gemini_model.boiler.html">6.1.3. gemini_model.boiler</a></li>
+<li class="toctree-l3"><a class="reference internal" href="gemini_model.booster_pump.html">6.1.4. gemini_model.booster_pump</a></li>
+<li class="toctree-l3"><a class="reference internal" href="gemini_model.chp.html">6.1.5. gemini_model.chp</a></li>
+<li class="toctree-l3"><a class="reference internal" href="gemini_model.compressor.html">6.1.6. gemini_model.compressor</a></li>
+<li class="toctree-l3"><a class="reference internal" href="gemini_model.corrosion.html">6.1.7. gemini_model.corrosion</a></li>
+<li class="toctree-l3"><a class="reference internal" href="gemini_model.electric_boiler.html">6.1.8. gemini_model.electric_boiler</a></li>
+<li class="toctree-l3 current"><a class="reference internal" href="gemini_model.electric_chiller.html">6.1.9. gemini_model.electric_chiller</a><ul class="current">
+<li class="toctree-l4 current"><a class="current reference internal" href="#">6.1.9.1. gemini_model.electric_chiller.electric_chiller</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="gemini_model.erosion.html">6.1.10. gemini_model.erosion</a></li>
+<li class="toctree-l3"><a class="reference internal" href="gemini_model.filter.html">6.1.11. gemini_model.filter</a></li>
+<li class="toctree-l3"><a class="reference internal" href="gemini_model.fluid.html">6.1.12. gemini_model.fluid</a></li>
+<li class="toctree-l3"><a class="reference internal" href="gemini_model.free_cooling.html">6.1.13. gemini_model.free_cooling</a></li>
+<li class="toctree-l3"><a class="reference internal" href="gemini_model.heat_exchanger.html">6.1.14. gemini_model.heat_exchanger</a></li>
+<li class="toctree-l3"><a class="reference internal" href="gemini_model.heat_rejection.html">6.1.15. gemini_model.heat_rejection</a></li>
+<li class="toctree-l3"><a class="reference internal" href="gemini_model.heatpump.html">6.1.16. gemini_model.heatpump</a></li>
+<li class="toctree-l3"><a class="reference internal" href="gemini_model.injector_pump.html">6.1.17. gemini_model.injector_pump</a></li>
+<li class="toctree-l3"><a class="reference internal" href="gemini_model.mixer.html">6.1.18. gemini_model.mixer</a></li>
+<li class="toctree-l3"><a class="reference internal" href="gemini_model.model_abstract.html">6.1.19. gemini_model.model_abstract</a></li>
+<li class="toctree-l3"><a class="reference internal" href="gemini_model.pump.html">6.1.20. gemini_model.pump</a></li>
+<li class="toctree-l3"><a class="reference internal" href="gemini_model.reservoir.html">6.1.21. gemini_model.reservoir</a></li>
+<li class="toctree-l3"><a class="reference internal" href="gemini_model.separator.html">6.1.22. gemini_model.separator</a></li>
+<li class="toctree-l3"><a class="reference internal" href="gemini_model.splitter.html">6.1.23. gemini_model.splitter</a></li>
+<li class="toctree-l3"><a class="reference internal" href="gemini_model.thermal_storage.html">6.1.24. gemini_model.thermal_storage</a></li>
+<li class="toctree-l3"><a class="reference internal" href="gemini_model.well.html">6.1.25. gemini_model.well</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="gemini_framework.html">6.2. gemini_framework</a></li>
+<li class="toctree-l2"><a class="reference internal" href="gemini_application.html">6.3. gemini_application</a></li>
+<li class="toctree-l2"><a class="reference internal" href="gemini_interface.html">6.4. gemini_interface</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../glossary.html">7. Glossary</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">GEMINI Geothermal Digital Twin</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index_sourcecode.html"><span class="section-number">6. </span>Source code documentation</a></li>
+          <li class="breadcrumb-item"><a href="gemini_model.html"><span class="section-number">6.1. </span>gemini_model</a></li>
+          <li class="breadcrumb-item"><a href="gemini_model.electric_chiller.html"><span class="section-number">6.1.9. </span>gemini_model.electric_chiller</a></li>
+      <li class="breadcrumb-item active"><span class="section-number">6.1.9.1. </span>gemini_model.electric_chiller.electric_chiller</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/codedocumentation/gemini_model.electric_chiller.electric_chiller.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="module-gemini_model.electric_chiller.electric_chiller">
+<span id="gemini-model-electric-chiller-electric-chiller"></span><h1><span class="section-number">6.1.9.1. </span>gemini_model.electric_chiller.electric_chiller<a class="headerlink" href="#module-gemini_model.electric_chiller.electric_chiller" title="Link to this heading"></a></h1>
+<p>Electric (vapour-compression) chiller with a Carnot-efficiency COP (GM-05).</p>
+<p>Source: RC-06 (<code class="docutils literal notranslate"><span class="pre">data/knowledge/reference_cards/RC-06_electric_chiller.md</span></code>, copied in
+<code class="docutils literal notranslate"><span class="pre">REFERENCE.md</span></code>); Geothermal Direct Use Engineering &amp; Design Guidebook (Geo-Heat Center
+1989) p.257-258, 262, 266; spec §3.3 and §7.2 GM-05.</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">COP</span> <span class="pre">=</span> <span class="pre">η</span> <span class="pre">T_evap</span> <span class="pre">/</span> <span class="pre">(T_cond</span> <span class="pre">-</span> <span class="pre">T_evap)</span></code> (K) on the <strong>refrigerant basis</strong> (T_evap and T_cond
+below include the -4 K / +3 K offsets). RC-06 “Temperature basis of η”: the Guidebook’s
+0.39-0.40 (COP 4.39 at 45 °F chilled / 90 °F condenser leaving water, p.257-258) is on the
+water basis; on the model’s basis the same point gives η = 4.39 × 32 / 276.35 = 0.508 [D].
+With <code class="docutils literal notranslate"><span class="pre">carnot_efficiency:</span> <span class="pre">None</span></code> (default) η is calibrated by
+<a class="reference internal" href="#gemini_model.electric_chiller.electric_chiller.calibrated_carnot_efficiency" title="gemini_model.electric_chiller.electric_chiller.calibrated_carnot_efficiency"><code class="xref py py-func docutils literal notranslate"><span class="pre">calibrated_carnot_efficiency()</span></code></a> from the model’s own approach parameters, so the
+Guidebook point is always reproduced (COOL-ELC); an explicit value overrides it (keep it
+on the refrigerant basis – do not mix bases).</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">T_evap</span> <span class="pre">=</span> <span class="pre">T_chilled,supply</span> <span class="pre">-</span> <span class="pre">4</span> <span class="pre">K</span></code> [A] (20 °C supply -&gt; 16 °C).</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">T_cond</span> <span class="pre">=</span> <span class="pre">T_cw,leaving</span> <span class="pre">+</span> <span class="pre">3</span> <span class="pre">K</span></code> with a cooling tower, <code class="docutils literal notranslate"><span class="pre">T_cw,leaving</span> <span class="pre">=</span> <span class="pre">T_wb</span> <span class="pre">+</span> <span class="pre">approach</span>
+<span class="pre">(4-5</span> <span class="pre">K,</span> <span class="pre">default</span> <span class="pre">4.5)</span> <span class="pre">+</span> <span class="pre">range</span> <span class="pre">(~5</span> <span class="pre">K)</span></code> [A]; or <code class="docutils literal notranslate"><span class="pre">T_cond</span> <span class="pre">=</span> <span class="pre">T_db</span> <span class="pre">+</span> <span class="pre">8</span> <span class="pre">K</span></code> with a dry cooler [A].
+If <code class="docutils literal notranslate"><span class="pre">cooling_water_temperature_in_degc</span></code> (water from a tower or dry cooler) is given,
+<code class="docutils literal notranslate"><span class="pre">T_cond</span> <span class="pre">=</span> <span class="pre">T_cw,in</span> <span class="pre">+</span> <span class="pre">range</span> <span class="pre">+</span> <span class="pre">3</span> <span class="pre">K</span></code> (water-cooled condenser) for either option. The
+<code class="docutils literal notranslate"><span class="pre">dry_cooler</span></code> option is RC-06’s air-cooled condensing (T_db + 8 K); a water-loop dry
+cooler (<code class="docutils literal notranslate"><span class="pre">heat_rejection</span></code> dry cooler, T_db + 5 K) feeding the condenser gives T_db + 13 K
+(COP 5.26 vs 6.80 at 25 °C) – a warning says which formula was used.</p></li>
+<li><p>COP capped at 8 and floored at 3 [A]; <code class="docutils literal notranslate"><span class="pre">P_el</span> <span class="pre">=</span> <span class="pre">Q_cool</span> <span class="pre">/</span> <span class="pre">COP</span></code> is compressor power only (tower
+fan and condenser-water pump belong to a <code class="docutils literal notranslate"><span class="pre">heat_rejection</span></code> component, RC-06);
+<code class="docutils literal notranslate"><span class="pre">Q_reject</span> <span class="pre">=</span> <span class="pre">Q_cool</span> <span class="pre">+</span> <span class="pre">P_el</span></code>. With η 0.508 the cap of 8 binds at the Dutch design points.</p></li>
+</ul>
+<p>Condenser sensitivity: the model gives <code class="docutils literal notranslate"><span class="pre">d</span> <span class="pre">ln</span> <span class="pre">COP</span> <span class="pre">/</span> <span class="pre">dT_cond</span> <span class="pre">=</span> <span class="pre">-1/(T_cond</span> <span class="pre">-</span> <span class="pre">T_evap)</span></code>
+(output <code class="docutils literal notranslate"><span class="pre">condenser_sensitivity_per_k</span></code>), -3.1 %/K at the Guidebook point (lift 32 K on the
+refrigerant basis), steeper than the Guidebook data (≈ -2.6 %/K of condenser-water
+temperature, p.257-258): the model’s COP falls faster in hot weather (documented check).</p>
+<p>Capacity is the nominal capacity (no temperature derating); unmet load is reported.
+At 20 °C chilled supply and Dutch summer conditions RC-06 expects COP ≈ 6-8; with the
+calibrated η the model reaches the cap (8) there and drops below it only in hotter weather
+(e.g. 6.7 with a dry cooler at 30 °C dry-bulb).</p>
+<p class="rubric">Functions</p>
+<table class="autosummary longtable docutils align-default">
+<tbody>
+<tr class="row-odd"><td><p><a class="reference internal" href="#gemini_model.electric_chiller.electric_chiller.calibrated_carnot_efficiency" title="gemini_model.electric_chiller.electric_chiller.calibrated_carnot_efficiency"><code class="xref py py-obj docutils literal notranslate"><span class="pre">calibrated_carnot_efficiency</span></code></a>([...])</p></td>
+<td><p>Return η on the model's refrigerant basis that reproduces a COP at water temperatures.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#gemini_model.electric_chiller.electric_chiller.carnot_cop" title="gemini_model.electric_chiller.electric_chiller.carnot_cop"><code class="xref py py-obj docutils literal notranslate"><span class="pre">carnot_cop</span></code></a>(evaporator_temperature_degc, ...)</p></td>
+<td><p>Return η T_evap / (T_cond - T_evap) (RC-06), uncapped; inf if T_cond &lt;= T_evap.</p></td>
+</tr>
+</tbody>
+</table>
+<p class="rubric">Classes</p>
+<table class="autosummary longtable docutils align-default">
+<tbody>
+<tr class="row-odd"><td><p><a class="reference internal" href="#gemini_model.electric_chiller.electric_chiller.ElectricChiller" title="gemini_model.electric_chiller.electric_chiller.ElectricChiller"><code class="xref py py-obj docutils literal notranslate"><span class="pre">ElectricChiller</span></code></a>()</p></td>
+<td><p>Electric vapour-compression chiller (RC-06).</p></td>
+</tr>
+</tbody>
+</table>
+<dl class="py class">
+<dt class="sig sig-object py" id="gemini_model.electric_chiller.electric_chiller.ElectricChiller">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">gemini_model.electric_chiller.electric_chiller.</span></span><span class="sig-name descname"><span class="pre">ElectricChiller</span></span><a class="reference internal" href="../_modules/gemini_model/electric_chiller/electric_chiller.html#ElectricChiller"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#gemini_model.electric_chiller.electric_chiller.ElectricChiller" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference internal" href="gemini_model.model_abstract.html#gemini_model.model_abstract.StaticModel" title="gemini_model.model_abstract.StaticModel"><code class="xref py py-class docutils literal notranslate"><span class="pre">StaticModel</span></code></a></p>
+<p>Electric vapour-compression chiller (RC-06).</p>
+<p>Model initialization with RC-06 defaults (nominal capacity must be set).</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="gemini_model.electric_chiller.electric_chiller.ElectricChiller.calculate_output">
+<span class="sig-name descname"><span class="pre">calculate_output</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">u</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">x</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/gemini_model/electric_chiller/electric_chiller.html#ElectricChiller.calculate_output"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#gemini_model.electric_chiller.electric_chiller.ElectricChiller.calculate_output" title="Link to this definition"></a></dt>
+<dd><p>Calculate cooling duty, COP, electric power and rejected heat.</p>
+<p>Inputs <code class="docutils literal notranslate"><span class="pre">u</span></code>: exactly one of <code class="docutils literal notranslate"><span class="pre">cooling_load_w</span></code> (W) or <code class="docutils literal notranslate"><span class="pre">chilled_water_flow_rate_m3s</span></code>
+(m³/s, load = ρ c_p V (T_return - T_supply)); <code class="docutils literal notranslate"><span class="pre">ambient_wet_bulb_degc</span></code> (cooling
+tower) or <code class="docutils literal notranslate"><span class="pre">ambient_dry_bulb_degc</span></code> (dry cooler); optional
+<code class="docutils literal notranslate"><span class="pre">cooling_water_temperature_in_degc</span></code> (condenser water from a heat-rejection unit),
+<code class="docutils literal notranslate"><span class="pre">chilled_water_temperature_in_degc</span></code> / <code class="docutils literal notranslate"><span class="pre">_out_degc</span></code> (return / supply set point),
+and direct overrides <code class="docutils literal notranslate"><span class="pre">evaporator_temperature_degc</span></code> / <code class="docutils literal notranslate"><span class="pre">condenser_temperature_degc</span></code>.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="gemini_model.electric_chiller.electric_chiller.ElectricChiller.carnot_efficiency">
+<span class="sig-name descname"><span class="pre">carnot_efficiency</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/gemini_model/electric_chiller/electric_chiller.html#ElectricChiller.carnot_efficiency"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#gemini_model.electric_chiller.electric_chiller.ElectricChiller.carnot_efficiency" title="Link to this definition"></a></dt>
+<dd><p>Return η in use: the parameter, or the RC-06 calibration on the model’s basis.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="gemini_model.electric_chiller.electric_chiller.ElectricChiller.condenser_temperature_degc">
+<span class="sig-name descname"><span class="pre">condenser_temperature_degc</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">u</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">warnings</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/gemini_model/electric_chiller/electric_chiller.html#ElectricChiller.condenser_temperature_degc"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#gemini_model.electric_chiller.electric_chiller.ElectricChiller.condenser_temperature_degc" title="Link to this definition"></a></dt>
+<dd><p>Return the condensing temperature (°C) from the inputs (RC-06).</p>
+<p>Appends a note to <code class="docutils literal notranslate"><span class="pre">warnings</span></code> (a list) when a dry cooler is configured but the
+water-cooled formula is used because condenser water is given.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="gemini_model.electric_chiller.electric_chiller.ElectricChiller.initialize_state">
+<span class="sig-name descname"><span class="pre">initialize_state</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">x</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/gemini_model/electric_chiller/electric_chiller.html#ElectricChiller.initialize_state"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#gemini_model.electric_chiller.electric_chiller.ElectricChiller.initialize_state" title="Link to this definition"></a></dt>
+<dd><p>Not applicable: static model.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="gemini_model.electric_chiller.electric_chiller.ElectricChiller.update_parameters">
+<span class="sig-name descname"><span class="pre">update_parameters</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">parameters</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/gemini_model/electric_chiller/electric_chiller.html#ElectricChiller.update_parameters"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#gemini_model.electric_chiller.electric_chiller.ElectricChiller.update_parameters" title="Link to this definition"></a></dt>
+<dd><p>Update model parameters.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>parameters</strong> (<em>dict</em>) – Parameters dict as defined by the model.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="gemini_model.electric_chiller.electric_chiller.ElectricChiller.update_state">
+<span class="sig-name descname"><span class="pre">update_state</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">u</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">x</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/gemini_model/electric_chiller/electric_chiller.html#ElectricChiller.update_state"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#gemini_model.electric_chiller.electric_chiller.ElectricChiller.update_state" title="Link to this definition"></a></dt>
+<dd><p>Not applicable: static model.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="gemini_model.electric_chiller.electric_chiller.calibrated_carnot_efficiency">
+<span class="sig-prename descclassname"><span class="pre">gemini_model.electric_chiller.electric_chiller.</span></span><span class="sig-name descname"><span class="pre">calibrated_carnot_efficiency</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">evaporator_approach_k</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">4.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">condenser_approach_k</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">3.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cop</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">4.39</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">chilled_water_degc</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">7.2</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">condenser_water_out_degc</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">32.2</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/gemini_model/electric_chiller/electric_chiller.html#calibrated_carnot_efficiency"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#gemini_model.electric_chiller.electric_chiller.calibrated_carnot_efficiency" title="Link to this definition"></a></dt>
+<dd><p>Return η on the model’s refrigerant basis that reproduces a COP at water temperatures.</p>
+<p>T_evap = chilled water - evaporator approach, T_cond = condenser leaving water +
+condenser approach; <code class="docutils literal notranslate"><span class="pre">η</span> <span class="pre">=</span> <span class="pre">COP</span> <span class="pre">(T_cond</span> <span class="pre">-</span> <span class="pre">T_evap)</span> <span class="pre">/</span> <span class="pre">T_evap</span></code> (K). With the RC-06 defaults
+(COP 4.39 at 7.2 / 32.2 °C, approaches 4 K / 3 K) η = 4.39 × 32 / 276.35 = 0.508 [D].</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="gemini_model.electric_chiller.electric_chiller.carnot_cop">
+<span class="sig-prename descclassname"><span class="pre">gemini_model.electric_chiller.electric_chiller.</span></span><span class="sig-name descname"><span class="pre">carnot_cop</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">evaporator_temperature_degc</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">condenser_temperature_degc</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">carnot_efficiency</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/gemini_model/electric_chiller/electric_chiller.html#carnot_cop"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#gemini_model.electric_chiller.electric_chiller.carnot_cop" title="Link to this definition"></a></dt>
+<dd><p>Return η T_evap / (T_cond - T_evap) (RC-06), uncapped; inf if T_cond &lt;= T_evap.</p>
+</dd></dl>
+
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="gemini_model.electric_chiller.html" class="btn btn-neutral float-left" title="6.1.9. gemini_model.electric_chiller" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="gemini_model.erosion.html" class="btn btn-neutral float-right" title="6.1.10. gemini_model.erosion" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, TNO.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
