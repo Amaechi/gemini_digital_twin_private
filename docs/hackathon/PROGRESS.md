@@ -1,6 +1,6 @@
 # PROGRESS — read first, update last
 
-Keep it ≤ 20 KB; it is the hand-off between sessions. Old detail: merged PRs and `git log -p`.
+Keep it ≤ 20 KB; it is the hand-off between sessions. Old detail: merged PRs, `git log -p`.
 
 ## Status board (final, 2026-11-03)
 | WP | Title | Status | PR | Notes |
