@@ -9,6 +9,7 @@ Usage::
     PYTHONPATH=src python -m gemini_agent.cli resume --run-id r1 --answer 55
     PYTHONPATH=src python -m gemini_agent.cli whatif --run-id final_llm --runs-dir runs/final \
         --set DB-31=65 --budget quick
+    PYTHONPATH=src python -m gemini_agent.cli serve --runs-dir runs/final --port 8765
 
 ``--engine policy`` is the deterministic engine used in cloud sessions, tests and CI; it never
 calls an LLM. ``--engine llm`` uses a local Ollama model (spec §4.3) and only runs on a laptop;
@@ -22,6 +23,10 @@ code 3 until ``resume --answer`` is given.
 reruns the year, economics and the verifier, and writes ``runs/<id>/whatif/<n>/`` without
 touching the run (``gemini_agent.tools.whatif``). Exit codes: 0 done, 2 usage (unknown lever,
 bad value, not a run), 5 refused (lever outside its bound, with the guard's reason).
+
+``serve`` (post-submission) is the web Design Commander view (``gemini_agent.ui``): a standard
+library HTTP server that shows the runs of a directory read-only and answers a paused run's
+question (or the P10 approval) through the same ``resume`` as the CLI.
 
 ``--speak`` (``run``, ``resume``, ``whatif``; post-submission) reads the questions, the P10
 summary with the verifier verdict, the DR-11 rationale and the what-if verdicts aloud with the
@@ -59,6 +64,7 @@ from gemini_agent.schemas.config import CONFIG_MODELS, load_config
 from gemini_agent.schemas.decision import InputRequest, RunStatus
 from gemini_agent.speech import Speaker, request_text, speaking_ask
 from gemini_agent.tools import whatif as whatif_tool
+from gemini_agent.ui import server as ui_server
 
 EXIT_OK = 0
 EXIT_CONFIG_ERROR = 1
@@ -176,6 +182,26 @@ def build_parser() -> argparse.ArgumentParser:
         help="quick = full year (default); full = also the TL-15 Monte Carlo (P(demand met)); "
         "smoke = CI day subset",
     )
+
+    serve = sub.add_parser(
+        "serve",
+        help="web Design Commander: browse the runs of a directory, answer a paused run",
+        description=(
+            "Serve the web Design Commander view (standard library HTTP server, no extra "
+            "dependency): run list, phase timeline with budgets, tool calls, LLM tokens, Decision "
+            "Records, verifier report, figures, and the pending question of a paused run with an "
+            "Answer box / Approve-Reject buttons that call the same resume logic as `resume`. "
+            "Read-only otherwise."
+        ),
+    )
+    _add_engine_args(serve)
+    serve.add_argument("--host", default=ui_server.DEFAULT_HOST, help="bind address")
+    serve.add_argument(
+        "--port", type=int, default=ui_server.DEFAULT_PORT, help="TCP port (0 = any free port)"
+    )
+    serve.add_argument(
+        "--read-only", action="store_true", help="disable the answer/approve routes (501)"
+    )
     return parser
 
 
@@ -259,6 +285,27 @@ def _runner(
         config_dir=args.config_dir,
         ask_fn=ask_fn,
     )
+
+
+def resume_runner(
+    run_id: str,
+    *,
+    runs_dir: Path | None = None,
+    config_dir: Path | None = None,
+    engine: str | None = None,
+    model: str | None = None,
+    budget: str | None = None,
+) -> DesignRunner:
+    """Runner for ``DesignRunner.resume`` built exactly as ``cli resume`` builds it.
+
+    Used by the web view (``gemini_agent.ui.server``) so a browser answer goes through the same
+    engine selection (the run's stored engine and model unless overridden) and the same
+    validation. The caller closes the runner.
+    """
+    args = argparse.Namespace(
+        runs_dir=runs_dir, config_dir=config_dir, engine=engine, model=model, budget=budget
+    )
+    return _runner(args, run_id, resuming=True)
 
 
 DR11_FILE = "DR-11.json"
@@ -393,6 +440,56 @@ def _whatif(args: argparse.Namespace) -> int:
     return EXIT_OK
 
 
+def _serve(args: argparse.Namespace) -> int:
+    runs_root = (args.runs_dir or RUNS_ROOT).resolve()
+    if not runs_root.is_dir():
+        print(f"error: runs directory not found: {runs_root}", file=sys.stderr)
+        return EXIT_USAGE
+    try:
+        load_config("llm", args.config_dir)
+    except (OSError, yaml.YAMLError, ValidationError) as exc:
+        print(f"config error: {exc}", file=sys.stderr)
+        return EXIT_CONFIG_ERROR
+
+    def factory(run_id: str) -> DesignRunner:
+        return resume_runner(
+            run_id,
+            runs_dir=runs_root,
+            config_dir=args.config_dir,
+            engine=args.engine,
+            model=args.model,
+            budget=args.budget,
+        )
+
+    try:
+        httpd = ui_server.make_server(
+            runs_root,
+            host=args.host,
+            port=args.port,
+            runner_factory=None if args.read_only else factory,
+            quiet=False,
+        )
+    except OSError as exc:
+        print(f"error: cannot bind {args.host}:{args.port}: {exc}", file=sys.stderr)
+        return EXIT_USAGE
+    host, port = httpd.server_address[:2]
+    mode = "read-only" if args.read_only else "answer/approve enabled"
+    if not args.read_only and not ui_server.is_loopback(str(host)):
+        print(
+            f"warning: {host} is not a loopback address and the answer/approve routes have no "
+            "authentication; use --read-only or --host 127.0.0.1 outside a trusted network",
+            file=sys.stderr,
+        )
+    print(f"Design Commander: http://{host}:{port}/  runs: {runs_root}  ({mode}; Ctrl-C stops)")
+    try:
+        httpd.serve_forever()
+    except KeyboardInterrupt:
+        pass
+    finally:
+        httpd.server_close()
+    return EXIT_OK
+
+
 def _exit_on_sigterm(signum: int, frame: object) -> None:
     """SIGTERM (CI time limit, kill) → SystemExit, so context managers stop worker pools."""
     raise SystemExit(128 + signum)
@@ -413,6 +510,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             return _resume(args)
         if args.command == "whatif":
             return _whatif(args)
+        if args.command == "serve":
+            return _serve(args)
         parser.print_help()
         return EXIT_OK
     finally:

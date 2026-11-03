@@ -1,0 +1,62 @@
+<!doctype html>
+<!--
+Adapted from marcosanyo/PlantDebugger (Apache-2.0), Copyright 2026 Plant Debugger contributors,
+file services/plant-debugger/plant_debugger/static/commander.html @ d69507a.
+Modified by GeoAgent team, 2026-11-03: Plant Debugger's incident console (plant map, telemetry,
+operator work orders) replaced by the GeoAgent Design Commander: run list, phase rail P0-P10 with
+budgets, Decision Record cards, DesignVerifier report, figures, pending question / P10 approval,
+tool-call and LLM-token sheets, event audit trail. Data comes from the JSON API of
+gemini_agent.ui.server; the page computes nothing.
+-->
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>GeoAgent Design Commander</title>
+  <meta name="description" content="GeoAgent design commander: a read-only web view of a GEMINI geothermal district heating and cooling design run." />
+  <link rel="stylesheet" href="/static/commander.css" />
+</head>
+<body>
+  <div class="page-grid" aria-hidden="true"></div>
+  <div class="shell">
+    <header class="title-block">
+      <div class="brand-block"><div class="brand-mark">GA</div><div><strong>GEOAGENT</strong><small>DESIGN COMMANDER / GEMINI DIGITAL TWIN</small></div></div>
+      <div class="header-meta">
+        <label class="run-picker"><span>RUN</span><select id="run-select" aria-label="Run"></select></label>
+        <div id="service-badges" class="badges"></div>
+      </div>
+    </header>
+    <main>
+      <section class="briefing-strip">
+        <div class="target-scope">
+          <span class="overline">TARGET SYSTEM</span>
+          <strong>DEEP GEOTHERMAL DISTRICT HEATING 100 °C / COOLING 20 °C</strong>
+          <small id="run-prompt" class="muted"></small>
+        </div>
+        <div class="hero-actions">
+          <button id="refresh" class="primary" title="Re-read the run files">REFRESH</button>
+          <a id="report-link" class="button-link hidden" href="#" target="_blank">REPORT DRAFT ↗</a>
+        </div>
+      </section>
+      <section id="mode-warning" class="mode-warning hidden"></section>
+      <section id="now-card" class="now-card state-idle"><div class="now-index" id="now-phase">—</div><div class="now-main"><span id="now-kicker">RUN STATUS</span><h2 id="now-title">Select a run</h2><p id="now-summary">The run list comes from the runs directory given to <code>cli serve</code>.</p></div><div class="now-facts"><div><span>SELECTED</span><strong id="now-selected">—</strong></div><div><span>VERDICT</span><strong id="now-verdict">—</strong></div><div><span>APPROVAL</span><strong id="now-approval">—</strong></div><div><span>ENGINE</span><strong id="now-engine">—</strong></div></div></section>
+      <section class="phase-sheet sheet"><div class="sheet-label"><span>WORKFLOW P0–P10 · BUDGET USED (STEPS · TOOL CALLS · TOKENS, AG-04)</span><strong id="session-status">IDLE</strong></div><div id="phase-rail" class="phase-rail"></div></section>
+      <section class="workspace-grid">
+        <div class="left-stack">
+          <article class="sheet records-sheet"><div class="sheet-head"><div><span>DECISION RECORDS (AG-07)</span><h2>Criterion → evidence → chosen option</h2></div><div id="records-count" class="status-stamp">0 RECORDS</div></div><div id="records" class="records-grid"><p class="muted">No Decision Records yet.</p></div></article>
+          <article class="sheet verifier-sheet"><div class="sheet-head"><div><span>DESIGNVERIFIER REPORT (AG-11)</span><h2 id="verifier-title">No verification yet</h2></div><div id="verifier-verdict" class="status-stamp">—</div></div><p id="verifier-summary" class="task-reason"></p><div id="verifier-layers" class="layer-row"></div><div class="table-wrap"><table id="verifier-table" class="data-table"><thead><tr><th>Check</th><th>Layer</th><th>Name</th><th>Status</th><th>Value</th><th>Limit</th><th>Margin</th><th>Unit</th></tr></thead><tbody></tbody></table></div></article>
+          <article class="sheet figures-sheet"><div class="sheet-head"><div><span>FIGURES (TL-21)</span><h2>Tool-output plots and tables</h2></div><div id="figures-count" class="status-stamp">0 FILES</div></div><div id="figures" class="figures-grid"><p class="muted">No figures.</p></div></article>
+        </div>
+        <aside class="right-stack">
+          <section class="sheet task-sheet"><div class="sheet-head"><div><span>PENDING QUESTION (AG-05)</span><h2 id="task-title">Nothing pending</h2></div><div id="task-status" class="status-stamp">—</div></div><p id="task-reason" class="task-reason">A paused run shows its question here; the answer goes through the runner's own resume logic.</p><div id="task-body" class="task-body empty">No question is pending.</div><form id="answer-form" class="answer-form hidden"><label for="answer-input">ANSWER</label><input id="answer-input" type="text" autocomplete="off" /><button type="submit" class="primary">SEND ANSWER</button></form><div id="approval-actions" class="approval-actions hidden"><button id="approve" class="approve">APPROVE DESIGN</button><button id="reject" class="reject">REJECT DESIGN</button></div><p id="answer-feedback" class="answer-feedback"></p><ul id="answers-list" class="answers-list"></ul></section>
+          <section class="sheet decision-sheet"><div class="sheet-head"><div><span>LLM CALLS · TOKENS · FALLBACKS (MEM-05, AG-03)</span><h2 id="llm-title">No LLM calls logged</h2></div><div id="llm-source" class="status-stamp">—</div></div><div id="llm-facts" class="metrics"></div><div class="table-wrap"><table id="llm-table" class="data-table"><thead><tr><th>Phase</th><th>Calls</th><th>In</th><th>Out</th><th>Fallbacks</th><th>Errors</th><th>Latency s</th></tr></thead><tbody></tbody></table></div></section>
+          <section class="sheet evidence-sheet"><div class="sheet-head"><div><span>TOOL CALLS (EVIDENCE TR-xxx)</span><h2>Deterministic tools, not the LLM</h2></div><div id="tools-count" class="status-stamp">0 CALLS</div></div><div id="tools" class="tool-list"><p class="muted">No tool calls.</p></div></section>
+        </aside>
+      </section>
+      <section class="sheet timeline-sheet"><div class="sheet-head"><div><span>AUDIT TRAIL (AG-10, append-only events)</span><h2>Runner ↔ agents ↔ tools ↔ user</h2></div><span id="event-count" class="status-stamp">0 EVENTS</span></div><div id="timeline" class="timeline"><p class="muted">No run selected.</p></div></section>
+    </main>
+    <footer><span>GEOAGENT / SPE GEOHACKATHON 2026 · shell adapted from Plant Debugger (Apache-2.0)</span><span>agents propose · tools compute · the verifier accepts · the human approves</span></footer>
+  </div>
+  <script src="/static/commander.js" defer></script>
+</body>
+</html>
