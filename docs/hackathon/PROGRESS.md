@@ -35,7 +35,7 @@ Keep it ≤ 20 KB; it is the hand-off between sessions. Old detail: merged PRs, 
 | Feature G | Web Design Commander view (`cli serve`) | in review | | `ui/run_view.py`, `ui/server.py`, `ui/static/` (Plant Debugger shell, Apache header); read-only JSON API; answer/approve via `resume` |
 
 Status: todo · in progress · in review · merged · blocked.
-Latest full suite (Feature G after merging main with Post-sub C + Runner J, 11-03): `PYTHONPATH=src python -m pytest -q unit_test/gemini_model unit_test/gemini_simulator unit_test/gemini_agent -x` → **FEATURE_G_MERGED_COUNT** (10 UI tests included). `validate_submission --pytest` → READY, 22 pass / 0 fail / WARN SUB-14 / MANUAL SUB-23; SUB-24 PASS (`docs/results/submission_check.md`).
+Latest full suite (Feature G after merging main with Post-sub C + Runner J, 11-03): `PYTHONPATH=src python -m pytest -q unit_test/gemini_model unit_test/gemini_simulator unit_test/gemini_agent -x` → **1386 passed, 8 warnings in 451 s** (merge commit eb5a473) (10 UI tests included). `validate_submission --pytest` → READY, 22 pass / 0 fail / WARN SUB-14 / MANUAL SUB-23; SUB-24 PASS (`docs/results/submission_check.md`).
 
 ## Decisions log (newest first)
 One line per decision, grouped by WP; dated 11-01 (WP-00: 10-31). Why: the `config/assumptions.yaml` entry or the module docstring.
