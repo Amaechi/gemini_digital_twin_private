@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>6.1.16.1. gemini_model.heatpump.closed_form &mdash; GEMINI Geothermal Digital Twin (sprint-plan-j)</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=19f00094" />
+
+  
+  <!--[if lt IE 9]>
+    <script src="../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="../_static/jquery.js?v=5d32c60e"></script>
+        <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+        <script src="../_static/documentation_options.js?v=f9d8b561"></script>
+        <script src="../_static/doctools.js?v=9a2dae69"></script>
+        <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="6.1.16.2. gemini_model.heatpump.heatpump_basic" href="gemini_model.heatpump.heatpump_basic.html" />
+    <link rel="prev" title="6.1.16. gemini_model.heatpump" href="gemini_model.heatpump.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            GEMINI Geothermal Digital Twin
+          </a>
+              <div class="version">
+                sprint-plan-j
+              </div>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Table of Contents</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../index_about_gemini.html">1. About GEMINI</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../index_getting_started.html">2. Getting started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../index_setup.html">3. Set-up</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../index_applications.html">4. Applications</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../index_models.html">5. Models</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../index_sourcecode.html">6. Source code documentation</a><ul class="current">
+<li class="toctree-l2 current"><a class="reference internal" href="gemini_model.html">6.1. gemini_model</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="gemini_model.absorption_chiller.html">6.1.1. gemini_model.absorption_chiller</a></li>
+<li class="toctree-l3"><a class="reference internal" href="gemini_model.adder.html">6.1.2. gemini_model.adder</a></li>
+<li class="toctree-l3"><a class="reference internal" href="gemini_model.boiler.html">6.1.3. gemini_model.boiler</a></li>
+<li class="toctree-l3"><a class="reference internal" href="gemini_model.booster_pump.html">6.1.4. gemini_model.booster_pump</a></li>
+<li class="toctree-l3"><a class="reference internal" href="gemini_model.chp.html">6.1.5. gemini_model.chp</a></li>
+<li class="toctree-l3"><a class="reference internal" href="gemini_model.compressor.html">6.1.6. gemini_model.compressor</a></li>
+<li class="toctree-l3"><a class="reference internal" href="gemini_model.corrosion.html">6.1.7. gemini_model.corrosion</a></li>
+<li class="toctree-l3"><a class="reference internal" href="gemini_model.electric_boiler.html">6.1.8. gemini_model.electric_boiler</a></li>
+<li class="toctree-l3"><a class="reference internal" href="gemini_model.electric_chiller.html">6.1.9. gemini_model.electric_chiller</a></li>
+<li class="toctree-l3"><a class="reference internal" href="gemini_model.erosion.html">6.1.10. gemini_model.erosion</a></li>
+<li class="toctree-l3"><a class="reference internal" href="gemini_model.filter.html">6.1.11. gemini_model.filter</a></li>
+<li class="toctree-l3"><a class="reference internal" href="gemini_model.fluid.html">6.1.12. gemini_model.fluid</a></li>
+<li class="toctree-l3"><a class="reference internal" href="gemini_model.free_cooling.html">6.1.13. gemini_model.free_cooling</a></li>
+<li class="toctree-l3"><a class="reference internal" href="gemini_model.heat_exchanger.html">6.1.14. gemini_model.heat_exchanger</a></li>
+<li class="toctree-l3"><a class="reference internal" href="gemini_model.heat_rejection.html">6.1.15. gemini_model.heat_rejection</a></li>
+<li class="toctree-l3 current"><a class="reference internal" href="gemini_model.heatpump.html">6.1.16. gemini_model.heatpump</a><ul class="current">
+<li class="toctree-l4 current"><a class="current reference internal" href="#">6.1.16.1. gemini_model.heatpump.closed_form</a></li>
+<li class="toctree-l4"><a class="reference internal" href="gemini_model.heatpump.heatpump_basic.html">6.1.16.2. gemini_model.heatpump.heatpump_basic</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="gemini_model.injector_pump.html">6.1.17. gemini_model.injector_pump</a></li>
+<li class="toctree-l3"><a class="reference internal" href="gemini_model.mixer.html">6.1.18. gemini_model.mixer</a></li>
+<li class="toctree-l3"><a class="reference internal" href="gemini_model.model_abstract.html">6.1.19. gemini_model.model_abstract</a></li>
+<li class="toctree-l3"><a class="reference internal" href="gemini_model.pump.html">6.1.20. gemini_model.pump</a></li>
+<li class="toctree-l3"><a class="reference internal" href="gemini_model.reservoir.html">6.1.21. gemini_model.reservoir</a></li>
+<li class="toctree-l3"><a class="reference internal" href="gemini_model.separator.html">6.1.22. gemini_model.separator</a></li>
+<li class="toctree-l3"><a class="reference internal" href="gemini_model.splitter.html">6.1.23. gemini_model.splitter</a></li>
+<li class="toctree-l3"><a class="reference internal" href="gemini_model.thermal_storage.html">6.1.24. gemini_model.thermal_storage</a></li>
+<li class="toctree-l3"><a class="reference internal" href="gemini_model.well.html">6.1.25. gemini_model.well</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="gemini_framework.html">6.2. gemini_framework</a></li>
+<li class="toctree-l2"><a class="reference internal" href="gemini_application.html">6.3. gemini_application</a></li>
+<li class="toctree-l2"><a class="reference internal" href="gemini_interface.html">6.4. gemini_interface</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../glossary.html">7. Glossary</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">GEMINI Geothermal Digital Twin</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index_sourcecode.html"><span class="section-number">6. </span>Source code documentation</a></li>
+          <li class="breadcrumb-item"><a href="gemini_model.html"><span class="section-number">6.1. </span>gemini_model</a></li>
+          <li class="breadcrumb-item"><a href="gemini_model.heatpump.html"><span class="section-number">6.1.16. </span>gemini_model.heatpump</a></li>
+      <li class="breadcrumb-item active"><span class="section-number">6.1.16.1. </span>gemini_model.heatpump.closed_form</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/codedocumentation/gemini_model.heatpump.closed_form.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="module-gemini_model.heatpump.closed_form">
+<span id="gemini-model-heatpump-closed-form"></span><h1><span class="section-number">6.1.16.1. </span>gemini_model.heatpump.closed_form<a class="headerlink" href="#module-gemini_model.heatpump.closed_form" title="Link to this heading"></a></h1>
+<p>Closed-form heat-pump COP, robust operating point and HTHP limit screening (GM-03).</p>
+<p>Source: RC-04 (<code class="docutils literal notranslate"><span class="pre">data/knowledge/reference_cards/RC-04_heat_pump.md</span></code>, copied in
+<code class="docutils literal notranslate"><span class="pre">REFERENCE.md</span></code>); Geothermal Direct Use Engineering &amp; Design Guidebook (Geo-Heat Center 1989)
+Ch13 p.250, 258, Table 13.2; spec §7.2 GM-03. DEA COP-by-lift figures from RC-10 (plausibility
+only).</p>
+<ul class="simple">
+<li><p>RC-04 eq. 1 (Carnot): <code class="docutils literal notranslate"><span class="pre">COP_C</span> <span class="pre">=</span> <span class="pre">T_cond</span> <span class="pre">/</span> <span class="pre">(T_cond</span> <span class="pre">-</span> <span class="pre">T_evap)</span></code> (K).</p></li>
+<li><p>RC-04 eq. 2 (Lorenz): <code class="docutils literal notranslate"><span class="pre">T̄</span> <span class="pre">=</span> <span class="pre">(T_out</span> <span class="pre">-</span> <span class="pre">T_in)</span> <span class="pre">/</span> <span class="pre">ln(T_out</span> <span class="pre">/</span> <span class="pre">T_in)</span></code> (log mean, K) for sink and
+source; <code class="docutils literal notranslate"><span class="pre">COP</span> <span class="pre">=</span> <span class="pre">η_L</span> <span class="pre">·</span> <span class="pre">T̄_sink</span> <span class="pre">/</span> <span class="pre">(T̄_sink</span> <span class="pre">-</span> <span class="pre">T̄_source)</span></code>.</p></li>
+<li><p>RC-04 eq. 3: <code class="docutils literal notranslate"><span class="pre">Q_h</span> <span class="pre">=</span> <span class="pre">Q_src</span> <span class="pre">·</span> <span class="pre">COP</span> <span class="pre">/</span> <span class="pre">(COP</span> <span class="pre">-</span> <span class="pre">1)</span></code>; <code class="docutils literal notranslate"><span class="pre">P_el</span> <span class="pre">=</span> <span class="pre">Q_h</span> <span class="pre">/</span> <span class="pre">COP</span></code>.</p></li>
+<li><p>RC-04 eq. 4: refrigerant condensing / evaporating temperature = sink outlet + approach /
+source outlet - approach, approach 3-5 K [A] (register HP-APPROACH: 4 K).</p></li>
+</ul>
+<p>HTHP limits at 100 °C are not covered by the 1989 book (Table 13.2: 82-104 °C, outdated): they
+come from a cited modern datasheet and stay <code class="docutils literal notranslate"><span class="pre">MISSING</span></code> until one is supplied. Without a datasheet
+the RC-04 default caps apply – COP ≤ 0.6 × Carnot at the refrigerant temperatures and lift (sink
+outlet - source outlet) ≤ 60 K [A]; they are the DesignVerifier’s register entries VER-HP-ETA and
+VER-HP-LIFT (check PH-14), reused here, not duplicated. The maximum sink temperature has no
+default: it is reported as missing and not checked.</p>
+<p><a class="reference internal" href="#gemini_model.heatpump.closed_form.solve_operating_point" title="gemini_model.heatpump.closed_form.solve_operating_point"><code class="xref py py-func docutils literal notranslate"><span class="pre">solve_operating_point()</span></code></a> solves the same problem as GEMINI’s Nelder-Mead path of
+<a class="reference internal" href="gemini_model.heatpump.heatpump_basic.html#gemini_model.heatpump.heatpump_basic.HeatpumpBasic" title="gemini_model.heatpump.heatpump_basic.HeatpumpBasic"><code class="xref py py-class docutils literal notranslate"><span class="pre">HeatpumpBasic</span></code></a> (sink outlet at its target, source
+outlet unknown; if the source outlet would fall below its minimum, it is fixed there and the sink
+outlet drops instead) without a starting guess: the COP is the closed-form expression above and the
+one unknown temperature is a bracketed scalar root (<code class="docutils literal notranslate"><span class="pre">brentq</span></code>) of the energy balance.</p>
+<p class="rubric">Module Attributes</p>
+<table class="autosummary longtable docutils align-default">
+<tbody>
+<tr class="row-odd"><td><p><a class="reference internal" href="#gemini_model.heatpump.closed_form.DEFAULT_LORENZ_EFFICIENCY" title="gemini_model.heatpump.closed_form.DEFAULT_LORENZ_EFFICIENCY"><code class="xref py py-obj docutils literal notranslate"><span class="pre">DEFAULT_LORENZ_EFFICIENCY</span></code></a></p></td>
+<td><p>η_L 0.50 [A] (RC-04; GEMINI default), register HP-ETA-L; sensitivity 0.40-0.55.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#gemini_model.heatpump.closed_form.DEFAULT_APPROACH_K" title="gemini_model.heatpump.closed_form.DEFAULT_APPROACH_K"><code class="xref py py-obj docutils literal notranslate"><span class="pre">DEFAULT_APPROACH_K</span></code></a></p></td>
+<td><p>3-5 K), register HP-APPROACH.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#gemini_model.heatpump.closed_form.RC04_DEFAULT_CARNOT_FRACTION" title="gemini_model.heatpump.closed_form.RC04_DEFAULT_CARNOT_FRACTION"><code class="xref py py-obj docutils literal notranslate"><span class="pre">RC04_DEFAULT_CARNOT_FRACTION</span></code></a></p></td>
+<td><p>COP ≤ 0.6 × Carnot without a datasheet (RC-04 [A]), register VER-HP-ETA.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#gemini_model.heatpump.closed_form.RC04_DEFAULT_MAX_LIFT_K" title="gemini_model.heatpump.closed_form.RC04_DEFAULT_MAX_LIFT_K"><code class="xref py py-obj docutils literal notranslate"><span class="pre">RC04_DEFAULT_MAX_LIFT_K</span></code></a></p></td>
+<td><p>Lift ≤ 60 K without a datasheet (RC-04 [A]), register VER-HP-LIFT.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#gemini_model.heatpump.closed_form.RC04_APPROACH_RANGE_K" title="gemini_model.heatpump.closed_form.RC04_APPROACH_RANGE_K"><code class="xref py py-obj docutils literal notranslate"><span class="pre">RC04_APPROACH_RANGE_K</span></code></a></p></td>
+<td><p>RC-04 eq.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#gemini_model.heatpump.closed_form.STANDARD_MAX_WATER_DELTA_T_K" title="gemini_model.heatpump.closed_form.STANDARD_MAX_WATER_DELTA_T_K"><code class="xref py py-obj docutils literal notranslate"><span class="pre">STANDARD_MAX_WATER_DELTA_T_K</span></code></a></p></td>
+<td><p>5.6 K rating, up to 11 K standard, more needs 4/8-pass (Guidebook p.250, RC-04).</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#gemini_model.heatpump.closed_form.DEA_COP_BY_LIFT" title="gemini_model.heatpump.closed_form.DEA_COP_BY_LIFT"><code class="xref py py-obj docutils literal notranslate"><span class="pre">DEA_COP_BY_LIFT</span></code></a></p></td>
+<td><p>DEA nominal HTHP COP by lift (RC-10 'Sourced values', DEA Industrial Process Heat ch.</p></td>
+</tr>
+</tbody>
+</table>
+<p class="rubric">Functions</p>
+<table class="autosummary longtable docutils align-default">
+<tbody>
+<tr class="row-odd"><td><p><a class="reference internal" href="#gemini_model.heatpump.closed_form.carnot_cop" title="gemini_model.heatpump.closed_form.carnot_cop"><code class="xref py py-obj docutils literal notranslate"><span class="pre">carnot_cop</span></code></a>(condensing_degc, evaporating_degc)</p></td>
+<td><p>Return <code class="docutils literal notranslate"><span class="pre">efficiency</span> <span class="pre">×</span> <span class="pre">T_cond</span> <span class="pre">/</span> <span class="pre">(T_cond</span> <span class="pre">-</span> <span class="pre">T_evap)</span></code> (RC-04 eq.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#gemini_model.heatpump.closed_form.dea_reference_cop" title="gemini_model.heatpump.closed_form.dea_reference_cop"><code class="xref py py-obj docutils literal notranslate"><span class="pre">dea_reference_cop</span></code></a>(lift_k)</p></td>
+<td><p>Return the DEA nominal COP interpolated at <code class="docutils literal notranslate"><span class="pre">lift_k</span></code> (40-100 K), else None (RC-10).</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#gemini_model.heatpump.closed_form.hthp_limits" title="gemini_model.heatpump.closed_form.hthp_limits"><code class="xref py py-obj docutils literal notranslate"><span class="pre">hthp_limits</span></code></a>([datasheet, max_lift_k, ...])</p></td>
+<td><p>Return the HTHP limits in force: cited datasheet values, else RC-04 defaults / MISSING.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#gemini_model.heatpump.closed_form.log_mean_temperature_k" title="gemini_model.heatpump.closed_form.log_mean_temperature_k"><code class="xref py py-obj docutils literal notranslate"><span class="pre">log_mean_temperature_k</span></code></a>(t_in_k, t_out_k)</p></td>
+<td><p>Return the log-mean temperature (K) of a stream gliding from t_in_k to t_out_k (RC-04 eq.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#gemini_model.heatpump.closed_form.lorenz_cop" title="gemini_model.heatpump.closed_form.lorenz_cop"><code class="xref py py-obj docutils literal notranslate"><span class="pre">lorenz_cop</span></code></a>(sink_in_degc, sink_out_degc, ...)</p></td>
+<td><p>Return <code class="docutils literal notranslate"><span class="pre">efficiency</span> <span class="pre">×</span> <span class="pre">T̄_sink</span> <span class="pre">/</span> <span class="pre">(T̄_sink</span> <span class="pre">-</span> <span class="pre">T̄_source)</span></code> (RC-04 eq.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#gemini_model.heatpump.closed_form.mean_lift_k" title="gemini_model.heatpump.closed_form.mean_lift_k"><code class="xref py py-obj docutils literal notranslate"><span class="pre">mean_lift_k</span></code></a>(sink_in_degc, sink_out_degc, ...)</p></td>
+<td><p>Return the Lorenz mean lift T̄_sink - T̄_source (K, RC-04 eq.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#gemini_model.heatpump.closed_form.sink_heat_from_source" title="gemini_model.heatpump.closed_form.sink_heat_from_source"><code class="xref py py-obj docutils literal notranslate"><span class="pre">sink_heat_from_source</span></code></a>(source_heat_w, cop)</p></td>
+<td><p>Return <code class="docutils literal notranslate"><span class="pre">Q_h</span> <span class="pre">=</span> <span class="pre">Q_src</span> <span class="pre">·</span> <span class="pre">COP</span> <span class="pre">/</span> <span class="pre">(COP</span> <span class="pre">-</span> <span class="pre">1)</span></code> (RC-04 eq.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#gemini_model.heatpump.closed_form.solve_operating_point" title="gemini_model.heatpump.closed_form.solve_operating_point"><code class="xref py py-obj docutils literal notranslate"><span class="pre">solve_operating_point</span></code></a>(*, mode, efficiency, ...)</p></td>
+<td><p>Solve the heat-pump operating point with closed-form COP and a bracketed root (RC-04).</p></td>
+</tr>
+</tbody>
+</table>
+<dl class="py data">
+<dt class="sig sig-object py" id="gemini_model.heatpump.closed_form.DEA_COP_BY_LIFT">
+<span class="sig-prename descclassname"><span class="pre">gemini_model.heatpump.closed_form.</span></span><span class="sig-name descname"><span class="pre">DEA_COP_BY_LIFT</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">((40.0,</span> <span class="pre">4.45),</span> <span class="pre">(65.0,</span> <span class="pre">2.75),</span> <span class="pre">(80.0,</span> <span class="pre">2.4),</span> <span class="pre">(100.0,</span> <span class="pre">2.05))</span></em><a class="headerlink" href="#gemini_model.heatpump.closed_form.DEA_COP_BY_LIFT" title="Link to this definition"></a></dt>
+<dd><p>DEA nominal HTHP COP by lift (RC-10 ‘Sourced values’, DEA Industrial Process Heat ch. 2). No
+entry below 40 K: plausibility band only, never the COP source (RC-10 conventions).</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="gemini_model.heatpump.closed_form.DEFAULT_APPROACH_K">
+<span class="sig-prename descclassname"><span class="pre">gemini_model.heatpump.closed_form.</span></span><span class="sig-name descname"><span class="pre">DEFAULT_APPROACH_K</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">4.0</span></em><a class="headerlink" href="#gemini_model.heatpump.closed_form.DEFAULT_APPROACH_K" title="Link to this definition"></a></dt>
+<dd><p>3-5 K), register HP-APPROACH.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Evaporator and condenser approach 4 K [A] (RC-04 eq. 4</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="gemini_model.heatpump.closed_form.DEFAULT_LORENZ_EFFICIENCY">
+<span class="sig-prename descclassname"><span class="pre">gemini_model.heatpump.closed_form.</span></span><span class="sig-name descname"><span class="pre">DEFAULT_LORENZ_EFFICIENCY</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">0.5</span></em><a class="headerlink" href="#gemini_model.heatpump.closed_form.DEFAULT_LORENZ_EFFICIENCY" title="Link to this definition"></a></dt>
+<dd><p>η_L 0.50 [A] (RC-04; GEMINI default), register HP-ETA-L; sensitivity 0.40-0.55.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="gemini_model.heatpump.closed_form.RC04_APPROACH_RANGE_K">
+<span class="sig-prename descclassname"><span class="pre">gemini_model.heatpump.closed_form.</span></span><span class="sig-name descname"><span class="pre">RC04_APPROACH_RANGE_K</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">(3.0,</span> <span class="pre">5.0)</span></em><a class="headerlink" href="#gemini_model.heatpump.closed_form.RC04_APPROACH_RANGE_K" title="Link to this definition"></a></dt>
+<dd><p>RC-04 eq. 4 approach range [A]; outside it the model warns.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="gemini_model.heatpump.closed_form.RC04_DEFAULT_CARNOT_FRACTION">
+<span class="sig-prename descclassname"><span class="pre">gemini_model.heatpump.closed_form.</span></span><span class="sig-name descname"><span class="pre">RC04_DEFAULT_CARNOT_FRACTION</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">0.6</span></em><a class="headerlink" href="#gemini_model.heatpump.closed_form.RC04_DEFAULT_CARNOT_FRACTION" title="Link to this definition"></a></dt>
+<dd><p>COP ≤ 0.6 × Carnot without a datasheet (RC-04 [A]), register VER-HP-ETA.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="gemini_model.heatpump.closed_form.RC04_DEFAULT_MAX_LIFT_K">
+<span class="sig-prename descclassname"><span class="pre">gemini_model.heatpump.closed_form.</span></span><span class="sig-name descname"><span class="pre">RC04_DEFAULT_MAX_LIFT_K</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">60.0</span></em><a class="headerlink" href="#gemini_model.heatpump.closed_form.RC04_DEFAULT_MAX_LIFT_K" title="Link to this definition"></a></dt>
+<dd><p>Lift ≤ 60 K without a datasheet (RC-04 [A]), register VER-HP-LIFT.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="gemini_model.heatpump.closed_form.STANDARD_MAX_WATER_DELTA_T_K">
+<span class="sig-prename descclassname"><span class="pre">gemini_model.heatpump.closed_form.</span></span><span class="sig-name descname"><span class="pre">STANDARD_MAX_WATER_DELTA_T_K</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">11.0</span></em><a class="headerlink" href="#gemini_model.heatpump.closed_form.STANDARD_MAX_WATER_DELTA_T_K" title="Link to this definition"></a></dt>
+<dd><p>5.6 K rating, up to 11 K standard, more needs 4/8-pass
+(Guidebook p.250, RC-04).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Evaporator/condenser water ΔT</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="gemini_model.heatpump.closed_form.carnot_cop">
+<span class="sig-prename descclassname"><span class="pre">gemini_model.heatpump.closed_form.</span></span><span class="sig-name descname"><span class="pre">carnot_cop</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">condensing_degc</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">evaporating_degc</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">efficiency</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1.0</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/gemini_model/heatpump/closed_form.html#carnot_cop"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#gemini_model.heatpump.closed_form.carnot_cop" title="Link to this definition"></a></dt>
+<dd><p>Return <code class="docutils literal notranslate"><span class="pre">efficiency</span> <span class="pre">×</span> <span class="pre">T_cond</span> <span class="pre">/</span> <span class="pre">(T_cond</span> <span class="pre">-</span> <span class="pre">T_evap)</span></code> (RC-04 eq. 1); inf if T_cond ≤ T_evap.</p>
+<p>Same arithmetic as the DesignVerifier’s PH-13/PH-14 (°C + 273.15), so a COP capped here at
+<code class="docutils literal notranslate"><span class="pre">fraction</span> <span class="pre">×</span> <span class="pre">carnot_cop(...)</span></code> has a margin of exactly 0 there.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="gemini_model.heatpump.closed_form.dea_reference_cop">
+<span class="sig-prename descclassname"><span class="pre">gemini_model.heatpump.closed_form.</span></span><span class="sig-name descname"><span class="pre">dea_reference_cop</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">lift_k</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/gemini_model/heatpump/closed_form.html#dea_reference_cop"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#gemini_model.heatpump.closed_form.dea_reference_cop" title="Link to this definition"></a></dt>
+<dd><p>Return the DEA nominal COP interpolated at <code class="docutils literal notranslate"><span class="pre">lift_k</span></code> (40-100 K), else None (RC-10).</p>
+<p>Plausibility only: RC-10 does not state DEA’s lift definition, and has no entry below 40 K.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="gemini_model.heatpump.closed_form.hthp_limits">
+<span class="sig-prename descclassname"><span class="pre">gemini_model.heatpump.closed_form.</span></span><span class="sig-name descname"><span class="pre">hthp_limits</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">datasheet</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">max_lift_k</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">max_sink_temperature_degc</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">max_carnot_fraction</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/gemini_model/heatpump/closed_form.html#hthp_limits"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#gemini_model.heatpump.closed_form.hthp_limits" title="Link to this definition"></a></dt>
+<dd><p>Return the HTHP limits in force: cited datasheet values, else RC-04 defaults / MISSING.</p>
+<p>Datasheet values need a <code class="docutils literal notranslate"><span class="pre">datasheet</span></code> citation (never invented). Returns a dict with
+<code class="docutils literal notranslate"><span class="pre">max_lift_k</span></code> / <code class="docutils literal notranslate"><span class="pre">max_carnot_fraction</span></code> in force, the datasheet-only values (None when
+missing) for the verifier’s <code class="docutils literal notranslate"><span class="pre">HeatPumpPoint</span></code>, <code class="docutils literal notranslate"><span class="pre">max_sink_temperature_degc</span></code> (None = MISSING,
+not checked), <code class="docutils literal notranslate"><span class="pre">missing_inputs</span></code>, <code class="docutils literal notranslate"><span class="pre">assumption_ids</span></code> (VER-HP-LIFT / VER-HP-ETA when their
+defaults apply) and <code class="docutils literal notranslate"><span class="pre">limits_source</span></code>.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="gemini_model.heatpump.closed_form.log_mean_temperature_k">
+<span class="sig-prename descclassname"><span class="pre">gemini_model.heatpump.closed_form.</span></span><span class="sig-name descname"><span class="pre">log_mean_temperature_k</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">t_in_k</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">t_out_k</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/gemini_model/heatpump/closed_form.html#log_mean_temperature_k"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#gemini_model.heatpump.closed_form.log_mean_temperature_k" title="Link to this definition"></a></dt>
+<dd><p>Return the log-mean temperature (K) of a stream gliding from t_in_k to t_out_k (RC-04 eq. 2).</p>
+<p>Equal temperatures (no glide) return that temperature.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="gemini_model.heatpump.closed_form.lorenz_cop">
+<span class="sig-prename descclassname"><span class="pre">gemini_model.heatpump.closed_form.</span></span><span class="sig-name descname"><span class="pre">lorenz_cop</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">sink_in_degc</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sink_out_degc</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">source_in_degc</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">source_out_degc</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">efficiency</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1.0</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/gemini_model/heatpump/closed_form.html#lorenz_cop"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#gemini_model.heatpump.closed_form.lorenz_cop" title="Link to this definition"></a></dt>
+<dd><p>Return <code class="docutils literal notranslate"><span class="pre">efficiency</span> <span class="pre">×</span> <span class="pre">T̄_sink</span> <span class="pre">/</span> <span class="pre">(T̄_sink</span> <span class="pre">-</span> <span class="pre">T̄_source)</span></code> (RC-04 eq. 2), water temperatures °C.</p>
+<p>Returns inf if the mean sink temperature does not exceed the mean source temperature (no lift).</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="gemini_model.heatpump.closed_form.mean_lift_k">
+<span class="sig-prename descclassname"><span class="pre">gemini_model.heatpump.closed_form.</span></span><span class="sig-name descname"><span class="pre">mean_lift_k</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">sink_in_degc</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sink_out_degc</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">source_in_degc</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">source_out_degc</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/gemini_model/heatpump/closed_form.html#mean_lift_k"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#gemini_model.heatpump.closed_form.mean_lift_k" title="Link to this definition"></a></dt>
+<dd><p>Return the Lorenz mean lift T̄_sink - T̄_source (K, RC-04 eq. 2).</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="gemini_model.heatpump.closed_form.sink_heat_from_source">
+<span class="sig-prename descclassname"><span class="pre">gemini_model.heatpump.closed_form.</span></span><span class="sig-name descname"><span class="pre">sink_heat_from_source</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">source_heat_w</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cop</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/gemini_model/heatpump/closed_form.html#sink_heat_from_source"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#gemini_model.heatpump.closed_form.sink_heat_from_source" title="Link to this definition"></a></dt>
+<dd><p>Return <code class="docutils literal notranslate"><span class="pre">Q_h</span> <span class="pre">=</span> <span class="pre">Q_src</span> <span class="pre">·</span> <span class="pre">COP</span> <span class="pre">/</span> <span class="pre">(COP</span> <span class="pre">-</span> <span class="pre">1)</span></code> (RC-04 eq. 3); COP must exceed 1.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="gemini_model.heatpump.closed_form.solve_operating_point">
+<span class="sig-prename descclassname"><span class="pre">gemini_model.heatpump.closed_form.</span></span><span class="sig-name descname"><span class="pre">solve_operating_point</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mode</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">efficiency</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sink_in_degc</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sink_out_target_degc</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">source_in_degc</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sink_capacity_rate_w_k</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">source_capacity_rate_w_k</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">source_out_min_degc</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">carnot_cap_fraction</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">condenser_approach_k</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">4.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">evaporator_approach_k</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">4.0</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/gemini_model/heatpump/closed_form.html#solve_operating_point"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#gemini_model.heatpump.closed_form.solve_operating_point" title="Link to this definition"></a></dt>
+<dd><p>Solve the heat-pump operating point with closed-form COP and a bracketed root (RC-04).</p>
+<p>Same problem as GEMINI’s Nelder-Mead path: the sink leaves at <code class="docutils literal notranslate"><span class="pre">sink_out_target_degc</span></code>; the
+source outlet follows from <code class="docutils literal notranslate"><span class="pre">Q_src</span> <span class="pre">=</span> <span class="pre">Q_h</span> <span class="pre">(1</span> <span class="pre">-</span> <span class="pre">1/COP)</span></code> (RC-04 eq. 3). If it would fall below
+<code class="docutils literal notranslate"><span class="pre">source_out_min_degc</span></code> it is fixed there and the sink outlet drops instead. Capacity rates are
+<code class="docutils literal notranslate"><span class="pre">ṁ</span> <span class="pre">c_p</span></code> (W/K). <code class="docutils literal notranslate"><span class="pre">carnot_cap_fraction</span></code> (None = no cap) caps COP at that fraction of Carnot at
+the refrigerant temperatures (sink outlet + condenser approach, source outlet - evaporator
+approach).</p>
+<p>Returns a dict: <code class="docutils literal notranslate"><span class="pre">running</span></code>, <code class="docutils literal notranslate"><span class="pre">cop</span></code>, <code class="docutils literal notranslate"><span class="pre">cop_uncapped</span></code>, <code class="docutils literal notranslate"><span class="pre">sink_out_degc</span></code>, <code class="docutils literal notranslate"><span class="pre">source_out_degc</span></code>,
+<code class="docutils literal notranslate"><span class="pre">sink_heat_w</span></code>, <code class="docutils literal notranslate"><span class="pre">source_heat_w</span></code>, <code class="docutils literal notranslate"><span class="pre">power_el_w</span></code>, <code class="docutils literal notranslate"><span class="pre">branch</span></code> (“target”, “source_floor” or
+“idle”) and <code class="docutils literal notranslate"><span class="pre">warnings</span></code>. <code class="docutils literal notranslate"><span class="pre">sink_heat_w</span> <span class="pre">=</span> <span class="pre">source_heat_w</span> <span class="pre">+</span> <span class="pre">power_el_w</span></code> exactly. The heat pump
+is idle (no exception) when a flow is zero, there is no heating need, the source is at or
+below its minimum, COP ≤ 1, or there is no lift (a heat exchanger suffices). Negative flows
+and non-finite inputs raise ValueError.</p>
+</dd></dl>
+
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="gemini_model.heatpump.html" class="btn btn-neutral float-left" title="6.1.16. gemini_model.heatpump" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="gemini_model.heatpump.heatpump_basic.html" class="btn btn-neutral float-right" title="6.1.16.2. gemini_model.heatpump.heatpump_basic" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, TNO.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
