@@ -1,8 +1,8 @@
 """HTTP tests of the Design Commander server on an ephemeral port (``http.client``, offline).
 
 The answer/approve round trip runs a paused policy smoke run with the stub tool catalogue
-(``stub_tools``) in a temporary runs directory; the fixture run ``runs/final_policy/`` is only
-read.
+(``stub_tools``) in a temporary runs directory; the read-only routes use a temp copy of the
+fixture run ``runs/final_policy/`` (``conftest.fixture_runs``).
 """
 
 import http.client
@@ -13,11 +13,9 @@ from pathlib import Path
 import pytest
 
 from gemini_agent import cli
-from gemini_agent.schemas.config import REPO_ROOT
 from gemini_agent.ui import run_view, server
 
 pytestmark = pytest.mark.usefixtures("stub_tools")
-FIXTURE_RUNS = REPO_ROOT / "runs"
 
 
 class Client:
@@ -68,9 +66,9 @@ def served():
         thread.join(timeout=5)
 
 
-def test_static_files_and_api_on_the_fixture_run(served):
+def test_static_files_and_api_on_the_fixture_run(served, fixture_runs):
     """The page, its assets and every read-only API route are served; path tricks are 404."""
-    client = served(FIXTURE_RUNS)
+    client = served(fixture_runs)
     status, body, content_type = client.get("/")
     assert status == 200 and content_type.startswith("text/html")
     assert b"GEOAGENT" in body and b"/static/commander.js" in body
@@ -172,9 +170,9 @@ def test_answer_and_approve_round_trip_on_a_paused_smoke_run(tmp_path, served):
     assert json.loads((tmp_path / "q" / "run_summary.json").read_text())["approval"] == "rejected"
 
 
-def test_server_errors_are_json(served, monkeypatch):
+def test_server_errors_are_json(served, fixture_runs, monkeypatch):
     """A reader exception becomes a 500 JSON error, not a dropped connection."""
-    client = served(FIXTURE_RUNS)
+    client = served(fixture_runs)
 
     def boom(run_dir):
         raise RuntimeError("broken view")
@@ -222,6 +220,12 @@ def test_cli_serve_command(tmp_path, monkeypatch, capsys):
     assert callable(seen["factory"])
     assert cli.main(["serve", "--runs-dir", str(tmp_path), "--read-only"]) == cli.EXIT_OK
     assert seen["factory"] is None and "read-only" in capsys.readouterr().out
+    # a non-loopback bind with the writing routes enabled is warned about (no authentication)
+    FakeServer.server_address = ("0.0.0.0", 4242)
+    assert cli.main(["serve", "--runs-dir", str(tmp_path), "--host", "0.0.0.0"]) == cli.EXIT_OK
+    assert "no authentication" in capsys.readouterr().err
+    assert server.is_loopback("127.0.0.1") and server.is_loopback("::1")
+    assert not server.is_loopback("0.0.0.0")
 
 
 def main_run(base, run_id):

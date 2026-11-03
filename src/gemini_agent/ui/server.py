@@ -170,6 +170,11 @@ def _result_json(result: RunResult) -> dict[str, Any]:
     }
 
 
+def is_loopback(host: str) -> bool:
+    """True for 127.0.0.0/8, ::1 and 'localhost' (the only safe binds for the writing routes)."""
+    return host in ("localhost", "::1") or host.startswith("127.")
+
+
 def _int(text: str) -> int:
     try:
         return max(0, int(text))

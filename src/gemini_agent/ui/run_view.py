@@ -13,6 +13,7 @@ import re
 import sqlite3
 from pathlib import Path
 from typing import Any
+from urllib.parse import quote
 
 from gemini_agent.logging.llm_logger import (
     LLM_CALLS_FILE,
@@ -71,7 +72,7 @@ def read_store(run_dir: Path) -> tuple[dict[str, Any] | None, list[EventRecord]]
     events: list[EventRecord] = []
     path = run_dir / STORE_FILE
     if path.exists():
-        conn = sqlite3.connect(f"file:{path}?mode=ro", uri=True)
+        conn = sqlite3.connect(f"file:{quote(str(path))}?mode=ro", uri=True)
         try:
             conn.row_factory = sqlite3.Row
             try:
@@ -102,7 +103,7 @@ def read_store(run_dir: Path) -> tuple[dict[str, Any] | None, list[EventRecord]]
                         )
                         for r in rows
                     ]
-            except sqlite3.OperationalError:
+            except sqlite3.DatabaseError:  # missing tables, or not a SQLite file at all
                 record, events = None, []
         finally:
             conn.close()
@@ -388,7 +389,11 @@ def _verifier_file(run_dir: Path, state: dict[str, Any] | None) -> Path | None:
 
 
 def run_verifier(run_dir: Path) -> dict[str, Any] | None:
-    """Latest DesignVerifier report of the selected design: layers, checks with margins."""
+    """Latest DesignVerifier report of the selected design: layers, checks with margins.
+
+    Copied from the tool result as stored; the "tightest margin" is the verifier's own summary
+    text (no margin is re-derived here).
+    """
     record, _ = read_store(run_dir)
     path = _verifier_file(run_dir, (record or {}).get("state"))
     if path is None:
@@ -398,19 +403,6 @@ def run_verifier(run_dir: Path) -> dict[str, Any] | None:
         return None
     data = doc.get("data") if isinstance(doc.get("data"), dict) else doc
     checks = [c for c in data.get("checks") or [] if isinstance(c, dict)]
-    tightest = None
-    for check in checks:
-        margin = check.get("margin")
-        if (
-            check.get("status") == "pass"
-            and isinstance(margin, int | float)
-            and (tightest is None or margin < tightest["margin"])
-        ):
-            tightest = {
-                "check_id": check.get("check_id"),
-                "margin": margin,
-                "unit": check.get("unit"),
-            }
     return {
         "file": path.name,
         "candidate_id": data.get("candidate_id"),
@@ -422,7 +414,6 @@ def run_verifier(run_dir: Path) -> dict[str, Any] | None:
         "layers": list(data.get("layers") or []),
         "checks": checks,
         "margins": data.get("margins") or {},
-        "tightest": tightest,
         "stub_evidence": bool(data.get("stub_evidence", False)),
         "assumption_ids": list(data.get("assumption_ids") or []),
     }

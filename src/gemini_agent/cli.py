@@ -415,6 +415,12 @@ def _serve(args: argparse.Namespace) -> int:
         return EXIT_USAGE
     host, port = httpd.server_address[:2]
     mode = "read-only" if args.read_only else "answer/approve enabled"
+    if not args.read_only and not ui_server.is_loopback(str(host)):
+        print(
+            f"warning: {host} is not a loopback address and the answer/approve routes have no "
+            "authentication; use --read-only or --host 127.0.0.1 outside a trusted network",
+            file=sys.stderr,
+        )
     print(f"Design Commander: http://{host}:{port}/  runs: {runs_root}  ({mode}; Ctrl-C stops)")
     try:
         httpd.serve_forever()

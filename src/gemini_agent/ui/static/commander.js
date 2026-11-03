@@ -284,9 +284,9 @@ escape helper and the status-stamp conventions. No framework; the page computes 
     }
     $("verifier-title").textContent = `${v.candidate_id} · ${v.verifier} (${v.file})`;
     stamp($("verifier-verdict"), v.verdict || "—", verdictClass(v.verdict));
-    $("verifier-summary").textContent = v.summary + (v.violations.length ? ` · violations: ${v.violations.join("; ")}` : "") + (v.not_evaluated.length ? ` · not evaluated: ${v.not_evaluated.join(", ")}` : "") + (v.tightest ? ` · tightest margin ${v.tightest.check_id} ${fmt(v.tightest.margin)} ${v.tightest.unit || ""}` : "");
+    $("verifier-summary").textContent = v.summary + (v.violations.length ? ` · violations: ${v.violations.join("; ")}` : "") + (v.not_evaluated.length ? ` · not evaluated: ${v.not_evaluated.join(", ")}` : "");
     layers.innerHTML = v.layers.map((l) => `<span class="${l.status}">${esc(l.layer)} · ${l.passed} pass · ${l.failed} fail · ${l.not_evaluated} n/e</span>`).join("");
-    tbody.innerHTML = v.checks.map((c) => `<tr class="${esc(c.status)}${v.tightest && c.check_id === v.tightest.check_id ? " tight" : ""}" title="${esc(c.detail || "")}"><td>${esc(c.check_id)}</td><td>${esc(c.layer)}</td><td>${esc(c.name)}</td><td>${esc(c.status)}</td><td class="num">${fmt(c.value)}</td><td class="num">${fmt(c.limit)}</td><td class="num">${fmt(c.margin)}</td><td>${esc(c.unit)}</td></tr>`).join("");
+    tbody.innerHTML = v.checks.map((c) => `<tr class="${esc(c.status)}" title="${esc(c.detail || "")}"><td>${esc(c.check_id)}</td><td>${esc(c.layer)}</td><td>${esc(c.name)}</td><td>${esc(c.status)}</td><td class="num">${fmt(c.value)}</td><td class="num">${fmt(c.limit)}</td><td class="num">${fmt(c.margin)}</td><td>${esc(c.unit)}</td></tr>`).join("");
   }
 
   // ------------------------------------------------------------------ figures
