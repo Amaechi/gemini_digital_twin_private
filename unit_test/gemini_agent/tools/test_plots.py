@@ -239,3 +239,45 @@ def test_dr11_variant_reports_its_tl15_source_and_the_change(tmp_path):
     assert "**C1-opt-robust**" in text and "LCOH 35.2 USD/MWh" in text
     assert "demand met in 46% of samples" in text and "→ 90% (installed by DR-11, llm)" in text
     assert "ΔLCOH +2.05, ΔLCOC +0.00 USD/MWh, ΔCAPEX +2.20 MUSD (full year" in text
+
+
+# --------------------------------------------------------------------------- token chart
+BLUE = tuple(int(plots.SERIES[0][i : i + 2], 16) / 255 for i in (1, 3, 5))
+
+
+def has_bars(png: Path) -> bool:
+    """True when the PNG holds pixels in the bar colour (the placeholder is text only)."""
+    import matplotlib.image as mpimg
+
+    rgb = mpimg.imread(png)[:, :, :3]
+    return bool((abs(rgb - BLUE).max(axis=2) < 0.03).any())
+
+
+def test_token_figure_is_drawn_from_the_summary_and_redrawn_at_run_end(tmp_path):
+    """Post-submission fix: ``render_tokens_figure`` fills the chart from ``token_summary.json``.
+
+    Without a summary (the state at P10 before the fix) the chart is the placeholder; with the
+    run's final summary it holds one bar per phase; only ``figures/fig_tokens.png`` is written.
+    """
+    run_dir = tmp_path / "run"
+    run_dir.mkdir()
+    assert plots.render_tokens_figure(run_dir) is False  # no summary yet → placeholder
+    figure = run_dir / "figures" / plots.TOKENS_FIGURE
+    assert figure.is_file() and not has_bars(figure)
+    assert sorted(p.name for p in (run_dir / "figures").iterdir()) == [plots.TOKENS_FIGURE]
+    summary = {
+        "total": {"input_tokens": 1500, "output_tokens": 300},
+        "by_phase": {
+            "P0": {"input_tokens": 500, "output_tokens": 100, "calls": 1},
+            "P1": {"input_tokens": 1000, "output_tokens": 200, "calls": 2},
+            "P2": "not a dict",
+        },
+    }
+    (run_dir / plots.TOKEN_SUMMARY).write_text(json.dumps(summary), "utf-8")
+    assert plots.tokens_by_phase(summary) == {"P0": 600, "P1": 1200, "P2": 0}
+    assert plots.render_tokens_figure(run_dir) is True
+    assert has_bars(figure)
+    assert sorted(p.name for p in run_dir.iterdir()) == ["figures", plots.TOKEN_SUMMARY]
+    # An explicit figures folder (the one-off script on a copied run) works the same way.
+    assert plots.render_tokens_figure(run_dir, tmp_path / "elsewhere") is True
+    assert has_bars(tmp_path / "elsewhere" / plots.TOKENS_FIGURE)

@@ -1,5 +1,6 @@
 """Unit tests for gemini_agent.runner.design_runner (spec §5.2, AG-03…AG-12) — offline only."""
 
+import dataclasses
 import json
 
 import pytest
@@ -1175,3 +1176,43 @@ def test_step_budget_still_escalates_outside_p0(tmp_path):
     result = _runner(tmp_path, engine=engine, budgets=budgets).start("", run_id="b3")
     assert result.status == RunStatus.ESCALATED and result.phase == Phase.P1
     assert "step budget exceeded in P1 (1 steps)" in result.summary
+
+
+def test_llm_run_token_figure_is_real_in_p10_and_redrawn_from_the_final_summary(tmp_path):
+    """Post-submission fix: the P10 token chart is drawn from an interim ``token_summary.json``
+    (written just before ``plot_figures``) and redrawn at run end from the final summary.
+
+    The figure tool here only draws the token chart (the real TL-21 tool does the same through
+    ``plots.render_all``); the engine is the FunctionModel LLM path, so tokens are logged.
+    """
+    from gemini_agent.runner.tool_stubs import StubOutput
+    from gemini_agent.tools import plots
+    from unit_test.gemini_agent.tools.test_plots import has_bars
+
+    in_run: dict[str, object] = {}
+
+    def plot_figures(args, context):
+        in_run["filled"] = plots.render_tokens_figure(context.run_dir)
+        in_run["png"] = (context.run_dir / "figures" / plots.TOKENS_FIGURE).read_bytes()
+        in_run["summary"] = json.loads((context.run_dir / "token_summary.json").read_text())
+        return ToolResult[StubOutput](
+            data=StubOutput(tool="plot_figures", owner="test"), summary="token chart drawn"
+        )
+
+    toolbox = stub_toolbox()
+    spec = toolbox.spec("plot_figures")
+    toolbox.register(dataclasses.replace(spec, func=plot_figures, stub=False))
+    engine, logger = _llm_engine(tmp_path, "fig", policy_like)
+    runner = _runner(tmp_path, engine=engine, toolbox=toolbox)
+    result = runner.start("", run_id="fig")
+    assert result.status == RunStatus.COMPLETED
+    # In P10 the chart already held tokens (interim summary covered P0–P9 and part of P10).
+    assert in_run["filled"] is True and in_run["summary"]["total"]["calls"] > 0
+    final = json.loads((tmp_path / "fig" / "token_summary.json").read_text())
+    assert final["total"]["calls"] == len(logger.records()) > in_run["summary"]["total"]["calls"]
+    figure = tmp_path / "fig" / "figures" / plots.TOKENS_FIGURE
+    assert has_bars(figure)
+    assert figure.read_bytes() != in_run["png"]  # redrawn after the last P10 LLM calls
+    # A policy run never has figures from the stubs: nothing is drawn at run end.
+    policy = _runner(tmp_path).start("", run_id="pol")
+    assert policy.status == RunStatus.COMPLETED and not (tmp_path / "pol" / "figures").exists()
