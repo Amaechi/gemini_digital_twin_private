@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>gemini_model.heat_rejection.heat_rejection &mdash; GEMINI Geothermal Digital Twin (claude/intelligent-galileo-s4zt80)</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=19f00094" />
+
+  
+  <!--[if lt IE 9]>
+    <script src="../../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+        <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+        <script src="../../../_static/documentation_options.js?v=557d928b"></script>
+        <script src="../../../_static/doctools.js?v=9a2dae69"></script>
+        <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            GEMINI Geothermal Digital Twin
+          </a>
+              <div class="version">
+                claude/intelligent-galileo-s4zt80
+              </div>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Table of Contents</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../index_about_gemini.html">1. About GEMINI</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../index_getting_started.html">2. Getting started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../index_setup.html">3. Set-up</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../index_applications.html">4. Applications</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../index_models.html">5. Models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../index_sourcecode.html">6. Source code documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../glossary.html">7. Glossary</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">GEMINI Geothermal Digital Twin</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">gemini_model.heat_rejection.heat_rejection</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for gemini_model.heat_rejection.heat_rejection</h1><div class="highlight"><pre>
+<span></span><span class="sd">"""Heat rejection to ambient: wet cooling tower or dry cooler (GM-06).</span>
+
+<span class="sd">Source: RC-07 (``data/knowledge/reference_cards/RC-07_heat_rejection_free_cooling_climate.md``,</span>
+<span class="sd">copied in ``REFERENCE.md``); Geothermal Direct Use Engineering &amp; Design Guidebook (Geo-Heat</span>
+<span class="sd">Center 1989) p.262, 269; RTES data-centre cooling paper; DiPippo, Geothermal Power Plants 3e,</span>
+<span class="sd">Ch23 p.11-12; spec §7.2 GM-06.</span>
+
+<span class="sd">- Heat to reject from a chiller ``Q_reject = Q_cool (1 + 1/COP)`` (Guidebook p.262):</span>
+<span class="sd">  2.43 Q_cool at COP 0.7, 1.33 Q_cool at COP 3 (:func:`chiller_heat_rejection_w`). The</span>
+<span class="sd">  chiller models already output ``heat_rejected_w``; wire that to ``heat_load_w``. For the</span>
+<span class="sd">  absorption chiller set ``include_heat_rejection_auxiliaries: false``: its default 2.2 % aux</span>
+<span class="sd">  is the extra tower fan and pump, which this unit already counts (COOL-ABS-AUX). The</span>
+<span class="sd">  electric chiller's ``power_el`` is compressor power only (RC-06).</span>
+<span class="sd">- Cooling tower: leaving (cold) water ``T_out = T_wb + approach``, approach 4-5 K</span>
+<span class="sd">  (default 4.5) [A]; range ≈ 5 K [A]; fan + cooling-water pump ≈ 2 % of heat rejected [A]</span>
+<span class="sd">  (Guidebook 0.077 kW/ton incremental, p.269).</span>
+<span class="sd">- Dry cooler: ``T_out = T_db + 5 K`` (RTES paper) [L]; fan power ≈ 3× the wet tower</span>
+<span class="sd">  (DiPippo Ch23 Miravalles comparison) [L] -&gt; fan + pump 3 × 2 % = 6 % [A, the 3× is</span>
+<span class="sd">  applied to the whole 2 %]; cost ≈ 3× and area ≈ 3× (for economics, not modelled here).</span>
+<span class="sd">- Water use (RC-07 MAY): evaporation ≈ Q_reject / h_fg, h_fg 2.45 MJ/kg (water at ≈ 20 °C,</span>
+<span class="sd">  steam tables) [A] -- an upper bound (all heat by evaporation); 0 for a dry cooler.</span>
+
+<span class="sd">With ``water_flow_rate_m3s`` the entering (hot) water temperature follows from the energy</span>
+<span class="sd">balance ``Q = ρ c_p V (T_in - T_out)``; without it the range is fixed and the flow is</span>
+<span class="sd">reported. All energy taken in leaves as heat: ``heat_to_ambient_w = heat_load_w +</span>
+<span class="sd">power_el``. There is no capacity limit: size the unit at the summer design point (DB-34b).</span>
+<span class="sd">A wet tower whose fixed-approach leaving water would be at or below 0 °C is flagged in</span>
+<span class="sd">``validity_warnings`` (freeze protection -- fan control, bypass -- is not modelled).</span>
+<span class="sd">"""</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">math</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">gemini_model.fluid.pvt_config</span><span class="w"> </span><span class="kn">import</span> <span class="n">liquid_properties</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">gemini_model.model_abstract</span><span class="w"> </span><span class="kn">import</span> <span class="n">StaticModel</span>
+
+<span class="n">TECHNOLOGIES</span> <span class="o">=</span> <span class="p">(</span><span class="s2">"cooling_tower"</span><span class="p">,</span> <span class="s2">"dry_cooler"</span><span class="p">)</span>
+<span class="n">DEFAULT_APPROACH_K</span> <span class="o">=</span> <span class="p">{</span><span class="s2">"cooling_tower"</span><span class="p">:</span> <span class="mf">4.5</span><span class="p">,</span> <span class="s2">"dry_cooler"</span><span class="p">:</span> <span class="mf">5.0</span><span class="p">}</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_finite</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">name</span><span class="p">):</span>
+    <span class="n">value</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">math</span><span class="o">.</span><span class="n">isfinite</span><span class="p">(</span><span class="n">value</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2"> must be finite, got </span><span class="si">{</span><span class="n">value</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">value</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_non_negative</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">name</span><span class="p">):</span>
+    <span class="n">value</span> <span class="o">=</span> <span class="n">_finite</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">name</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">value</span> <span class="o">&lt;</span> <span class="mf">0.0</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2"> must be &gt;= 0, got </span><span class="si">{</span><span class="n">value</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">value</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_positive</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">name</span><span class="p">):</span>
+    <span class="n">value</span> <span class="o">=</span> <span class="n">_finite</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">name</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">value</span> <span class="o">&lt;=</span> <span class="mf">0.0</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2"> must be &gt; 0, got </span><span class="si">{</span><span class="n">value</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">value</span>
+
+
+<div class="viewcode-block" id="chiller_heat_rejection_w">
+<a class="viewcode-back" href="../../../codedocumentation/gemini_model.heat_rejection.heat_rejection.html#gemini_model.heat_rejection.heat_rejection.chiller_heat_rejection_w">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">chiller_heat_rejection_w</span><span class="p">(</span><span class="n">cooling_w</span><span class="p">,</span> <span class="n">cop</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Return Q_reject = Q_cool (1 + 1/COP) (W) for a chiller (RC-07, Guidebook p.262)."""</span>
+    <span class="k">return</span> <span class="n">_non_negative</span><span class="p">(</span><span class="n">cooling_w</span><span class="p">,</span> <span class="s2">"cooling_w"</span><span class="p">)</span> <span class="o">*</span> <span class="p">(</span><span class="mf">1.0</span> <span class="o">+</span> <span class="mf">1.0</span> <span class="o">/</span> <span class="n">_positive</span><span class="p">(</span><span class="n">cop</span><span class="p">,</span> <span class="s2">"cop"</span><span class="p">))</span></div>
+
+
+
+<div class="viewcode-block" id="HeatRejection">
+<a class="viewcode-back" href="../../../codedocumentation/gemini_model.heat_rejection.heat_rejection.html#gemini_model.heat_rejection.heat_rejection.HeatRejection">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">HeatRejection</span><span class="p">(</span><span class="n">StaticModel</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Wet cooling tower or dry cooler with a fixed approach (RC-07)."""</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">"""Model initialization with RC-07 defaults (wet cooling tower)."""</span>
+        <span class="n">density</span><span class="p">,</span> <span class="n">specific_heat</span> <span class="o">=</span> <span class="n">liquid_properties</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s2">"technology"</span><span class="p">:</span> <span class="s2">"cooling_tower"</span><span class="p">,</span>  <span class="c1"># or "dry_cooler"</span>
+            <span class="s2">"approach_k"</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>  <span class="c1"># None -&gt; 4.5 K (tower) [A] / 5 K (dry cooler) [L]</span>
+            <span class="s2">"range_k"</span><span class="p">:</span> <span class="mf">5.0</span><span class="p">,</span>  <span class="c1"># [A] ≈ 5 K</span>
+            <span class="s2">"aux_power_fraction"</span><span class="p">:</span> <span class="mf">0.02</span><span class="p">,</span>  <span class="c1"># [A] fan + pump of a wet tower, of heat rejected</span>
+            <span class="s2">"dry_cooler_power_factor"</span><span class="p">:</span> <span class="mf">3.0</span><span class="p">,</span>  <span class="c1"># [L] dry-cooler fan power ≈ 3× wet</span>
+            <span class="s2">"latent_heat_j_kg"</span><span class="p">:</span> <span class="mf">2.45e6</span><span class="p">,</span>  <span class="c1"># [A] h_fg of water at ≈ 20 °C (steam tables)</span>
+            <span class="s2">"water_density_kg_m3"</span><span class="p">:</span> <span class="n">density</span><span class="p">,</span>
+            <span class="s2">"water_specific_heat_j_kgk"</span><span class="p">:</span> <span class="n">specific_heat</span><span class="p">,</span>
+        <span class="p">}</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">output</span> <span class="o">=</span> <span class="p">{}</span>
+
+<div class="viewcode-block" id="HeatRejection.update_parameters">
+<a class="viewcode-back" href="../../../codedocumentation/gemini_model.heat_rejection.heat_rejection.html#gemini_model.heat_rejection.heat_rejection.HeatRejection.update_parameters">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">update_parameters</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">parameters</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">"""Update model parameters.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        parameters: dict</span>
+<span class="sd">            Parameters dict as defined by the model.</span>
+<span class="sd">        """</span>
+        <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">parameters</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="n">value</span></div>
+
+
+<div class="viewcode-block" id="HeatRejection.initialize_state">
+<a class="viewcode-back" href="../../../codedocumentation/gemini_model.heat_rejection.heat_rejection.html#gemini_model.heat_rejection.heat_rejection.HeatRejection.initialize_state">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">initialize_state</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">"""Not applicable: static model."""</span></div>
+
+
+<div class="viewcode-block" id="HeatRejection.update_state">
+<a class="viewcode-back" href="../../../codedocumentation/gemini_model.heat_rejection.heat_rejection.html#gemini_model.heat_rejection.heat_rejection.HeatRejection.update_state">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">update_state</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">u</span><span class="p">,</span> <span class="n">x</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">"""Not applicable: static model."""</span></div>
+
+
+<div class="viewcode-block" id="HeatRejection.calculate_output">
+<a class="viewcode-back" href="../../../codedocumentation/gemini_model.heat_rejection.heat_rejection.html#gemini_model.heat_rejection.heat_rejection.HeatRejection.calculate_output">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">calculate_output</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">u</span><span class="p">,</span> <span class="n">x</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">"""Calculate leaving-water temperature, flow, fan/pump power and water use.</span>
+
+<span class="sd">        Inputs ``u``: ``heat_load_w`` (W, ≥ 0); ``ambient_wet_bulb_degc`` (cooling tower)</span>
+<span class="sd">        or ``ambient_dry_bulb_degc`` (dry cooler); optional ``water_flow_rate_m3s``.</span>
+<span class="sd">        """</span>
+        <span class="n">p</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span>
+        <span class="n">technology</span> <span class="o">=</span> <span class="n">p</span><span class="p">[</span><span class="s2">"technology"</span><span class="p">]</span>
+        <span class="k">if</span> <span class="n">technology</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">TECHNOLOGIES</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"technology must be one of </span><span class="si">{</span><span class="n">TECHNOLOGIES</span><span class="si">}</span><span class="s2">, got </span><span class="si">{</span><span class="n">technology</span><span class="si">!r}</span><span class="s2">"</span><span class="p">)</span>
+        <span class="n">approach</span> <span class="o">=</span> <span class="n">p</span><span class="p">[</span><span class="s2">"approach_k"</span><span class="p">]</span>
+        <span class="n">approach</span> <span class="o">=</span> <span class="n">DEFAULT_APPROACH_K</span><span class="p">[</span><span class="n">technology</span><span class="p">]</span> <span class="k">if</span> <span class="n">approach</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">approach</span>
+        <span class="n">approach</span> <span class="o">=</span> <span class="n">_non_negative</span><span class="p">(</span><span class="n">approach</span><span class="p">,</span> <span class="s2">"approach_k"</span><span class="p">)</span>
+        <span class="n">aux_fraction</span> <span class="o">=</span> <span class="n">_non_negative</span><span class="p">(</span><span class="n">p</span><span class="p">[</span><span class="s2">"aux_power_fraction"</span><span class="p">],</span> <span class="s2">"aux_power_fraction"</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">technology</span> <span class="o">==</span> <span class="s2">"cooling_tower"</span><span class="p">:</span>
+            <span class="n">ambient</span> <span class="o">=</span> <span class="n">_finite</span><span class="p">(</span><span class="n">u</span><span class="p">[</span><span class="s2">"ambient_wet_bulb_degc"</span><span class="p">],</span> <span class="s2">"ambient_wet_bulb_degc"</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">ambient</span> <span class="o">=</span> <span class="n">_finite</span><span class="p">(</span><span class="n">u</span><span class="p">[</span><span class="s2">"ambient_dry_bulb_degc"</span><span class="p">],</span> <span class="s2">"ambient_dry_bulb_degc"</span><span class="p">)</span>
+            <span class="n">aux_fraction</span> <span class="o">*=</span> <span class="n">_non_negative</span><span class="p">(</span><span class="n">p</span><span class="p">[</span><span class="s2">"dry_cooler_power_factor"</span><span class="p">],</span> <span class="s2">"dry_cooler_power_factor"</span><span class="p">)</span>
+
+        <span class="n">q_load</span> <span class="o">=</span> <span class="n">_non_negative</span><span class="p">(</span><span class="n">u</span><span class="p">[</span><span class="s2">"heat_load_w"</span><span class="p">],</span> <span class="s2">"heat_load_w"</span><span class="p">)</span>
+        <span class="n">rho_cp</span> <span class="o">=</span> <span class="n">_positive</span><span class="p">(</span><span class="n">p</span><span class="p">[</span><span class="s2">"water_density_kg_m3"</span><span class="p">],</span> <span class="s2">"water_density_kg_m3"</span><span class="p">)</span> <span class="o">*</span> <span class="n">_positive</span><span class="p">(</span>
+            <span class="n">p</span><span class="p">[</span><span class="s2">"water_specific_heat_j_kgk"</span><span class="p">],</span> <span class="s2">"water_specific_heat_j_kgk"</span>
+        <span class="p">)</span>
+        <span class="n">t_out</span> <span class="o">=</span> <span class="n">ambient</span> <span class="o">+</span> <span class="n">approach</span>
+        <span class="k">if</span> <span class="n">u</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"water_flow_rate_m3s"</span><span class="p">)</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">flow</span> <span class="o">=</span> <span class="n">_non_negative</span><span class="p">(</span><span class="n">u</span><span class="p">[</span><span class="s2">"water_flow_rate_m3s"</span><span class="p">],</span> <span class="s2">"water_flow_rate_m3s"</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">q_load</span> <span class="o">&gt;</span> <span class="mf">0.0</span> <span class="ow">and</span> <span class="n">flow</span> <span class="o">&lt;=</span> <span class="mf">0.0</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"water_flow_rate_m3s must be &gt; 0 when heat_load_w &gt; 0"</span><span class="p">)</span>
+            <span class="n">water_range</span> <span class="o">=</span> <span class="n">q_load</span> <span class="o">/</span> <span class="p">(</span><span class="n">rho_cp</span> <span class="o">*</span> <span class="n">flow</span><span class="p">)</span> <span class="k">if</span> <span class="n">flow</span> <span class="o">&gt;</span> <span class="mf">0.0</span> <span class="k">else</span> <span class="mf">0.0</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">water_range</span> <span class="o">=</span> <span class="n">_positive</span><span class="p">(</span><span class="n">p</span><span class="p">[</span><span class="s2">"range_k"</span><span class="p">],</span> <span class="s2">"range_k"</span><span class="p">)</span> <span class="k">if</span> <span class="n">q_load</span> <span class="o">&gt;</span> <span class="mf">0.0</span> <span class="k">else</span> <span class="mf">0.0</span>
+            <span class="n">flow</span> <span class="o">=</span> <span class="n">q_load</span> <span class="o">/</span> <span class="p">(</span><span class="n">rho_cp</span> <span class="o">*</span> <span class="n">water_range</span><span class="p">)</span> <span class="k">if</span> <span class="n">q_load</span> <span class="o">&gt;</span> <span class="mf">0.0</span> <span class="k">else</span> <span class="mf">0.0</span>
+
+        <span class="n">warnings</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">if</span> <span class="n">technology</span> <span class="o">==</span> <span class="s2">"cooling_tower"</span> <span class="ow">and</span> <span class="n">t_out</span> <span class="o">&lt;=</span> <span class="mf">0.0</span><span class="p">:</span>
+            <span class="n">warnings</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">"tower leaving water </span><span class="si">{</span><span class="n">t_out</span><span class="si">:</span><span class="s2">.1f</span><span class="si">}</span><span class="s2"> °C &lt;= 0 °C: freeze protection not modelled"</span>
+            <span class="p">)</span>
+        <span class="n">power_el</span> <span class="o">=</span> <span class="n">aux_fraction</span> <span class="o">*</span> <span class="n">q_load</span>
+        <span class="k">if</span> <span class="n">technology</span> <span class="o">==</span> <span class="s2">"cooling_tower"</span><span class="p">:</span>
+            <span class="n">evaporation</span> <span class="o">=</span> <span class="n">q_load</span> <span class="o">/</span> <span class="n">_positive</span><span class="p">(</span><span class="n">p</span><span class="p">[</span><span class="s2">"latent_heat_j_kg"</span><span class="p">],</span> <span class="s2">"latent_heat_j_kg"</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">evaporation</span> <span class="o">=</span> <span class="mf">0.0</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">output</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s2">"technology"</span><span class="p">:</span> <span class="n">technology</span><span class="p">,</span>
+            <span class="s2">"heat_rejected_w"</span><span class="p">:</span> <span class="n">q_load</span><span class="p">,</span>
+            <span class="s2">"heat_to_ambient_w"</span><span class="p">:</span> <span class="n">q_load</span> <span class="o">+</span> <span class="n">power_el</span><span class="p">,</span>
+            <span class="s2">"water_temperature_out_degc"</span><span class="p">:</span> <span class="n">t_out</span><span class="p">,</span>
+            <span class="s2">"water_temperature_in_degc"</span><span class="p">:</span> <span class="n">t_out</span> <span class="o">+</span> <span class="n">water_range</span><span class="p">,</span>
+            <span class="s2">"water_flow_rate_m3s"</span><span class="p">:</span> <span class="n">flow</span><span class="p">,</span>
+            <span class="s2">"range_k"</span><span class="p">:</span> <span class="n">water_range</span><span class="p">,</span>
+            <span class="s2">"approach_k"</span><span class="p">:</span> <span class="n">approach</span><span class="p">,</span>
+            <span class="s2">"water_evaporation_kg_s"</span><span class="p">:</span> <span class="n">evaporation</span><span class="p">,</span>
+            <span class="s2">"validity_warnings"</span><span class="p">:</span> <span class="n">warnings</span><span class="p">,</span>
+            <span class="s2">"power_el"</span><span class="p">:</span> <span class="n">power_el</span><span class="p">,</span>
+            <span class="s2">"power_th"</span><span class="p">:</span> <span class="mf">0.0</span><span class="p">,</span>
+            <span class="s2">"emission"</span><span class="p">:</span> <span class="mf">0.0</span><span class="p">,</span>
+        <span class="p">}</span></div>
+</div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, TNO.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
