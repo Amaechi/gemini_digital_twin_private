@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>5.9. Heat pump, electric boiler and thermal storage &mdash; GEMINI Geothermal Digital Twin (claude/trusting-ptolemy-4otuf8)</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=19f00094" />
+
+  
+  <!--[if lt IE 9]>
+    <script src="_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="_static/jquery.js?v=5d32c60e"></script>
+        <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+        <script src="_static/documentation_options.js?v=d9d2e33c"></script>
+        <script src="_static/doctools.js?v=9a2dae69"></script>
+        <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+        <script async="async" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="6. Source code documentation" href="index_sourcecode.html" />
+    <link rel="prev" title="5.8. Cooling" href="model_cooling.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            GEMINI Geothermal Digital Twin
+          </a>
+              <div class="version">
+                claude/trusting-ptolemy-4otuf8
+              </div>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Table of Contents</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="index_about_gemini.html">1. About GEMINI</a></li>
+<li class="toctree-l1"><a class="reference internal" href="index_getting_started.html">2. Getting started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="index_setup.html">3. Set-up</a></li>
+<li class="toctree-l1"><a class="reference internal" href="index_applications.html">4. Applications</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index_models.html">5. Models</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="model_well_esp.html">5.1. Pump: Electrical Submersible Pump (ESP)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="model_well_hydraulics.html">5.2. Well: Pressure and Temperature Hydraulics</a></li>
+<li class="toctree-l2"><a class="reference internal" href="model_fluid_pvt.html">5.3. Fluid: PVT Properties</a></li>
+<li class="toctree-l2"><a class="reference internal" href="model_reservoir.html">5.4. Reservoir Performance Models</a></li>
+<li class="toctree-l2"><a class="reference internal" href="model_corrosion.html">5.5. Corrosion: CO2 Corrosion Rate</a></li>
+<li class="toctree-l2"><a class="reference internal" href="model_erosion.html">5.6. Erosion: Erosional Velocity/Rate</a></li>
+<li class="toctree-l2"><a class="reference internal" href="model_surface_equipment.html">5.7. Surface Equipment</a></li>
+<li class="toctree-l2"><a class="reference internal" href="model_cooling.html">5.8. Cooling</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">5.9. Heat pump, electric boiler and thermal storage</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#description">5.9.1. Description</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#heat-pump-closed-form-path">5.9.2. Heat pump: closed-form path</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#hthp-cap-and-datasheet-limits">5.9.3. HTHP cap and datasheet limits</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#electric-boiler">5.9.4. Electric boiler</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#thermal-storage">5.9.5. Thermal storage</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#example-project">5.9.6. Example project</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#references">5.9.7. References</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="index_sourcecode.html">6. Source code documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="glossary.html">7. Glossary</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">GEMINI Geothermal Digital Twin</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="index_models.html"><span class="section-number">5. </span>Models</a></li>
+      <li class="breadcrumb-item active"><span class="section-number">5.9. </span>Heat pump, electric boiler and thermal storage</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/model_heating.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="heat-pump-electric-boiler-and-thermal-storage">
+<h1><span class="section-number">5.9. </span>Heat pump, electric boiler and thermal storage<a class="headerlink" href="#heat-pump-electric-boiler-and-thermal-storage" title="Link to this heading"></a></h1>
+<section id="description">
+<h2><span class="section-number">5.9.1. </span>Description<a class="headerlink" href="#description" title="Link to this heading"></a></h2>
+<p>These models top up and shift geothermal heat for the 100 °C district-heating supply: a
+<strong>high-temperature heat pump</strong> (HTHP) that lifts district water with heat drawn from the brine, an
+<strong>electric boiler</strong> for peaks and back-up, and a <strong>thermal storage</strong> (seasonal HT-ATES or cold
+storage). The heat pump and the electric boiler are <strong>static models</strong>; the storage is a
+<strong>dynamic model</strong> (<code class="docutils literal notranslate"><span class="pre">gemini_model.model_abstract.DynamicModel</span></code>) whose state is the stored energy.
+They are registered for project JSON files as <code class="docutils literal notranslate"><span class="pre">heatpump</span></code>, <code class="docutils literal notranslate"><span class="pre">electric_boiler</span></code> and
+<code class="docutils literal notranslate"><span class="pre">thermal_storage</span></code>.</p>
+<p>Every model outputs <code class="docutils literal notranslate"><span class="pre">power_el</span></code> (electricity used, W), <code class="docutils literal notranslate"><span class="pre">power_th</span></code> (useful heat delivered, W)
+and <code class="docutils literal notranslate"><span class="pre">emission</span></code> (0 kg/s; grid CO₂ is counted by the economics). Each model folder holds a
+<code class="docutils literal notranslate"><span class="pre">REFERENCE.md</span></code> with the equations, defaults and citations (reference cards RC-04, RC-09, RC-10).
+The defaults are recorded in <code class="docutils literal notranslate"><span class="pre">config/assumptions.yaml</span></code> (<code class="docutils literal notranslate"><span class="pre">HP-ETA-L</span></code>, <code class="docutils literal notranslate"><span class="pre">HP-APPROACH</span></code>,
+<code class="docutils literal notranslate"><span class="pre">VER-HP-ETA</span></code>, <code class="docutils literal notranslate"><span class="pre">VER-HP-LIFT</span></code>, <code class="docutils literal notranslate"><span class="pre">EB-ETA</span></code>, <code class="docutils literal notranslate"><span class="pre">STO-REC-HT</span></code>, <code class="docutils literal notranslate"><span class="pre">STO-REC-COLD</span></code>).</p>
+</section>
+<section id="heat-pump-closed-form-path">
+<h2><span class="section-number">5.9.2. </span>Heat pump: closed-form path<a class="headerlink" href="#heat-pump-closed-form-path" title="Link to this heading"></a></h2>
+<p><code class="docutils literal notranslate"><span class="pre">gemini_model.heatpump.heatpump_basic.HeatpumpBasic</span></code> keeps GEMINI’s Nelder-Mead solver as the
+default (<code class="docutils literal notranslate"><span class="pre">solver:</span> <span class="pre">&quot;nelder_mead&quot;</span></code>; see <a class="reference internal" href="model_surface_equipment.html"><span class="doc">Surface Equipment</span></a>). With
+<code class="docutils literal notranslate"><span class="pre">solver:</span> <span class="pre">&quot;closed_form&quot;</span></code> the same operating point is found without a starting guess (Geo-Heat
+Center Guidebook 1989, Ch13; RC-04):</p>
+<div class="math notranslate nohighlight">
+\[\bar T = \frac{T_{out} - T_{in}}{\ln(T_{out}/T_{in})}, \qquad
+COP = \eta_L \frac{\bar T_{sink}}{\bar T_{sink} - \bar T_{source}}, \qquad
+Q_h = Q_{src} \frac{COP}{COP - 1}, \qquad P_{el} = \frac{Q_h}{COP}\]</div>
+<p>with <span class="math notranslate nohighlight">\(\eta_L = 0.5\)</span> (<code class="docutils literal notranslate"><span class="pre">mode:</span> <span class="pre">&quot;lorenz&quot;</span></code>, water log-mean temperatures in K). The sink leaves
+at <code class="docutils literal notranslate"><span class="pre">Th_out_target</span></code>; the source outlet is the bracketed root of the energy balance. If it would
+fall below <code class="docutils literal notranslate"><span class="pre">Ts_in_minimum</span></code> it is held there and the sink outlet drops instead (as GEMINI). Where
+Nelder-Mead converges to a physical point the two solvers agree within 2 % (in practice 1e-5).</p>
+</section>
+<section id="hthp-cap-and-datasheet-limits">
+<h2><span class="section-number">5.9.3. </span>HTHP cap and datasheet limits<a class="headerlink" href="#hthp-cap-and-datasheet-limits" title="Link to this heading"></a></h2>
+<p>On the closed-form path the result is capped at a fraction of the ideal cycle at the refrigerant
+temperatures (condensing = sink outlet + 4 K, evaporating = source outlet − 4 K):</p>
+<div class="math notranslate nohighlight">
+\[COP \le f \, \frac{T_{cond}}{T_{cond} - T_{evap}}\]</div>
+<p>with <span class="math notranslate nohighlight">\(f = 0.6\)</span> without a datasheet (RC-04 default, the verifier’s <code class="docutils literal notranslate"><span class="pre">VER-HP-ETA</span></code>). For the
+RC-04 design case (district water 82 → 100 °C, brine 60 °C in) the uncapped Lorenz value is 4.79
+and the capped one 3.71.</p>
+<p><strong>HTHP limits are MISSING until a datasheet is cited.</strong> The parameters <code class="docutils literal notranslate"><span class="pre">datasheet</span></code> (citation),
+<code class="docutils literal notranslate"><span class="pre">max_lift_k</span></code>, <code class="docutils literal notranslate"><span class="pre">max_sink_temperature_degc</span></code> and <code class="docutils literal notranslate"><span class="pre">max_carnot_fraction</span></code> default to <code class="docutils literal notranslate"><span class="pre">None</span></code>;
+limits without a citation are refused. Without a datasheet the outlet-to-outlet temperature
+difference is screened against 60 K (<code class="docutils literal notranslate"><span class="pre">VER-HP-LIFT</span></code>) and the maximum sink temperature is not
+checked. The
+outputs <code class="docutils literal notranslate"><span class="pre">missing_inputs</span></code>, <code class="docutils literal notranslate"><span class="pre">within_limits</span></code>, <code class="docutils literal notranslate"><span class="pre">validity_warnings</span></code>, <code class="docutils literal notranslate"><span class="pre">source_heat_w</span></code> and
+<code class="docutils literal notranslate"><span class="pre">heat_pump_point</span></code> (the verifier’s <code class="docutils literal notranslate"><span class="pre">HeatPumpPoint</span></code> evidence) are given by both solvers.
+<code class="docutils literal notranslate"><span class="pre">dea_reference_cop</span></code> interpolates the DEA performance table (40–100 K) as a plausibility band
+only.</p>
+</section>
+<section id="electric-boiler">
+<h2><span class="section-number">5.9.4. </span>Electric boiler<a class="headerlink" href="#electric-boiler" title="Link to this heading"></a></h2>
+<p><code class="docutils literal notranslate"><span class="pre">gemini_model.electric_boiler.electric_boiler.ElectricBoiler</span></code>: <span class="math notranslate nohighlight">\(P_{el} = Q_{th} / 0.99\)</span>
+(spec GM-08, DEA). Inputs <code class="docutils literal notranslate"><span class="pre">heat_demand_w</span></code>, or <code class="docutils literal notranslate"><span class="pre">water_flow_rate_m3s</span></code> with
+<code class="docutils literal notranslate"><span class="pre">water_temperature_in_degc</span></code> (heated to <code class="docutils literal notranslate"><span class="pre">water_temperature_out_degc</span></code>, default 100 °C). The duty
+is capped at <code class="docutils literal notranslate"><span class="pre">nominal_capacity_w</span></code> and the rest reported as <code class="docutils literal notranslate"><span class="pre">unmet_heat_w</span></code>.</p>
+</section>
+<section id="thermal-storage">
+<h2><span class="section-number">5.9.5. </span>Thermal storage<a class="headerlink" href="#thermal-storage" title="Link to this heading"></a></h2>
+<p><code class="docutils literal notranslate"><span class="pre">gemini_model.thermal_storage.thermal_storage.ThermalStorage</span></code> (RC-09):</p>
+<div class="math notranslate nohighlight">
+\[E_{t+1} = E_t - \lambda \frac{\Delta t}{1\,d} E_t + \eta_c P_c \Delta t - \frac{P_d \Delta t}{\eta_d}\]</div>
+<p>Inputs <code class="docutils literal notranslate"><span class="pre">charge_power_w</span></code> or <code class="docutils literal notranslate"><span class="pre">discharge_power_w</span></code> (W) and optional <code class="docutils literal notranslate"><span class="pre">time_step_s</span></code> (default one
+day). Parameters: <code class="docutils literal notranslate"><span class="pre">capacity_mwh</span></code>, <code class="docutils literal notranslate"><span class="pre">initial_soc</span></code>, power limits, <code class="docutils literal notranslate"><span class="pre">storage_type</span></code> (<code class="docutils literal notranslate"><span class="pre">ht_ates</span></code> or
+<code class="docutils literal notranslate"><span class="pre">cold</span></code>). The cycle recovery <span class="math notranslate nohighlight">\(\eta_c \eta_d\)</span> is put on discharge: 0.63 for HT-ATES (TU Delft)
+and 0.96 for cold storage (RTES 0.96–0.99). Outputs include <code class="docutils literal notranslate"><span class="pre">energy_mwh</span></code>, <code class="docutils literal notranslate"><span class="pre">soc</span></code>, <code class="docutils literal notranslate"><span class="pre">losses_w</span></code>,
+the cumulative charged and discharged energy and an energy-balance residual.</p>
+</section>
+<section id="example-project">
+<h2><span class="section-number">5.9.6. </span>Example project<a class="headerlink" href="#example-project" title="Link to this heading"></a></h2>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">"components"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nt">"hthp"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">"type"</span><span class="p">:</span><span class="w"> </span><span class="s2">"heatpump"</span><span class="p">,</span><span class="w"> </span><span class="nt">"parameters"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">"mode"</span><span class="p">:</span><span class="w"> </span><span class="s2">"lorenz"</span><span class="p">,</span><span class="w"> </span><span class="nt">"solver"</span><span class="p">:</span><span class="w"> </span><span class="s2">"closed_form"</span><span class="p">,</span>
+<span class="w">             </span><span class="nt">"Th_out_target"</span><span class="p">:</span><span class="w"> </span><span class="mf">100.0</span><span class="p">,</span><span class="w"> </span><span class="nt">"Ts_in_minimum"</span><span class="p">:</span><span class="w"> </span><span class="mf">10.0</span><span class="p">,</span><span class="w"> </span><span class="nt">"Cp_s"</span><span class="p">:</span><span class="w"> </span><span class="mf">4100.0</span><span class="p">,</span><span class="w"> </span><span class="nt">"rho_s"</span><span class="p">:</span><span class="w"> </span><span class="mf">1030.0</span><span class="p">}},</span>
+<span class="w">    </span><span class="nt">"eboiler"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">"type"</span><span class="p">:</span><span class="w"> </span><span class="s2">"electric_boiler"</span><span class="p">,</span><span class="w"> </span><span class="nt">"parameters"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">"nominal_capacity_w"</span><span class="p">:</span><span class="w"> </span><span class="mf">5.0e6</span><span class="p">}}</span>
+<span class="w">  </span><span class="p">},</span>
+<span class="w">  </span><span class="nt">"boundary_inputs"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">    </span><span class="p">{</span><span class="nt">"component"</span><span class="p">:</span><span class="w"> </span><span class="s2">"hthp"</span><span class="p">,</span><span class="w"> </span><span class="nt">"key"</span><span class="p">:</span><span class="w"> </span><span class="s2">"Th_in"</span><span class="p">,</span><span class="w"> </span><span class="nt">"value"</span><span class="p">:</span><span class="w"> </span><span class="mf">82.0</span><span class="p">},</span>
+<span class="w">    </span><span class="p">{</span><span class="nt">"component"</span><span class="p">:</span><span class="w"> </span><span class="s2">"hthp"</span><span class="p">,</span><span class="w"> </span><span class="nt">"key"</span><span class="p">:</span><span class="w"> </span><span class="s2">"Ts_in"</span><span class="p">,</span><span class="w"> </span><span class="nt">"value"</span><span class="p">:</span><span class="w"> </span><span class="mf">60.0</span><span class="p">},</span>
+<span class="w">    </span><span class="p">{</span><span class="nt">"component"</span><span class="p">:</span><span class="w"> </span><span class="s2">"hthp"</span><span class="p">,</span><span class="w"> </span><span class="nt">"key"</span><span class="p">:</span><span class="w"> </span><span class="s2">"hot_flow_rate"</span><span class="p">,</span><span class="w"> </span><span class="nt">"value"</span><span class="p">:</span><span class="w"> </span><span class="mf">0.02778</span><span class="p">},</span>
+<span class="w">    </span><span class="p">{</span><span class="nt">"component"</span><span class="p">:</span><span class="w"> </span><span class="s2">"hthp"</span><span class="p">,</span><span class="w"> </span><span class="nt">"key"</span><span class="p">:</span><span class="w"> </span><span class="s2">"source_flow_rate"</span><span class="p">,</span><span class="w"> </span><span class="nt">"value"</span><span class="p">:</span><span class="w"> </span><span class="mf">0.02222</span><span class="p">}</span>
+<span class="w">  </span><span class="p">],</span>
+<span class="w">  </span><span class="nt">"connections"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">    </span><span class="p">{</span><span class="nt">"predecessor"</span><span class="p">:</span><span class="w"> </span><span class="s2">"hthp"</span><span class="p">,</span><span class="w"> </span><span class="nt">"successor"</span><span class="p">:</span><span class="w"> </span><span class="s2">"eboiler"</span><span class="p">,</span>
+<span class="w">     </span><span class="nt">"ports"</span><span class="p">:</span><span class="w"> </span><span class="p">[[</span><span class="s2">"Th_out"</span><span class="p">,</span><span class="w"> </span><span class="s2">"water_temperature_in_degc"</span><span class="p">],</span>
+<span class="w">               </span><span class="p">[</span><span class="s2">"hot_flow_rate"</span><span class="p">,</span><span class="w"> </span><span class="s2">"water_flow_rate_m3s"</span><span class="p">]]}</span>
+<span class="w">  </span><span class="p">]</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</section>
+<section id="references">
+<h2><span class="section-number">5.9.7. </span>References<a class="headerlink" href="#references" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p>Geothermal Direct Use Engineering &amp; Design Guidebook, Geo-Heat Center (1989): Ch13 heat pumps
+p.250 (water ΔT, fouling), p.258 (COP 4.41 at 15.6 / 48.9 °C), p.260 (peaking practice),
+Table 13.2 (1989 condenser limits, outdated).</p></li>
+<li><p>Danish Energy Agency technology catalogues: Industrial Process Heat ch. 2 (high-temperature heat
+pumps, COP by lift); Electricity &amp; District Heating ch. 41 (electric boilers, η 0.99).</p></li>
+<li><p>TU Delft campus HT-ATES study (recovery ≈ 63 % after 10 years); RTES data-centre cooling paper
+(cold storage recovery 96–99 %, citing Pepin 2021).</p></li>
+</ul>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="model_cooling.html" class="btn btn-neutral float-left" title="5.8. Cooling" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="index_sourcecode.html" class="btn btn-neutral float-right" title="6. Source code documentation" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, TNO.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
