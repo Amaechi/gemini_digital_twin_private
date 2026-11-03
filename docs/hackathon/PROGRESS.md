@@ -20,7 +20,7 @@ Keep it ≤ 20 KB; it is the hand-off between sessions. Old detail: merged PRs a
 | WP-10 P0 | P0 intake cannot escalate an in-scope request | in review | | finalise/refuse only; `INTAKE_CLOSED` |
 | WP-11 | Optimisation & uncertainty | merged (78491fe) | [#18](https://github.com/Amaechi/gemini_digital_twin_private/pull/18) | TL-13/15 |
 | WP-12 | Model gap & Model Builder | merged (b81cfa9) | [#15](https://github.com/Amaechi/gemini_digital_twin_private/pull/15) | TL-17/18; S7 demo |
-| WP-12 follow-up | Builder uses llm.yaml call settings, retries on timeout | in review | | `calls.model_builder` 1200 s / 8192 tok; local S7 timed out |
+| WP-12 follow-up | Builder uses llm.yaml call settings, retries on timeout | in review | [#23](https://github.com/Amaechi/gemini_digital_twin_private/pull/23) | `calls.model_builder` 1200 s / 8192 tok; local S7 timed out |
 | WP-13 | Eval suite & submission checks | merged (a622551) | [#16](https://github.com/Amaechi/gemini_digital_twin_private/pull/16) | S1–S11; SUB-01…24 |
 | WP-14 | Integration run & figures | merged (c694720) | [#20](https://github.com/Amaechi/gemini_digital_twin_private/pull/20) | real tools |
 | Pre-L-2 | Robust backup (DR-11), final-run instructions | in review | [#21](https://github.com/Amaechi/gemini_digital_twin_private/pull/21) | OPT-ROBUST-BACKUP; CLOUD_SETUP §7 |
