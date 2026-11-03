@@ -1,0 +1,66 @@
+{
+ "data": {
+  "doublets": 3,
+  "flow_m3h": 150.0,
+  "spacing_m": 600.0,
+  "layout": "parallel",
+  "unit_pressure_bar": 1.3438962330858863,
+  "limit_bar": 1.0,
+  "min_separation_m": 570.8962005576454,
+  "separation_m": 570.8962005576454,
+  "wells": [
+   {
+    "doublet": 0,
+    "kind": "producer",
+    "x_m": 0.0,
+    "y_m": 0.0,
+    "pressure_change_bar": -0.6638473858400916
+   },
+   {
+    "doublet": 0,
+    "kind": "injector",
+    "x_m": 0.0,
+    "y_m": 600.0,
+    "pressure_change_bar": 0.6638473858400917
+   },
+   {
+    "doublet": 1,
+    "kind": "producer",
+    "x_m": 570.8962005576454,
+    "y_m": 0.0,
+    "pressure_change_bar": -1.0000000005030796
+   },
+   {
+    "doublet": 1,
+    "kind": "injector",
+    "x_m": 570.8962005576454,
+    "y_m": 600.0,
+    "pressure_change_bar": 1.0000000005030796
+   },
+   {
+    "doublet": 2,
+    "kind": "producer",
+    "x_m": 1141.7924011152909,
+    "y_m": 0.0,
+    "pressure_change_bar": -0.6638473858400916
+   },
+   {
+    "doublet": 2,
+    "kind": "injector",
+    "x_m": 1141.7924011152909,
+    "y_m": 600.0,
+    "pressure_change_bar": 0.6638473858400917
+   }
+  ],
+  "max_abs_pressure_change_bar": 1.0000000005030796,
+  "within_limit": true
+ },
+ "summary": "3 doublets (parallel, D 600 m, Q 150 m\u00b3/h): max |\u0394P| 1.00 bar at separation 571 m (limit 1 bar \u21d2 min 571 m); within limit: True",
+ "warnings": [],
+ "assumption_ids": [
+  "SUB-SPACING"
+ ],
+ "sources": [
+  "RC-02"
+ ]
+}

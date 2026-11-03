@@ -1,0 +1,83 @@
+{
+  "dr_id": "DR-04",
+  "title": "Cooling technology mix",
+  "run_id": "final_llm",
+  "phase": "P5",
+  "role": "system_architect",
+  "question": "Which cooling technology mix supplies 20 degC?",
+  "options": [
+    {
+      "id": "electric-chillers",
+      "label": "Electric chillers (C1)",
+      "evidence_ids": [
+        "TR-009",
+        "TR-010",
+        "TR-012",
+        "TR-013"
+      ],
+      "recommended": false,
+      "eligible": true,
+      "notes": "candidates: C1-3d"
+    },
+    {
+      "id": "free-cooling-electric",
+      "label": "Free cooling + electric chillers (C2, C5)",
+      "evidence_ids": [
+        "TR-009",
+        "TR-010",
+        "TR-012",
+        "TR-013"
+      ],
+      "recommended": true,
+      "eligible": true,
+      "notes": "candidates: C2-2d, C5-3d, C6-2d, C7-2d, C8-3d; top-ranked (LCOH ranking)"
+    },
+    {
+      "id": "free-cooling-absorption",
+      "label": "Free cooling + absorption + electric peak (C3, C4)",
+      "evidence_ids": [
+        "TR-009",
+        "TR-010",
+        "TR-012",
+        "TR-013"
+      ],
+      "recommended": false,
+      "eligible": true,
+      "notes": "candidates: C3-2d; excluded by DesignGuard/verifier: C4-2d"
+    }
+  ],
+  "evidence_ids": [
+    "TR-009",
+    "TR-010",
+    "TR-012",
+    "TR-013"
+  ],
+  "choice": "free-cooling-electric",
+  "choice_label": "Free cooling + electric chillers (C2, C5)",
+  "criterion": {
+    "id": "ranking-lowest-lcoh_per_mwh",
+    "key": "lcoh_per_mwh",
+    "source": "economics",
+    "text": "lowest lcoh_per_mwh + lcoc_per_mwh among guard-passed candidates without unmet demand in economics",
+    "best_option_ids": [
+      "free-cooling-electric"
+    ],
+    "evidence_ids": [
+      "TR-012",
+      "TR-013"
+    ]
+  },
+  "rationale": "Selected based on the ranking-lowest-lcoh_per_mwh among guard-passed options in economics. C1-3d was rejected for higher cost. C3-2d was rejected because C4-2d was excluded by the design guard.",
+  "rejected": [
+    {
+      "option_id": "electric-chillers",
+      "reason": "Not chosen."
+    },
+    {
+      "option_id": "free-cooling-absorption",
+      "reason": "Not chosen."
+    }
+  ],
+  "decision_source": "llm",
+  "stub_evidence": false
+}

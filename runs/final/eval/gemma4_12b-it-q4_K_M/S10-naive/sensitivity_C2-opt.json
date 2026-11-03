@@ -1,0 +1,198 @@
+{
+ "lcoh": {
+  "candidate_id": "C2-opt",
+  "kpi": "lcoh",
+  "unit": "USD/MWh",
+  "analysis_period_yr": 30,
+  "kpi_base": 42.952756858447366,
+  "bars": [
+   {
+    "input_name": "discount_rate_frac",
+    "unit": "1/yr",
+    "base_value": 0.08,
+    "low_value": 0.055999999999999994,
+    "high_value": 0.112,
+    "kpi_base": 42.952756858447366,
+    "kpi_at_low": 39.60546164612622,
+    "kpi_at_high": 48.045734085580534,
+    "swing": 8.440272439454311
+   },
+   {
+    "input_name": "electricity_price_usd_per_mwh",
+    "unit": "USD/MWh_e",
+    "base_value": 133.566,
+    "low_value": 93.4962,
+    "high_value": 173.63580000000002,
+    "kpi_base": 42.952756858447366,
+    "kpi_at_low": 38.984941501504814,
+    "kpi_at_high": 46.92057221538992,
+    "swing": 7.935630713885104
+   },
+   {
+    "input_name": "well_cost_large_diameter_musd",
+    "unit": "\u00d7 base",
+    "base_value": null,
+    "low_value": 0.7,
+    "high_value": 1.3,
+    "kpi_base": 42.952756858447366,
+    "kpi_at_low": 39.10342843841296,
+    "kpi_at_high": 46.80208527848177,
+    "swing": 7.698656840068807
+   },
+   {
+    "input_name": "energy_escalation_real_frac",
+    "unit": "1/yr (real)",
+    "base_value": 0.024390243902439046,
+    "low_value": 0.004878048780487809,
+    "high_value": 0.043902439024390505,
+    "kpi_base": 42.952756858447366,
+    "kpi_at_low": 39.69952435036651,
+    "kpi_at_high": 47.357759883205034,
+    "swing": 7.658235532838525
+   },
+   {
+    "input_name": "hthp_capex_usd_per_kw_th",
+    "unit": "USD/kW_th",
+    "base_value": 1356.0,
+    "low_value": 949.1999999999999,
+    "high_value": 1762.8,
+    "kpi_base": 42.952756858447366,
+    "kpi_at_low": 40.33540140791904,
+    "kpi_at_high": 45.57011230897569,
+    "swing": 5.234710901056644
+   },
+   {
+    "input_name": "co2_price_usd_per_t",
+    "unit": "USD/t CO2",
+    "base_value": 89.74459999999999,
+    "low_value": 62.82121999999999,
+    "high_value": 116.66797999999999,
+    "kpi_base": 42.952756858447366,
+    "kpi_at_low": 41.737651920725526,
+    "kpi_at_high": 44.16786179616921,
+    "swing": 2.430209875443687
+   },
+   {
+    "input_name": "om_frac_of_capex_per_yr",
+    "unit": "1/yr",
+    "base_value": 0.015,
+    "low_value": 0.01,
+    "high_value": 0.02,
+    "kpi_base": 42.952756858447366,
+    "kpi_at_low": 41.86276144806535,
+    "kpi_at_high": 44.04275226882939,
+    "swing": 2.17999082076404
+   },
+   {
+    "input_name": "gas_price_usd_per_mwh",
+    "unit": "USD/MWh_LHV",
+    "base_value": 71.41382990279999,
+    "low_value": 40.0,
+    "high_value": 105.0,
+    "kpi_base": 42.952756858447366,
+    "kpi_at_low": 42.42978590150043,
+    "kpi_at_high": 43.51189248661697,
+    "swing": 1.0821065851165415
+   }
+  ],
+  "min_sensitivity_frac": 0.3
+ },
+ "lcoc": {
+  "candidate_id": "C2-opt",
+  "kpi": "lcoc",
+  "unit": "USD/MWh",
+  "analysis_period_yr": 30,
+  "kpi_base": 26.325376211555238,
+  "bars": [
+   {
+    "input_name": "free_cooling_hex_capex_usd_per_kw_th",
+    "unit": "USD/kW_th installed",
+    "base_value": 296.48963599595544,
+    "low_value": 53.0,
+    "high_value": 385.43652679474206,
+    "kpi_base": 26.325376211555238,
+    "kpi_at_low": 17.177956600212568,
+    "kpi_at_high": 29.66693335805444,
+    "swing": 12.488976757841872
+   },
+   {
+    "input_name": "discount_rate_frac",
+    "unit": "1/yr",
+    "base_value": 0.08,
+    "low_value": 0.055999999999999994,
+    "high_value": 0.112,
+    "kpi_base": 26.325376211555238,
+    "kpi_at_low": 22.61288705292101,
+    "kpi_at_high": 31.793692625183567,
+    "swing": 9.180805572262557
+   },
+   {
+    "input_name": "electric_chiller_plant_cost_function_usd",
+    "unit": "\u00d7 base",
+    "base_value": null,
+    "low_value": 0.7,
+    "high_value": 1.3,
+    "kpi_base": 26.325376211555238,
+    "kpi_at_low": 23.486780656291682,
+    "kpi_at_high": 29.16397176681879,
+    "swing": 5.677191110527108
+   },
+   {
+    "input_name": "electricity_price_usd_per_mwh",
+    "unit": "USD/MWh_e",
+    "base_value": 133.566,
+    "low_value": 93.4962,
+    "high_value": 173.63580000000002,
+    "kpi_base": 26.325376211555238,
+    "kpi_at_low": 24.742047423843005,
+    "kpi_at_high": 27.90870499926747,
+    "swing": 3.166657575424466
+   },
+   {
+    "input_name": "energy_escalation_real_frac",
+    "unit": "1/yr (real)",
+    "base_value": 0.024390243902439046,
+    "low_value": 0.004878048780487809,
+    "high_value": 0.043902439024390505,
+    "kpi_base": 26.325376211555238,
+    "kpi_at_low": 25.395534610534842,
+    "kpi_at_high": 27.584417812444883,
+    "swing": 2.1888832019100413
+   },
+   {
+    "input_name": "om_frac_of_capex_per_yr",
+    "unit": "1/yr",
+    "base_value": 0.015,
+    "low_value": 0.01,
+    "high_value": 0.02,
+    "kpi_base": 26.325376211555238,
+    "kpi_at_low": 25.311789874149547,
+    "kpi_at_high": 27.338962548960932,
+    "swing": 2.0271726748113856
+   },
+   {
+    "input_name": "cooling_tower_capex_usd_per_kw_th",
+    "unit": "USD/kW_th rejected",
+    "base_value": 87.18729725115246,
+    "low_value": 40.0,
+    "high_value": 170.0,
+    "kpi_base": 26.325376211555238,
+    "kpi_at_low": 26.083395356744322,
+    "kpi_at_high": 26.750047463517618,
+    "swing": 0.6666521067732951
+   },
+   {
+    "input_name": "chp_capex_usd_per_kw_e",
+    "unit": "USD/kW_e",
+    "base_value": 1333.0384,
+    "low_value": 933.1268799999999,
+    "high_value": 1732.94992,
+    "kpi_base": 26.325376211555238,
+    "kpi_at_low": 26.325376211555238,
+    "kpi_at_high": 26.325376211555238,
+    "swing": 0.0
+   }
+  ],
+  "min_sensitivity_frac": 0.3
+ }
+}

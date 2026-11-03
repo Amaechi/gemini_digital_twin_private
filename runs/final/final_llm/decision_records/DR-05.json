@@ -1,0 +1,66 @@
+{
+  "dr_id": "DR-05",
+  "title": "Storage yes/no",
+  "run_id": "final_llm",
+  "phase": "P5",
+  "role": "system_architect",
+  "question": "Should the plant include thermal storage?",
+  "options": [
+    {
+      "id": "no-storage",
+      "label": "No seasonal storage",
+      "evidence_ids": [
+        "TR-009",
+        "TR-010",
+        "TR-012",
+        "TR-013"
+      ],
+      "recommended": true,
+      "eligible": true,
+      "notes": "candidates: C1-3d, C2-2d, C3-2d, C5-3d, C7-2d, C8-3d; excluded by DesignGuard/verifier: C4-2d; top-ranked (LCOH ranking)"
+    },
+    {
+      "id": "seasonal-ht-ates",
+      "label": "Seasonal HT-ATES storage (C6)",
+      "evidence_ids": [
+        "TR-009",
+        "TR-010",
+        "TR-012",
+        "TR-013"
+      ],
+      "recommended": false,
+      "eligible": true,
+      "notes": "candidates: C6-2d"
+    }
+  ],
+  "evidence_ids": [
+    "TR-009",
+    "TR-010",
+    "TR-012",
+    "TR-013"
+  ],
+  "choice": "no-storage",
+  "choice_label": "No seasonal storage",
+  "criterion": {
+    "id": "ranking-lowest-lcoh_per_mwh",
+    "key": "lcoh_per_mwh",
+    "source": "economics",
+    "text": "lowest lcoh_per_mwh + lcoc_per_mwh among guard-passed candidates without unmet demand in economics",
+    "best_option_ids": [
+      "no-storage"
+    ],
+    "evidence_ids": [
+      "TR-012",
+      "TR-013"
+    ]
+  },
+  "rationale": "lowest lcoh_per_mwh among guard-passed options in economics. Option seasonal-ht-ates was rejected because it had a higher lcoh_per_mwh than the best ranked options in the no-storage group according to TR-013.",
+  "rejected": [
+    {
+      "option_id": "seasonal-ht-ates",
+      "reason": "Not chosen."
+    }
+  ],
+  "decision_source": "llm",
+  "stub_evidence": false
+}

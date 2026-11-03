@@ -1,0 +1,20 @@
+{
+  "run_id": "S2",
+  "status": "paused",
+  "phase": "P1",
+  "engine": "llm+policy_fallback",
+  "input_mode": "pause",
+  "selected_candidate": null,
+  "verdict": null,
+  "approval": null,
+  "loop_count": 0,
+  "excluded_candidates": [],
+  "llm_fallbacks": 0,
+  "conflicts": [],
+  "assumptions_and_answers": [],
+  "decision_records": [],
+  "tool_calls": 3,
+  "stub_tool_calls": 0,
+  "final_summary": "Paused in P1: How should '330 daily steps' be read: A = each doublet available 330 of 365 days (35-day outage, demand met all year) or B = simulate only 330 days?",
+  "escalation_reason": ""
+}

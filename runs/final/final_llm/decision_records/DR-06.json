@@ -1,0 +1,60 @@
+{
+  "dr_id": "DR-06",
+  "title": "Maintenance windows",
+  "run_id": "final_llm",
+  "phase": "P6",
+  "role": "system_architect",
+  "question": "How are doublet maintenance windows scheduled?",
+  "options": [
+    {
+      "id": "optimiser-lowest-load",
+      "label": "Outages placed by the optimiser in the lowest-load windows, never overlapping (DB-30)",
+      "evidence_ids": [
+        "TR-014",
+        "config:assumptions.yaml#DB-30"
+      ],
+      "recommended": true,
+      "eligible": true,
+      "notes": ""
+    },
+    {
+      "id": "common-summer-block",
+      "label": "One common summer block for all doublets",
+      "evidence_ids": [
+        "TR-014",
+        "config:assumptions.yaml#DB-30"
+      ],
+      "recommended": false,
+      "eligible": false,
+      "notes": "outages would overlap; DB-30 requires non-overlapping outages"
+    }
+  ],
+  "evidence_ids": [
+    "TR-014",
+    "config:assumptions.yaml#DB-30"
+  ],
+  "choice": "optimiser-lowest-load",
+  "choice_label": "Outages placed by the optimiser in the lowest-load windows, never overlapping (DB-30)",
+  "criterion": {
+    "id": "db30-non-overlapping",
+    "key": "DB-30",
+    "source": "assumptions register",
+    "text": "only option meeting DB-30: non-overlapping outages in the lowest-load windows",
+    "best_option_ids": [
+      "optimiser-lowest-load"
+    ],
+    "evidence_ids": [
+      "TR-014",
+      "config:assumptions.yaml#DB-30"
+    ]
+  },
+  "rationale": "lowest lcoh_per_mwh among guard-passed options in economics; option common-summer-block violates DB-30 as it causes overlapping outages.",
+  "rejected": [
+    {
+      "option_id": "common-summer-block",
+      "reason": "violates DB-30 requirement for non-overlapping outages"
+    }
+  ],
+  "decision_source": "llm",
+  "stub_evidence": false
+}

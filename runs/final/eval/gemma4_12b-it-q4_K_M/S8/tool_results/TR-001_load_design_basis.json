@@ -1,0 +1,208 @@
+{
+ "data": {
+  "report": {
+   "fixed": {
+    "schema_version": 1,
+    "source": "GEOAGENT_DESIGN_SPEC \u00a72.1 (organiser problem statement) [P]",
+    "year": 2027,
+    "reservoir": {
+     "mid_depth_m": 2500.0,
+     "gross_thickness_m": 100.0,
+     "geothermal_gradient_k_per_km": 30.0,
+     "surface_temperature_degc": 12.0,
+     "pressure_barg": 250.0,
+     "permeability_md": 50.0,
+     "other_depths_allowed": true,
+     "other_depths_pressure_model": "hydrostatic"
+    },
+    "brine": {
+     "density_kg_m3": 1030.0,
+     "viscosity_pa_s": 0.0004,
+     "gas_liquid_ratio_nm3_per_m3": 0.8,
+     "gas_ch4_mol_frac": 0.8,
+     "gas_co2_mol_frac": 0.2
+    },
+    "doublets": {
+     "count_min": 1,
+     "count_max": 3,
+     "flow_min_active_m3h": 50.0,
+     "flow_max_m3h": 300.0,
+     "brine_cooling_max_k": 40.0,
+     "pump_hydraulic_efficiency_frac": 0.7,
+     "injection_equals_production": true,
+     "same_reservoir": true,
+     "operation_days_per_yr": 330
+    },
+    "heating": {
+     "supply_temperature_degc": 100.0,
+     "demand_csv": "data/demand/GEMINI_Heating_Demand_Daily_2027.csv",
+     "csv_date_column": "date",
+     "csv_value_column": "heating_demand_MWth",
+     "peak_mw": 30.0,
+     "peak_date": "2027-01-28",
+     "annual_gwh": 111.67,
+     "nonzero_days": 365
+    },
+    "cooling": {
+     "supply_temperature_degc": 20.0,
+     "demand_csv": "data/demand/GEMINI_Cooling_Demand_Daily_2027.csv",
+     "csv_date_column": "date",
+     "csv_value_column": "cooling_demand_MWcool",
+     "peak_mw": 10.0,
+     "peak_date": "2027-07-19",
+     "annual_gwh": 23.74,
+     "nonzero_days": 219
+    }
+   },
+   "brine_cp_j_per_kg_k": 4100.0,
+   "skin": 0.0,
+   "wellbore_radius_m": 0.108,
+   "drainage_radius_m": 1000.0,
+   "aquifer_rho_c_j_per_m3_k": 2500000.0,
+   "derived": {
+    "reservoir_temperature_degc": 87.0,
+    "heating_supply_above_reservoir_k": 13.0,
+    "hydrostatic_pressure_barg": 252.60750000000004,
+    "static_wellhead_pressure_barg": -2.6075000000000443,
+    "production_wellhead_pressure_at_max_flow_barg": -100.80201262448357,
+    "esp_required": true,
+    "injection_wellhead_pressure_at_min_flow_barg": 13.758252104080544,
+    "injection_wellhead_pressure_at_max_flow_barg": 95.58701262448348,
+    "injection_pump_required": true,
+    "mass_flow_at_max_flow_kg_s": 85.83333333333333,
+    "max_heat_per_doublet_mw": 14.076666666666664,
+    "min_heat_per_active_doublet_mw": 2.346111111111111,
+    "max_geothermal_heat_all_doublets_mw": 42.22999999999999,
+    "min_doublets_for_peak_brine_heat": 3,
+    "productivity_index_m3h_per_bar": 3.055160537811956,
+    "drawdown_at_max_flow_bar": 98.19451262448352,
+    "breakthrough": [
+     {
+      "spacing_m": 1000.0,
+      "flow_m3h": 300.0,
+      "breakthrough_time_yr": 23.573541056798863
+     },
+     {
+      "spacing_m": 1200.0,
+      "flow_m3h": 300.0,
+      "breakthrough_time_yr": 33.94589912179036
+     }
+    ],
+    "associated_gas_at_max_flow_nm3h": 240.0,
+    "associated_gas_fuel_at_max_flow_mw": 1.9093333333333333,
+    "ch4_kg_per_m3_brine": 0.4579994646203266,
+    "co2_kg_per_m3_brine": 0.3141607923619167,
+    "gas_mix": {
+     "density_kg_per_nm3": 0.965200321227804,
+     "lhv_mj_per_nm3": 28.64,
+     "lhv_mj_per_kg": 29.67259683831007,
+     "co2_when_burned_kg_per_nm3": 1.963504952261979,
+     "co2_when_burned_kg_per_gj": 68.55813380803
+    },
+    "temperature_at_depth": [
+     {
+      "depth_m": 1500.0,
+      "temperature_degc": 57.0
+     },
+     {
+      "depth_m": 2000.0,
+      "temperature_degc": 72.0
+     },
+     {
+      "depth_m": 3000.0,
+      "temperature_degc": 102.0
+     },
+     {
+      "depth_m": 3200.0,
+      "temperature_degc": 108.0
+     },
+     {
+      "depth_m": 3500.0,
+      "temperature_degc": 117.0
+     }
+    ]
+   }
+  },
+  "design_basis": {
+   "schema_version": 1,
+   "source": "GEOAGENT_DESIGN_SPEC \u00a72.1 (organiser problem statement) [P]",
+   "year": 2027,
+   "reservoir": {
+    "mid_depth_m": 2500.0,
+    "gross_thickness_m": 100.0,
+    "geothermal_gradient_k_per_km": 30.0,
+    "surface_temperature_degc": 12.0,
+    "pressure_barg": 250.0,
+    "permeability_md": 50.0,
+    "other_depths_allowed": true,
+    "other_depths_pressure_model": "hydrostatic"
+   },
+   "brine": {
+    "density_kg_m3": 1030.0,
+    "viscosity_pa_s": 0.0004,
+    "gas_liquid_ratio_nm3_per_m3": 0.8,
+    "gas_ch4_mol_frac": 0.8,
+    "gas_co2_mol_frac": 0.2
+   },
+   "doublets": {
+    "count_min": 1,
+    "count_max": 3,
+    "flow_min_active_m3h": 50.0,
+    "flow_max_m3h": 300.0,
+    "brine_cooling_max_k": 40.0,
+    "pump_hydraulic_efficiency_frac": 0.7,
+    "injection_equals_production": true,
+    "same_reservoir": true,
+    "operation_days_per_yr": 330
+   },
+   "heating": {
+    "supply_temperature_degc": 100.0,
+    "demand_csv": "data/demand/GEMINI_Heating_Demand_Daily_2027.csv",
+    "csv_date_column": "date",
+    "csv_value_column": "heating_demand_MWth",
+    "peak_mw": 30.0,
+    "peak_date": "2027-01-28",
+    "annual_gwh": 111.67,
+    "nonzero_days": 365
+   },
+   "cooling": {
+    "supply_temperature_degc": 20.0,
+    "demand_csv": "data/demand/GEMINI_Cooling_Demand_Daily_2027.csv",
+    "csv_date_column": "date",
+    "csv_value_column": "cooling_demand_MWcool",
+    "peak_mw": 10.0,
+    "peak_date": "2027-07-19",
+    "annual_gwh": 23.74,
+    "nonzero_days": 219
+   }
+  },
+  "open_gaps": [
+   "DB-30",
+   "DB-31",
+   "DB-32"
+  ],
+  "gap_questions": {
+   "DB-30": "How should '330 daily steps' be read: A = each doublet available 330 of 365 days (35-day outage, demand met all year) or B = simulate only 330 days?",
+   "DB-31": "What district-heating return temperature should the design use (degC)?",
+   "DB-32": "What cooling-network return temperature should the design use (degC)?"
+  },
+  "remembered_answers": {}
+ },
+ "summary": "T_res 87.0\u00b0C (supply 100\u00b0C); P_hyd 252.6 vs P_res 250 bar(g) \u21d2 ESP yes, inj pump yes; heat/doublet 2.35\u201314.08 MW (50\u2013300 m\u00b3/h, 40 K); PI 3.1 m\u00b3/h/bar; t_b 23.6 yr@1 km\u202633.9 yr@1.2 km; gas 1.91 MW/doublet; open gaps: DB-30, DB-31, DB-32",
+ "warnings": [
+  "Reservoir temperature is below the heating supply temperature: geothermal heat alone cannot reach supply; a top-up is required."
+ ],
+ "assumption_ids": [
+  "DB-33",
+  "DB-38",
+  "SUB-RHOC",
+  "SUB-II"
+ ],
+ "sources": [
+  "spec \u00a72.1\u20132.2",
+  "RC-01",
+  "RC-02",
+  "RC-08",
+  "config/assumptions.yaml"
+ ]
+}
