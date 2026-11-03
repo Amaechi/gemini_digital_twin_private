@@ -1,0 +1,7 @@
+# GeoAgent voice front-end (`cli talk`, post-submission, experimental) — optional extras.
+# Install on the laptop only, after requirements-hackathon.txt:  uv pip install -r requirements-voice.txt
+# The main CI (.github/workflows/hackathon_tests.yaml) never installs this file; gemini_agent imports
+# these packages lazily and `talk` fails with an install hint when they are missing (`--typed` needs none).
+# faster-whisper downloads the "small" model (about 0.5 GB) into the Hugging Face cache on first use.
+faster-whisper==1.2.1
+sounddevice==0.5.6
