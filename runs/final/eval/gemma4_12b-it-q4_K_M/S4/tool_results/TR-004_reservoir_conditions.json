@@ -1,0 +1,22 @@
+{
+ "data": {
+  "depth_m": 2500.0,
+  "temperature_degc": 87.0,
+  "pressure_barg": 250.0,
+  "pressure_model": "given",
+  "hydrostatic_pressure_barg": 252.60750000000004,
+  "static_wellhead_pressure_barg": -2.6075000000000443,
+  "esp_required": true,
+  "heating_supply_gap_k": 13.0,
+  "depth_for_heating_supply_m": 2933.333333333333
+ },
+ "summary": "z 2500 m: T_res 87.0\u00b0C, P_res 250.0 bar(g) (given); static WHP -2.6 bar(g) \u21d2 ESP yes; supply gap 13.0 K (100\u00b0C reached at 2933 m)",
+ "warnings": [
+  "Reservoir temperature is below the 100 \u00b0C heating supply: geothermal heat needs a top-up (heat pump, boiler or CHP)."
+ ],
+ "assumption_ids": [],
+ "sources": [
+  "RC-01",
+  "spec \u00a72.1 DB-01\u202607"
+ ]
+}

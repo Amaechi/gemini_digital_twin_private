@@ -1,0 +1,96 @@
+{
+  "dr_id": "DR-08",
+  "title": "Return temperature",
+  "run_id": "S11",
+  "phase": "P5",
+  "role": "system_architect",
+  "question": "Which district-heating return temperature is designed for?",
+  "options": [
+    {
+      "id": "dh-return-55",
+      "label": "District-heating return 55 degC",
+      "evidence_ids": [
+        "config:assumptions.yaml#DB-31",
+        "TR-011",
+        "TR-014"
+      ],
+      "recommended": true,
+      "eligible": true,
+      "notes": ""
+    },
+    {
+      "id": "dh-return-45",
+      "label": "District-heating return 45 degC",
+      "evidence_ids": [
+        "config:assumptions.yaml#DB-31",
+        "TR-011",
+        "TR-014"
+      ],
+      "recommended": false,
+      "eligible": true,
+      "notes": ""
+    },
+    {
+      "id": "dh-return-65",
+      "label": "District-heating return 65 degC",
+      "evidence_ids": [
+        "config:assumptions.yaml#DB-31",
+        "TR-011",
+        "TR-014"
+      ],
+      "recommended": false,
+      "eligible": true,
+      "notes": ""
+    },
+    {
+      "id": "dh-return-75",
+      "label": "District-heating return 75 degC",
+      "evidence_ids": [
+        "config:assumptions.yaml#DB-31",
+        "TR-011",
+        "TR-014"
+      ],
+      "recommended": false,
+      "eligible": true,
+      "notes": ""
+    }
+  ],
+  "evidence_ids": [
+    "TR-011",
+    "TR-014",
+    "config:assumptions.yaml#DB-31"
+  ],
+  "choice": "dh-return-55",
+  "choice_label": "District-heating return 55 degC",
+  "criterion": {
+    "id": "db31-answer",
+    "key": "DB-31",
+    "source": "assumptions register",
+    "text": "register default kept for the district-heating return temperature (DB-31)",
+    "best_option_ids": [
+      "dh-return-55"
+    ],
+    "evidence_ids": [
+      "TR-011",
+      "TR-014",
+      "config:assumptions.yaml#DB-31"
+    ]
+  },
+  "rationale": "Chose dh-return-55 because criterion db31-answer specifies it as the best option for assumption DB-31. Other options were rejected as they do not align with the required register default.",
+  "rejected": [
+    {
+      "option_id": "dh-return-45",
+      "reason": "Not chosen."
+    },
+    {
+      "option_id": "dh-return-65",
+      "reason": "Not chosen."
+    },
+    {
+      "option_id": "dh-return-75",
+      "reason": "Not chosen."
+    }
+  ],
+  "decision_source": "llm",
+  "stub_evidence": false
+}

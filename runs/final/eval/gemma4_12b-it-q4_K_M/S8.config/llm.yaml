@@ -1,0 +1,56 @@
+# LLM engine settings (GEOAGENT_DESIGN_SPEC §4.2–4.3). Schema: gemini_agent.schemas.config.LLMConfig.
+# engine: policy = deterministic PolicyEngine (cloud sessions, tests, CI — never calls an LLM)
+#         llm    = Pydantic AI agents on a local Ollama model (user's laptop only; CLOUD_SETUP.md §7)
+# The CLI flag --engine overrides `engine`.
+# Orchestrator/coder tags were verified on ollama.com on 31 Oct 2026 (CLOUD_SETUP.md §7: all exist, with the
+# "tools" + "thinking" badges, 256K context). Not verified: gpt-oss:20b, gemma4:26b-a4b, qwen3.8:27b,
+# gemma4:31b. L-1 still confirms each tag
+# locally with `ollama show <tag>` (it must list `tools`).
+schema_version: 1
+engine: policy
+active_profile: 16gb
+
+ollama:
+  base_url: http://localhost:11434/v1   # OpenAI-compatible endpoint
+  num_ctx: 65536                        # >= 32K required, 64K preferred (Ollama defaults to 4K under 24 GB VRAM)
+  keep_alive: 60m                       # keep the model loaded between calls
+
+profiles:
+  16gb:
+    description: "RTX 4060 Ti 16 GB / 4080 or 16 GB Mac — one model at a time (keep_alive swapping)"
+    orchestrator: qwen3.5:9b            # Qwen3.5-9B q4_K_M, 6.6 GB
+    coder: gemma4:12b                   # Gemma 4 12B q4_K_M/QAT, 7–8 GB (or qwen3.5:9b for everything)
+    alternatives: [qwen3.5:9b, gpt-oss:20b]   # gpt-oss-20b fits a 16 GB GPU with short context, not a 16 GB Mac
+  36gb:
+    description: "Mac M3/M4 Pro/Max 36 GB (nearest Windows: RTX 4090 24 GB / RTX 5090 32 GB)"
+    orchestrator: qwen3.6:35b-a3b       # Qwen3.6-35B-A3B MoE, 23 GB
+    coder: qwen3.6:27b                  # Qwen3.6-27B, 18–19 GB (cannot co-reside with the 35B on 36 GB)
+    alternatives: [gemma4:26b-a4b, qwen3.5:9b, qwen3.8:27b, gemma4:31b]   # 24 GB card: Gemma 4 26B-A4B QAT; router+coder: 9B + 27B; Qwen3.8-27B alt coder
+
+temperatures:
+  extraction: 0.0     # formatting / extraction
+  formatting: 0.0
+  planning: 0.6       # model-recommended ≈ 0.6 for planning with thinking
+
+max_output_retries: 2 # structured-output retries before falling back to the PolicyEngine (WP-10)
+seed: 42
+
+# Per-call limits for every structured-output call (Decision / OptionChoice), added after the L-1
+# eval: reasoning landed in the output content and used up the P0/P1 budgets; one call hung 30 min.
+# Checked against pydantic-ai 2.64.0 / openai 3.42.0 and Ollama main (openai/openai.go):
+#   thinking: false  -> openai_reasoning_effort "none" -> reasoning_effort "none" -> think=false.
+#                       Needed: Ollama leaves the leading thinking span outside the JSON grammar
+#                       (CompletionRequest.ThinkingClose), so with thinking on the content can hold
+#                       free text before the JSON. pydantic-ai's unified `thinking` setting is NOT
+#                       sent for Ollama profiles (supports_thinking false).
+#   max_output_tokens -> body max_tokens (Ollama num_predict; it ignores max_completion_tokens, so
+#                       the engine sets the profile flag openai_chat_supports_max_completion_tokens
+#                       false). Thinking tokens count against it.
+#   request_timeout_s -> pydantic-ai request_timeout (one deadline per model request, all SDK
+#                       retries included) + the HTTP client timeout; a timeout is a policy
+#                       fallback. The first call of a run also loads the model: raise it if L-1
+#                       shows first-call timeouts.
+calls:
+  thinking: false
+  max_output_tokens: 2048
+  request_timeout_s: 300

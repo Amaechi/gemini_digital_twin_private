@@ -1,0 +1,69 @@
+{
+  "generated_at": "2026-11-02T22:00:47.897275+00:00",
+  "engine": "llm",
+  "model": "gemma4:26b-a4b",
+  "eval_dir": "runs/final/eval/gemma4_26b-a4b",
+  "scenarios_source": "evals/scenarios.yaml",
+  "runs": [
+    {
+      "scenario": "S11",
+      "situation": "Same task on 16 GB-class vs 36 GB-class model",
+      "expected": "Tool-call validity, retries, fallbacks, tokens, quality",
+      "engine": "llm",
+      "model": "gemma4:26b-a4b",
+      "outcome": "fail",
+      "status": "escalated",
+      "phase": "P5",
+      "verdict": null,
+      "selected_candidate": "C2-opt",
+      "conflicts": [],
+      "metrics": {
+        "runtime_s": 175.731,
+        "tool_calls": 17,
+        "stub_tool_calls": 0,
+        "llm_calls": 27,
+        "llm_valid_calls": 19,
+        "retries": 14,
+        "fallbacks": 7,
+        "step_rejections": 2,
+        "kind_coercions": 4,
+        "input_tokens": 96793,
+        "output_tokens": 5078
+      },
+      "checks": [
+        {
+          "type": "status",
+          "expect": "the run completes",
+          "passed": false,
+          "detail": "status escalated"
+        },
+        {
+          "type": "llm_metrics",
+          "expect": "tool-call validity, retries, fallbacks and tokens are recorded",
+          "passed": true,
+          "detail": "19/27 LLM calls used without fallback"
+        }
+      ],
+      "pending": [
+        {
+          "expect": "the 16 GB-class and 36 GB-class models are compared",
+          "needs": [
+            "L-1"
+          ],
+          "reason": "needs two local Ollama runs (run_eval.py --engine llm --model <tag> for each), then run_eval.py --compare",
+          "currently": null,
+          "now_passes": null
+        }
+      ],
+      "run_dirs": [
+        "S11"
+      ],
+      "verify_cost_items": [
+        "absorption_chiller_plant_cost_function_usd",
+        "electric_chiller_plant_cost_function_usd"
+      ],
+      "token_comparison": null,
+      "note": ""
+    }
+  ]
+}

@@ -1,0 +1,186 @@
+{
+ "data": {
+  "doublet": {
+   "depth_m": 2500.0,
+   "reservoir_temperature_degc": 87.0,
+   "reservoir_pressure_barg": 250.0,
+   "pressure_model": "given",
+   "thickness_m": 100.0,
+   "productivity_index_m3h_per_bar": 3.055160537811956,
+   "injectivity_index_m3h_per_bar": 3.055160537811956,
+   "density_kg_m3": 1030.0,
+   "viscosity_pa_s": 0.0004,
+   "cp_j_per_kg_k": 4100.0,
+   "well_inner_diameter_m": 0.216,
+   "well_roughness_m": 4.57e-05,
+   "producer_wellhead_pressure_barg": 3.0,
+   "injection_pump_suction_barg": 0.0,
+   "brine_cooling_k": 40.0,
+   "bubble_point": {
+    "temperature_degc": 87.0,
+    "gas_liquid_ratio_nm3_per_m3": 0.8,
+    "basis": {
+     "solvent": "sea_water",
+     "gases": [
+      {
+       "gas": "CH4",
+       "concentration_mol_m3": 28.55358258231463,
+       "henry_mol_m3_pa": 6.3583665290185305e-06,
+       "partial_pressure_bara": 44.907103816681236
+      },
+      {
+       "gas": "CO2",
+       "concentration_mol_m3": 7.138395645578657,
+       "henry_mol_m3_pa": 6.239973878935773e-05,
+       "partial_pressure_bara": 1.1439784499219907
+      }
+     ],
+     "bubble_pressure_bara": 46.051082266603224
+    },
+    "second_bound": {
+     "solvent": "pure_water",
+     "gases": [
+      {
+       "gas": "CH4",
+       "concentration_mol_m3": 28.55358258231463,
+       "henry_mol_m3_pa": 5.557922559159511e-06,
+       "partial_pressure_bara": 51.3745599698183
+      },
+      {
+       "gas": "CO2",
+       "concentration_mol_m3": 7.138395645578657,
+       "henry_mol_m3_pa": 9.010140681460423e-05,
+       "partial_pressure_bara": 0.7922623961096265
+      }
+     ],
+     "bubble_pressure_bara": 52.16682236592793
+    },
+    "margin_factor": 1.2,
+    "atmospheric_pressure_bara": 1.01325,
+    "release_pressure_bara": 46.051082266603224,
+    "release_pressure_barg": 45.037832266603225,
+    "intake_setpoint_bara": 55.261298719923865,
+    "intake_setpoint_barg": 54.248048719923865,
+    "notes": []
+   },
+   "npsh_margin_m": 15.0,
+   "vapour_pressure_bound_bara": 1.01325,
+   "vapour_pressure_bound_valid_to_degc": 100.0,
+   "atmospheric_pressure_bara": 1.01325,
+   "surface_temperature_degc": 12.0,
+   "gradient_k_per_km": 30.0,
+   "pump_hydraulic_efficiency_frac": 0.7,
+   "motor_efficiency_frac": 0.93,
+   "vfd_efficiency_frac": 0.97,
+   "flow_min_m3h": 50.0,
+   "flow_max_m3h": 300.0,
+   "esp": {
+    "flow_scale": 1.6421874013323667,
+    "stages": 49,
+    "setting_depth_m": 1560.0,
+    "head_coeff": [
+     83.08389282,
+     -0.00028038456489583644,
+     -4.4126708066699757e-08,
+     3.816089543576204e-12,
+     -8.745129637844657e-17,
+     5.601605734444926e-22
+    ],
+    "power_coeff": [
+     16.456195352308413,
+     -0.000160233,
+     3.970314225227941e-08,
+     -7.898309931266427e-13,
+     3.8612503665771054e-18,
+     1.897528128966294e-24
+    ],
+    "best_efficiency_flow_m3h": 299.9999952107544,
+    "best_efficiency_frac": 0.7215763004425645,
+    "runout_flow_m3h": 459.3414842434465,
+    "frequency_min_hz": 30.0,
+    "frequency_max_hz": 70.0,
+    "frequency_nominal_hz": 60.0,
+    "sized": [
+     "flow_scale",
+     "stages",
+     "setting_depth"
+    ],
+    "notes": []
+   }
+  },
+  "point": {
+   "flow_m3h": 200.0,
+   "feasible": true,
+   "reasons": [],
+   "notes": [
+    "Wellhead 3.0 < p_b 45.0 bar(g): gas leaves solution above \u2248 413 m in the tubing; dose inhibitor below it (RC-12) or hold pressure."
+   ],
+   "injection_flow_m3h": 200.0,
+   "bottomhole_pressure_barg": 184.53699158367763,
+   "drawdown_bar": 65.46300841632237,
+   "esp_mode": "variable_frequency",
+   "esp_frequency_hz": 46.47848643646432,
+   "producer_wellhead_pressure_barg": 3.0,
+   "wellhead_choke_dp_bar": 0.0,
+   "producer_flow_check_m3h": 199.9999999999971,
+   "flow_error_frac": 1.4495071809506044e-14,
+   "esp_intake_pressure_barg": 88.78161481164678,
+   "esp_discharge_pressure_barg": 161.9131784727321,
+   "esp_dp_bar": 73.13156366108534,
+   "producer_friction_bar": 2.061055244762947,
+   "esp_hydraulic_power_w": 406286.4647838074,
+   "esp_shaft_power_w": 580409.2354054392,
+   "esp_electric_power_w": 643397.8887101642,
+   "esp_curve_shaft_power_w": 513079.83336913725,
+   "esp_curve_efficiency_frac": 0.7918581833862549,
+   "esp_flow_to_bep_ratio": 0.8606132364754548,
+   "release_pressure_barg": 45.037832266603225,
+   "intake_setpoint_barg": 54.248048719923865,
+   "intake_margin_bar": 34.53356609172291,
+   "npsh_available_m": 878.6518097408704,
+   "gas_release_depth_m": 1130.5812354512984,
+   "setting_depth_margin_m": 429.4187645487016,
+   "tubing_gas_release_depth_m": 412.67199464614396,
+   "esp_evidence": {
+    "name": "producer ESP @ 200 m3/h",
+    "intake_pressure_barg": 88.78161481164678,
+    "release_pressure_barg": 45.037832266603225,
+    "npsh_available_m": 878.6518097408704,
+    "npsh_required_m": null
+   },
+   "wellhead_temperature_degc": 84.34889523465995,
+   "wellbore_cooling_k": 2.651104765340051,
+   "injection_temperature_degc": 44.34889523465995,
+   "injector_bottomhole_pressure_barg": 315.46300841632234,
+   "injector_friction_bar": 2.061055244762947,
+   "injector_wellhead_pressure_barg": 64.91656366108525,
+   "injection_pump_required": true,
+   "injection_pump_dp_bar": 64.91656366108525,
+   "injection_pump_hydraulic_power_w": 360647.57589491806,
+   "injection_pump_shaft_power_w": 515210.82270702586,
+   "injection_pump_electric_power_w": 571123.8473639571,
+   "total_pump_electric_power_w": 1214521.7360741212,
+   "brine_heat_mw": 9.384444444444444
+  }
+ },
+ "summary": "Q 200 m\u00b3/h @2500 m: ESP 46.5 Hz, \u0394p 73.1 bar, shaft 0.58 MW (curve 0.51), intake 88.8 \u2265 1.2\u00b7p_b 54.2 bar(g); T_wh 84.3\u00b0C; inj WHP 64.9 bar(g), pump 0.52 MW shaft; total 1.21 MW_e",
+ "warnings": [],
+ "assumption_ids": [
+  "DB-33",
+  "DB-38",
+  "DB-40",
+  "SUB-RHOC",
+  "SUB-II",
+  "SUB-WELL",
+  "SUB-PWH",
+  "SUB-PBUB",
+  "SUB-NPSH",
+  "SUB-ESP",
+  "SUB-PSUC",
+  "SUB-SPACING"
+ ],
+ "sources": [
+  "RC-01",
+  "GEMINI ProducerWell/InjectorWell/DPDT/ESP/IPR"
+ ]
+}

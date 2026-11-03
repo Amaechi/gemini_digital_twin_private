@@ -1,0 +1,22 @@
+{
+ "data": {
+  "path": "report_draft.md",
+  "sections": [
+   "Answer",
+   "Alternatives compared (C0\u2013C8)",
+   "Final design sizing",
+   "Verification",
+   "Uncertainty",
+   "Figures",
+   "Model gaps and limitations",
+   "Decision Records",
+   "Assumptions and answers"
+  ]
+ },
+ "summary": "Report draft with 9 sections and 11 DRs; 0 durable user answer(s) stored.",
+ "warnings": [],
+ "assumption_ids": [],
+ "sources": [
+  "spec \u00a713"
+ ]
+}

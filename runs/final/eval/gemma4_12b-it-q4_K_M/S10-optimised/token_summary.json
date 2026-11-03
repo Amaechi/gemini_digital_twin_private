@@ -1,0 +1,425 @@
+{
+  "total": {
+    "calls": 34,
+    "input_tokens": 95713,
+    "output_tokens": 5329,
+    "total_tokens": 101042,
+    "requests": 44,
+    "retries": 10,
+    "fallbacks": 1,
+    "errors": 1,
+    "latency_s": 295.7288
+  },
+  "by_agent": {
+    "lead_engineer": {
+      "calls": 4,
+      "input_tokens": 9265,
+      "output_tokens": 461,
+      "total_tokens": 9726,
+      "requests": 5,
+      "retries": 1,
+      "fallbacks": 0,
+      "errors": 0,
+      "latency_s": 26.6373
+    },
+    "requirements": {
+      "calls": 3,
+      "input_tokens": 7291,
+      "output_tokens": 648,
+      "total_tokens": 7939,
+      "requests": 4,
+      "retries": 1,
+      "fallbacks": 0,
+      "errors": 0,
+      "latency_s": 23.1084
+    },
+    "subsurface": {
+      "calls": 6,
+      "input_tokens": 17170,
+      "output_tokens": 871,
+      "total_tokens": 18041,
+      "requests": 7,
+      "retries": 1,
+      "fallbacks": 0,
+      "errors": 0,
+      "latency_s": 55.0033
+    },
+    "system_architect": {
+      "calls": 13,
+      "input_tokens": 40373,
+      "output_tokens": 2205,
+      "total_tokens": 42578,
+      "requests": 18,
+      "retries": 5,
+      "fallbacks": 1,
+      "errors": 1,
+      "latency_s": 120.2097
+    },
+    "model_builder": {
+      "calls": 1,
+      "input_tokens": 2250,
+      "output_tokens": 99,
+      "total_tokens": 2349,
+      "requests": 1,
+      "retries": 0,
+      "fallbacks": 0,
+      "errors": 0,
+      "latency_s": 8.7056
+    },
+    "economics": {
+      "calls": 3,
+      "input_tokens": 8963,
+      "output_tokens": 476,
+      "total_tokens": 9439,
+      "requests": 4,
+      "retries": 1,
+      "fallbacks": 0,
+      "errors": 0,
+      "latency_s": 26.3137
+    },
+    "reviewer": {
+      "calls": 2,
+      "input_tokens": 7086,
+      "output_tokens": 385,
+      "total_tokens": 7471,
+      "requests": 3,
+      "retries": 1,
+      "fallbacks": 0,
+      "errors": 0,
+      "latency_s": 22.0324
+    },
+    "reporter": {
+      "calls": 2,
+      "input_tokens": 3315,
+      "output_tokens": 184,
+      "total_tokens": 3499,
+      "requests": 2,
+      "retries": 0,
+      "fallbacks": 0,
+      "errors": 0,
+      "latency_s": 13.7184
+    }
+  },
+  "by_phase": {
+    "P0": {
+      "calls": 1,
+      "input_tokens": 1098,
+      "output_tokens": 61,
+      "total_tokens": 1159,
+      "requests": 1,
+      "retries": 0,
+      "fallbacks": 0,
+      "errors": 0,
+      "latency_s": 2.7503
+    },
+    "P1": {
+      "calls": 3,
+      "input_tokens": 7291,
+      "output_tokens": 648,
+      "total_tokens": 7939,
+      "requests": 4,
+      "retries": 1,
+      "fallbacks": 0,
+      "errors": 0,
+      "latency_s": 23.1084
+    },
+    "P2": {
+      "calls": 4,
+      "input_tokens": 9219,
+      "output_tokens": 543,
+      "total_tokens": 9762,
+      "requests": 4,
+      "retries": 0,
+      "fallbacks": 0,
+      "errors": 0,
+      "latency_s": 32.9006
+    },
+    "P3": {
+      "calls": 5,
+      "input_tokens": 15597,
+      "output_tokens": 839,
+      "total_tokens": 16436,
+      "requests": 7,
+      "retries": 2,
+      "fallbacks": 1,
+      "errors": 1,
+      "latency_s": 39.2679
+    },
+    "P4": {
+      "calls": 1,
+      "input_tokens": 2250,
+      "output_tokens": 99,
+      "total_tokens": 2349,
+      "requests": 1,
+      "retries": 0,
+      "fallbacks": 0,
+      "errors": 0,
+      "latency_s": 8.7056
+    },
+    "P5": {
+      "calls": 8,
+      "input_tokens": 24952,
+      "output_tokens": 1250,
+      "total_tokens": 26202,
+      "requests": 10,
+      "retries": 2,
+      "fallbacks": 0,
+      "errors": 0,
+      "latency_s": 82.2766
+    },
+    "P6": {
+      "calls": 2,
+      "input_tokens": 7775,
+      "output_tokens": 444,
+      "total_tokens": 8219,
+      "requests": 4,
+      "retries": 2,
+      "fallbacks": 0,
+      "errors": 0,
+      "latency_s": 20.7679
+    },
+    "P7": {
+      "calls": 2,
+      "input_tokens": 5823,
+      "output_tokens": 327,
+      "total_tokens": 6150,
+      "requests": 3,
+      "retries": 1,
+      "fallbacks": 0,
+      "errors": 0,
+      "latency_s": 15.3746
+    },
+    "P8": {
+      "calls": 3,
+      "input_tokens": 8963,
+      "output_tokens": 476,
+      "total_tokens": 9439,
+      "requests": 4,
+      "retries": 1,
+      "fallbacks": 0,
+      "errors": 0,
+      "latency_s": 26.3137
+    },
+    "P9": {
+      "calls": 3,
+      "input_tokens": 9430,
+      "output_tokens": 458,
+      "total_tokens": 9888,
+      "requests": 4,
+      "retries": 1,
+      "fallbacks": 0,
+      "errors": 0,
+      "latency_s": 30.5448
+    },
+    "P10": {
+      "calls": 2,
+      "input_tokens": 3315,
+      "output_tokens": 184,
+      "total_tokens": 3499,
+      "requests": 2,
+      "retries": 0,
+      "fallbacks": 0,
+      "errors": 0,
+      "latency_s": 13.7184
+    }
+  },
+  "by_agent_phase": {
+    "lead_engineer": {
+      "P0": {
+        "calls": 1,
+        "input_tokens": 1098,
+        "output_tokens": 61,
+        "total_tokens": 1159,
+        "requests": 1,
+        "retries": 0,
+        "fallbacks": 0,
+        "errors": 0,
+        "latency_s": 2.7503
+      },
+      "P7": {
+        "calls": 2,
+        "input_tokens": 5823,
+        "output_tokens": 327,
+        "total_tokens": 6150,
+        "requests": 3,
+        "retries": 1,
+        "fallbacks": 0,
+        "errors": 0,
+        "latency_s": 15.3746
+      },
+      "P9": {
+        "calls": 1,
+        "input_tokens": 2344,
+        "output_tokens": 73,
+        "total_tokens": 2417,
+        "requests": 1,
+        "retries": 0,
+        "fallbacks": 0,
+        "errors": 0,
+        "latency_s": 8.5124
+      }
+    },
+    "requirements": {
+      "P1": {
+        "calls": 3,
+        "input_tokens": 7291,
+        "output_tokens": 648,
+        "total_tokens": 7939,
+        "requests": 4,
+        "retries": 1,
+        "fallbacks": 0,
+        "errors": 0,
+        "latency_s": 23.1084
+      }
+    },
+    "subsurface": {
+      "P2": {
+        "calls": 4,
+        "input_tokens": 9219,
+        "output_tokens": 543,
+        "total_tokens": 9762,
+        "requests": 4,
+        "retries": 0,
+        "fallbacks": 0,
+        "errors": 0,
+        "latency_s": 32.9006
+      },
+      "P5": {
+        "calls": 2,
+        "input_tokens": 7951,
+        "output_tokens": 328,
+        "total_tokens": 8279,
+        "requests": 3,
+        "retries": 1,
+        "fallbacks": 0,
+        "errors": 0,
+        "latency_s": 22.1027
+      }
+    },
+    "system_architect": {
+      "P3": {
+        "calls": 5,
+        "input_tokens": 15597,
+        "output_tokens": 839,
+        "total_tokens": 16436,
+        "requests": 7,
+        "retries": 2,
+        "fallbacks": 1,
+        "errors": 1,
+        "latency_s": 39.2679
+      },
+      "P5": {
+        "calls": 6,
+        "input_tokens": 17001,
+        "output_tokens": 922,
+        "total_tokens": 17923,
+        "requests": 7,
+        "retries": 1,
+        "fallbacks": 0,
+        "errors": 0,
+        "latency_s": 60.1739
+      },
+      "P6": {
+        "calls": 2,
+        "input_tokens": 7775,
+        "output_tokens": 444,
+        "total_tokens": 8219,
+        "requests": 4,
+        "retries": 2,
+        "fallbacks": 0,
+        "errors": 0,
+        "latency_s": 20.7679
+      }
+    },
+    "model_builder": {
+      "P4": {
+        "calls": 1,
+        "input_tokens": 2250,
+        "output_tokens": 99,
+        "total_tokens": 2349,
+        "requests": 1,
+        "retries": 0,
+        "fallbacks": 0,
+        "errors": 0,
+        "latency_s": 8.7056
+      }
+    },
+    "economics": {
+      "P8": {
+        "calls": 3,
+        "input_tokens": 8963,
+        "output_tokens": 476,
+        "total_tokens": 9439,
+        "requests": 4,
+        "retries": 1,
+        "fallbacks": 0,
+        "errors": 0,
+        "latency_s": 26.3137
+      }
+    },
+    "reviewer": {
+      "P9": {
+        "calls": 2,
+        "input_tokens": 7086,
+        "output_tokens": 385,
+        "total_tokens": 7471,
+        "requests": 3,
+        "retries": 1,
+        "fallbacks": 0,
+        "errors": 0,
+        "latency_s": 22.0324
+      }
+    },
+    "reporter": {
+      "P10": {
+        "calls": 2,
+        "input_tokens": 3315,
+        "output_tokens": 184,
+        "total_tokens": 3499,
+        "requests": 2,
+        "retries": 0,
+        "fallbacks": 0,
+        "errors": 0,
+        "latency_s": 13.7184
+      }
+    }
+  },
+  "by_decision_source": {
+    "llm": {
+      "calls": 33,
+      "input_tokens": 88608,
+      "output_tokens": 5013,
+      "total_tokens": 93621,
+      "requests": 41,
+      "retries": 8,
+      "fallbacks": 0,
+      "errors": 0,
+      "latency_s": 280.9192
+    },
+    "policy_fallback": {
+      "calls": 1,
+      "input_tokens": 7105,
+      "output_tokens": 316,
+      "total_tokens": 7421,
+      "requests": 3,
+      "retries": 2,
+      "fallbacks": 1,
+      "errors": 1,
+      "latency_s": 14.8096
+    }
+  },
+  "by_model": {
+    "gemma4:12b-it-q4_K_M": {
+      "calls": 34,
+      "input_tokens": 95713,
+      "output_tokens": 5329,
+      "total_tokens": 101042,
+      "requests": 44,
+      "retries": 10,
+      "fallbacks": 1,
+      "errors": 1,
+      "latency_s": 295.7288
+    }
+  },
+  "corrupt_lines": 0
+}

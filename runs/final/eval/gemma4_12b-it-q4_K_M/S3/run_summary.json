@@ -1,0 +1,20 @@
+{
+  "run_id": "S3",
+  "status": "refused",
+  "phase": "P0",
+  "engine": "llm+policy_fallback",
+  "input_mode": "assume",
+  "selected_candidate": null,
+  "verdict": null,
+  "approval": null,
+  "loop_count": 0,
+  "excluded_candidates": [],
+  "llm_fallbacks": 0,
+  "conflicts": [],
+  "assumptions_and_answers": [],
+  "decision_records": [],
+  "tool_calls": 0,
+  "stub_tool_calls": 0,
+  "final_summary": "GeoAgent only designs deep-geothermal district heating (100 degC) and cooling (20 degC) systems with the GEMINI digital twin. 'What's the best pizza in Delft?' is outside that scope; please ask about the design, its alternatives, KPIs or decisions.",
+  "escalation_reason": ""
+}

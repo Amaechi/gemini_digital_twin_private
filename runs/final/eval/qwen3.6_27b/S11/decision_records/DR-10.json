@@ -1,0 +1,110 @@
+{
+  "dr_id": "DR-10",
+  "title": "Final selection",
+  "run_id": "S11",
+  "phase": "P9",
+  "role": "lead_engineer",
+  "question": "Which design is recommended?",
+  "options": [
+    {
+      "id": "C2-opt-robust",
+      "label": "C2-opt-robust (C2-opt with the TL-15 P90 robust backups (OPT-ROBUST-BACKUP))",
+      "evidence_ids": [
+        "TR-022",
+        "TR-023",
+        "TR-024"
+      ],
+      "recommended": true,
+      "eligible": true,
+      "notes": "verifier verdict: ACCEPTED"
+    },
+    {
+      "id": "C2-opt",
+      "label": "C2-opt (TL-13 optimum of C2 (sized from C2-2d))",
+      "evidence_ids": [
+        "TR-013",
+        "TR-015",
+        "TR-016",
+        "TR-017",
+        "TR-018",
+        "TR-019",
+        "TR-020",
+        "TR-021",
+        "TR-022"
+      ],
+      "recommended": false,
+      "eligible": false,
+      "notes": "not the verified design (only the verified design can be selected)"
+    },
+    {
+      "id": "C6-opt",
+      "label": "C6-opt (TL-13 optimum of C6 (sized from C6-2d))",
+      "evidence_ids": [
+        "TR-013",
+        "TR-015",
+        "TR-016",
+        "TR-017"
+      ],
+      "recommended": false,
+      "eligible": false,
+      "notes": "not the verified design (only the verified design can be selected)"
+    },
+    {
+      "id": "C1-opt",
+      "label": "C1-opt (TL-13 optimum of C1 (sized from C1-3d))",
+      "evidence_ids": [
+        "TR-013",
+        "TR-015",
+        "TR-016",
+        "TR-017"
+      ],
+      "recommended": false,
+      "eligible": false,
+      "notes": "not the verified design (only the verified design can be selected)"
+    }
+  ],
+  "evidence_ids": [
+    "TR-013",
+    "TR-015",
+    "TR-016",
+    "TR-017",
+    "TR-018",
+    "TR-019",
+    "TR-020",
+    "TR-021",
+    "TR-022",
+    "TR-023",
+    "TR-024"
+  ],
+  "choice": "C2-opt-robust",
+  "choice_label": "C2-opt-robust (C2-opt with the TL-15 P90 robust backups (OPT-ROBUST-BACKUP))",
+  "criterion": {
+    "id": "selected-not-rejected",
+    "key": "verdict",
+    "source": "verify_design",
+    "text": "selected design whose latest verifier verdict is not REJECTED",
+    "best_option_ids": [
+      "C2-opt-robust"
+    ],
+    "evidence_ids": [
+      "TR-024"
+    ]
+  },
+  "rationale": "Decisive criterion: selected design whose latest verifier verdict is not REJECTED; it selects C2-opt-robust (TR-024).",
+  "rejected": [
+    {
+      "option_id": "C2-opt",
+      "reason": "Not eligible: not the verified design (only the verified design can be selected)"
+    },
+    {
+      "option_id": "C6-opt",
+      "reason": "Not eligible: not the verified design (only the verified design can be selected)"
+    },
+    {
+      "option_id": "C1-opt",
+      "reason": "Not eligible: not the verified design (only the verified design can be selected)"
+    }
+  ],
+  "decision_source": "policy_fallback",
+  "stub_evidence": false
+}

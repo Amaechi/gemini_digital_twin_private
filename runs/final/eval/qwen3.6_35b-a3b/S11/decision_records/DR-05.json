@@ -1,0 +1,80 @@
+{
+  "dr_id": "DR-05",
+  "title": "Storage yes/no",
+  "run_id": "S11",
+  "phase": "P5",
+  "role": "system_architect",
+  "question": "Should the plant include thermal storage?",
+  "options": [
+    {
+      "id": "no-storage",
+      "label": "No seasonal storage",
+      "evidence_ids": [
+        "TR-009",
+        "TR-010",
+        "TR-011",
+        "TR-012",
+        "TR-014",
+        "TR-015",
+        "TR-016",
+        "TR-017"
+      ],
+      "recommended": true,
+      "eligible": true,
+      "notes": "candidates: C1-3d, C2-2d, C3-2d, C5-3d, C7-2d, C8-3d; excluded by DesignGuard/verifier: C4-2d; top-ranked (LCOH ranking)"
+    },
+    {
+      "id": "seasonal-ht-ates",
+      "label": "Seasonal HT-ATES storage (C6)",
+      "evidence_ids": [
+        "TR-009",
+        "TR-010",
+        "TR-011",
+        "TR-012",
+        "TR-014",
+        "TR-015",
+        "TR-016",
+        "TR-017"
+      ],
+      "recommended": false,
+      "eligible": true,
+      "notes": "candidates: C6-2d"
+    }
+  ],
+  "evidence_ids": [
+    "TR-009",
+    "TR-010",
+    "TR-011",
+    "TR-012",
+    "TR-014",
+    "TR-015",
+    "TR-016",
+    "TR-017"
+  ],
+  "choice": "no-storage",
+  "choice_label": "No seasonal storage",
+  "criterion": {
+    "id": "ranking-lowest-lcoh_per_mwh",
+    "key": "lcoh_per_mwh",
+    "source": "economics",
+    "text": "lowest lcoh_per_mwh + lcoc_per_mwh among guard-passed candidates without unmet demand in economics",
+    "best_option_ids": [
+      "no-storage"
+    ],
+    "evidence_ids": [
+      "TR-011",
+      "TR-012",
+      "TR-014",
+      "TR-015"
+    ]
+  },
+  "rationale": "The criterion 'ranking-lowest-lcoh_per_mwh' identifies 'no-storage' as the best option. This aligns with the economics evidence showing superior LCOH and LCOC metrics for the no-storage configuration compared to seasonal HT-ATES.",
+  "rejected": [
+    {
+      "option_id": "seasonal-ht-ates",
+      "reason": "Not chosen."
+    }
+  ],
+  "decision_source": "llm",
+  "stub_evidence": false
+}

@@ -1,0 +1,212 @@
+{
+ "data": {
+  "candidate_id": "C2-opt",
+  "reports": {
+   "lcoh": {
+    "candidate_id": "C2-opt",
+    "kpi": "lcoh",
+    "unit": "USD/MWh",
+    "analysis_period_yr": 30,
+    "kpi_base": 58.9509439556323,
+    "bars": [
+     {
+      "input_name": "electricity_price_usd_per_mwh",
+      "unit": "USD/MWh_e",
+      "base_value": 133.566,
+      "low_value": 93.4962,
+      "high_value": 173.63580000000002,
+      "kpi_base": 58.9509439556323,
+      "kpi_at_low": 50.86081392204709,
+      "kpi_at_high": 67.04107398921751,
+      "swing": 16.180260067170416
+     },
+     {
+      "input_name": "energy_escalation_real_frac",
+      "unit": "1/yr (real)",
+      "base_value": 0.024390243902439046,
+      "low_value": 0.004878048780487809,
+      "high_value": 0.043902439024390505,
+      "kpi_base": 58.9509439556323,
+      "kpi_at_low": 53.640819854682206,
+      "kpi_at_high": 66.14105799402991,
+      "swing": 12.500238139347701
+     },
+     {
+      "input_name": "discount_rate_frac",
+      "unit": "1/yr",
+      "base_value": 0.08,
+      "low_value": 0.055999999999999994,
+      "high_value": 0.112,
+      "kpi_base": 58.9509439556323,
+      "kpi_at_low": 55.55775053967489,
+      "kpi_at_high": 64.25317634086959,
+      "swing": 8.695425801194695
+     },
+     {
+      "input_name": "hthp_capex_usd_per_kw_th",
+      "unit": "USD/kW_th",
+      "base_value": 1356.0,
+      "low_value": 949.1999999999999,
+      "high_value": 1762.8,
+      "kpi_base": 58.9509439556323,
+      "kpi_at_low": 54.676730467613574,
+      "kpi_at_high": 63.22515744365102,
+      "swing": 8.548426976037447
+     },
+     {
+      "input_name": "well_cost_large_diameter_musd",
+      "unit": "\u00d7 base",
+      "base_value": null,
+      "low_value": 0.7,
+      "high_value": 1.3,
+      "kpi_base": 58.9509439556323,
+      "kpi_at_low": 55.101615535597894,
+      "kpi_at_high": 62.8002723756667,
+      "swing": 7.698656840068807
+     },
+     {
+      "input_name": "om_frac_of_capex_per_yr",
+      "unit": "1/yr",
+      "base_value": 0.015,
+      "low_value": 0.01,
+      "high_value": 0.02,
+      "kpi_base": 58.9509439556323,
+      "kpi_at_low": 57.709245291693044,
+      "kpi_at_high": 60.192642619571544,
+      "swing": 2.4833973278784995
+     },
+     {
+      "input_name": "co2_price_usd_per_t",
+      "unit": "USD/t CO2",
+      "base_value": 89.74459999999999,
+      "low_value": 62.82121999999999,
+      "high_value": 116.66797999999999,
+      "kpi_base": 58.9509439556323,
+      "kpi_at_low": 57.99912715760683,
+      "kpi_at_high": 59.90276075365775,
+      "swing": 1.9036335960509234
+     },
+     {
+      "input_name": "chp_capex_usd_per_kw_e",
+      "unit": "USD/kW_e",
+      "base_value": 1333.0384,
+      "low_value": 933.1268799999999,
+      "high_value": 1732.94992,
+      "kpi_base": 58.9509439556323,
+      "kpi_at_low": 58.49664145998447,
+      "kpi_at_high": 59.40524645128013,
+      "swing": 0.9086049912956611
+     }
+    ],
+    "min_sensitivity_frac": 0.3
+   },
+   "lcoc": {
+    "candidate_id": "C2-opt",
+    "kpi": "lcoc",
+    "unit": "USD/MWh",
+    "analysis_period_yr": 30,
+    "kpi_base": 26.444959139566716,
+    "bars": [
+     {
+      "input_name": "free_cooling_hex_capex_usd_per_kw_th",
+      "unit": "USD/kW_th installed",
+      "base_value": 296.48963599595544,
+      "low_value": 53.0,
+      "high_value": 385.43652679474206,
+      "kpi_base": 26.444959139566716,
+      "kpi_at_low": 17.297539528224043,
+      "kpi_at_high": 29.786516286065922,
+      "swing": 12.488976757841879
+     },
+     {
+      "input_name": "discount_rate_frac",
+      "unit": "1/yr",
+      "base_value": 0.08,
+      "low_value": 0.055999999999999994,
+      "high_value": 0.112,
+      "kpi_base": 26.444959139566716,
+      "kpi_at_low": 22.736818443014265,
+      "kpi_at_high": 31.90853148325854,
+      "swing": 9.171713040244274
+     },
+     {
+      "input_name": "electric_chiller_plant_cost_function_usd",
+      "unit": "\u00d7 base",
+      "base_value": null,
+      "low_value": 0.7,
+      "high_value": 1.3,
+      "kpi_base": 26.444959139566716,
+      "kpi_at_low": 23.60636358430316,
+      "kpi_at_high": 29.283554694830265,
+      "swing": 5.6771911105271045
+     },
+     {
+      "input_name": "electricity_price_usd_per_mwh",
+      "unit": "USD/MWh_e",
+      "base_value": 133.566,
+      "low_value": 93.4962,
+      "high_value": 173.63580000000002,
+      "kpi_base": 26.444959139566716,
+      "kpi_at_low": 24.82575547345104,
+      "kpi_at_high": 28.064162805682393,
+      "swing": 3.238407332231354
+     },
+     {
+      "input_name": "energy_escalation_real_frac",
+      "unit": "1/yr (real)",
+      "base_value": 0.024390243902439046,
+      "low_value": 0.004878048780487809,
+      "high_value": 0.043902439024390505,
+      "kpi_base": 26.444959139566716,
+      "kpi_at_low": 25.49404929635307,
+      "kpi_at_high": 27.732527957726287,
+      "swing": 2.238478661373218
+     },
+     {
+      "input_name": "om_frac_of_capex_per_yr",
+      "unit": "1/yr",
+      "base_value": 0.015,
+      "low_value": 0.01,
+      "high_value": 0.02,
+      "kpi_base": 26.444959139566716,
+      "kpi_at_low": 25.43137280216102,
+      "kpi_at_high": 27.45854547697241,
+      "swing": 2.027172674811389
+     },
+     {
+      "input_name": "cooling_tower_capex_usd_per_kw_th",
+      "unit": "USD/kW_th rejected",
+      "base_value": 87.18729725115246,
+      "low_value": 40.0,
+      "high_value": 170.0,
+      "kpi_base": 26.444959139566716,
+      "kpi_at_low": 26.202978284755805,
+      "kpi_at_high": 26.8696303915291,
+      "swing": 0.6666521067732951
+     },
+     {
+      "input_name": "chp_capex_usd_per_kw_e",
+      "unit": "USD/kW_e",
+      "base_value": 1333.0384,
+      "low_value": 933.1268799999999,
+      "high_value": 1732.94992,
+      "kpi_base": 26.444959139566716,
+      "kpi_at_low": 26.444959139566716,
+      "kpi_at_high": 26.444959139566716,
+      "swing": 0.0
+     }
+    ],
+    "min_sensitivity_frac": 0.3
+   }
+  }
+ },
+ "summary": "TL-14 cost sensitivity C2-opt: LCOH base 59.0, LCOC base 26.4 USD/MWh; top LCOH driver electricity_price_usd_per_mwh swing 16.2",
+ "warnings": [],
+ "assumption_ids": [
+  "ECO-SENS-MULT"
+ ],
+ "sources": [
+  "spec \u00a79.3",
+  "RC-10"
+ ]
+}

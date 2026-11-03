@@ -23,8 +23,8 @@ Keep it ≤ 20 KB; it is the hand-off between sessions. Old detail: merged PRs a
 | WP-13 | Eval suite & submission checks | merged (a622551) | [#16](https://github.com/Amaechi/gemini_digital_twin_private/pull/16) | S1–S11; SUB-01…24 |
 | WP-14 | Integration run & figures | merged (c694720) | [#20](https://github.com/Amaechi/gemini_digital_twin_private/pull/20) | real tools |
 | Pre-L-2 | Robust backup (DR-11), final-run instructions | in review | [#21](https://github.com/Amaechi/gemini_digital_twin_private/pull/21) | OPT-ROBUST-BACKUP; CLOUD_SETUP §7 |
-| L-1 | Local: pick LLM via S11 eval | todo | | user: CLOUD_SETUP §7.1–7.4 |
-| L-2 | Local: final LLM run + eval transcripts | todo | | user: CLOUD_SETUP §7.5–7.8 |
+| L-1 | Local: pick LLM via S11 eval | done | | user: CLOUD_SETUP §7.1–7.4 |
+| L-2 | Local: final LLM run + eval transcripts | done | | user: CLOUD_SETUP §7.5–7.8 |
 | WP-15 | Final review & packaging | todo | | |
 
 Status: todo · in progress · in review · merged · blocked (say why).
@@ -201,3 +201,11 @@ See spec §17. Answers: —
 ## Hand-off notes (latest session writes here, replace previous)
 2026-11-02, WP-10 P0 follow-up: runner/agent files only (`design_runner.py`, `phases.py` objective text, `prompts/system.py`); 9 new tests replay the three models' recorded P0 answers (each reaches P1), S3 refused, S5/S9 conflicts identical to the policy run, policy P0 unchanged, P1 budget still escalates. Evidence read from `origin/l1-p0-evidence` (not merged). Next: user re-runs L-1 (§7.3), then L-2, WP-15.
 Previous (Pre-L-2): `build_results.py` (full) 528 s. P8 `robust_backup` → DR-11 (policy) installs **C2-opt-robust** (boiler 5.0 → 10.9 MW); P9 **ACCEPTED** 46/46, 0/23 stubs, 11 DRs. Before → after: LCOH 42.54 → 44.59, LCOC 26.31 → 26.31 USD/MWh, CAPEX 27.86 → 30.07 MUSD, P(demand met) 0.46 → 0.90; CO₂ −72 %, unmet 0 d unchanged. `validate_submission`: FAIL only LLM-only 12, 15–17 (WARN 02, 14, 22). §7 dry-run verified (ask mode needs a TTY; DB-30/31/32 asked before the approval). Next: L-1/L-2 (§7), WP-15.
+2026-11-03 L-1/L-2 (local, MacBook Pro M3, 36 GB, Ollama OLLAMA_CONTEXT_LENGTH=65536): L-1 S11 on 5 Ollama models → gemma4:12b-it-q4_K_M
+(completed, 100 % tool-call validity, 0 fallbacks, 79 k tokens, 328 s); qwen3.6:27b completed (82 %, 7 fallbacks, 127 k tokens, 673 s);
+qwen3.6:35b-a3b (P6 tool-call budget), gemma4:26b-a4b (P5 DR-08 token limit) and qwen3.5:9b-q4_K_M (P5 tool-call budget) escalated.
+L-2 final run gemma4:12b-it-q4_K_M (--budget full, runs/final/final_llm): C2-opt-robust ACCEPTED, approval approved, 0/23 stub calls,
+34 LLM calls, 2 policy fallbacks, tokens 93,699 in / 5,602 out (99,301 total), LLM latency 299 s.
+S1–S11 eval (--tool-profile quick): 5 pass, 5 pending, 1 fail (S7 — Model Builder drafts timed out; follow-up PR #23); S10 token saving 45 %.
+validate_submission: READY — 20 pass, 0 fail; WARN SUB-14 (RC-05 VERIFY chiller costs), SUB-22 (README API placeholders);
+MANUAL SUB-23 (deck/video), SUB-24 (tests).

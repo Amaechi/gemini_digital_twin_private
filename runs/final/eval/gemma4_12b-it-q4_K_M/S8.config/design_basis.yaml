@@ -1,0 +1,46 @@
+schema_version: 1
+source: "GEOAGENT_DESIGN_SPEC \xA72.1 (organiser problem statement) [P]"
+year: 2027
+reservoir:
+  mid_depth_m: 2500.0
+  gross_thickness_m: 100.0
+  geothermal_gradient_k_per_km: 30.0
+  surface_temperature_degc: 12.0
+  pressure_barg: 250.0
+  permeability_md: 50.0
+  other_depths_allowed: true
+  other_depths_pressure_model: hydrostatic
+brine:
+  density_kg_m3: 1030.0
+  viscosity_pa_s: 0.0004
+  gas_liquid_ratio_nm3_per_m3: 0.8
+  gas_ch4_mol_frac: 0.8
+  gas_co2_mol_frac: 0.2
+doublets:
+  count_min: 1
+  count_max: 3
+  flow_min_active_m3h: 50.0
+  flow_max_m3h: 300.0
+  brine_cooling_max_k: 40.0
+  pump_hydraulic_efficiency_frac: 0.7
+  injection_equals_production: true
+  same_reservoir: true
+  operation_days_per_yr: 330
+heating:
+  supply_temperature_degc: 100.0
+  demand_csv: data/demand/GEMINI_Heating_Demand_Daily_2027.csv
+  csv_date_column: date
+  csv_value_column: heating_demand_MWth
+  peak_mw: 30.0
+  peak_date: 2027-01-28
+  annual_gwh: 111.67
+  nonzero_days: 365
+cooling:
+  supply_temperature_degc: 20.0
+  demand_csv: data/demand/GEMINI_Cooling_Demand_Daily_2027.csv
+  csv_date_column: date
+  csv_value_column: cooling_demand_MWcool
+  peak_mw: 10.0
+  peak_date: 2027-07-19
+  annual_gwh: 23.74
+  nonzero_days: 219
