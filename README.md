@@ -160,6 +160,48 @@ PYTHONPATH=src python scripts/build_results.py --run-id final_policy
 PYTHONPATH=src python scripts/build_report_pack.py
 ```
 
+### What-if on a finished run
+
+`cli whatif` (post-submission feature) changes one or more bounded design levers of a finished run's
+selected design, reruns the TL-12 year, TL-14 economics (+ CO₂ vs C0, exergy) and the
+DesignGuard/DesignVerifier on the changed design, and prints a before → after table. It reads the run
+and writes only `runs/<id>/whatif/<n>/` (`whatif.json`, `whatif.md`, a Decision-Record-style
+`DR-W<n>.json/.md` with evidence keys, `tool_results/`); the run's own files stay byte-identical
+(tested). No LLM is involved; every number comes from the same deterministic tools as the run.
+
+```bash
+PYTHONPATH=src python -m gemini_agent.cli whatif --run-id final_llm --runs-dir runs/final --set DB-31=65 --budget quick
+```
+
+Output on the submitted run (39 s; margin rows other than the boiler's omitted here):
+
+| Metric | Unit | before (C2-opt-robust) | after (C2-opt-robust-w1) | Δ |
+|---|---|---|---|---|
+| LCOH | USD/MWh | 45 | 58 | +14 |
+| LCOC | USD/MWh | 26 | 27 | +0 |
+| CAPEX | MUSD | 30.07 | 29.99 | -0.08 |
+| OPEX | MUSD/yr | 2.28 | 3.51 | +1.22 |
+| CO2 | t/yr | 7,360 | 10,609 | +3,249 |
+| CO2 reduction vs C0 | frac | 0.721 | 0.597 | -0.123 |
+| unmet heating days | d | 0 | 0 | +0 |
+| unmet cooling days | d | 0 | 0 | +0 |
+| exergy efficiency | frac | 0.440 | 0.356 | -0.084 |
+| P(demand met) | frac | 0.900 | n/a | n/a |
+| min margin peak_boiler_capacity_margin_mw | mw | 5.93 | 0.20 | -5.73 |
+| DesignGuard / verifier | | guard APPROVED / verifier ACCEPTED | guard APPROVED / verifier ACCEPTED | |
+
+A 65 °C return leaves less heat to the direct HEX, so the heat pumps and the boiler run more
+(OPEX, CO₂ and LCOH up) while the DR-11 P90 boiler still covers every day with 0.20 MW to spare;
+`--set OPT-ROBUST-BACKUP=off` reproduces DR-11's deltas (CAPEX −2.21 MUSD, LCOH −2 USD/MWh).
+Levers (`--set`, repeatable; `whatif --help` lists them with their bounds): `DB-31`, `DB-32`
+(return temperatures, register range), `DB-30=A|B`, `ECO-CO2-GAS`, `CHP-EL-FRAC` (register range),
+`OPT-ROBUST-BACKUP=on|off` (the run's TL-15 robust nameplates), `design_flow_m3h`, `doublets`
+(DesignGuard DB-10/11), `concept=<id>` (re-pick a screened candidate of the run). An out-of-limit
+lever is refused with the guard's reason (`doublets=5` → "DB-10: 5 doublets outside 1–3", exit 5);
+an unknown lever lists the valid ones (exit 2). `--budget full` also reruns the TL-15 Monte Carlo
+on the changed design for its P(demand met); `--budget smoke` is the CI day subset (no `DB-30=B`).
+The same function is `gemini_agent.tools.whatif.whatif(run_dir, levers, budget) -> WhatIfResult`.
+
 **Laptop LLM run** (needs [Ollama](https://ollama.com); full detail and timings in
 `docs/hackathon/CLOUD_SETUP.md` §7). Models per hardware are in `config/llm.yaml`: profile
 `16gb` (qwen3.5:9b orchestrator, gemma4:12b coder) and `36gb` (qwen3.6:35b-a3b, qwen3.6:27b);
