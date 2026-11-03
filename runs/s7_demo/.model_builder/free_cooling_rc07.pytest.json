@@ -1,0 +1,16 @@
+{
+ "model_name": "free_cooling_rc07",
+ "passed": true,
+ "returncode": 0,
+ "timed_out": false,
+ "timeout_s": 120.0,
+ "duration_s": 0.21,
+ "tests": 2,
+ "failures": 0,
+ "errors": 0,
+ "skipped": 0,
+ "failed_tests": [],
+ "files_sha256": "4d0fce59ec5d3926388f863786970c259ab6f0bcd1085434cf4b32db1091bea8",
+ "output_tail": "..                                                                       [100%]\n2 passed in 0.01s\n",
+ "error": null
+}
