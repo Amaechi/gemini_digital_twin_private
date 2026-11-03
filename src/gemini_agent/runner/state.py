@@ -84,6 +84,32 @@ class RobustBackup(StrictModel):
     reason: str = Field(default="", description="Why there is no usable robust variant.")
 
 
+ReviewStage = Literal["objection", "adopt", "done"]
+"""Review loop (2026-11-03) state machine: asking for an objection, asking whether to adopt the
+computed what-if, finished for this pass."""
+
+
+class ReviewState(StrictModel):
+    """Progress of the P9 review loop in the current pass (persisted so a pause can resume it).
+
+    ``answer`` holds the text ``resume`` brought for the pending review question until the
+    runner consumes it. Nothing here is a design value: the levers and KPIs live in the
+    what-if folder (``runs/<id>/whatif/<n>/``) the runner reads.
+    """
+
+    stage: ReviewStage = "objection"
+    round: int = Field(default=0, ge=0, description="Objections mapped in this pass (max 3).")
+    objection: str = ""
+    lever: str | None = None
+    value: JsonValue = None
+    mapping_source: str = ""
+    whatif_index: int | None = None
+    whatif_candidate_id: str | None = None
+    whatif_tool_result_id: str | None = None
+    feedback: str = ""
+    answer: str | None = None
+
+
 class PhaseProgress(StrictModel):
     """Budget use and completion inside one phase pass."""
 
@@ -136,6 +162,21 @@ class RunState(StrictModel):
         default=None, description="Latest robust_backup result (P8, DR-11)."
     )
     violations: list[str] = Field(default_factory=list)
+    review_enabled: bool = Field(
+        default=False, description="cli run --review: ask for objections after the P9 verdict."
+    )
+    review: ReviewState | None = Field(
+        default=None, description="Review loop in progress (None outside the P9 review)."
+    )
+    review_levers: dict[str, JsonValue] = Field(
+        default_factory=dict,
+        description="Levers the user adopted in this pass (DR-12); constrain P6 and DR-11.",
+    )
+    review_pin: str | None = Field(
+        default=None,
+        description="Adopted what-if design TL-13 sizes from in the P6 rerun (optimise_design "
+        "candidate_id); cleared by a verifier loop-back.",
+    )
     approval: Literal["approved", "rejected", "pending"] | None = None
     final_summary: str = ""
     escalation_reason: str = ""

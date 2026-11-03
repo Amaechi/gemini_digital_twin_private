@@ -32,9 +32,15 @@ from urllib.parse import urlparse
 
 from pydantic import BaseModel
 
+from gemini_agent.agents.objections import map_objection_by_keywords
 from gemini_agent.agents.roles import ROLES
 from gemini_agent.logging.llm_logger import RETRY_PARTS, LLMCallRecord, LLMLogger
-from gemini_agent.prompts.system import choice_prompt, decision_prompt, system_prompt
+from gemini_agent.prompts.system import (
+    choice_prompt,
+    decision_prompt,
+    review_prompt,
+    system_prompt,
+)
 from gemini_agent.schemas.config import CallLimits, LLMConfig
 from gemini_agent.schemas.decision import (
     KIND_TOOLS,
@@ -44,12 +50,15 @@ from gemini_agent.schemas.decision import (
     DecisionContext,
     DecisionQuestion,
     DecisionSource,
+    LeverChoice,
     NextStep,
     OptionChoice,
     Phase,
     RejectedOption,
+    ReviewQuestion,
     Role,
     StepKind,
+    check_lever_choice,
     key_tokens,
     names_key,
 )
@@ -153,6 +162,16 @@ class DecisionEngine(ABC):
         self, question: DecisionQuestion, context: DecisionContext
     ) -> EngineResult[OptionChoice]:
         """One eligible option for a Decision Record."""
+
+    def map_objection(
+        self, question: ReviewQuestion, context: DecisionContext
+    ) -> EngineResult[LeverChoice]:
+        """Map a user's review objection to one bounded what-if lever (review loop).
+
+        The default is the deterministic keyword mapping (``agents.objections``), so an engine
+        that does not override it behaves like the policy engine.
+        """
+        return EngineResult(map_objection_by_keywords(question), source="policy")
 
     def close(self) -> None:
         """Release what the engine holds open (HTTP clients, event loop); a no-op by default."""
@@ -263,6 +282,7 @@ class AgentDeps:
     option_ids: tuple[str, ...] = ()
     eligible_ids: tuple[str, ...] = ()
     question: DecisionQuestion | None = None
+    review: ReviewQuestion | None = None
     kind_coercions: list[dict[str, str]] = field(default_factory=list)
 
 
@@ -494,13 +514,18 @@ class LLMEngine(DecisionEngine):
             self.model = build_ollama_model(self.llm_config, "orchestrator")
         return self.model
 
-    def _agent(self, role: Role, kind: Literal["decision", "choice"]) -> Any:
+    def _agent(self, role: Role, kind: Literal["decision", "choice", "review"]) -> Any:
         from pydantic_ai import Agent, ModelRetry, NativeOutput, RunContext
 
         key = (role, kind)
         if key in self._agents:
             return self._agents[key]
-        output_type: type[BaseModel] = Decision if kind == "decision" else OptionChoice
+        output_types: dict[str, type[BaseModel]] = {
+            "decision": Decision,
+            "choice": OptionChoice,
+            "review": LeverChoice,
+        }
+        output_type = output_types[kind]
         agent: Agent[AgentDeps, Any] = Agent(
             output_type=NativeOutput(output_type),
             instructions=system_prompt(role),
@@ -515,11 +540,13 @@ class LLMEngine(DecisionEngine):
 
         @agent.output_validator
         def _validate(ctx: RunContext[AgentDeps], output: Any) -> Any:
-            error = (
-                check_decision(ctx.deps, output)
-                if isinstance(output, Decision)
-                else check_choice(ctx.deps, output)
-            )
+            if isinstance(output, Decision):
+                error = check_decision(ctx.deps, output)
+            elif isinstance(output, LeverChoice):
+                assert ctx.deps.review is not None
+                error = check_lever_choice(ctx.deps.review, output)
+            else:
+                error = check_choice(ctx.deps, output)
             if error:
                 raise ModelRetry(error)
             return output
@@ -552,7 +579,7 @@ class LLMEngine(DecisionEngine):
     def _run(
         self,
         role: Role,
-        kind: Literal["decision", "choice"],
+        kind: Literal["decision", "choice", "review"],
         prompt: str,
         deps: AgentDeps,
         budget: dict[str, int],
@@ -699,6 +726,25 @@ class LLMEngine(DecisionEngine):
             floor_tokens=self.call_token_ceiling(prompt, question.role),
         )
 
+    def map_objection(
+        self, question: ReviewQuestion, context: DecisionContext
+    ) -> EngineResult[LeverChoice]:
+        """Run the Lead Engineer's review agent: objection → one bounded lever (``LeverChoice``).
+
+        Floored like a Decision Record call: the review is a workflow step the user asked for,
+        so it completes even when P9 has few tokens left (the runner records the overrun).
+        """
+        deps = AgentDeps(phase=question.phase, allowed_tools=(), review=question)
+        prompt = review_prompt(question)
+        return self._run(
+            question.role,
+            "review",
+            prompt,
+            deps,
+            context.budget_left,
+            floor_tokens=self.call_token_ceiling(prompt, question.role),
+        )
+
 
 class ResilientEngine(DecisionEngine):
     """Primary LLM engine with deterministic fallback (Plant Debugger ``ResilientDecisionEngine``).
@@ -735,6 +781,22 @@ class ResilientEngine(DecisionEngine):
             return self.primary.choose(question, context)
         except EngineFailure as exc:
             result = self.fallback.choose(question, context)
+            return EngineResult(
+                result.value,
+                source="policy_fallback",
+                input_tokens=exc.input_tokens,
+                output_tokens=exc.output_tokens,
+                error=str(exc)[:500],
+            )
+
+    def map_objection(
+        self, question: ReviewQuestion, context: DecisionContext
+    ) -> EngineResult[LeverChoice]:
+        """Primary mapping, or the fallback's keyword mapping on ``EngineFailure``."""
+        try:
+            return self.primary.map_objection(question, context)
+        except EngineFailure as exc:
+            result = self.fallback.map_objection(question, context)
             return EngineResult(
                 result.value,
                 source="policy_fallback",

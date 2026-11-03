@@ -127,6 +127,11 @@ class OptimiseArgs(StrictModel):
     """Arguments of ``optimise_design``."""
 
     top_n: int = Field(default=3, ge=1, le=3, description="Size the top 2–3 candidates.")
+    candidate_id: str | None = Field(
+        default=None,
+        description="Review loop (DR-12): size this adopted design only, at its doublets, depth "
+        "and return temperatures; None: the top-ranked concepts.",
+    )
 
 
 class CardArgs(StrictModel):

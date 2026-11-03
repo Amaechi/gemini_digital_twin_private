@@ -583,6 +583,19 @@ class ToolSession:
             raw = json.loads(path.read_text(encoding="utf-8"))
             memo.sized = {k: SizedDesign.model_validate(v) for k, v in raw.items()}
 
+    def register_design(self, context: ToolContext, sized: SizedDesign) -> None:
+        """Add a design evaluated elsewhere (an adopted what-if, DR-12) to the run's sized designs.
+
+        The runner calls it when the user adopts a what-if design: TL-13 then sizes from that
+        point (``optimise_design`` ``candidate_id``) and the other tools find its outage schedule
+        and parent concept. Persisted with the session's sized designs (resume).
+        """
+        memo = self.memo(context)
+        memo.sized[sized.candidate.id] = sized
+        for cache in (memo.screen, memo.full, memo.subsurface, memo.economics):
+            cache.pop(sized.candidate.id, None)
+        self._save_sized(memo)
+
     # ------------------------------------------------------------------ TL-09 / TL-12 / TL-14
     def config(self, context: ToolContext, candidate: Candidate) -> tl09.GeneratedConfig:
         """TL-09 project of a candidate (cached per run)."""
@@ -1322,21 +1335,29 @@ class RealTools:
         sized_out: list[SizedDesign] = []
         skipped: dict[str, str] = {}
         limit = min(args.top_n, profile.max_concepts or args.top_n)
+        pinned = args.candidate_id
+        if pinned is not None:
+            # Review loop (DR-12): size the adopted design only, from its own point. Its
+            # doublets, depth and return temperatures are fixed; the DE sizes the equipment
+            # (and the flow, a size variable of OPT-SPACE) as for every other concept.
+            if pinned in excluded:
+                raise ValueError(f"{pinned} was excluded by DesignGuard/verifier: cannot size it")
+            ranked, limit = [pinned], 1
         for cid in ranked:
             if len(sized_out) >= limit:
                 break
             concept_candidate = session.candidate(context, cid)
             concept = concept_candidate.concept
-            sized_id = f"{concept}-opt"
+            sized_id = f"{cid}-opt" if cid == pinned else f"{concept}-opt"
             if sized_id in excluded:
                 skipped[cid] = f"{sized_id} rejected by the verifier"
                 continue
-            if any(s.candidate.concept == concept for s in sized_out):
+            if cid != pinned and any(s.candidate.concept == concept for s in sized_out):
                 continue
             parent = session.parent_concept(context, concept_candidate)
             depths = (
                 [concept_candidate.depth_m or 0.0]
-                if profile.own_point_only
+                if profile.own_point_only or cid == pinned
                 else list(settings.depth_options_m)
             )
             degas = concept_candidate.gas_handling == GasHandling.DEGAS_USE
@@ -1358,7 +1379,11 @@ class RealTools:
             request = OptimiseRequest(
                 concept=concept,
                 parent_concept=parent,
-                doublet_options=[concept_candidate.doublets] if profile.own_point_only else None,
+                doublet_options=(
+                    [concept_candidate.doublets]
+                    if profile.own_point_only or cid == pinned
+                    else None
+                ),
                 depth_options_m=safe,
                 heating_return_degc=concept_candidate.heating_return_degc,
                 cooling_return_degc=concept_candidate.cooling_return_degc,
@@ -1390,7 +1415,12 @@ class RealTools:
                 update={
                     "id": sized_id,
                     "parent_id": concept_candidate.parent_id,
-                    "description": f"TL-13 optimum of {concept} (sized from {cid})",
+                    "description": (
+                        f"TL-13 optimum of {concept} sized from the adopted design {cid} "
+                        "(user review, DR-12)"
+                        if cid == pinned
+                        else f"TL-13 optimum of {concept} (sized from {cid})"
+                    ),
                 }
             )
             sized_out.append(

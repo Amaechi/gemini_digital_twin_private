@@ -271,6 +271,13 @@ PYTHONPATH=src python -m gemini_agent.cli whatif --run-id final_llm --runs-dir r
 ```
 Levers (`--set`, repeatable; `whatif --help` lists them with their bounds): `DB-31`, `DB-32` (return temperatures, register range), `DB-30=A|B`, `ECO-CO2-GAS`, `CHP-EL-FRAC` (register range), `OPT-ROBUST-BACKUP=on|off` (the run's TL-15 robust nameplates), `design_flow_m3h`, `doublets` (DesignGuard DB-10/11), `concept=<id>` (re-pick a screened candidate of the run). `--budget quick` (default) simulates the full year on both sides (≈ 1–3 min on a laptop); `--budget full` also reruns the TL-15 Monte Carlo on the changed design for P(demand met) (≈ the P8 time of the run). An out-of-limit lever is refused with the guard's reason (exit 5); an unknown lever lists the valid ones (exit 2). Outputs: `whatif.json`, `whatif.md`, `DR-W<n>.json/.md` (Decision-Record layout, evidence keys), `tool_results/`.
 
+### 7.10 Review loop on a run (post-submission, optional)
+`cli run --review` asks, after the P9 verifier verdict, "Any objection to the recommended design? (Enter = none)". Your free text goes to the Lead Engineer (the LLM with `--engine llm`, keyword patterns with `--engine policy`), which maps it to exactly one bounded what-if lever (see 7.9) or says that no lever matches and asks again (max 3 rounds). The runner then runs the what-if on the live run (`runs/<dir>/<id>/whatif/<n>/`), prints the before → after table with the DesignGuard/verifier verdicts and asks "adopt the change? yes/no". *yes* reruns P6–P9 on the changed design (TL-13 sizes from it; counted against the ≤ 3 verification loops), then asks again; *no* keeps the design. Either way DR-12 "User review: <objection> → <lever>" is written with the what-if as evidence. Default off: the submitted runs and evals never use it.
+```bash
+PYTHONPATH=src python -m gemini_agent.cli run --engine llm --model gemma4:12b-it-q4_K_M --budget quick --runs-dir runs/review_demo --run-id demo --input-mode ask --review
+```
+Enter × 3 for the DB-30/31/32 defaults; at the review type e.g. `the boiler is too big` (→ `OPT-ROBUST-BACKUP=off`) or `I'd prefer 3 doublets`; `yes`/`no` at "adopt the change?"; `yes` at the P10 approval. With `--budget quick` the what-if takes ≈ 1–3 min (both sides simulated for a full year) and an adoption reruns P6–P9 (≈ the run's own P6–P9 time). Pause mode: `run --input-mode pause --review` exits 3 at the review; `resume --run-id demo --answer "the boiler is too big"` then `resume --answer yes|no`. Not adoptable (shown only): `design_flow_m3h` (a TL-13 size variable) and the register values `ECO-CO2-GAS` / `CHP-EL-FRAC`.
+
 ## 8. Submission
 1. GitHub → fork `GEMINI-Digital-Twin/gemini-geothermal-suite-open` to your account (public).
 2. Push the final branch there:

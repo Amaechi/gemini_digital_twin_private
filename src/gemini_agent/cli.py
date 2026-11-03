@@ -28,6 +28,12 @@ bad value, not a run), 5 refused (lever outside its bound, with the guard's reas
 library HTTP server that shows the runs of a directory read-only and answers a paused run's
 question (or the P10 approval) through the same ``resume`` as the CLI.
 
+``run --review`` (post-submission) adds the P9b user review: after the verifier verdict the user
+is asked for an objection to the recommended design (ask and pause modes; assume mode records
+"no objection"); the engine maps it to one bounded what-if lever, the what-if tool computes the
+before → after table, and the user adopts the change (P6–P9 rerun) or keeps the design — DR-12
+(``gemini_agent.runner.review``). Default off: runs and evals without the flag are unchanged.
+
 ``--speak`` (``run``, ``resume``, ``whatif``; post-submission) reads the questions, the P10
 summary with the verifier verdict, the DR-11 rationale and the what-if verdicts aloud with the
 macOS ``say`` command (``gemini_agent.speech``); elsewhere it prints one note and is a no-op.
@@ -140,6 +146,13 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         help="missing inputs: assume defaults, ask on the terminal, or pause (default: ask if "
         "stdin is a terminal, else assume)",
+    )
+    run.add_argument(
+        "--review",
+        action="store_true",
+        help="after the P9 verdict ask for objections to the recommended design, map each to "
+        "one bounded what-if lever, show the before -> after table and offer to adopt the change "
+        "(P6-P9 rerun; DR-12); off by default",
     )
 
     resume = sub.add_parser("resume", help="answer the pending question of a paused run")
@@ -278,12 +291,17 @@ def _runner(
     ask_fn = ask_terminal if sys.stdin.isatty() else None
     if ask_fn is not None and speaker is not None and speaker.enabled:
         ask_fn = speaking_ask(speaker, ask_fn)
+    budget = getattr(args, "budget", None)
     return DesignRunner(
         engine,
         runs_root=runs_root,
         toolbox=toolbox,
         config_dir=args.config_dir,
         ask_fn=ask_fn,
+        review=bool(getattr(args, "review", False)),
+        # The review's what-if runs on the run's own budget (full / quick / smoke); without a
+        # --budget the what-if default (quick = full year, no Monte Carlo) keeps the review short.
+        review_budget=budget if budget in whatif_tool.BUDGETS else whatif_tool.DEFAULT_BUDGET,
     )
 
 
