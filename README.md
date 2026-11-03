@@ -327,7 +327,8 @@ credential exists anywhere in the repository (`.env.template` is GEMINI's and un
   vs 1 900 used) and the run escalated inside a DR the workflow requires. Now a DR choice call's
   usage limit is floored at the call's own token ceiling (every allowed request at the prompt
   size plus `calls.max_output_tokens`), a DR past the phase budget is recorded as a
-  `TOKEN_BUDGET_OVERRUN` event (an eval-harness metric, like the fallbacks) and P5 has an
+  `TOKEN_BUDGET_OVERRUN` event (an eval-harness metric, like the fallbacks), a call past even
+  its own ceiling is answered by the policy (a counted fallback, same event) and P5 has an
   explicit 90 k token budget; ordinary decisions still escalate at the budget (AG-04). Two other
   models escalated on the tool-call budget (P5/P6).
 - **Heat-exchanger fluid properties**: the GEMINI plate HEX takes one ρ/c_p per side (brine

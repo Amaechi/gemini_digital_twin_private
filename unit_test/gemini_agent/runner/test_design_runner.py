@@ -598,6 +598,37 @@ def test_p5_decision_records_are_not_starved_by_the_phase_token_budget(tmp_path)
     assert _metrics(runner, "j1", 0.0).token_budget_overruns == 1
 
 
+def test_dr_call_past_its_own_ceiling_is_written_by_the_policy_not_escalated(tmp_path):
+    """Runner J: a DR call beyond the call's own token ceiling (beyond the configured call
+    limits) raises EngineBudgetExceeded; the runner lets the policy choose, records the overrun
+    with the error and the run completes (the DR is required; no mid-DR escalation)."""
+
+    def func(messages, info):
+        response = policy_like(messages, info)
+        if user_prompt(messages).startswith("DR-08 "):
+            response.usage = RequestUsage(input_tokens=200_000, output_tokens=100)
+        return response
+
+    engine, logger = _llm_engine(tmp_path, "j2", func)
+    runner = _runner(tmp_path, engine=engine)
+    result = runner.start("", run_id="j2")
+    assert result.status == RunStatus.COMPLETED
+    state = runner.load_state("j2")
+    dr08 = next(r for r in state.decision_records if r.dr_id == "DR-08")
+    assert dr08.decision_source == "policy_fallback" and state.fallback_count() == 1
+    p5_sources = [r.decision_source for r in logger.records() if r.phase == "P5"]
+    assert p5_sources[-1] == "escalated"  # the call's own log entry (the DR itself fell back)
+    overruns = [e for e in runner.store("j2").list_events("j2") if e.type == "TOKEN_BUDGET_OVERRUN"]
+    assert len(overruns) == 1 and overruns[0].payload["dr_id"] == "DR-08"
+    assert "total_tokens_limit" in overruns[0].payload["error"]
+    assert "policy_fallback" in overruns[0].payload["message"]
+    assert overruns[0].payload["overrun"] == max(state.progress[Phase.P5].tokens_used - 90_000, 0)
+    assert (
+        "LLM fallbacks to policy: 1. Decision Records past a phase token budget: 1"
+        in result.summary
+    )
+
+
 def test_ordinary_step_with_no_tokens_left_still_escalates(tmp_path):
     """AG-04 unchanged by runner J: the floor is for Decision Record calls only; a decision with
     the phase budget used up escalates before any LLM call is made."""

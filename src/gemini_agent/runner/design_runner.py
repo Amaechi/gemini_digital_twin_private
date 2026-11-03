@@ -12,7 +12,8 @@
 # with the basis (CFG-BASIS-CONFIRM) and list the inputs the request does not provide
 # (CFG-INPUT-DEFAULTS) — asked once, before any tool runs or default is assumed. 2026-11-03
 # (runner J): a Decision Record call past the phase token budget records TOKEN_BUDGET_OVERRUN
-# instead of escalating mid-DR (the engine floors its usage limit); decisions keep AG-04.
+# instead of escalating mid-DR (the engine floors its usage limit; past the call's own ceiling
+# the policy chooses, a counted fallback); decisions keep AG-04.
 """Workflow runner: deterministic phases P0–P10 (spec §4.1, §5.2).
 
 The runner decides WHICH phase runs, enforces budgets (AG-04), executes every tool call,
@@ -35,6 +36,7 @@ from typing import Any, Literal
 from gemini_agent.agents.engine import (
     DecisionEngine,
     EngineBudgetExceeded,
+    EngineResult,
     PolicyEngine,
     check_choice,
     choice_deps,
@@ -1023,11 +1025,22 @@ class DesignRunner:
             return "continue"
         prog = state.phase_progress(spec.phase)
         context = self._context(state, spec, role=question.role)
+        budget = self._budget(spec)
+        limit_error: str | None = None
         try:
             result = self.engine.choose(question, context)
         except EngineBudgetExceeded as exc:
-            prog.tokens_used += exc.input_tokens + exc.output_tokens
-            return self._escalate(state, f"LLM usage limit exceeded for {dr_id}: {exc}")
+            # Runner J: the call went past its own token ceiling (the engine floors its usage
+            # limit there), i.e. beyond the configured call limits. The DR is still required,
+            # so the policy chooses (a counted fallback) and the overrun is recorded below.
+            limit_error = f"LLM usage limit exceeded for {dr_id}: {exc}"[:500]
+            result = EngineResult(
+                self._policy.choose(question, context).value,
+                source="policy_fallback",
+                input_tokens=exc.input_tokens,
+                output_tokens=exc.output_tokens,
+                error=limit_error,
+            )
         prog.tokens_used += result.input_tokens + result.output_tokens
         choice, source = result.value, result.source
         error = check_choice(choice_deps(question), choice)
@@ -1064,12 +1077,22 @@ class DesignRunner:
                     f"{previous}; the P9 DesignVerifier verifies it",
                 },
             )
-        budget = self._budget(spec)
-        if prog.tokens_used > budget.max_tokens:
+        if limit_error is not None or prog.tokens_used > budget.max_tokens:
             # Runner J: the DR is a phase-close step the workflow requires, so the engine floors
             # its usage limit and the overrun is recorded (counted by the eval harness like the
-            # fallbacks) rather than escalated mid-DR. Decisions still escalate (AG-04).
-            overrun = prog.tokens_used - budget.max_tokens
+            # fallbacks) rather than escalated mid-DR. Ordinary decisions still escalate at the
+            # budget (AG-04).
+            overrun = max(prog.tokens_used - budget.max_tokens, 0)
+            message = (
+                f"{dr_id} written {overrun} tokens past the {spec.phase.value} token budget "
+                f"({prog.tokens_used} > {budget.max_tokens}); a required Decision Record is not "
+                "starved, ordinary decisions still escalate at the budget (AG-04)"
+            )
+            if limit_error is not None:
+                message = (
+                    f"{dr_id}: the LLM call exceeded its own usage ceiling, the policy chose "
+                    f"the option (policy_fallback); {limit_error}"
+                )
             self._event(
                 state,
                 "TOKEN_BUDGET_OVERRUN",
@@ -1078,9 +1101,8 @@ class DesignRunner:
                     "tokens_used": prog.tokens_used,
                     "max_tokens": budget.max_tokens,
                     "overrun": overrun,
-                    "message": f"{dr_id} written {overrun} tokens past the {spec.phase.value} "
-                    f"token budget ({prog.tokens_used} > {budget.max_tokens}); a required "
-                    "Decision Record is not starved (AG-04 applies to the agent's steps)",
+                    "error": limit_error,
+                    "message": message,
                 },
             )
         return "continue"

@@ -16,6 +16,8 @@ from pydantic_ai.models.test import TestModel
 from pydantic_ai.usage import RequestUsage
 
 from gemini_agent.agents.engine import (
+    CHARS_PER_TOKEN,
+    REQUEST_OVERHEAD_TOKENS,
     EngineBudgetExceeded,
     EngineFailure,
     LLMEngine,
@@ -736,14 +738,15 @@ def test_choice_call_is_floored_at_its_own_token_ceiling(tmp_path):
 
     prompt = choice_prompt(_question(), _context())
     ceiling = engine.call_token_ceiling(prompt, Role.SYSTEM_ARCHITECT)
-    requests = LLM_CONFIG.max_output_retries + 2
-    outputs = LLM_CONFIG.calls.max_output_tokens * requests * (requests + 1) // 2
-    prompts = requests * (len(prompt) + len(system_prompt(Role.SYSTEM_ARCHITECT))) // 3
-    assert outputs < ceiling <= outputs + prompts + requests
+    n = LLM_CONFIG.max_output_retries + 2
+    outputs = LLM_CONFIG.calls.max_output_tokens * n * (n + 1) // 2
+    prompt_tokens = (len(prompt) + len(system_prompt(Role.SYSTEM_ARCHITECT))) // CHARS_PER_TOKEN
+    assert ceiling == n * (prompt_tokens + 1 + REQUEST_OVERHEAD_TOKENS) + outputs
     # A call that uses more than the phase has left but less than its ceiling completes …
     engine, _ = _llm(_with_usage(ceiling - 100), tmp_path)
     assert engine.choose(_question(), _context(tokens=5)).source == "llm"
-    # … while one past its own ceiling is still a budget overrun the runner escalates (AG-04).
+    # … while one past its own ceiling raises EngineBudgetExceeded through ResilientEngine too
+    # (the runner then lets the policy choose the DR and records the overrun).
     engine, logger = _llm(_with_usage(ceiling + 1), tmp_path)
     with pytest.raises(EngineBudgetExceeded, match="total_tokens_limit"):
         ResilientEngine(engine).choose(_question(), _context(tokens=5))
