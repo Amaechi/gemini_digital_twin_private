@@ -30,8 +30,8 @@ Keep it ≤ 20 KB; it is the hand-off between sessions. Old detail: merged PRs a
 | WP-15 | Final review, documentation, licensing, packaging | in review | | README, NOTICE, REPORT.md, DECK_OUTLINE.md, clean LLM shutdown |
 | Feature B | What-if on a finished run (`cli whatif`) | in review | | `tools/whatif.py`; 9 levers; `runs/<id>/whatif/<n>/` + DR-W<n> |
 
-Status: todo · in progress · in review · merged · blocked (say why).
-Feature B (11-03): `PYTHONPATH=src python -m pytest -q unit_test/gemini_model unit_test/gemini_simulator unit_test/gemini_agent -x` → **1341 passed in 617 s** (the working-tree sentinel failed only because this file was edited during the run; green alone); `tools/test_whatif.py` alone (smoke run + 3 what-ifs): **7 passed in 89 s**.
+Status: todo · in progress · in review · merged · blocked.
+Feature B (11-03): `PYTHONPATH=src python -m pytest -q unit_test/gemini_model unit_test/gemini_simulator unit_test/gemini_agent -x` → **1341 passed in 617 s** (working-tree sentinel tripped on edits to this file during the run; green alone); `tools/test_whatif.py` alone (smoke run + 3 what-ifs): **7 passed in 89 s**.
 Latest full suite (WP-15, 11-03): `PYTHONPATH=src python -m pytest -q unit_test/gemini_model unit_test/gemini_simulator unit_test/gemini_agent -x` → **1334 passed, 7 warnings in 475 s (7 min 56 s)**. `validate_submission --pytest` → **READY, 22 pass / 0 fail / WARN SUB-14 / MANUAL SUB-23; SUB-24 PASS (`docs/results/submission_check.md`). CI smoke run: 22.8 s.**
 
 ## Decisions log (newest first)
@@ -131,4 +131,4 @@ Spec §18 with evidence:
 
 WP-15 touched: `README.md` (new; GEMINI's → `README_GEMINI.md`), `NOTICE`, `docs/results/`, `scripts/build_report_pack.py`, `agents/engine.py`, `agents/model_builder.py`, `runner/design_runner.py` (`close`), tests, this file. wp-reviewer approved (5 findings fixed). Next: user records deck + video, merges, pushes the fork branch.
 
-Feature B touched (new): `src/gemini_agent/tools/whatif.py`, `unit_test/gemini_agent/tools/test_whatif.py`; edited: `cli.py` (`whatif` command), `README.md` (What-if subsection), `CLOUD_SETUP.md` §7.9, `.gitignore`, this file. Nothing in models, other tools, config or `runs/`.
+Feature B touched (new): `tools/whatif.py`, `tools/test_whatif.py`; edited: `cli.py` (`whatif`), `README.md` (What-if), `CLOUD_SETUP.md` §7.9, `.gitignore`, this file. Nothing in models, other tools, config or `runs/`.
