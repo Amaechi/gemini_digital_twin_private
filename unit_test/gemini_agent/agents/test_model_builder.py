@@ -5,9 +5,12 @@ RC-07 (``s7_scripted_model.py``); the real-LLM demo runs locally. All files go t
 under a NEW folder name; registrations go to registry copies (or a monkeypatched live registry).
 """
 
+import asyncio
 import json
+import time
 
 import pytest
+import yaml
 
 from gemini_agent.agents import engine as engine_module
 from gemini_agent.agents import model_builder as mb
@@ -31,6 +34,7 @@ from gemini_model.free_cooling.free_cooling import FreeCooling
 from gemini_simulator.registry import COMPONENT_REGISTRY, create_component
 from unit_test.gemini_agent.agents.s7_scripted_model import (
     ScriptedCoder,
+    build_request,
     scripted_draft,
     scripted_model,
 )
@@ -44,7 +48,7 @@ NAME = "free_cooling_rc07"
 def _coder(tmp_path, scripted=None, **kwargs) -> LLMCoder:
     model = scripted_model(scripted) if isinstance(scripted, ScriptedCoder) else scripted
     return LLMCoder(
-        llm_config=load_config("llm"),
+        llm_config=kwargs.pop("llm_config", None) or load_config("llm"),
         logger=LLMLogger(tmp_path / "logs"),
         model=model,
         run_id="s7",
@@ -160,6 +164,156 @@ def test_invalid_coder_output_ends_the_build(tmp_path):
     assert "free_cooling" not in registry
     (record,) = LLMLogger(tmp_path / "logs", create=False).records()
     assert record.decision_source == "failed" and record.error
+
+
+def _builder_config(**limits):
+    """llm.yaml with overridden ``calls.model_builder`` limits."""
+    config = load_config("llm")
+    builder = config.calls.model_builder.model_copy(update=limits)
+    return config.model_copy(
+        update={"calls": config.calls.model_copy(update={"model_builder": builder})}
+    )
+
+
+class HangingCoder(ScriptedCoder):
+    """Scripted coder whose first ``hangs`` calls never answer (the local S7 timeout)."""
+
+    def __init__(self, hangs: int = 99) -> None:
+        """Hang for the first ``hangs`` requests, then answer the scripted draft."""
+        super().__init__()
+        self.hangs = hangs
+        self.settings: list[dict] = []
+
+    async def __call__(self, messages, info):  # type: ignore[override]
+        """Record the model settings; sleep past the deadline or answer."""
+        self.settings.append(dict(info.model_settings or {}))
+        if len(self.settings) <= self.hangs:
+            self.requests.append(build_request(messages))
+            await asyncio.sleep(5)
+        return super().__call__(messages, info)
+
+
+def test_coder_settings_come_from_llm_yaml_calls_model_builder(tmp_path):
+    """WP-12 follow-up: the coder uses the engine settings path with calls.model_builder."""
+    scripted = HangingCoder(hangs=0)
+    config = _builder_config(request_timeout_s=777.0, max_output_tokens=4096, thinking=True)
+    coder = _coder(tmp_path, scripted_model(scripted), llm_config=config)
+    coder(_request())
+    (seen,) = scripted.settings
+    assert seen["request_timeout"] == seen["timeout"] == 777.0
+    assert seen["max_tokens"] == 4096 and "openai_reasoning_effort" not in seen  # thinking on
+    assert seen["temperature"] == config.temperatures.extraction and seen["seed"] == config.seed
+    assert seen["extra_body"]["options"]["num_ctx"] == config.ollama.num_ctx
+    assert seen == engine_module.model_settings(
+        config, config.calls.model_builder, temperature=config.temperatures.extraction
+    )
+    # the yaml defaults (1200 s, 8192 tokens, thinking off) differ from the Decision limits
+    default = _coder(tmp_path, scripted_model(scripted)).model_settings()
+    assert default["request_timeout"] == 1200.0 and default["max_tokens"] == 8192
+    assert default["openai_reasoning_effort"] == "none"
+    assert (
+        default["request_timeout"]
+        != engine_module.model_settings(load_config("llm"))["request_timeout"]
+    )
+
+
+def test_timed_out_drafts_are_retried_then_coder_failed(tmp_path):
+    """A draft past request_timeout_s is one failed attempt; the loop retries up to max."""
+    scripted = HangingCoder()
+    coder = _coder(
+        tmp_path, scripted_model(scripted), llm_config=_builder_config(request_timeout_s=0.05)
+    )
+    registry = {k: v for k, v in COMPONENT_REGISTRY.items() if k != "free_cooling"}
+    builder = ModelBuilder(
+        ModelSandbox(tmp_path / "sandbox"), coder, registry=registry, max_attempts=3
+    )
+    start = time.perf_counter()
+    result = builder.build(_gap(registry))
+    assert time.perf_counter() - start < 4.0
+    assert result.status == "coder_failed" and len(result.attempts) == 3
+    assert len(scripted.settings) == 3
+    for number, attempt in enumerate(result.attempts, start=1):
+        assert attempt.attempt == number and attempt.decision_source == "failed"
+        assert attempt.timed_out and "ModelRequestTimeout" in (attempt.error or "")
+        assert "request_timeout_s = 0.05" in attempt.error and attempt.elapsed_s > 0
+    assert "not registered after 3 draft(s)" in result.summary
+    assert result.input_tokens == sum(a.input_tokens for a in result.attempts)
+    assert "free_cooling" not in registry and not (tmp_path / "sandbox" / "src").exists()
+    records = LLMLogger(tmp_path / "logs", create=False).records()
+    assert len(records) == 3 and all(r.decision_source == "failed" for r in records)
+    # the retry prompt tells the coder why the previous draft failed
+    assert "timed out" in scripted.requests[1]["feedback"]
+    assert scripted.requests[0]["feedback"] == ""
+
+
+def test_timed_out_draft_then_valid_draft_is_registered(tmp_path):
+    """First draft times out, the second passes: registered with two recorded attempts."""
+    scripted = HangingCoder(hangs=1)
+    coder = _coder(
+        tmp_path, scripted_model(scripted), llm_config=_builder_config(request_timeout_s=0.05)
+    )
+    demo = run_s7_demo(tmp_path / "sandbox", coder, max_attempts=2)
+    (result,) = demo.report.run.results
+    assert result.status == "registered" and demo.report.gap_closed
+    assert [a.timed_out for a in result.attempts] == [True, False]
+    assert [a.decision_source for a in result.attempts] == ["failed", "llm"]
+    assert result.attempts[1].pytest is not None and result.attempts[1].pytest.passed
+    assert result.output_tokens == sum(a.output_tokens for a in result.attempts) > 0
+
+
+def test_timed_out_draft_then_failing_draft_is_tests_failed(tmp_path):
+    """A timeout followed by a draft whose tests fail is reported as tests_failed."""
+    scripted = HangingCoder(hangs=1)
+    scripted.broken_drafts = 99
+    coder = _coder(
+        tmp_path, scripted_model(scripted), llm_config=_builder_config(request_timeout_s=0.05)
+    )
+    registry = {k: v for k, v in COMPONENT_REGISTRY.items() if k != "free_cooling"}
+    builder = ModelBuilder(
+        ModelSandbox(tmp_path / "sandbox"), coder, registry=registry, max_attempts=2
+    )
+    result = builder.build(_gap(registry))
+    assert result.status == "tests_failed" and len(result.attempts) == 2
+    assert [a.timed_out for a in result.attempts] == [True, False]
+    assert result.attempts[1].pytest is not None and not result.attempts[1].pytest.passed
+
+
+def test_non_timeout_coder_error_still_ends_the_build(tmp_path):
+    """Only timeouts are retried: a budget error stops after one recorded attempt."""
+    coder = _coder(tmp_path, ScriptedCoder(), token_budget=10, tokens_used=10)
+    registry = {k: v for k, v in COMPONENT_REGISTRY.items() if k != "free_cooling"}
+    builder = ModelBuilder(ModelSandbox(tmp_path / "sandbox"), coder, registry=registry)
+    result = builder.build(_gap(registry))
+    assert result.status == "coder_failed" and len(result.attempts) == 1
+    assert not result.attempts[0].timed_out and "budget" in result.attempts[0].error
+
+
+def test_main_reports_elapsed_time_and_timeout_on_failure(tmp_path, monkeypatch, capsys):
+    """The demo CLI prints the elapsed time, the coder limits and each attempt on failure."""
+    scripted = HangingCoder()
+    monkeypatch.setattr(
+        engine_module, "build_ollama_model", lambda cfg, kind, tag="": scripted_model(scripted)
+    )
+    config_dir = tmp_path / "config"
+    config_dir.mkdir()
+    (config_dir / "llm.yaml").write_text(
+        yaml.safe_dump(_builder_config(request_timeout_s=0.05).model_dump(mode="json")),
+        encoding="utf-8",
+    )
+    sandbox = tmp_path / "s7"
+    code = mb.main(
+        ["--sandbox", str(sandbox), "--config-dir", str(config_dir), "--max-attempts", "2"]
+    )
+    out = capsys.readouterr().out
+    assert code == 1 and len(scripted.settings) == 2
+    assert "FAILED after" in out and "request_timeout_s = 0.05" in out
+    assert "max_output_tokens = 8192" in out and "scripted-coder" in out
+    assert "attempt 1: timed out after" in out and "attempt 2: timed out after" in out
+    assert "Raise calls.model_builder.request_timeout_s" in out
+    report = json.loads((sandbox / "s7_report.json").read_text())
+    (result,) = report["run"]["results"]
+    assert result["status"] == "coder_failed" and len(result["attempts"]) == 2
+    assert all(a["timed_out"] for a in result["attempts"])
 
 
 def test_token_budget_is_enforced(tmp_path):

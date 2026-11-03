@@ -361,12 +361,8 @@ class Temperatures(StrictModel):
     planning: float = Field(ge=0, le=2)
 
 
-class CallSettings(StrictModel):
-    """Per-call limits of every structured-output LLM call (``Decision`` / ``OptionChoice``).
-
-    Added after the L-1 eval (reasoning in the content used up the phase budgets; one call hung
-    for 30 min). How each value reaches Ollama's ``/v1`` endpoint: ``agents.engine``.
-    """
+class CallLimits(StrictModel):
+    """Per-call limits of one kind of LLM call; how each value reaches Ollama: ``agents.engine``."""
 
     thinking: bool = Field(
         default=False,
@@ -378,6 +374,36 @@ class CallSettings(StrictModel):
     )
     request_timeout_s: float = Field(
         default=300.0, gt=0, description="Deadline per model request (pydantic-ai)."
+    )
+
+
+class ModelBuilderCallSettings(CallLimits):
+    """Limits of the Model Builder coder call (``calls.model_builder``), a long-answer role.
+
+    One draft is a model file, a test file and REFERENCE.md (1.5–3 k output tokens at laptop
+    speed), so it needs a longer deadline and a larger output cap than a ``Decision`` call. Added
+    after the local S7 demo: every draft hit the SDK default timeout (WP-12 follow-up).
+    """
+
+    max_output_tokens: int = Field(
+        default=8192, ge=256, description="Cap per draft, sent as max_tokens (Ollama num_predict)."
+    )
+    request_timeout_s: float = Field(
+        default=1200.0, gt=0, description="Deadline per draft request (pydantic-ai)."
+    )
+
+
+class CallSettings(CallLimits):
+    """Per-call limits of every structured-output LLM call (``Decision`` / ``OptionChoice``).
+
+    Added after the L-1 eval (reasoning in the content used up the phase budgets; one call hung
+    for 30 min). ``model_builder`` holds the limits of the coder call, which otherwise shares
+    the same settings path (``agents.engine.model_settings``).
+    """
+
+    model_builder: ModelBuilderCallSettings = Field(
+        default_factory=ModelBuilderCallSettings,
+        description="Limits of the Model Builder coder call (long answers).",
     )
 
 

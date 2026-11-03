@@ -20,6 +20,7 @@ Keep it ≤ 20 KB; it is the hand-off between sessions. Old detail: merged PRs a
 | WP-10 P0 | P0 intake cannot escalate an in-scope request | in review | | finalise/refuse only; `INTAKE_CLOSED` |
 | WP-11 | Optimisation & uncertainty | merged (78491fe) | [#18](https://github.com/Amaechi/gemini_digital_twin_private/pull/18) | TL-13/15 |
 | WP-12 | Model gap & Model Builder | merged (b81cfa9) | [#15](https://github.com/Amaechi/gemini_digital_twin_private/pull/15) | TL-17/18; S7 demo |
+| WP-12 follow-up | Builder uses llm.yaml call settings, retries on timeout | in review | [#23](https://github.com/Amaechi/gemini_digital_twin_private/pull/23) | `calls.model_builder` 1200 s / 8192 tok; local S7 timed out |
 | WP-13 | Eval suite & submission checks | merged (a622551) | [#16](https://github.com/Amaechi/gemini_digital_twin_private/pull/16) | S1–S11; SUB-01…24 |
 | WP-14 | Integration run & figures | merged (c694720) | [#20](https://github.com/Amaechi/gemini_digital_twin_private/pull/20) | real tools |
 | Pre-L-2 | Robust backup (DR-11), final-run instructions | in review | [#21](https://github.com/Amaechi/gemini_digital_twin_private/pull/21) | OPT-ROBUST-BACKUP; CLOUD_SETUP §7 |
@@ -28,7 +29,7 @@ Keep it ≤ 20 KB; it is the hand-off between sessions. Old detail: merged PRs a
 | WP-15 | Final review & packaging | todo | | |
 
 Status: todo · in progress · in review · merged · blocked (say why).
-Latest full suite (WP-10 P0, 11-02): `PYTHONPATH=src python -m pytest -q unit_test/gemini_model unit_test/gemini_simulator unit_test/gemini_agent -x` → **1326 passed** (here 8 min 16 s; the working-tree snapshot check failed only because files were edited during the run and passed when re-run). CLI smoke `--budget smoke`: CI 22.8 s.
+Latest full suite (WP-12 follow-up, 11-03): `PYTHONPATH=src python -m pytest -q unit_test/gemini_model unit_test/gemini_simulator unit_test/gemini_agent -x` → **1332 passed** (6 min 40 s on a clean tree; a first run failed only the working-tree snapshot check because PROGRESS.md was edited during it). CLI smoke `--budget smoke`: CI 22.8 s.
 Next: re-run L-1 (CLOUD_SETUP §7.3) with this fix, L-2, then WP-15.
 
 ## Decisions log (newest first)
@@ -92,6 +93,10 @@ One line per decision, grouped by WP; dated 11-01 (WP-00: 10-31). Why: the `conf
 **WP-02**
 - COOL-ELC η 0.508 [D] (COP 4.39 @ 7.2/32.2 °C), COP cap 8; COOL-HR `include_heat_rejection_auxiliaries`; cooling = `StaticModel`s, `power_th` = useful cooling, 20/26 °C.
 - COOL-ABS-B 1.15; 85 °C drive → COP 0.64; COOL-ABS-DRV ≈ 13.9 m³/h per MW; PL 0.65 → 0.47 at 10 %; AUX 2.2 %; COOL-FC T_db + 8 K; HEX per-side ρ/c_p.
+**WP-12 follow-up** (11-03)
+- Local S7 (`--sandbox runs/s7_demo --model gemma4:12b-it-q4_K_M`): gap detected True, closed False; every draft "ModelTimeoutError: Request timed out". Cause: `LLMCoder` built its own model settings (no timeout/cap, `calls` ignored) and the loop stopped at the first `CoderError`.
+- One settings path: `engine.model_settings(llm_config, calls, temperature)` (module-level; `LLMEngine._settings` delegates). Coder = `calls.model_builder` (`ModelBuilderCallSettings`: thinking off, 8192 tokens, 1200 s; `CallSettings` keeps its name) at the extraction temperature.
+- `CoderError.timed_out` (pydantic-ai `ModelRequestTimeout`/`ModelTimeoutError`): a failed `BuildAttempt` (tokens, `elapsed_s`), feedback "timed out … compact code", next draft up to `--max-attempts`; other coder errors still end the build after one attempt. CLI prints `failure_report` (elapsed, limits in use, each attempt) when the gap stays open.
 **WP-10 P0 follow-up** (11-02; evidence `origin/l1-p0-evidence`, never merged)
 - Cause: #19's STEP_KINDS line named `delegate` first (never in the prompt before #19); qwen3.6:35b-a3b, gemma4:26b-a4b, qwen3.5:9b answered P0 with `delegate` (9b: one `knowledge_search` first); `DELEGATE` was not in the history ⇒ 3 steps ⇒ "step budget exceeded in P0".
 - P0 = pure intake: `P0_STEP_KINDS` {finalise, refuse}; any other kind or tool ⇒ STEP_REJECTED (in the history); P0 context offers no tool, objective says finalise if `in_scope` else refuse.
@@ -164,6 +169,7 @@ One line per decision, grouped by WP; dated 11-01 (WP-00: 10-31). Why: the `conf
 **WP-12**
 - LLM P4 calls the tools directly (no `check_draft`) and `register_model` mutates the live registry; use `ModelBuilder.close_gaps` if a gap appears.
 - L-2: `python -m gemini_agent.agents.model_builder --sandbox runs/s7_demo [--model TAG]` runs generated tests locally (review first). WP-15: promotion = copy folders + registry + `.rst` via PR.
+- L-2: re-run the S7 demo with the follow-up; if drafts still time out, raise `calls.model_builder.request_timeout_s` (1200 s ≈ 3 k tokens at 2.5 tok/s) or `--max-attempts`; `s7_report.json` attempts carry `timed_out`, `elapsed_s`, tokens.
 
 **WP-13**
 - WP-15: S5 confirm-basis request; S2 missing inputs; S8 re-size check; S7 builder needs the LLM.
@@ -199,6 +205,8 @@ One line per decision, grouped by WP; dated 11-01 (WP-00: 10-31). Why: the `conf
 See spec §17. Answers: —
 
 ## Hand-off notes (latest session writes here, replace previous)
+2026-11-03, WP-12 follow-up: `agents/model_builder.py`, `agents/engine.py` (`model_settings` extracted, behaviour of Decision/OptionChoice calls unchanged), `schemas/config.py`, `config/llm.yaml`; 5 new tests (settings from llm.yaml, timeout ×3 → `coder_failed` with 3 attempts, timeout then registered, budget error not retried, CLI failure report). Local S7 before the fix: gap detected True, closed False, every draft timed out. `pyproject.toml` dev group: `coverage = "7.17.1"` pinned (CI `poetry lock` resolved 7.17.1 mid-upload on PyPI, no cp311 wheel yet; GEMINI Lint/Test/Docs failed in `run_installation.sh`; SUB-21 will warn). Next: user re-runs the S7 demo locally (L-2), then WP-15.
+Previous (WP-10 P0 follow-up): runner/agent files only (`design_runner.py`, `phases.py` objective text, `prompts/system.py`); 9 new tests replay the three models' recorded P0 answers (each reaches P1), S3 refused, S5/S9 conflicts identical to the policy run, policy P0 unchanged, P1 budget still escalates. Evidence read from `origin/l1-p0-evidence` (not merged). Next: user re-runs L-1 (§7.3), then L-2, WP-15.
 2026-11-02, WP-10 P0 follow-up: runner/agent files only (`design_runner.py`, `phases.py` objective text, `prompts/system.py`); 9 new tests replay the three models' recorded P0 answers (each reaches P1), S3 refused, S5/S9 conflicts identical to the policy run, policy P0 unchanged, P1 budget still escalates. Evidence read from `origin/l1-p0-evidence` (not merged). Next: user re-runs L-1 (§7.3), then L-2, WP-15.
 Previous (Pre-L-2): `build_results.py` (full) 528 s. P8 `robust_backup` → DR-11 (policy) installs **C2-opt-robust** (boiler 5.0 → 10.9 MW); P9 **ACCEPTED** 46/46, 0/23 stubs, 11 DRs. Before → after: LCOH 42.54 → 44.59, LCOC 26.31 → 26.31 USD/MWh, CAPEX 27.86 → 30.07 MUSD, P(demand met) 0.46 → 0.90; CO₂ −72 %, unmet 0 d unchanged. `validate_submission`: FAIL only LLM-only 12, 15–17 (WARN 02, 14, 22). §7 dry-run verified (ask mode needs a TTY; DB-30/31/32 asked before the approval). Next: L-1/L-2 (§7), WP-15.
 2026-11-03 L-1/L-2 (local, MacBook Pro M3, 36 GB, Ollama OLLAMA_CONTEXT_LENGTH=65536): L-1 S11 on 5 Ollama models → gemma4:12b-it-q4_K_M

@@ -64,6 +64,11 @@ python-dotenv = "^1.2.3"
 [tool.poetry.group.dev.dependencies]
 pytest = "8.4.2"
 pytest-cov = "5.0.0"
+# Modified by the GeoAgent team for SPE GeoHackathon 2026, 2026-11-03: pin coverage (pulled in by
+# pytest-cov). CI runs `poetry lock` fresh on every push and resolved coverage 7.17.1 while its wheels
+# were still uploading to PyPI (no cp311 Linux wheel yet -> "Unable to find installation candidates").
+# An exact pin keeps the next coverage release from racing CI; bump it deliberately.
+coverage = "7.17.1"
 flake8 = "7.3.0"
 flake8-docstrings = "1.7.0"
 black = "25.11.0"
