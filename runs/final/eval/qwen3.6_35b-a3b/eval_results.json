@@ -1,0 +1,69 @@
+{
+  "generated_at": "2026-11-02T21:54:13.614742+00:00",
+  "engine": "llm",
+  "model": "qwen3.6:35b-a3b",
+  "eval_dir": "runs/final/eval/qwen3.6_35b-a3b",
+  "scenarios_source": "evals/scenarios.yaml",
+  "runs": [
+    {
+      "scenario": "S11",
+      "situation": "Same task on 16 GB-class vs 36 GB-class model",
+      "expected": "Tool-call validity, retries, fallbacks, tokens, quality",
+      "engine": "llm",
+      "model": "qwen3.6:35b-a3b",
+      "outcome": "fail",
+      "status": "escalated",
+      "phase": "P6",
+      "verdict": null,
+      "selected_candidate": "C2-opt",
+      "conflicts": [],
+      "metrics": {
+        "runtime_s": 167.335,
+        "tool_calls": 23,
+        "stub_tool_calls": 0,
+        "llm_calls": 29,
+        "llm_valid_calls": 28,
+        "retries": 7,
+        "fallbacks": 1,
+        "step_rejections": 1,
+        "kind_coercions": 0,
+        "input_tokens": 73885,
+        "output_tokens": 5176
+      },
+      "checks": [
+        {
+          "type": "status",
+          "expect": "the run completes",
+          "passed": false,
+          "detail": "status escalated"
+        },
+        {
+          "type": "llm_metrics",
+          "expect": "tool-call validity, retries, fallbacks and tokens are recorded",
+          "passed": true,
+          "detail": "28/29 LLM calls used without fallback"
+        }
+      ],
+      "pending": [
+        {
+          "expect": "the 16 GB-class and 36 GB-class models are compared",
+          "needs": [
+            "L-1"
+          ],
+          "reason": "needs two local Ollama runs (run_eval.py --engine llm --model <tag> for each), then run_eval.py --compare",
+          "currently": null,
+          "now_passes": null
+        }
+      ],
+      "run_dirs": [
+        "S11"
+      ],
+      "verify_cost_items": [
+        "absorption_chiller_plant_cost_function_usd",
+        "electric_chiller_plant_cost_function_usd"
+      ],
+      "token_comparison": null,
+      "note": ""
+    }
+  ]
+}

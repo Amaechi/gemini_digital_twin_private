@@ -1,0 +1,15 @@
+# Hard limits — never violated silently (CLAUDE.md golden rule 4; spec §2.1 DB-10…17, DB-36).
+# Enforced by DesignGuard (pre-simulation) and DesignVerifier. Must agree with config/design_basis.yaml
+# (checked by unit_test/gemini_agent/schemas/test_config.py). Schema: gemini_agent.schemas.config.HardLimits.
+schema_version: 1
+source: "CLAUDE.md golden rule 4; GEOAGENT_DESIGN_SPEC §2.1 DB-10…DB-17, §2.4 DB-36 [P]"
+doublet_count_min: 1                      # DB-10
+doublet_count_max: 3                      # DB-10
+flow_min_active_m3h: 50.0                 # DB-11 per active doublet
+flow_max_m3h: 300.0                       # DB-11 per doublet
+brine_cooling_max_k: 40.0                 # DB-12
+pump_hydraulic_efficiency_frac: 0.70      # DB-13
+injection_equals_production: true         # DB-14 Q_inj = Q_prod
+heating_supply_degc: 100.0                # DB-16
+cooling_supply_degc: 20.0                 # DB-17
+ch4_venting_allowed: false                # DB-36 venting CH4 is never allowed

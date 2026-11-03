@@ -1,0 +1,1622 @@
+# Assumptions register (CLAUDE.md golden rule 2). Every [A] value or interpretation a tool uses MUST be here.
+# Seeded by WP-00 from GEOAGENT_DESIGN_SPEC §2.3 (DB-34) and §2.4 (DB-30…DB-40). Note: the spec defines no DB-39.
+# Later WPs append entries (never rename/remove); set added_by to the WP id and note them in PROGRESS.md.
+# Fields: id, title, value, unit, justification, source, sensitivity, tag (P/D/L/W/A), status, added_by.
+# Schema: gemini_agent.schemas.config.AssumptionsRegister.
+schema_version: 1
+assumptions:
+  - id: DB-30
+    title: Meaning of "330 daily steps" (doublet availability)
+    value:
+      interpretation: A
+      doublet_available_days_per_yr: 330
+      planned_outage_days_per_doublet: 35
+      outages_may_overlap: false
+      outage_schedule: chosen by the optimiser
+      demand_met_days_per_yr: 365
+    unit: null
+    justification: >-
+      Availability interpretation: each doublet is available 330 of 365 days (35-day planned outage,
+      never overlapping); heating and cooling demand must be met on all 365 days. 330/365 = 90.4 %
+      matches the standard 90 % availability planning assumption; it is the conservative reading
+      (forces backup capacity) and a design that passes it also passes the "simulate only 330 days" reading.
+    source: GEOAGENT_DESIGN_SPEC §2.4 DB-30; ESMAP p.31 [L]
+    sensitivity: "Interpretation B: simulate 330 days with no outage; report both."
+    tag: A
+    status: default
+    added_by: WP-00
+
+  - id: DB-31
+    title: District-heating return temperature
+    value: 55.0
+    unit: degC
+    justification: >-
+      100/55 °C network. Between measured Danish returns of 40–43 °C (Danfoss/Thisted p.4–5) and
+      conventional geothermal practice of ΔT >= 17–22 K (Guidebook p.231, 234); 55 °C lets the plate
+      HEX cool brine ≈ 86 → 58 °C before the heat-pump evaporator takes it to >= 46 °C. The agent MAY
+      treat the return temperature as a design lever.
+    source: GEOAGENT_DESIGN_SPEC §2.4 DB-31; Danfoss/Thisted p.4–5 [L]; Guidebook p.231, 234 [L]
+    sensitivity: [45.0, 65.0, 75.0]
+    tag: A
+    status: default
+    added_by: WP-00
+
+  - id: DB-32
+    title: Cooling-network return temperature
+    value: 26.0
+    unit: degC
+    justification: 20/26 °C; direct-cooling grids run ΔT 5–6 K.
+    source: GEOAGENT_DESIGN_SPEC §2.4 DB-32; Shallow DHC review p.8 [L]
+    sensitivity: [24.0, 28.0]
+    tag: A
+    status: default
+    added_by: WP-00
+
+  - id: DB-33
+    title: Brine specific heat capacity
+    value: 4100.0
+    unit: J/(kg K)
+    justification: Saline brine is below fresh water 4.19 kJ/(kg K) (the Guidebook uses fresh-water values).
+    source: GEOAGENT_DESIGN_SPEC §2.4 DB-33
+    sensitivity: [4000.0, 4190.0]
+    tag: A
+    status: default
+    added_by: WP-00
+
+  - id: DB-34a
+    title: Daily ambient temperature series for 2027
+    value:
+      method: piecewise_linear
+      anchor_day_of_month: 15
+      wrap_year: true
+      data: config/climate_nl.yaml
+    unit: null
+    justification: >-
+      Smooth seasonal profile from KNMI De Bilt 1991–2020 monthly normals placed at mid-month.
+    source: GEOAGENT_DESIGN_SPEC §2.3 DB-34a; RC-07; KNMI normals [W]
+    sensitivity: "Warm-climate case (DB-34b)."
+    tag: A
+    status: default
+    added_by: WP-00
+
+  - id: DB-34-RH
+    title: Monthly relative humidity (for wet-bulb)
+    value: [87, 84, 80, 75, 74, 76, 77, 78, 82, 85, 88, 88]
+    unit: "%"
+    justification: >-
+      No KNMI RH normals obtained; assumed values used with the Stull (2011) formula to derive monthly
+      wet-bulb. Replace with KNMI normals if obtained.
+    source: GEOAGENT_DESIGN_SPEC §2.3; RC-07 [A]
+    sensitivity: "Warm-climate design point 30 °C DB / 21 °C WB (DB-34b)."
+    tag: A
+    status: default
+    added_by: WP-00
+
+  - id: DB-34b
+    title: Summer design point for chiller and heat-rejection sizing
+    value:
+      dry_bulb_degc: 25.0
+      wet_bulb_degc: 18.4
+      warm_case_dry_bulb_degc: 30.0
+      warm_case_wet_bulb_degc: 21.0
+    unit: degC
+    justification: >-
+      1 % cooling dry-bulb with mean coincident wet-bulb, Amsterdam WMO 062400 (1973–1996) [W]. The warm
+      case (30 °C DB / 21 °C WB) is an assumption [A] because the record pre-dates recent warming.
+    source: GEOAGENT_DESIGN_SPEC §2.3 DB-34b; RC-07; NOAA Engineering Weather Data [W]; warm case [A]
+    sensitivity: "Warm-climate case 30 °C DB / 21 °C WB."
+    tag: W
+    status: default
+    added_by: WP-00
+
+  - id: DB-34c
+    title: Annual mean air and shallow-ground temperature
+    value:
+      annual_mean_air_degc: 10.5
+      shallow_ground_degc: 12.5
+    unit: degC
+    justification: >-
+      Annual mean = mean of the KNMI monthly normals [W] (10.52 °C) [D]; shallow ground ≈ air mean
+      + 2 °C [L]; consistent with DB-04 (surface 12 °C).
+    source: GEOAGENT_DESIGN_SPEC §2.3 DB-34c; Shallow DHC review p.3 [L]
+    sensitivity: null
+    tag: D
+    status: default
+    added_by: WP-00
+
+  - id: DB-34d
+    title: Exergy dead state
+    value: daily_dry_bulb
+    unit: null
+    justification: Dead state T0 = daily ambient dry-bulb; stated in every exergy KPI.
+    source: GEOAGENT_DESIGN_SPEC §2.3 DB-34d; DiPippo Ch10 p.7 [L]
+    sensitivity: null
+    tag: L
+    status: default
+    added_by: WP-00
+
+  - id: DB-35
+    title: Cost data policy
+    value:
+      labelled_sources_only: true
+      min_sensitivity_frac: 0.30
+    unit: null
+    justification: >-
+      Only labelled sources (spec §9.2). The former '[A] placeholder' items now carry the RC-10 "Sourced
+      values"; sensitivity is ±30 % or the item's stated range, whichever is wider (ECO-04).
+    source: GEOAGENT_DESIGN_SPEC §2.4 DB-35, §9.2 ECO-04; RC-10; config/cost_assumptions.yaml
+    sensitivity: "±30 % or the stated range, whichever is wider."
+    tag: A
+    status: default
+    added_by: WP-00
+
+  - id: DB-36
+    title: Associated-gas handling
+    value:
+      decision_variable: true
+      options: [degas_use, pressurised_reinject]
+      venting_allowed: false
+    unit: null
+    justification: >-
+      Decision variable, not an assumption (DR-07): (a) degas and use the gas in CHP/boiler with
+      calcite inhibitor, or (b) keep the loop pressurised and reinject dissolved gas. Venting CH4 is
+      never allowed. Degassing CO2 raises calcite scaling risk; Pleasant Bayou precedent for burning
+      separated methane.
+    source: GEOAGENT_DESIGN_SPEC §2.4 DB-36; DiPippo §4.4, §9.6.3 [L]; WEC p.15 [L]; Guidebook p.160 [L]
+    sensitivity: "Both variants simulated."
+    tag: A
+    status: default
+    added_by: WP-00
+
+  - id: DB-37
+    title: Grid electricity CO2 intensity
+    value: 0.3
+    unit: kg/kWh
+    justification: Value used in the GEMINI example.
+    source: GEOAGENT_DESIGN_SPEC §2.4 DB-37; GEMINI example
+    sensitivity: [0.2, 0.4]
+    tag: A
+    status: default
+    added_by: WP-00
+
+  - id: DB-38
+    title: Skin, wellbore radius, drainage radius
+    value:
+      skin: 0.0
+      wellbore_radius_m: 0.108
+      drainage_radius_m: 1000.0
+    unit: null
+    justification: Skin 0; rw = 0.108 m (8½-inch hole); re = 1,000 m.
+    source: GEOAGENT_DESIGN_SPEC §2.4 DB-38
+    sensitivity:
+      skin: [-1.0, 5.0]
+    tag: A
+    status: default
+    added_by: WP-00
+
+  - id: DB-40
+    title: Meaning of the 70 % pump efficiency
+    value:
+      pump_hydraulic_efficiency_frac: 0.70
+      motor_efficiency_frac: 0.93
+      vfd_efficiency_frac: 0.97
+    unit: null
+    justification: >-
+      70 % is the pump hydraulic (shaft) efficiency; motor and VFD losses are added separately
+      (motor 93 %, VFD 97 % [A]). Guidebook examples use 60–65 % wire-to-water.
+    source: GEOAGENT_DESIGN_SPEC §2.4 DB-40; Guidebook p.256–263 [L]
+    sensitivity: "Wire-to-water 70 %."
+    tag: A
+    status: default
+    added_by: WP-00
+
+  - id: ECO-CUR
+    title: Reporting currency for costs
+    value: USD
+    unit: null
+    justification: >-
+      The cost basis (currency, discount rate, energy prices) is an open question for the organisers
+      (spec §17 Q5). RC-10 reports every sourced value in USD as well as natively. Values are stored
+      natively (EUR, USD, AUD with price year) and converted in code with eur_to_usd = 1.13 (ECB 2025
+      annual average), aud_to_usd = 0.63, the DEA 2020→2025 EUR factor 1.168 and CEPCI where marked.
+      The price-year mismatch between sources (2002/2011/2020/2023/2025 EUR and USD; NREL dollar-year
+      not stated) is accepted as ± a few % (RC-10).
+    source: RC-10 (incl. Sourced values); GEOAGENT_DESIGN_SPEC §17 Q5 (open)
+    sensitivity: "eur_to_usd 1.08–1.13; revisit when the organisers answer §17 Q5."
+    tag: A
+    status: default
+    added_by: WP-00
+
+  - id: SUB-RHOC
+    title: Aquifer volumetric heat capacity (thermal-breakthrough screening)
+    value: 2500000.0
+    unit: J/(m3 K)
+    justification: >-
+      Gringarten–Sauty (1975) breakthrough time t_b = π h D² (ρC)_a / (3 (ρC)_w Q) needs the
+      volumetric heat capacity of the saturated aquifer; RC-02 gives ≈ 2.5e6 J/(m³ K) [A]. With
+      h = 100 m and Q = 300 m³/h it reproduces DB-26 (23.6 yr at D = 1.0 km, 34 yr at 1.2 km).
+    source: RC-02 eq 1 [A]; GEOAGENT_DESIGN_SPEC §2.2 DB-26
+    sensitivity: >-
+      No range on RC-02; t_b is linear in (ρC)_a, so a ±x % change moves t_b by ±x % (WP-11 UQ-RANGES: not varied, no range on the card).
+    tag: A
+    status: default
+    added_by: WP-04
+
+  - id: DEM-COP-HD
+    title: Screening COP of heat-driven cooling (demand profiling only)
+    value: 0.75
+    unit: "-"
+    justification: >-
+      Used only by the demand tool to build the screening profile "heating + cooling / COP" (the heat a
+      geothermal plant would supply if all cooling were heat-driven). Spec §3.2 states this screening
+      value (window 6 May–9 Jun, ≈ 143 GWh/yr). Sizing and simulation use the calibrated RC-05
+      absorption-chiller model, which gives COP ≈ 0.60–0.70 for 85–105 °C drive heat.
+    source: GEOAGENT_DESIGN_SPEC §3.2 [A]; RC-05 (COP 0.60–0.70) [L]
+    sensitivity: [0.60, 0.70]
+    tag: A
+    status: default
+    added_by: WP-04
+
+  - id: SUB-II
+    title: Injectivity index of the injector
+    value: equal_to_pi
+    unit: null
+    justification: >-
+      The injector's injectivity index II is taken equal to the producer's PI (same reservoir, same
+      completion), so injection bottom-hole pressure is P_res + Q/II (RC-01 item 4, DiPippo eq
+      4.14–4.15). Used by TL-01 to show that an injection pump is needed (DB-21).
+    source: RC-01 item 4 [A]
+    sensitivity: "Cold-water injection usually lowers II (viscosity); WP-05 may add a factor."
+    tag: A
+    status: default
+    added_by: WP-04
+
+  - id: SUB-WELL
+    title: Well completion used for doublet hydraulics (TL-05, TL-06)
+    value:
+      trajectory: vertical
+      inner_diameter_m: 0.216
+      roughness_m: 0.0000457
+    unit: null
+    justification: >-
+      Producer and injector are vertical to the reservoir mid-depth. One flow-path inner diameter is used
+      for the whole well: the 8½-inch hole of DB-38 (2 × r_w = 0.216 m). This is conservative for friction,
+      because the pump chamber is ≥ 13⅜-inch casing (RC-01 item 11). Wall roughness is that of steel pipe,
+      0.0457 mm (RC-01 eq 5); it is always passed explicitly as roughness_m, never GEMINI's 0.01 m default
+      (WP-01 follow-up). Wellbore heat loss uses GEMINI DPDT's hard-coded U = 10 W/(m² K) against the
+      undisturbed geothermal gradient (RC-01 eq 1 and envelope note); this steady value is
+      conservative (start-up) at part load, e.g. ≈ 10 K loss at 50 m³/h.
+    source: RC-01 items 1, 5, 11; GEOAGENT_DESIGN_SPEC §2.4 DB-38
+    sensitivity: >-
+      A larger flow diameter (13⅜-inch casing above the pump) lowers friction; scaling or corrosion raises
+      roughness. Producer friction is ≈ 4.5 bar at 300 m³/h with the base values.
+    tag: A
+    status: default
+    added_by: WP-05
+
+  - id: SUB-PWH
+    title: Producer wellhead pressure (TL-05 operating point)
+    value: 3.0
+    unit: bar(g)
+    justification: >-
+      GEMINI's own doublet example (simulator_examples/projects/doublet_plant.json) produces against a
+      3.0 bar wellhead pressure, and the C2/C3 reference process degasses at the surface (spec §3.5). With
+      this value TL-05 reproduces the RC-01 envelope (ESP Δp 30–40 bar, ≈ 0.4 MW shaft at 300 m³/h). A
+      pressurised loop without degassing (C7, DB-36) must keep the wellhead above the bubble point
+      (SUB-PBUB, ≈ 45 bar(g) at 87 °C; RC-01 item 9, RC-12) and passes its own value to TL-05; that exceeds
+      the plate-HEX ratings on RC-03. Pressures are gauge throughout.
+    source: GEMINI doublet_plant.json boundary input; GEOAGENT_DESIGN_SPEC §3.5; RC-01 envelope; RC-12
+    sensitivity: [3.0, 50.0]
+    tag: A
+    status: default
+    added_by: WP-05
+
+  - id: SUB-PBUB
+    title: Brine bubble-point pressure (Henry's law) and ESP-intake setpoint (VER-ESP-PB)
+    value:
+      method: henry_law
+      basis: sea_water
+      second_bound: pure_water
+      intake_margin_factor: 1.2
+      bubble_pressure_bara: 46.1
+      bubble_pressure_pure_water_bara: 52.2
+      at_temperature_degc: 87.0
+      intake_setpoint_bara: 55.3
+    unit: null
+    justification: >-
+      The design basis gives no bubble point, so it is computed with Henry's law exactly as RC-01 item 9
+      specifies: p_b = Σ c_i / H_i(T), c_i = GLR · y_i / 0.022414 mol/m³ (DB-09: 0.8 Nm³/m³, 80 % CH₄,
+      20 % CO₂), H_i(T) = H_i° · exp[B_i (1/T − 1/298.15)] with the card's sea-water constants (CH₄ 1.2e-5
+      mol m⁻³ Pa⁻¹, B 1100 K; CO₂ 2.8e-4, B 2600 K) as the basis for our 1030 kg/m³ brine and the
+      pure-water constants (CH₄ 1.4e-5, 1600 K; CO₂ 3.4e-4, 2300 K) as the second bound. Ideal gas, no
+      fugacity or water-vapour correction (card). TL-05 evaluates it at the reservoir temperature of each
+      design (CH₄ p_b rises with T over 25–100 °C, so this is the conservative end); the values above are
+      the record at DB-01 (87 °C): p_b 46.1 bar(a) sea water (CH₄ 44.9 + CO₂ 1.1 bar), 52.2 bar(a) pure
+      water. The ESP intake must stay at or above 1.2 · p_b (margin for the van 't Hoff extrapolation
+      298 → 360 K and salinity above sea water [A]) = 55.3 bar(a) = 54.3 bar(g); the card rounds this up
+      to 60 bar(a) only as a default when p_b is not computed. The bare p_b (bar(g), not multiplied) is
+      passed to the verifier as the release pressure (EspPoint.release_pressure_barg); the DesignVerifier
+      applies the same factor itself from VER-ESP-MARGIN, so the two entries must state the same margin
+      (a test checks it). Replaces the former 20 bar(g) default, which the card now calls not
+      conservative.
+    source: >-
+      RC-01 item 9 (Henry's-law constants: Sander, Compilation of Henry's law constants v5.0.0, Atmos.
+      Chem. Phys. 23, 10901–12440, 2023; Burkholder et al. 2019, JPL Publication 19-5) [L]; margin 1.2 [A]
+    sensitivity: >-
+      Pure-water bound 52.2 bar(a) (setpoint 62.6 bar(a)); margin 1.1–1.3. The ESP setting depth moves
+      ≈ 10 m per bar of setpoint; a measured bubble point replaces the estimate.
+    tag: L
+    status: default
+    added_by: WP-05
+
+  - id: SUB-NPSH
+    title: ESP net positive suction head check
+    value:
+      npsh_margin_m: 15.0
+      vapour_pressure_bound_bara: 1.01325
+      vapour_pressure_bound_valid_to_degc: 100.0
+      atmospheric_pressure_bara: 1.01325
+    unit: null
+    justification: >-
+      NPSHA = (P_intake + P_atm − P_vap) / (ρ g), in m of brine (Guidebook p.173, RC-01 item 8). The
+      pump's NPSHR is not given (missing input), so the check is NPSHA ≥ 15 m, the heuristic margin of
+      RC-01 item 8 (DiPippo Problem 4.5); add NPSHR when a pump is selected. The vapour pressure is bounded
+      by water at its normal boiling point (1.01325 bar(a) at 100 °C), which is conservative for brine at
+      or below 100 °C (dissolved salt lowers it). Above 100 °C NPSHA is not evaluated (warning). The
+      bubble-point setpoint SUB-PBUB (1.2 · p_b) is far more restrictive at the intake.
+    source: RC-01 item 8 [L Guidebook p.173; DiPippo Problem 4.5]; [A]
+    sensitivity: "NPSHR of the selected pump (typically a few metres) adds to the 15 m margin."
+    tag: A
+    status: default
+    added_by: WP-05
+
+  - id: SUB-ESP
+    title: ESP model and sizing rules (TL-05, TL-06)
+    value:
+      stage_head_coeff: [83.08389282, -0.000460444, -1.19e-07, 1.69e-11, -6.36e-16, 6.69e-21]
+      stage_power_coeff: [10.02089977, -0.000160233, 6.52e-08, -2.13e-12, 1.71e-17, 1.38e-23]
+      frequency_min_hz: 30.0
+      frequency_max_hz: 70.0
+      frequency_nominal_hz: 60.0
+      setting_depth_step_m: 10.0
+      flow_scale_rule: best_efficiency_point_at_max_flow
+      stages_rule: max_flow_at_nominal_frequency
+      setting_depth_rule: shallowest_with_intake_at_bubble_pressure_at_max_flow
+    unit: null
+    justification: >-
+      Stage curves are GEMINI's ESP polynomials (TNO 2022 R11363; pump HC27000 in GEMINI's tests and the
+      doublet example; head in ft and brake power in hp per stage against bbl/d at 60 Hz). Their best-
+      efficiency point is ≈ 183 m³/h (72 %) and the head is negative above ≈ 280 m³/h, so DB-11's
+      300 m³/h needs a larger pump of the same family: the curve is flow-scaled (Q × k, head per stage × 1,
+      power × k, efficiency unchanged; like k impellers in parallel) so that its best-efficiency point is at
+      the maximum design flow. The number of stages is the smallest that gives the required ESP Δp at the
+      maximum flow at the nominal 60 Hz (60–70 Hz is kept for decline). The setting depth is the shallowest
+      depth, in 10 m steps, where the intake stays at or above the SUB-PBUB setpoint (1.2 · p_b) at the
+      maximum flow. Frequency window
+      30–70 Hz (RC-01 item 7); below 30 Hz the flow is held at 30 Hz with a wellhead choke. GEMINI scales
+      head by (f/60)² and power by (f/60)³ at the same flow (no flow affinity), so its curve power is
+      optimistic at reduced frequency; plant power uses the DB-13/DB-40 rule QΔp/0.70 and the curve power
+      is reported for comparison only.
+    source: RC-01 items 7, 11; GEMINI gemini_model/pump/esp.py and simulator_examples/projects/doublet_plant.json
+    sensitivity: "Stage count ± 1 and flow scale ± 10 % (change the frequency, not the rule-based power)."
+    tag: A
+    status: default
+    added_by: WP-05
+
+  - id: SUB-PSUC
+    title: Injection-pump suction pressure
+    value: 0.0
+    unit: bar(g)
+    justification: >-
+      The surface-loop pressure that reaches the injection pump is not known until WP-06 builds the plant.
+      Conservatively the injection pump supplies the whole injector wellhead pressure: no credit is taken
+      for the producer wellhead pressure (SUB-PWH), which the separator, filters and heat exchangers
+      consume. This reproduces the RC-01 envelope (≈ 0.3 MW shaft per doublet at 300 m³/h).
+    source: "[A]; RC-01 envelope"
+    sensitivity: [0.0, 3.0]
+    tag: A
+    status: default
+    added_by: WP-05
+
+  - id: SUB-SPACING
+    title: Producer–injector spacing at reservoir depth
+    value: 1200.0
+    unit: m
+    justification: >-
+      RC-02 default D ≥ 1200 m (target breakthrough time ≥ 30 yr; ENG-06). Paris/Dogger doublets use
+      1–1.3 km, Landau ≈ 1.2 km (RC-02). TL-07 also reports the minimum spacing for t_b ≥ the analysis
+      period.
+    source: RC-02 Defaults; GEOAGENT_DESIGN_SPEC §3.6 ENG-06
+    sensitivity: [1000.0, 1500.0]
+    tag: A
+    status: default
+    added_by: WP-05
+
+  - id: VER-ESP-PB
+    title: ESP-intake / CO₂-release pressure setpoint (bubble point from Henry's law)
+    value: 60.0
+    unit: bar(a)
+    justification: >-
+      The design basis gives no bubble point, so RC-01 item 9 computes it with Henry's law
+      (p_b = Σ c_i / H_i(T), sea-water constants, 87 °C, GLR 0.8 Nm³/m³, 80 % CH₄ / 20 % CO₂):
+      p_b ≈ 46 bar(a) on the sea-water basis (52 bar(a) pure water); the card's setpoint is 1.2 · p_b
+      ≈ 55 bar(a), rounded up to 60 bar(a). This register default is that computed setpoint. The
+      DesignVerifier uses it, converted to gauge (60 − 1.01325 = 58.99 bar(g)), as the minimum ESP
+      intake pressure (PH-18) and, for a pressurised loop without degassing (DB-36 option b), as the
+      minimum brine pressure at every brine HEX (PD-10, RC-12); with it a gasketed (≈ 20 bar) or welded
+      (300 psig) plate HEX cannot hold the loop above release (RC-03). When WP-05's tool computes p_b
+      for the actual depth, temperature and gas, it passes the bare bubble point in bar(g)
+      (EspPoint.release_pressure_barg / VerificationEvidence.co2_release_pressure_barg); the verifier
+      then applies VER-ESP-MARGIN itself and this default is not used. This value already contains
+      the 1.2 factor and is not recomputed from VER-ESP-MARGIN: change both together in sensitivity
+      runs.
+    source: RC-01 item 9 (Henry's law, Sander 2023 constants), margin 1.2 [A]
+    sensitivity: "p_b 46 (sea water) / 52 (pure water) bar(a); margin 1.0–1.3 ⇒ setpoint ≈ 46–68 bar(a): the ESP setting depth moves accordingly."
+    tag: A
+    status: default
+    added_by: WP-09
+
+  - id: VER-ESP-MARGIN
+    title: Safety factor on the computed bubble point for the ESP-intake / brine-pressure setpoint
+    value: 1.2
+    unit: "-"
+    justification: >-
+      RC-01 item 9 sets p_intake ≥ 1.2 · p_b with p_b in bar(a); the factor covers the van 't Hoff
+      extrapolation of the Henry's-law constants (298 → 360 K; CH₄ solubility has its minimum near
+      80–100 °C) and salinity above sea water. When a tool passes the bare bubble point p_b (bar(g):
+      EspPoint.release_pressure_barg or VerificationEvidence.co2_release_pressure_barg), the
+      DesignVerifier applies this factor itself: limit_barg = 1.2 · (p_b_barg + 1.01325) − 1.01325,
+      for the ESP intake (PH-18) and the pressurised-loop brine pressure (PD-10). For PD-10 this is a
+      conservative reading: RC-01 item 9 only requires the surface loop to stay above p_b, but the
+      same Henry's-law uncertainty applies there, and it matches the default path. The no-p_b default
+      VER-ESP-PB (60 bar(a)) already includes the factor and does not follow this entry at run time:
+      a sensitivity run on the margin must change VER-ESP-PB with it (≈ factor × 46.1 bar(a)).
+    source: RC-01 item 9 (margin 1.2 [A])
+    sensitivity: [1.0, 1.3]
+    tag: A
+    status: default
+    added_by: WP-09
+
+  - id: VER-HP-ETA
+    title: Heat-pump COP cap as a fraction of Carnot when no datasheet is cited
+    value: 0.6
+    unit: "-"
+    justification: >-
+      RC-04 flags the 100 °C HTHP datasheet as MISSING and sets a default cap COP ≤ 0.6 × Carnot
+      (Carnot from the condensing/evaporating temperatures, RC-04 eq. 1). The DesignVerifier applies
+      it (check PH-14) unless the heat-pump operating point carries a datasheet value. gemini_model.heatpump
+      reuses it (closed-form path caps COP here; WP-03).
+    source: RC-04 parameter table, HTHP at 100 °C supply [A]
+    sensitivity: "0.50 / 0.55 / 0.65 (capped design-case COP 3.14 / 3.43 / 4.00; WP-03)"
+    tag: A
+    status: default
+    added_by: WP-09
+
+  - id: VER-HP-LIFT
+    title: Heat-pump lift limit (sink outlet − source outlet) when no datasheet is cited
+    value: 60.0
+    unit: K
+    justification: >-
+      RC-04 default cap "lift ≤ 60 K [A]" for a 100 °C HTHP without a cited datasheet. The
+      DesignVerifier applies it (check PH-14) unless the operating point carries a datasheet lift.
+      gemini_model.heatpump reuses it to flag within_limits (WP-03).
+    source: RC-04 parameter table, HTHP at 100 °C supply [A]
+    sensitivity: "50 / 70 K"
+    tag: A
+    status: default
+    added_by: WP-09
+
+  - id: COOL-ABS-B
+    title: Dühring slope B of the LiBr absorption-chiller characteristic equation
+    value: 1.15
+    unit: "-"
+    justification: >-
+      RC-05 Method B (ΔΔt = (t_G − t_AC) − B (t_AC − t_E)) gives B ≈ 1.1–1.2 for LiBr without a single
+      value; the mid-point is used. With B = 1.15, raising the mean evaporator temperature by 14 K is worth
+      ≈ 16 K of drive temperature (RC-05 screening statement 15–17 K).
+    source: RC-05 Method B [A]; gemini_model.absorption_chiller (GM-04)
+    sensitivity: [1.1, 1.2]
+    tag: A
+    status: default
+    added_by: WP-02
+
+  - id: COOL-ABS-CAL
+    title: Absorption-chiller characteristic coefficients calibrated to Method A (no datasheet)
+    value:
+      fit: weighted least squares (relative error) on Method A rating points
+      rating_points: "T_chw 44 °F, T_cw 85 °F, T_hw 180–240 °F every 5 °F"
+      generator_delta_t_k: 7.2
+      cooling_water_range_k: 5.0
+      chilled_water_delta_t_k: 6.0
+      s_e_per_k: 0.022260
+      ddt_min_k: 9.503
+      s_g_per_k: 0.032491
+      ddt_min_g_k: 7.453
+    unit: null
+    justification: >-
+      RC-05 leaves the Method B coefficients MISSING and says to calibrate them to a datasheet or, failing
+      that, to Method A at its rating points. Method A gives inlet/leaving temperatures, so circuit means use
+      the generator ΔT 7.2 K [L Guidebook p.267], a cooling-water range of 5 K [A RC-07] and a chilled-water
+      ΔT of 6 K [A: the DB-32 design ΔT; the card gives no rating ΔT]. On the rating points the fit matches
+      Method A within 1.0 % (capacity) and 2.1 % (COP). At 20 °C chilled water the method is extrapolated
+      (RC-05: uncertain); off the rating line Method A's product form F_T·F_c diverges from ΔΔt (up to 0.27
+      of nominal capacity at 180 °F / 50 °F / 75 °F).
+    source: RC-05 Method B option (ii); gemini_model.absorption_chiller.characteristic.calibrate_to_ghc1989
+    sensitivity: >-
+      Method A ("ghc1989", conservative lower bound) and B = 1.1 / 1.2; replace with a datasheet fit
+      (characteristic.fit_coefficients) if one is found.
+    tag: A
+    status: default
+    added_by: WP-02
+
+  - id: COOL-ABS-CAP
+    title: Absorption-chiller capacity never exceeds the nameplate rating
+    value: 1.0
+    unit: fraction of nominal capacity
+    justification: >-
+      With cold cooling water and 20 °C chilled water the calibrated characteristic equation (and Method A
+      outside validity) can exceed the nominal capacity; the model credits at most the nameplate rating
+      (max_capacity_fraction), which is conservative for sizing.
+    source: engineering judgement [A]; GM-04
+    sensitivity: null
+    tag: A
+    status: default
+    added_by: WP-02
+
+  - id: COOL-ABS-LB
+    title: Method A outside its validity is evaluated at the conservative validity edge
+    value:
+      chilled_water_above_degf: 50.0
+      cooling_water_below_degf: 75.0
+    unit: degF
+    justification: >-
+      RC-05: outside 40–50 °F chilled / 75–90 °F cooling water Method A is a lower bound only. F rises with the
+      chilled-water and falls with the cooling-water temperature, so chilled water above 50 °F is evaluated
+      at 50 °F and cooling water below 75 °F at 75 °F (never overstates capacity); a validity warning is
+      reported. Other excursions are extrapolated with a warning.
+    source: RC-05 Method A [A interpretation]; parameter ghc1989_conservative_clamp
+    sensitivity: "ghc1989_conservative_clamp: false (raw extrapolation)."
+    tag: A
+    status: default
+    added_by: WP-02
+
+  - id: COOL-ABS-AUX
+    title: Absorption-chiller auxiliary power (extra tower fan and cooling-water pump)
+    value: 0.021894
+    unit: fraction of cooling duty
+    justification: >-
+      0.077 kW/ton ÷ 3.517 kW/ton ≈ 2.2 % of Q_cool (Guidebook p.269), the extra tower fan and cooling-water
+      pump of absorption versus electric chilling. Applied only while include_heat_rejection_auxiliaries is
+      true (default). When the project has a heat_rejection component that counts the tower fan and pumps
+      (2 % of heat rejected), set include_heat_rejection_auxiliaries: false (RC-05/RC-06 no-double-counting
+      rule): P_aux = 0 and Q_reject = Q_cool + Q_drive.
+    source: RC-05 Auxiliaries [L Guidebook p.269]
+    sensitivity: null
+    tag: L
+    status: default
+    added_by: WP-02
+
+  - id: COOL-ABS-PL
+    title: Absorption-chiller part-load behaviour
+    value:
+      characteristic: "ΔΔt reduced to ΔΔt_min + Q_E/s_E; Q_G = s_G (ΔΔt − ΔΔt_min,G)"
+      ghc1989: "COP(T_hw) unchanged; Q_G = Q_E / COP"
+    unit: null
+    justification: >-
+      RC-05 gives no part-load rule. Method B: part load is a reduction of the characteristic temperature
+      difference (drive-temperature control, Ziegler/Hellmann), so the drive heat keeps an offset s_G (ΔΔt_min −
+      ΔΔt_min,G) ≈ 0.067 Q_nom and the COP falls at low load (≈ 0.47 at 10 % and 0.21 at 2 % load at 85 °C
+      drive); it drops to 0 only when the machine stops (Q_E = 0). Method A has no part-load information, so
+      its COP is kept. Dispatch (WP-07) should avoid very low absorption loads.
+    source: RC-05 Method B form [A interpretation]; Method A [A]
+    sensitivity: "Constant COP at part load (Method A rule) as an optimistic bound."
+    tag: A
+    status: default
+    added_by: WP-02
+
+  - id: COOL-ABS-DRV
+    title: Absorption-chiller drive-side consistency with a given drive flow
+    value:
+      characteristic_min_drive_capacity_rate: "C_G >= s_G / 2 (minimum_drive_flow_rate_m3s), else machine off"
+      ghc1989_drive_outlet_floor_degc: 71.4
+    unit: null
+    justification: >-
+      With arithmetic-mean circuit temperatures, the drive outlet stays above the machine's minimum generator
+      temperature t_G,min = ΔΔt_min,G + (1+B) t̄_AC − B t̄_E exactly when the drive capacity rate C_G = ρ c_p V
+      ≥ s_G/2 (independent of the operating point; ≈ 13.9 m³/h of water per MW of nominal capacity). Below that
+      the characteristic equation over-credits capacity with an outlet that violates the model (and can fall
+      below the cooling water), so the machine is treated as off and a warning is returned. Method A has no
+      flow term: the drive heat is limited so the outlet stays at or above its zero-capacity temperature
+      (160.5 °F = 71.4 °C), and Q_E = Q_G · COP. Without a given flow the fixed 7.2 K generator ΔT is used.
+    source: derived from RC-05 Method B / Method A [A interpretation]; WP-02 reviews
+    sensitivity: null
+    tag: A
+    status: default
+    added_by: WP-02
+
+  - id: COOL-ELC
+    title: Electric-chiller Carnot efficiency η on the model's refrigerant basis
+    value:
+      carnot_efficiency: 0.50834
+      basis: "refrigerant: T_evap = chilled supply − 4 K, T_cond = condenser leaving water + 3 K"
+      calibration_point: "COP 4.39 at 7.2 °C chilled / 32.2 °C condenser leaving water (Guidebook p.257–258)"
+    unit: "-"
+    justification: >-
+      RC-06 "Temperature basis of η": the Guidebook's 0.39–0.40 is on the water basis (water temperatures in
+      the COP equation). The model applies the −4 K / +3 K refrigerant offsets (COOL-ELC-APPROACH), so η is
+      calibrated on that basis to reproduce the Guidebook point: η = 4.39 × (35.2 − 3.2) / (3.2 + 273.15) =
+      0.50834 [D] (card: ≈ 0.51 / 0.508). The model does this itself (carnot_efficiency: null →
+      electric_chiller.calibrated_carnot_efficiency from its own approach parameters), so changing an approach
+      keeps the point reproduced. Bases are not mixed. With this η the COP cap of 8 binds at the Dutch design
+      points (tower WB 18.4 / 21 °C, dry 25 °C); below the cap e.g. 6.7 with a dry cooler at 30 °C. P_el is
+      compressor power only; tower fan and pumps belong to the heat-rejection model (RC-06).
+    source: RC-06 temperature-basis row and validation test [D]; Guidebook p.257–258
+    sensitivity: [0.44, 0.513]
+    tag: D
+    status: default
+    added_by: WP-02
+
+  - id: COOL-ELC-APPROACH
+    title: Electric-chiller temperature chain and COP limits
+    value:
+      evaporator_approach_k: 4.0
+      condenser_approach_k: 3.0
+      tower_approach_k: 4.5
+      cooling_water_range_k: 5.0
+      dry_cooler_condenser_offset_k: 8.0
+      cop_max: 8.0
+      cop_min: 3.0
+    unit: null
+    justification: >-
+      RC-06: T_evap = supply − 4 K, T_cond = tower leaving water (T_wb + 4–5 K approach + 5 K range) + 3 K, or
+      T_db + 8 K with an air-cooled (dry) condenser; COP capped at 8 and floored at 3 [A]. The constant-η model
+      is steeper (−3.1 %/K at the Guidebook point) than the Guidebook data (≈ −2.6 %/K). A water-loop dry
+      cooler (heat_rejection, T_db + 5 K) feeding the condenser gives T_db + 13 K instead of T_db + 8 K (the
+      model warns). The spec GM-05 row omits the 5 K range; the card (with range) is followed. Sensitivity of η:
+      0.44 is the condenser-offset-only reading (RC-06), 0.513 the 45/95 °F Guidebook point on the model basis.
+    source: RC-06 [A]; spec GM-05
+    sensitivity: "tower approach 4–5 K; dry cooler T_db + 13 K (water loop)."
+    tag: A
+    status: default
+    added_by: WP-02
+
+  - id: COOL-HR
+    title: Heat-rejection (cooling tower / dry cooler) defaults
+    value:
+      tower_approach_k: 4.5
+      range_k: 5.0
+      aux_power_fraction: 0.02
+      dry_cooler_approach_k: 5.0
+      dry_cooler_power_factor: 3.0
+      latent_heat_j_kg: 2450000.0
+    unit: null
+    justification: >-
+      Tower leaving water = T_wb + approach (4–5 K → 4.5) [A], range ≈ 5 K [A], fan + pump ≈ 2 % of heat
+      rejected [A]; dry cooler leaving water = T_db + 5 K [L RTES], fan power ≈ 3× wet [L DiPippo Ch23], applied
+      to the whole 2 % (→ 6 %) [A]. Tower water use = Q_reject / h_fg with h_fg 2.45 MJ/kg (water at ≈ 20 °C,
+      steam tables) [A]: an upper bound (all heat by evaporation). Cost and area ≈ 3× wet for a dry cooler are
+      for economics (WP-08).
+    source: RC-07 Heat rejection [A]/[L]; steam tables for h_fg [A]
+    sensitivity: "tower approach 4–5 K; dry-cooler power factor 3 applied to the fan only."
+    tag: A
+    status: default
+    added_by: WP-02
+
+  - id: COOL-FC
+    title: Free-cooling (water-side economiser) defaults
+    value:
+      tower_approach_k: 4.5
+      hex_approach_k: 2.0
+      aux_power_fraction: 0.02
+    unit: null
+    justification: >-
+      Full free cooling when T_wb + 4.5 + 2 ≤ 20 °C (T_wb ≤ 13.5 °C), partial pre-cooling of the 26 °C return
+      while T_wb + 6.5 < 26 °C; power = fan + pumps ≈ 2 % of the heat moved, i.e. a performance factor of 50
+      (inside the 24–53 seasonal range).
+    source: RC-07 Free cooling [A]; RC-03 plate-HEX approach 2–3 K
+    sensitivity: "HEX approach 3 K; tower approach 5 K."
+    tag: A
+    status: default
+    added_by: WP-02
+
+  - id: CFG-LAYOUT
+    title: Plant topology generated for each concept (TL-09)
+    value:
+      brine_train: "producer → [degasser] → filter A → [brine split → absorption drive] → [plate HEX-1] → [brine mix] → [HP evaporator] → filter B → injector"
+      district_chain: "return → [bypass] plate HEXs (per doublet, flow shares ∝ doublet flow) → [CHP on associated gas] → [bypass] heat pumps (100 °C target) → [peak boiler, grid gas]"
+      controls: "simulate_day cuts the plate-HEX share to hold brine ΔT ≤ DB-12 and ≤ 100 °C before the heat pumps, cuts the heat-pump share only to an hthp_heating_mw nameplate (capacity control), and fires the peak boiler to 100 °C"
+      cooling_chain: "[free cooling] → [absorption, residual] → electric chiller (unmet); one cooling tower for all"
+      absorption_drive: "brine of the first active doublet through titanium generator tubes, taken before HEX-1"
+      derived_concepts: "C6 = parent plant (no storage model in GEMINI); C7 = parent without degasser, WHP = SUB-PBUB setpoint, no CHP; C8 = parent"
+    unit: null
+    justification: >-
+      Spec §3.5 reference process. The CHP is placed before the heat pumps so that the associated gas, which must
+      be burned anyway (DB-36, no venting), displaces heat-pump electricity and the heat pumps (fixed 100 °C target)
+      self-regulate; the peak boiler is last and is fired by simulate_day only to hold 100 °C. The absorption drive
+      uses brine directly through titanium generator tubes (RC-05 p.266–267: Cu/CuNi incompatible) because a clean
+      isolation loop is a recycle the forward GEMINI solver cannot run.
+    source: GEOAGENT_DESIGN_SPEC §3.4, §3.5; RC-05; RC-07; RC-08 [A]
+    sensitivity: "Spec order (HP before CHP trim); isolation HEX + clean loop for the absorption drive (WP-11)."
+    tag: A
+    status: default
+    added_by: WP-06
+
+  - id: CFG-SURFACE
+    title: Surface brine train hydraulics and heat losses (TL-09)
+    value:
+      separator_letdown: "WHP − SUB-PSUC lumped in the degasser at the operating flow"
+      filter_and_hex_resistance: 0.0
+      surface_temperature_drop_k: 0.0
+    unit: null
+    justification: >-
+      No card gives surface pressure drops or heat losses. The whole wellhead-to-pump-suction drop (SUB-PWH 3 bar(g)
+      → SUB-PSUC 0 bar(g)) is put into the degasser (gas separates at the lowest pressure), so the injection pump
+      sees the same suction as TL-05; filters and plate HEX have zero resistance, and every surface component is
+      adiabatic, so the brine-side balance (verifier PH-22) closes exactly. In the pressurised loop (C7) there is
+      no letdown and the brine reaches the injector at the producer WHP. Brine above 100 °C (C4 at 3.2 km) let
+      down to 0 bar(g) may flash; the generator flags it (no saturation data in RC-01).
+    source: SUB-PWH, SUB-PSUC (WP-05); RC-03 control valve at the HEX outlet (Guidebook p.234) [A]
+    sensitivity: "Filter/HEX Δp 24 kPa/NTU (RC-03 eq 4) moved from the letdown to the HEX; 1 K surface heat loss."
+    tag: A
+    status: default
+    added_by: WP-06
+
+  - id: CFG-HEX
+    title: Plate heat exchanger HEX-1 design rule (TL-09)
+    value:
+      approach_k: 3.0
+      u_w_per_m2k: 4000.0
+      ntu_per_pass_max: 4.0
+      dp_per_ntu_psi: 3.5
+      construction: gasketed
+      plate_material: titanium
+    unit: null
+    justification: >-
+      Counter-flow, sized at the candidate's design flow: UA from the ε-NTU relation of GEMINI's HeatExchanger
+      inverted (RC-03 eq 1 and 3; exact at balanced flows, where GEMINI's C_r < 1 branch loses precision).
+      Design outlets: district min(T_wh − approach, 100 °C), brine max(T_wh − 40 K, 55 °C + approach); the district
+      flow closes the balance (balanced flows at 85 °C brine: 82.2/58 °C). Approach 3 K and U 4.0 kW/m²K are the
+      card's [A] defaults; NTU per pass ≤ 4 and 3.5 psi (24 kPa) per NTU from Guidebook p.221; titanium plates for
+      saline brine (RC-03, RC-12).
+    source: RC-03 parameter table and eq 3–4 (GNS; Guidebook p.217–223) [A]/[L]
+    sensitivity: "approach 2–5.6 K; U 3.0–6.2 kW/m²K."
+    tag: A
+    status: default
+    added_by: WP-06
+
+  - id: CFG-HP
+    title: Heat-pump model settings used in generated configs (TL-09)
+    value:
+      solver: closed_form
+      mode: lorenz
+      efficiency: "HP-ETA-L (η_L, WP-03)"
+      source_outlet_min: "max(T_wh − DB-12, 100 °C − VER-HP-LIFT) (Ts_in_minimum)"
+      sink_target: "DB-16 (Th_out_target)"
+    unit: null
+    justification: >-
+      Generated heat pumps use WP-03's closed-form HeatpumpBasic path (GM-03: RC-04 eq. 1–3 with a bracketed root, no
+      Nelder–Mead starting guess) in Lorenz mode, RC-04's preferred method, with η_L from HP-ETA-L; the COP is capped
+      at VER-HP-ETA × Carnot at the refrigerant temperatures (HP-APPROACH 4 K) and the model reports its RC-04
+      screening (within_limits, missing_inputs, heat_pump_point). The cap binds at every point simulated (C2 design:
+      Lorenz 4.67 → 3.86, i.e. ≈ 0.52 × Carnot on water temperatures), so the COP is set by VER-HP-ETA and HP-APPROACH,
+      not by η_L (inert above ≈ 0.41). GEMINI's default Nelder–Mead solver is unchanged
+      for every other user. Evaporator on brine (ρ 1030, c_p 4100), condenser on district water; the source-outlet
+      floor enforces DB-12 and the VER-HP-LIFT 60 K lift (C5: 56 °C brine is cooled to 40 °C at most). No HTHP
+      datasheet is cited, so every heat-pump day is flagged with the MISSING datasheet values.
+    source: RC-04 (Lorenz preferred; η_L default 0.50); WP-03 GM-03 closed form; HP-ETA-L, HP-APPROACH, VER-HP-ETA
+    sensitivity: "Run on VER-HP-ETA and HP-APPROACH: the cap binds at every simulated point (η_L inert above ≈ 0.41); a cited HTHP datasheet replaces the RC-04 defaults."
+    tag: A
+    status: default
+    added_by: WP-06
+
+  - id: CFG-CHP
+    title: CHP total efficiency in generated configs (electrical share is CHP-EL-FRAC)
+    value:
+      total_efficiency_frac: 0.96
+    unit: "-"
+    justification: >-
+      GEMINI chp.py takes efficiency_factor = useful output / fuel LHV; the generator uses the DEA gas-engine total
+      efficiency ≈ 0.96 (η_e 0.48, C_b 0.99 at DH 50/100 °C, RC-10). The electrical share of that output is
+      CHP-EL-FRAC (WP-03: GEMINI's hard-coded 1/3 kept; the generator refuses a register value that differs from
+      chp.py's ELECTRICAL_POWER_FRACTION), so η_e = 0.32 and η_th = 0.64 of fuel LHV versus DEA 0.48 / 0.48. The CHP
+      burns only the associated gas (≈ 1.9 MW fuel per doublet at 300 m³/h).
+    source: RC-10 'CHP capex' row (DEA ch. 06 gas engines); RC-08; CHP-EL-FRAC (WP-03)
+    sensitivity: "Total efficiency 0.90–0.96; electrical share per CHP-EL-FRAC."
+    tag: A
+    status: default
+    added_by: WP-06
+
+  - id: CFG-BOILER
+    title: Peak (grid-gas) boiler efficiency
+    value:
+      efficiency_frac: 0.90
+    unit: "-"
+    justification: >-
+      RC-08 gives η = 0.80 (GEMINI example) / 0.90 modern [A]; a new peak boiler is modern. Nameplate = DB-18 peak
+      unless the candidate sizes it (CFG-SIZING); simulate_day fires it only to hold the 100 °C supply.
+    source: RC-08 Boiler [A]; NREL benchmark 80 % (RC-08 emission table)
+    sensitivity: "0.80 (GEMINI example, NREL benchmark)."
+    tag: A
+    status: default
+    added_by: WP-06
+
+  - id: CFG-GRID-GAS
+    title: Grid natural gas as burner fuel (peak boiler, C0)
+    value:
+      ch4_mol_frac: 1.0
+    unit: null
+    justification: >-
+      Grid gas is modelled as methane: LHV 35.8 MJ/Nm³ / (16.04/22.414 kg/Nm³) = 50.03 MJ/kg (RC-08 constants, same
+      as GEMINI's 50 MJ/kg example). The burner's CO₂ factor is ECO-CO2-GAS (WP-08, ECO-05: 56.6 kg/GJ), read by
+      the generator so both use one value.
+    source: RC-08 associated gas constants [D]; ECO-CO2-GAS (WP-08)
+    sensitivity: "Groningen L-gas LHV 31.65 MJ/m³ (RC-10); CO₂ factor per ECO-CO2-GAS."
+    tag: A
+    status: default
+    added_by: WP-06
+
+  - id: CFG-ASSOC-GAS
+    title: Associated-gas burner fuel properties (CHP on separated gas)
+    value:
+      lhv_j_kg: 29670000.0
+      emission_kg_per_gj: 68.56
+      density_kg_nm3: 0.965
+    unit: null
+    justification: >-
+      From the separator composition (DB-09: 80/20 mol % CH₄/CO₂) via separator.associated_gas_properties: LHV 28.64
+      MJ/Nm³ = 29.67 MJ/kg; CO₂ when burned 1.964 kg/Nm³ (combustion + inherent) = 68.56 kg/GJ_LHV. The CHP gets
+      caloric_value = the separator's fuel_lhv_j_kg and this factor, replacing GEMINI's 50 MJ/kg / 56.6 kg/GJ (which
+      would overstate the fuel ×1.69 and understate CO₂ ×1.39). Values are computed in code, listed here for audit.
+    source: RC-08 Associated gas [D]; DB-09
+    sensitivity: "Gas-liquid ratio and composition (DB-09)."
+    tag: D
+    status: default
+    added_by: WP-06
+
+  - id: CFG-SIZING
+    title: Default equipment nameplates and dispatch defaults in generated configs
+    value:
+      peak_boiler_mw: "DB-18 peak (30 MW) unless equipment_sizes.peak_boiler_mw"
+      electric_chiller_mw: "DB-19 peak (10 MW) unless equipment_sizes.electric_chiller_mw"
+      absorption_chiller_mw: "DB-19 peak (10 MW) unless equipment_sizes.absorption_chiller_mw"
+      doublet_flow: "candidate design_flow_m3h on every doublet unless the dispatch gives flows"
+      absorption_drive_frac: "drive flow the absorption model needs for the residual load (fixed 7.2 K drive ΔT), capped at the doublet flow"
+      district_flow: "heating demand / (ρ c_p (100 − 55 K)) with GEMINI water properties"
+    unit: null
+    justification: >-
+      The generator must produce a runnable plant before WP-11 sizes it; every unit that can carry its load alone
+      is given the design peak, which never under-sizes. Dispatch defaults are placeholders until WP-07.
+    source: DB-18, DB-19, DB-31; RC-05 (generator ΔT 7.2 K, Guidebook p.267) [A]
+    sensitivity: "Sizes come from WP-11 optimisation; dispatch from WP-07."
+    tag: A
+    status: default
+    added_by: WP-06
+
+  - id: ECO-CO2-GAS
+    title: Grid natural-gas CO2 emission factor
+    value: 56.6
+    unit: kg CO2/GJ (LHV)
+    justification: >-
+      ECO-05 asks to choose between 56.6 kg/GJ (GEMINI example, the boiler model's gas_emission_factor; GEMINI is
+      a Dutch geothermal tool and the site is in the Netherlands) and 51.53 kg CO2-e/GJ (Gippsland paper, an
+      Australian scope-1 factor for Australian pipeline gas). 56.6 is chosen for consistency with the digital
+      twin we simulate with. 51.53 is the sensitivity case: it lowers C0's emissions and therefore the
+      reported CO2 reduction of the geothermal candidates (the conservative side for that claim).
+      VERIFY: RC-08 does not state the energy basis of 51.53; if it is gross (HHV), as Australian NGA factors
+      usually are, it is ≈ 57 kg/GJ on LHV — then the two values agree and the sensitivity only shows the basis.
+    source: GEOAGENT_DESIGN_SPEC §9.2 ECO-05; RC-08 Emission factors (GEMINI example; Gippsland) [L]
+    sensitivity: [51.53]
+    tag: A
+    status: default
+    added_by: WP-08
+
+  - id: ECO-CO2-AG
+    title: Associated-gas CO2 accounting
+    value:
+      factor_kg_per_gj_lhv: 68.6
+      burners_use_associated_gas_first: true
+      surplus: flared
+    unit: null
+    justification: >-
+      With degassing (DB-36 a) every Nm3 of separated gas ends as CO2: burned in CHP/boiler or flared, never vented
+      (DB-36). Factor 68.6 kg/GJ_LHV incl. the inherent 20 mol % CO2 is DB-28, derived in code from the DB-09
+      composition (tools.design_basis.gas_mix_properties). Burners take the associated gas first (it is free),
+      grid gas makes up the rest; gas beyond the burners' daily need is flared (CO2 counted, no energy credit).
+      With the pressurised loop (DB-36 b) dissolved gas is reinjected: zero emission.
+    source: RC-08 Associated gas [D]; GEOAGENT_DESIGN_SPEC §2.2 DB-28, §2.4 DB-36
+    sensitivity: "Pressurised-reinjection variant (C7) is the zero-emission case."
+    tag: D
+    status: default
+    added_by: WP-08
+
+  - id: ECO-CO2-SCOPE
+    title: CO2 price applies to direct emissions only
+    value: direct_emissions
+    unit: null
+    justification: >-
+      The CO2 price (EUA reference 79.42 EUR/t) is charged on gas burned or flared on site. Indirect CO2 of
+      purchased electricity (DB-37) is reported but not priced again: the electricity price already carries the
+      ETS cost. The price is applied to all on-site combustion although small boilers (< 20 MW thermal input)
+      fall under ETS2 only from 2028 (RC-10) — a conservative simplification.
+    source: RC-10 Sourced values (CO2 price, ETS1/ETS2 scope) [L]; our interpretation [A]
+    sensitivity: "CO2 price 63–117 USD/t in the tornado (DB-35 rule)."
+    tag: A
+    status: default
+    added_by: WP-08
+
+  - id: ECO-ELEC-NET
+    title: Own electricity generation offsets purchases daily; surplus not credited
+    value:
+      netting: daily
+      surplus_export_credit: 0.0
+    unit: null
+    justification: >-
+      CHP electricity first covers the plant's own consumption on the same day (valued at the purchase price);
+      any surplus is reported but not credited because no export/feed-in price is sourced on RC-10.
+    source: our assumption [A]; RC-10 (no export price)
+    sensitivity: "Follow-up: an export price would lower LCOH for CHP-heavy candidates."
+    tag: A
+    status: default
+    added_by: WP-08
+
+  - id: ECO-REAL
+    title: Levelised cost in real terms with real energy-price escalation
+    value:
+      energy_escalation_real_frac: "(1 + energy_escalation_frac)/(1 + inflation_general_frac) − 1 = 0.0244"
+      discount_rate_basis: real
+    unit: null
+    justification: >-
+      ECO-01 (Gippsland Eq. 1) with r = 8 % treated as a real rate; capex and O&M constant in real terms;
+      electricity, gas and CO2 prices escalate at the real rate implied by the configured RC-10 defaults (energy
+      5 % nominal, midpoint of 3–7 %, and 2.5 % general inflation) = 2.44 %/yr. 0 % (constant prices) is a
+      request option; the RC-10 range 0.49–4.39 %/yr real is one tornado bar around the base.
+    source: RC-10 Levelised cost and defaults [L]; config/cost_assumptions.yaml; our interpretation [A]
+    sensitivity: "energy_escalation_real_frac 0.0049–0.0439 (tornado)."
+    tag: A
+    status: default
+    added_by: WP-08
+
+  - id: ECO-ALLOC
+    title: Shared costs split between heat and cooling by delivered energy
+    value: delivered_energy_share
+    unit: null
+    justification: >-
+      Wells, pumps and flaring serve both products: their capex, O&M, energy and CO2 cost are split by the brine
+      heat each service draws (DayResult.brine_heat_drawn_mw; absorption drive = cooling, every other user =
+      heat), an energy share as RC-10 asks; without brine-heat data by delivered heat/(heat + cooling) MWh. Free
+      cooling and electric chillers draw no brine, so they carry no well cost. An allocation-free combined cost
+      per MWh (heat + cooling) is reported too (spec ECO-01, RC-10). Heat-only equipment (HEX to the DH network, HTHP,
+      CHP, boilers) goes to LCOH, cooling-only equipment (chillers, tower, free cooling) to LCOC; electricity
+      and fuel follow each consumer's service (explicit map, else keyword rules, else shared).
+    source: GEOAGENT_DESIGN_SPEC §9.2 ECO-01; RC-10 Levelised cost
+    sensitivity: "Delivered-energy split as the fallback; exergy-based allocation not implemented."
+    tag: A
+    status: default
+    added_by: WP-08
+
+  - id: ECO-OM
+    title: O&M as a fraction of capex for every item; replacements
+    value:
+      om_frac_of_capex_per_yr: 0.015
+      pump_replacement_interval_yr: 7
+      heat_pump_replacement_interval_yr: 15
+    unit: null
+    justification: >-
+      ECO-01: O&M 1–2 % of capex per year (midpoint 1.5 %), applied to the total capex; the DEA item-specific
+      fixed/variable O&M (HTHP, CHP, e-boiler) is not used, to keep one rule for all candidates. Replacements at
+      multiples of the interval (rounded half up) strictly before the end of the analysis period; no salvage
+      value, so the 20-yr case pays a full HTHP replacement at year 15 (≈ +2 $/MWh vs a straight-line residual).
+    source: RC-10 Opex [L]; config/cost_assumptions.yaml
+    sensitivity: "om_frac_of_capex_per_yr 1–2 % (the stated range is wider than ±30 %, DB-35)."
+    tag: A
+    status: default
+    added_by: WP-08
+
+  - id: ECO-PUMP-CAPEX
+    title: ESP and injection-pump capex not on the reference cards
+    value: null
+    unit: USD per doublet
+    justification: >-
+      RC-10 has no ESP or injection-pump price, so pumps and their 7-yr replacement are not costed unless the
+      caller supplies pump_capex_usd_per_doublet; the economics tool warns "MISSING INPUT". The NREL well costs
+      include the completion, not the ESP.
+    source: RC-10 (gap)
+    sensitivity: "Supply a vendor quote when available."
+    tag: A
+    status: default
+    added_by: WP-08
+
+  - id: ECO-CHILLER
+    title: RC-05 chiller cost functions applied per unit of at most 1000 nominal tons
+    value:
+      max_nominal_tons_per_unit: 1000
+      escalation: cepci_1986_to_2023
+    unit: null
+    justification: >-
+      The Guidebook p.269 cost functions (decoded, VERIFY) are valid for 100–1000 ton; larger plants are split
+      into equal units (absorption by nominal tons = duty/F), smaller ones are extrapolated with a warning.
+      Escalated with CEPCI 797.9/318.4 = 2.51 (spec ×≈2.5). The absorption plant function includes tower, pumps
+      and piping; the electric plant function is assumed to include its heat rejection too (VERIFY), so chiller
+      heat rejection is not costed again. The 100-ton lower bound is checked on nominal tons per unit.
+    source: RC-05 Cost [L, VERIFY]; RC-10 CEPCI [L]
+    sensitivity: "±30 % (DB-35)."
+    tag: A
+    status: default
+    added_by: WP-08
+
+  - id: EXG-FUEL
+    title: Fuel chemical exergy factor
+    value: 1.04
+    unit: exergy / LHV
+    justification: RC-11 — fuel exergy ≈ LHV × 1.04 [A] (or LHV).
+    source: RC-11 Equations [A]
+    sensitivity: [1.0]
+    tag: A
+    status: default
+    added_by: WP-08
+
+  - id: EXG-KPI
+    title: Exergy KPI definition
+    value: functional_efficiency
+    unit: null
+    justification: >-
+      KPISet.exergy_efficiency_frac = functional efficiency (E_heat + E_cold + W_generated) / (brine exergy at the
+      production temperature + electricity consumed + fuel exergy), with T0 = daily dry-bulb (DB-34d). It is
+      defined for every candidate (C0 has no brine) and charges every exergy input. The spec §10.1 utilisation
+      (W_net + E_heat + E_cold)/(m e_res) is reported as exergy_utilisation_frac; it credits heat from gas and
+      heat pumps to the brine and can exceed 1 for hybrid plants.
+    source: RC-11; GEOAGENT_DESIGN_SPEC §10.1 exergy row
+    sensitivity: null
+    tag: A
+    status: default
+    added_by: WP-08
+
+  - id: NET-LOSS-FRAC
+    title: Default distribution heat loss when the network is not described
+    value: 0.10
+    unit: fraction of heat demand
+    justification: >-
+      Network length and pipe data are not given (missing input): losses = 10 % of demand [A], just below the
+      Danfoss/Thisted benchmark 10.9–17 % (optimistic side; the benchmark is the sensitivity).
+    source: RC-09 Pipe heat loss [A]; Danfoss/Thisted [L]
+    sensitivity: [0.109, 0.17]
+    tag: A
+    status: default
+    added_by: WP-08
+
+  - id: NET-TRUNK-M
+    title: Nominal trunk length when the network is not described
+    value: 5000.0
+    unit: m
+    justification: Network length not given (missing input); nominal 5 km trunk [A] for the layered-resistance case.
+    source: RC-09 Pipe heat loss [A]
+    sensitivity: null
+    tag: A
+    status: default
+    added_by: WP-08
+
+  - id: SCL-RULES
+    title: Scaling-screen pass/fail thresholds
+    value:
+      ryznar_fail_below: 5.5
+      ryznar_inhibitor_below: 6.2
+      gypsum_rs_fail_above: 1.2
+      gypsum_rs_inhibitor_from: 0.8
+    unit: null
+    justification: >-
+      RC-12 gives the Ryznar classes (< 4 extreme, 4–5.5 heavy, 5.5–6.2 slight, 6.2–7 little/none, > 7 none) and
+      the gypsum ambiguous band 0.8–1.2 but no pass/fail rule. Fail on heavy/extreme calcite (RI < 5.5) or
+      gypsum supersaturation (RS > 1.2), require the calcite inhibitor for slight scaling or ambiguous gypsum,
+      fail a pressurised loop below the CO2-release pressure, and fail when a required mitigation is missing.
+      K_c(T) and log K_gyp(T) (Guidebook p.160–163) are inputs with the brine analysis (not on RC-12).
+    source: RC-12 Scaling [L]; our pass/fail interpretation [A]
+    sensitivity: null
+    tag: A
+    status: default
+    added_by: WP-08
+
+  - id: ECO-SENS-MULT
+    title: Sensitivity of cost multipliers applies to the premium
+    value: premium_only
+    unit: null
+    justification: >-
+      For items named *_multiplier (titanium plates 1.5, titanium generator tubes 1.125, deviated wells 1.125, dry
+      cooler 3.0) the DB-35 ±30 % applies to the premium (x − 1), so a multiplier never drops below 1 (a deviated
+      well never cheaper than a vertical one); the stated range still widens the bounds.
+    source: GEOAGENT_DESIGN_SPEC §2.4 DB-35, §9.2 ECO-04; our interpretation [A]
+    sensitivity: null
+    tag: A
+    status: default
+    added_by: WP-08
+
+  - id: HP-ETA-L
+    title: Heat-pump Lorenz efficiency η_L on water temperatures
+    value: 0.5
+    unit: "-"
+    justification: >-
+      RC-04 eq. 2: COP = η_L · T̄_sink / (T̄_sink − T̄_source) with log-mean water temperatures; η_L 0.50 [A] is
+      the RC-04 default and GEMINI's eta_lorenz default (the Guidebook point implies η_Carnot ≈ 0.46 on the
+      Carnot basis). Used by gemini_model.heatpump in both solvers. At the large glides of the design case
+      (sink 82→100 °C, brine 60→46 °C, mean lift 38 K) η_L 0.5 gives COP 4.79, above the RC-04 default cap
+      0.6 × Carnot at the refrigerant temperatures (VER-HP-ETA): the closed-form path applies that cap. The
+      capped pump draws less brine heat, so the brine leaves at 47.1 °C (not 46) and COP = 3.71 (RC-04
+      expects 3.5–4.5; DEA 3.57 at the same 52.9 K lift, plausibility only). While the cap binds (here for
+      η_L ≥ ≈ 0.39) η_L has no effect: the COP is set by VER-HP-ETA and HP-APPROACH, so run the sensitivity
+      on those; η_L matters only on the Nelder-Mead path or with apply_cop_cap false.
+    source: RC-04 parameter table (η_L default 0.50 [A]); GEMINI heatpump_basic default
+    sensitivity: [0.40, 0.55]
+    tag: A
+    status: default
+    added_by: WP-03
+
+  - id: HP-APPROACH
+    title: Heat-pump evaporator and condenser approach (refrigerant vs water outlet)
+    value:
+      condenser_approach_k: 4.0
+      evaporator_approach_k: 4.0
+    unit: K
+    justification: >-
+      RC-04 eq. 4: approach 3–5 K [A]; mid-point used (as COOL-ABS-B). Condensing = sink outlet + 4 K,
+      evaporating = source outlet − 4 K. gemini_model.heatpump reports them as the DesignVerifier's
+      HeatPumpPoint evidence (PH-13/PH-14) and evaluates the VER-HP-ETA cap there. The Lorenz COP itself
+      is on water temperatures (η_L absorbs the approach losses), so the approach changes only the cap.
+    source: RC-04 eq. 4 [A]
+    sensitivity: "3 / 5 K (capped COP at the design case 3.82 / 3.61)"
+    tag: A
+    status: default
+    added_by: WP-03
+
+  - id: EB-ETA
+    title: Electric-boiler efficiency
+    value: 0.99
+    unit: "-"
+    justification: >-
+      Heat = 0.99 × electricity (spec GM-08); the DEA catalogue gives the same value. Losses 1 %. No direct
+      emission; grid CO₂ is counted by economics (WP-08).
+    source: spec §7.2 GM-08; RC-10 Sourced values (DEA Electricity & DH catalogue ch. 41 "Electric boilers")
+    sensitivity: "none (DEA constant 2025–2050)"
+    tag: L
+    status: default
+    added_by: WP-03
+
+  - id: STO-REC-HT
+    title: High-temperature ATES cycle recovery (and how the storage model applies it)
+    value: 0.63
+    unit: "-"
+    justification: >-
+      RC-09: HT-ATES recovers ≈ 63 % of the stored heat after 10 years (TU Delft). gemini_model.thermal_storage
+      puts the whole recovery on discharge (η_c = 1, η_d = 0.63, no standing loss) [A], so one full
+      charge/discharge cycle returns exactly 0.63 × the charged heat regardless of the holding time; a
+      standing loss would double count it. Candidate C6 (seasonal HT-ATES) uses this value.
+    source: RC-09 Thermal storage [L TU Delft HT-ATES]; split on discharge [A]
+    sensitivity: "0.5 / 0.75 (early years recover less)"
+    tag: L
+    status: default
+    added_by: WP-03
+
+  - id: STO-REC-COLD
+    title: Cold storage cycle recovery
+    value: 0.96
+    unit: "-"
+    justification: >-
+      RC-09: cold RTES recovers 96–99 % (RTES paper citing Pepin 2021); the lower end is used. Applied as for
+      STO-REC-HT (η_c = 1, η_d = recovery). RC-09: daily storage adds little at daily resolution (≈ 12 h
+      storage matters only with sub-daily data).
+    source: RC-09 Thermal storage [L RTES]; lower end of the range [A]
+    sensitivity: [0.96, 0.99]
+    tag: L
+    status: default
+    added_by: WP-03
+
+  - id: CHP-EL-FRAC
+    title: CHP electrical share of the useful output (GEMINI chp.py vs DEA gas engine)
+    value: 0.3333
+    unit: "-"
+    justification: >-
+      Choice: simulations keep GEMINI chp.py's default — P_el = 1/3 and P_th = 2/3 of efficiency_factor ×
+      fuel power (class constant; since WP-11 an optional electrical_fraction parameter, written by TL-09
+      only when this entry differs from 1/3). The DEA 1–10 MW_e gas engine has η_e 0.48 and C_b 0.99
+      (≈ 1.01 MW_th per MW_e), an electrical share ≈ 0.50 at ≈ 0.96 total efficiency. 1/3 is conservative
+      for the electricity a degas + CHP option (DR-07 a) credits and generous on its heat. Economics (WP-08)
+      must cost and credit the simulated P_el / P_th (not DEA η_e) so the energy and money balances agree.
+      The 0.50 sensitivity is TL-15 case CHP-EL-FRAC=0.5 (UQ-CASES; every degassing concept has a CHP).
+    source: GEMINI chp.py ELECTRICAL_POWER_FRACTION; RC-10 Sourced values (DEA ch. 06 gas engines)
+    sensitivity: [0.3333, 0.50]
+    tag: A
+    status: default
+    added_by: WP-03
+
+  - id: SIM-OUTAGE
+    title: Default placement of the DB-30 planned doublet outages (WP-07 calendar)
+    value:
+      placement: greedy lowest-load non-overlapping windows, one per doublet
+      load: "daily heating demand + cooling demand / GM-04 design COP (absorption concepts only)"
+      window_wrap: false
+      ties: earliest window
+      optimiser_parameter: outage_start_indices
+    unit: null
+    justification: >-
+      DB-30 leaves the outage schedule to the optimiser. Until WP-11 chooses it, each doublet's 35-day outage
+      is put where the geothermal-side load is lowest (least backup needed), the first doublet in the year's
+      lowest window and each next one in the lowest window not overlapping those chosen (DB-30: never
+      overlapping). Same window rule as TL-02 (no wrap, earliest on ties). With absorption the drive heat is
+      geothermal load, so cooling counts at the GM-04 model COP (not DEM-COP-HD).
+    source: GEOAGENT_DESIGN_SPEC §2.4 DB-30, §8 SIM-02 [A interpretation]
+    sensitivity: "Any non-overlapping schedule via outage_start_indices (WP-11 optimiser)."
+    tag: A
+    status: default
+    added_by: WP-07
+
+  - id: SIM-DB30B
+    title: Days simulated under DB-30 interpretation B
+    value:
+      simulated_days: "year minus its lowest heating + cooling demand window of (365 − demand_met_days_per_yr) days"
+      outages: none
+    unit: null
+    justification: >-
+      Interpretation B simulates 330 daily steps without outage but does not say which 35 days are dropped.
+      Dropping the window of lowest total demand (heating + cooling, not the SIM-OUTAGE geothermal load, which
+      for non-absorption concepts is heating only and would drop the July cooling peak) keeps the DB-18 and
+      DB-19 design days, so B is not judged on easier days than A.
+    source: GEOAGENT_DESIGN_SPEC §2.4 DB-30 [A interpretation]
+    sensitivity: "Drop the last 35 days of the year instead (less conservative: removes December)."
+    tag: A
+    status: default
+    added_by: WP-07
+
+  - id: SIM-FAST
+    title: Fast and full annual simulation modes (SIM-04)
+    value:
+      fast_wells: TL-06 doublet performance map, linear between 10 m3/h grid points
+      fast_surface: TL-09 design PlantSpec components evaluated once each in the CFG-LAYOUT order
+      full: the fast daily plan run in GEMINI with TL-11 simulate_plant_day (TL-05 points, controls on)
+      comparison: PD-06 metric, warning above 0.02, fail above 0.05
+    unit: null
+    justification: >-
+      SIM-04 asks for a performance-map fast mode and a GEMINI-every-day full mode. The wells (TL-05 root
+      solve, the expensive part) come from the TL-06 map; the surface plant uses the same GEMINI component
+      models and parameters as the full project so both modes differ only by map interpolation and solver
+      order. The dispatch is decided once (fast) and replayed in full mode, so the comparison measures model
+      differences, not different decisions.
+    source: GEOAGENT_DESIGN_SPEC §8 SIM-04 [D]
+    sensitivity: "Map step 5 / 25 m3/h (TL-06 step_m3h)."
+    tag: D
+    status: default
+    added_by: WP-07
+
+  - id: DSP-FLOW
+    title: Daily doublet flow rule (SIM-03 (3))
+    value:
+      split: equal flow on the available doublets
+      switch_off: a doublet is switched off when the equal share would fall below the DB-11 minimum
+      target: smallest flow at which plate HEX + CHP + HTHP (≤ nameplate) meet the plant load without the boiler
+      maximum: candidate design flow (plate HEX and ESP design point), within the DB-11 range
+      resolution_m3h: 0.06
+    unit: null
+    justification: >-
+      The district water passes plate HEX → CHP → HTHP → peak boiler, so the SIM-03 order in which sources
+      take the load is the topology and the free decision is the brine flow. The smallest flow that keeps the
+      boiler off minimises brine production: pumping, and the associated gas the CHP must burn (DB-36) with
+      its CO2. It is knowingly not the lowest operating cost: a larger flow gives more plate-HEX and less
+      HTHP heat, which can save electricity (WP-07 physics check: C7 15 Apr 108 → 135 m3/h, −6 % net
+      electricity; C2 also more CHP electricity but +3.8 t/d CO2). A cost/CO2-priced flow search is WP-11's.
+      Equal sharing minimises pump power because ESP power Q·Δp(Q) grows faster than Q (RC-01). When the
+      maximum flow is not enough the boiler fills, then unmet demand is recorded.
+    source: GEOAGENT_DESIGN_SPEC §8 SIM-03; RC-01 [A interpretation]
+    sensitivity: "Spread over all doublets at the minimum flow; or maximum geothermal flow (WP-11)."
+    tag: A
+    status: default
+    added_by: WP-07
+
+  - id: DSP-HP-MIN
+    title: HTHP minimum daily part load before switching the heat pumps off
+    value:
+      min_part_load_frac: 0.10
+      max_extra_flow_frac: 0.10
+    unit: "-"
+    justification: >-
+      RC-04 gives no HTHP turndown. Below min_part_load_frac of the reference heat (hthp_heating_mw, else the
+      HTHP heat at the DB-18 peak with all doublets at the design flow) the HTHPs are switched off if HEX + CHP
+      carry the load with at most max_extra_flow_frac more total brine (DSP-FLOW re-solved without HTHPs), so
+      no large brine or CHP must-run increase is bought against the HEX → HTHP → CHP merit order; otherwise a
+      daily average below the minimum is read as on/off cycling within the day and kept (noted). The WP-06
+      July trickle at full flow (≈ 150 W, COP 9.8) is removed by DSP-FLOW's minimum flow; this rule removes
+      the remaining small trickles with hot brine (e.g. 3 kW at 105 °C wellhead) when the reference is > 0; a
+      zero reference (no nameplate and no HTHP heat at the design point) disables the rule (TL-12 warns).
+    source: engineering assumption [A]; WP-06 follow-up (PROGRESS)
+    sensitivity: "min_part_load_frac 0–0.25; max_extra_flow_frac 0–0.25"
+    tag: A
+    status: default
+    added_by: WP-07
+
+  - id: DSP-ABS-MIN
+    title: Absorption chiller minimum load (dispatch)
+    value: 0.10
+    unit: "-"
+    justification: >-
+      COOL-ABS-PL: Method B COP falls to ≈ 0.47 at 10 % load and 0.21 at 2 % (85 °C drive); WP-02 asks dispatch
+      to avoid very low absorption loads. Below 10 % of the absorption nameplate the residual after free
+      cooling goes to the electric chiller. Above it the drive brine is the smallest given flow (≥ the
+      COOL-ABS-DRV minimum + 1 % TL-05 flow tolerance, drive ΔT ≤ DB-12) at which GM-04 meets the residual
+      capped at its capacity at the maximum doublet flow — SIM-03 (1) puts absorption up to its GM-04
+      capacity before the electric chiller. Consequence (WP-07 physics check): a small, capacity-limited
+      machine chases its last few % with a large drive flow (C3 with 3 MW: one doublet at ≈ 290 m3/h in
+      late July for ≈ 0.2–0.8 MW more absorption cooling, + CHP gas), against DSP-FLOW's minimise-brine
+      reasoning; a cost/CO2-based absorption vs electric split is WP-11's.
+    source: COOL-ABS-PL (WP-02) [A]
+    sensitivity: [0.05, 0.25]
+    tag: A
+    status: default
+    added_by: WP-07
+
+  - id: DSP-STORAGE
+    title: C6 seasonal HT-ATES dispatch ledger
+    value:
+      sizes: "equipment_sizes storage_capacity_mwh and storage_power_mw (both required, no default)"
+      charge: spare geothermal capacity (all available doublets at the design flow, the day's absorption drive, no boiler) on days without boiler heat; served by the plant as extra load
+      discharge: in series ahead of the peak boiler at full district flow, displacing boiler heat, fuel and CO2 one for one
+      recovery: STO-REC-HT (on discharge)
+      cycles: 2 (second pass starts from the first's end state)
+      outlet_temperature: not modelled (discharge assumed at the supply temperature)
+    unit: null
+    justification: >-
+      C6 has no GEMINI storage component (WP-06). WP-03's ThermalStorage keeps the ledger: the plant serves
+      demand + charge on charge days; on discharge days the plant is unchanged and the storage preheats the
+      water ahead of the boiler, so HEX/HTHP heat is not lost to a smaller district flow (WP-07 physics
+      check). DayResult heat_by_source_mw['storage'] holds the net heat (negative while charging), as
+      ThermalStorage.net_heat_to_plant_w prescribes. No storage power default: capacity / 24 h gave 125 MW
+      for 3000 MWh, implausible for seasonal ATES. RC-09: seasonal ATES needs an annual heat balance —
+      charged/discharged totals are reported and an end ≠ start above 1 % of capacity is warned.
+    source: RC-09 Thermal storage; WP-03 GM-09 [A interpretation]
+    sensitivity: "Recovery 0.63 → 0.8; storage power ± 50 %."
+    tag: A
+    status: default
+    added_by: WP-07
+
+  - id: OPT-SPACE
+    title: Optimisation variables, integer options and bounds (TL-13)
+    value:
+      doublet_options: [1, 2, 3]
+      depth_options_m: [1500.0, 2000.0, 2500.0, 3000.0, 3200.0, 3500.0]
+      design_flow_m3h: "DB-11 range (limits.yaml flow_min_active_m3h … flow_max_m3h)"
+      peak_boiler_mw: "not searched: largest daily boiler heat of the design, rounded up to size_resolution_mw (cap-only unit)"
+      electric_chiller_mw: "not searched: larger of the largest daily electric-chiller duty and its duty on the DB-19 peak day at the DB-34b design ambient (the chiller sizing point), rounded up, at least min_equipment_mw (cap-only unit)"
+      absorption_chiller_mw: "min_equipment_mw … DB-19 cooling peak (C3, C4; the absorption/electric split)"
+      hthp_heating_mw: "min_equipment_mw … HTHP heat at the design point with every doublet at the DB-11 maximum flow (C2, C3, C5)"
+      min_equipment_mw: 0.5
+      outage_start_indices: "DB-30 A only, second DE stage at the size optimum: one integer per doublet; sorted u_i ∈ [0, 365 − n·35], start_i = u_(i) + i·35 (never overlapping); seeded with SIM-OUTAGE"
+      flow_resolution_m3h: 1.0
+      size_resolution_mw: 0.05
+      dispatch_levers:
+        DSP-HP-MIN.min_part_load_frac: [0.0, 0.25]
+        DSP-HP-MIN.max_extra_flow_frac: [0.0, 0.25]
+        DSP-ABS-MIN: [0.05, 0.25]
+      derived_not_searched: "plate-HEX UA (CFG-HEX: sized at the design flow for DB-12/DB-16), CHP (burns all associated gas, DB-36; priced at its largest daily heat), free-cooling HEX (largest daily duty) and its tower beyond the chiller plant's (largest daily rejection), storage (C6, unpriced)"
+    unit: null
+    justification: >-
+      Spec §9.1 OPT-01/OPT-03: integers (doublets 1–3, depths 1.5/2.0/2.5/3.0/3.2/3.5 km) are enumerated; the
+      continuous sizes are refined by seeded differential evolution. Every integer combination is first
+      screened at the CFG-SIZING sizes (DB-18/DB-19 peaks, HTHP without a nameplate) and the DB-11 maximum
+      flow; only the best `top_k` combinations are refined (OPT-DE). The peak boiler and the electric chiller
+      only cap their output in the WP-07 dispatch (constant boiler efficiency; the chiller COP does not depend
+      on its load ratio), so with the CFG-SIZING peaks (never binding) their cost-optimal nameplate given the
+      other choices is the largest daily output: an exact inner optimum that keeps them out of the search; the
+      optimum is re-run with these nameplates to confirm zero unmet demand. Day-average sizing, like the whole
+      model (DB-18/DB-19 are day-average peaks); no N-1 redundancy is required by the hard limits. An HTHP
+      nameplate above its design-point heat (all doublets at the DB-11 maximum, DB-18 peak, brine floor DB-12
+      and VER-HP-LIFT) is never used. The
+      GEMINI chiller and heat-pump models need a positive nominal capacity, hence min_equipment_mw (0.5 MW
+      = 142 tons, above the RC-05 cost functions' 100-ton floor); a concept without the unit is the other
+      concept (C1 = C2 without HTHP). Outage starts use the sorted-gap transform so every DE vector is a
+      DB-30-valid, non-overlapping schedule. Sizes are rounded to the stated resolution (DSP-FLOW resolves
+      0.06 m³/h) so repeated vectors are evaluated once. C6 storage sizes are not optimised: RC-10 has no
+      HT-ATES cost (they are scanned unpriced). Return temperature (OPT-01 MAY) is a TL-15 case (DB-31).
+      The remaining OPT-01 variables are derived, not searched (derived_not_searched): the plate-HEX UA follows
+      the design flow (CFG-HEX), the CHP burns all associated gas (DB-36), the free-cooling HEX and its extra
+      tower follow their largest daily duty. DSP-* levers are priced at the bounds of their own sensitivity
+      fields (dispatch_levers) on the optimum and reported; the register values are not changed. A year whose
+      WP-07 margins breach DB-11, DB-12 or DB-14 is rejected like a guard violation (golden rule 4); a DB-16/
+      DB-17 supply margin below zero is the temperature view of a capacity shortfall that WP-07 counts as
+      unmet demand (penalised by OPT-OBJ, never selected), and is rejected only without unmet demand.
+    source: GEOAGENT_DESIGN_SPEC §9.1 OPT-01, OPT-03; DB-10, DB-11, DB-18, DB-19, DB-30; CFG-SIZING; RC-05 (100-ton floor) [A]
+    sensitivity: "top_k and the DE budget (OPT-DE) trade runtime against the size refinement."
+    tag: A
+    status: default
+    added_by: WP-11
+
+  - id: OPT-OBJ
+    title: Optimisation objective, unmet-demand penalty and hard-limit barrier (TL-13)
+    value:
+      objective: "LCOH + LCOC over the base analysis period (ECO-01, 30 yr), USD/MWh"
+      unmet_penalty_base_per_mwh: 1000.0
+      unmet_penalty_per_unmet_mwh: 1.0
+      rejected_objective: 1000000.0
+      pareto_points: 3
+    unit: USD/MWh
+    justification: >-
+      Spec §9.1 OPT-02: minimise LCOH + LCOC subject to zero unmet demand and the hard limits. Unmet demand
+      > 0 adds 1000 USD/MWh plus 1 USD/MWh per MWh unmet: the base exceeds any LCOH + LCOC of a design that
+      meets demand (C0 LCOH ≈ 137 USD/MWh ≈ the ACM cap, ECO-07), so such a design always ranks first, and
+      the slope steers the search towards feasibility. A design that DesignGuard rejects (golden rule 4) or
+      that the generator/dispatch cannot build is never simulated or priced: it gets the barrier value
+      1e6, is recorded with the guard's reason and can never be selected (only evaluations with status ok
+      and zero unmet demand are reported as optimal). CO₂ Pareto: up to 3 non-dominated points (lowest
+      cost, lowest CO₂, closest to the normalised utopia point) among the evaluated designs that meet demand.
+    source: GEOAGENT_DESIGN_SPEC §9.1 OPT-02; ECO-07 benchmarks [A]
+    sensitivity: "Any base above the largest feasible LCOH + LCOC gives the same optimum."
+    tag: A
+    status: default
+    added_by: WP-11
+
+  - id: OPT-DE
+    title: Differential-evolution settings (seeded, reproducible)
+    value:
+      seed: 2026
+      strategy: best1bin
+      popsize: 5
+      maxiter: 8
+      maxiter_outage: 6
+      mutation: [0.5, 1.0]
+      recombination: 0.7
+      tol: 0.01
+      init: latinhypercube
+      polish: false
+      updating: deferred
+      top_k: 2
+    unit: null
+    justification: >-
+      scipy.optimize.differential_evolution with a fixed seed and deferred updating, so the same seed gives
+      identical results whether the population is evaluated serially or by a process pool (OPT-03); each
+      stage's population is seeded (x0) with the screened design / the SIM-OUTAGE schedule. One fast-mode
+      year takes ≈ 2 s at 2.5 km but 7–25 s at ≥ 3 km (brine ≥ 100 °C: nested HEX-share/HTHP bisections in
+      WP-07), so popsize 5 × (number of variables) with 8 size and 6 outage generations keep the C2 run within
+      the 15-min budget on 4 vCPU (WP-11 acceptance); polish is off (L-BFGS-B on a penalised, rounded
+      objective wastes evaluations). Unit tests use a smaller budget.
+    source: GEOAGENT_DESIGN_SPEC §9.1 OPT-03; scipy differential_evolution docs [A]
+    sensitivity: "More generations refine sizes by a few tenths of a USD/MWh at proportionally more runtime."
+    tag: A
+    status: default
+    added_by: WP-11
+
+  - id: UQ-RANGES
+    title: Uncertainty inputs for the Monte Carlo and one-at-a-time sensitivity (TL-15)
+    value:
+      permeability_md: {distribution: lognormal, low: 100.0, high: 400.0, note: "P90–P10 (10th/90th percentiles); median 200 = DB-06", source: "spec §9.3 UQ-01; DB-06"}
+      geothermal_gradient_k_per_km: {distribution: uniform, low: 28.0, high: 32.0, source: "spec §9.3 UQ-01; DB-03"}
+      skin: {distribution: uniform, low: -1.0, high: 5.0, source: "DB-38 sensitivity; spec §9.3 UQ-01"}
+      heating_demand_scale: {distribution: uniform, low: 0.9, high: 1.1, source: "spec §9.3 UQ-01 demand ±10 %"}
+      cooling_demand_scale: {distribution: uniform, low: 0.9, high: 1.1, source: "spec §9.3 UQ-01 demand ±10 %"}
+      heating_return_degc: {distribution: uniform, low: 45.0, high: 65.0, note: "operating return of the built plant (capex fixed); the UQ-CASES DB-31 values are design alternatives (capex re-derived)", source: "spec §9.3 UQ-01; DB-31"}
+      warm_climate_frac: {distribution: uniform, low: 0.0, high: 1.0, note: "[A] fraction of the DB-34b warm-case offset (+5 K dry bulb, +2.6 K wet bulb) added to cooling-season days (cooling demand > 0); one-sided: the base is its P0, not its P50", source: "DB-34b warm case; spec §9.3 UQ-01"}
+      production_temperature_shift_k: {distribution: uniform, low: -6.0, high: 6.0, note: "[A] interpretation: RC-02's Boolean-lens extreme on the 30-yr production temperature (smoother case ±2 °C) applied from year 1 as gradient ± shift/depth (also moves p_b and the DPDT profile)", source: "RC-02 item 3 (±6 °C on 30-yr production temperature); spec UQ-01"}
+      hp_carnot_fraction: {distribution: uniform, low: 0.50, high: 0.65, source: "VER-HP-ETA sensitivity (RC-04)"}
+      hp_approach_k: {distribution: uniform, low: 3.0, high: 5.0, source: "HP-APPROACH sensitivity (RC-04 eq 4)"}
+      absorption_duhring_slope: {distribution: uniform, low: 1.1, high: 1.2, source: "COOL-ABS-B (RC-05 Method B)"}
+      electric_chiller_carnot_efficiency: {distribution: uniform, low: 0.44, high: 0.513, source: "COOL-ELC (RC-06)"}
+      esp_intake_margin_factor: {distribution: uniform, low: 1.1, high: 1.3, note: "SUB-PBUB margin = VER-ESP-MARGIN (moved together, TL-05 enforces it); VER-ESP-PB is only the DesignVerifier's fallback (inert in TL-13/15) and is scaled 60 × margin/1.2 so the base is unchanged", source: "SUB-PBUB sensitivity; VER-ESP-MARGIN"}
+      injection_pump_suction_barg: {distribution: uniform, low: 0.0, high: 3.0, source: "SUB-PSUC sensitivity"}
+      injectivity_factor: {distribution: uniform, low: 0.65, high: 1.0, note: "[A] II = factor × PI. No card value: 0.8 reproduces LIM-SUB-02's +6 bar on the 26.5 bar(g) injection WHP at 300 m³/h; a near-well cold zone with water viscosity 1.5–1.65 × that at reservoir temperature (55–65 °C injectate) gives ≈ 0.63–0.72, hence 0.65 as the low bound", source: "SUB-II; LIM-SUB-02 (cold injection); WP-11 physics check"}
+      well_spacing_m: {distribution: uniform, low: 1000.0, high: 1500.0, source: "SUB-SPACING sensitivity (RC-02)"}
+      cost_items: {distribution: uniform, low: "item sensitivity_low", high: "item sensitivity_high", source: "DB-35 / ECO-04: ±30 % or the stated range, whichever is wider (CostBook)"}
+    unit: null
+    justification: >-
+      Spec §9.3 UQ-01 lists the Monte Carlo inputs; each range is taken from the register entry, card or
+      spec item that owns the value (source); entries marked [A] in their note are our interpretation or
+      derivation and say so. Where the spec and the register differ the register wins (HTHP performance:
+      VER-HP-ETA 0.50–0.65 instead of ±15 %; absorption: COOL-ABS-B 1.1–1.2). Not varied: SUB-RHOC (RC-02
+      gives no range; t_b is linear in it), SUB-WELL and SUB-ESP (no numeric range on the card; ESP
+      stage/scale changes move the frequency, not the rule-based power), SUB-NPSH (a check margin, not a
+      performance input), SUB-PWH (the 50 bar(g) value is the C7 pressurised concept, not an uncertainty),
+      HP-ETA-L (inert: the VER-HP-ETA cap binds, WP-06). Limitation: TL-09 re-plans the design point of each
+      scenario (plate-HEX UA, HTHP brine floor) for its own brine and return temperatures, so a fixed design
+      meets a matched HEX in −6 K or low-gradient samples (slightly optimistic); installed costs stay the
+      base design's. Samples are Latin-hypercube (seeded), mapped through each
+      distribution's inverse CDF; one-at-a-time cases take the low and high values.
+    source: GEOAGENT_DESIGN_SPEC §9.3 UQ-01; register entries named per input; RC-02, RC-04, RC-05, RC-06
+    sensitivity: "Ranges change with the owning entries; UQ-CASES holds the discrete cases."
+    tag: A
+    status: default
+    added_by: WP-11
+
+  - id: UQ-CASES
+    title: Discrete sensitivity cases run on the selected design (TL-15)
+    value:
+      grid_gas_co2_kg_per_gj: [51.53]
+      heating_return_degc: [45.0, 65.0, 75.0]
+      chp_electrical_fraction: [0.5]
+      bubble_point_basis: [pure_water]
+      warm_climate: [true]
+      db30_interpretation: ["B"]
+    unit: null
+    justification: >-
+      Cases that are alternatives rather than ranges: ECO-CO2-GAS 51.53 kg/GJ (Gippsland, ECO-05), the DB-31
+      return temperatures 45/65/75 °C (eval scenario S6), CHP-EL-FRAC 0.50 (DEA gas engines; chp.py takes an
+      electrical_fraction parameter since WP-11), the SUB-PBUB pure-water bound (52.2 bar(a)), the DB-34b
+      warm climate (whole offset) and DB-30 interpretation B (330 days, no outage). Each case regenerates
+      the plant at the selected sizes and reports LCOH, LCOC, unmet demand and CO₂ against the base.
+    source: ECO-CO2-GAS, DB-31, CHP-EL-FRAC, SUB-PBUB, DB-34b and DB-30 sensitivity fields
+    sensitivity: "—"
+    tag: A
+    status: default
+    added_by: WP-11
+
+  - id: UQ-MC
+    title: Monte Carlo settings and statistics (TL-15)
+    value:
+      samples: 200
+      seed: 2026
+      sampling: latin_hypercube
+      percentiles: {p10: 10, p50: 50, p90: 90}
+      driver_ranking: spearman_rank_correlation
+      top_drivers: 8
+      robust_backup_percentile: 90
+    unit: null
+    justification: >-
+      Spec §9.3 UQ-01/UQ-02: ≥ 200 fast-mode samples; P10/P50/P90 are the 10th/50th/90th percentiles of the
+      sampled KPI (P10 = low value, not an exceedance probability); probability of meeting demand = share of
+      samples (failed samples included) with zero unmet heating and cooling; dominant risk drivers = inputs
+      ranked by |Spearman ρ| with each KPI. Fixed seed ⇒ identical samples and results (OPT-03 spirit).
+      KPISet.min_constraint_margins of the TL-15 result is the smallest margin over the base run and all
+      successful samples (the robustness view); the base run's own margins stay in the base KPIs. The peak
+      boiler and electric chiller are last in the merit order and cap-only, so a sample's required nameplate
+      is the installed one plus its largest day-average unmet MW; robust_backup_mw = the 90th percentile
+      of that requirement (rounded up to OPT-SPACE size_resolution_mw), re-run on the base year to price the
+      robustness. The tornado ranks inputs by the LCOH + LCOC swing; unmet demand is reported per bar, not
+      mixed into the swing through the OPT-OBJ penalty.
+    source: GEOAGENT_DESIGN_SPEC §9.3 UQ-01, UQ-02 [A]
+    sensitivity: "More samples narrow the percentile estimates (≈ ±3 percentile points at 200)."
+    tag: A
+    status: default
+    added_by: WP-11
+
+  - id: RUN-BUDGET
+    title: Search budgets of the real tools for evals and CI smoke runs (TL-13/TL-15 effort only)
+    value:
+      full: {}
+      quick: {own_point_only: true, top_k: 1, popsize: 1, maxiter: 1, maxiter_outage: 1, dispatch_search: false, storage_scan: false, mc_samples: 12, one_at_a_time: false}
+      smoke: {own_point_only: true, max_concepts: 1, top_k: 1, popsize: 1, maxiter: 0, maxiter_outage: 0, dispatch_search: false, storage_scan: false, mc_samples: 2, one_at_a_time: false, uq_cases: false, day_step: 30, workers: 1}
+    unit: null
+    justification: >-
+      Runtime only: the same real tools (never stubs) with a smaller search. full = the register values
+      (OPT-SPACE, OPT-DE, UQ-MC) on every CPU — the submitted run (scripts/build_results.py). quick = evals
+      (run_eval.py): the candidate's own doublet count and verifiable depth, one DE generation, 12 Monte Carlo
+      samples, sensitivity cases kept (S6). smoke = CI and the pytest end-to-end run: one concept sized, the
+      DE initial population only, 2 samples, every 30th day of the DB-30 year (economics then cover those
+      days only, so its KPIs are not design results), one process (no worker pool). Keys absent from a
+      budget take the full value; workers absent = all CPUs. Selected with `cli run --budget` (or the
+      GEOAGENT_BUDGET environment variable).
+    source: WP-14 (CI time limit; engineering values stay in OPT-SPACE, OPT-DE, UQ-MC)
+    sensitivity: "Smaller budgets find a worse optimum and wider percentile error; never used for reported results."
+    tag: A
+    status: default
+    added_by: WP-14
+
+  - id: OPT-ROBUST-BACKUP
+    title: Install the TL-15 robust backup nameplates (DR-11 recommendation)
+    value:
+      recommend: robust
+      robust_backup_percentile: 90
+    unit: null
+    justification: >-
+      The peak boiler and the electric chiller are the backup units of the plant (last in the WP-07 merit
+      order, cap-only). TL-13 sizes them to the largest daily output of the single DB-30 design year
+      (OPT-SPACE), i.e. with no reserve; peak/backup-reserve practice sizes backup capacity for the design
+      condition plus the uncertainty of the base load, not for one deterministic year. TL-15 (UQ-MC) gives
+      that evidence per run: the share of Monte Carlo samples meeting demand with the installed nameplates
+      (probability_demand_met) and with robust_backup_mw = the robust_backup_percentile of each sample's
+      required nameplate (probability_demand_met_robust). Rule (DR-11, after P8): recommend installing
+      robust_backup_mw when it is larger than an installed backup, raises the probability of meeting demand,
+      and the variant passes the guard and meets demand on every base-year day; otherwise recommend the
+      installed backups. The variant is re-simulated (TL-12 fast year, plus the full year when the selected
+      design has one, so both rest on the same basis) and re-priced with TL-14 (capex, fuel, O&M of the added
+      nameplate); the DesignVerifier then verifies it in P9 (golden rule 3). Evidence that motivated the
+      entry (WP-14 final policy run, C2-opt): demand met in 46 % of 200 samples with the installed 5.0 MW
+      boiler, 90 % with the P90 10.9 MW boiler, at about +2 USD/MWh LCOH and unchanged LCOC.
+      recommend: robust | installed (the DR-11 option the rule recommends; the engine may choose the other
+      option on an offered criterion). robust_backup_percentile must equal UQ-MC robust_backup_percentile
+      (the percentile TL-15 computed robust_backup_mw at; checked by the tool).
+    source: GEOAGENT_DESIGN_SPEC §9.3 UQ-01/UQ-02 (probability of meeting demand); UQ-MC; OPT-SPACE; user decision (pre-L-2, 2026-11-02) [A]
+    sensitivity: "recommend: installed keeps the TL-13 base-year backups (lower cost, lower probability of meeting demand); a lower percentile buys less robustness for less capex."
+    tag: A
+    status: default
+    added_by: Pre-L-2

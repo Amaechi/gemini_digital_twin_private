@@ -1,0 +1,255 @@
+{
+ "data": {
+  "candidates": [
+   {
+    "id": "C0-0d",
+    "concept": "C0",
+    "parent_id": null,
+    "description": "No geothermal: grid-gas boilers, electric chillers (counterfactual).",
+    "doublets": 0,
+    "depth_m": null,
+    "design_flow_m3h": null,
+    "equipment_sizes": {},
+    "gas_handling": null,
+    "heating_return_degc": 55.0,
+    "cooling_return_degc": 26.0
+   },
+   {
+    "id": "C1-3d",
+    "concept": "C1",
+    "parent_id": null,
+    "description": "3 doublets, plate HEX + gas boiler/CHP top-up, electric chillers.",
+    "doublets": 3,
+    "depth_m": 2500.0,
+    "design_flow_m3h": 300.0,
+    "equipment_sizes": {},
+    "gas_handling": "degas_use",
+    "heating_return_degc": 55.0,
+    "cooling_return_degc": 26.0
+   },
+   {
+    "id": "C2-2d",
+    "concept": "C2",
+    "parent_id": null,
+    "description": "2 doublets, HEX + HTHP + CHP + boiler; free cooling + electric.",
+    "doublets": 2,
+    "depth_m": 2500.0,
+    "design_flow_m3h": 300.0,
+    "equipment_sizes": {},
+    "gas_handling": "degas_use",
+    "heating_return_degc": 55.0,
+    "cooling_return_degc": 26.0
+   },
+   {
+    "id": "C3-2d",
+    "concept": "C3",
+    "parent_id": null,
+    "description": "As C2; free cooling + absorption + small electric peak chiller.",
+    "doublets": 2,
+    "depth_m": 2500.0,
+    "design_flow_m3h": 300.0,
+    "equipment_sizes": {},
+    "gas_handling": "degas_use",
+    "heating_return_degc": 55.0,
+    "cooling_return_degc": 26.0
+   },
+   {
+    "id": "C4-2d",
+    "concept": "C4",
+    "parent_id": null,
+    "description": "2 doublets at about 3.2 km, direct HEX; free cooling + absorption.",
+    "doublets": 2,
+    "depth_m": 3200.0,
+    "design_flow_m3h": 300.0,
+    "equipment_sizes": {},
+    "gas_handling": "degas_use",
+    "heating_return_degc": 55.0,
+    "cooling_return_degc": 26.0
+   },
+   {
+    "id": "C5-3d",
+    "concept": "C5",
+    "parent_id": null,
+    "description": "Doublets at 1.5 km with large heat pumps; free cooling + electric.",
+    "doublets": 3,
+    "depth_m": 1500.0,
+    "design_flow_m3h": 300.0,
+    "equipment_sizes": {},
+    "gas_handling": "degas_use",
+    "heating_return_degc": 55.0,
+    "cooling_return_degc": 26.0
+   },
+   {
+    "id": "C6-2d",
+    "concept": "C6",
+    "parent_id": "C2-2d",
+    "description": "Parent + seasonal HT-ATES storage of summer surplus.",
+    "doublets": 2,
+    "depth_m": 2500.0,
+    "design_flow_m3h": 300.0,
+    "equipment_sizes": {},
+    "gas_handling": "degas_use",
+    "heating_return_degc": 55.0,
+    "cooling_return_degc": 26.0
+   },
+   {
+    "id": "C7-2d",
+    "concept": "C7",
+    "parent_id": "C2-2d",
+    "description": "Parent with pressurised loop, no degassing, gas reinjected.",
+    "doublets": 2,
+    "depth_m": 2500.0,
+    "design_flow_m3h": 300.0,
+    "equipment_sizes": {},
+    "gas_handling": "pressurised_reinject",
+    "heating_return_degc": 55.0,
+    "cooling_return_degc": 26.0
+   },
+   {
+    "id": "C8-3d",
+    "concept": "C8",
+    "parent_id": "C2-2d",
+    "description": "Parent + 1 doublet as N-1 redundancy.",
+    "doublets": 3,
+    "depth_m": 2500.0,
+    "design_flow_m3h": 300.0,
+    "equipment_sizes": {},
+    "gas_handling": "degas_use",
+    "heating_return_degc": 55.0,
+    "cooling_return_degc": 26.0
+   }
+  ],
+  "configs": [
+   {
+    "candidate_id": "C0-0d",
+    "config_hash": "9a14dae833951d3a2725ee506010803442a405166fa0e66a57e7d6087b68ec99",
+    "components": 3,
+    "connections": 1,
+    "equipment_mw": {
+     "electric_chiller_mw": 10.0,
+     "peak_boiler_mw": 30.0
+    },
+    "flags": [],
+    "error": ""
+   },
+   {
+    "candidate_id": "C1-3d",
+    "config_hash": "62b2ca804d7e9042eb2f20d83696db819e3a26ebde8e8e0174052b7fae41a948",
+    "components": 27,
+    "connections": 31,
+    "equipment_mw": {
+     "electric_chiller_mw": 10.0,
+     "peak_boiler_mw": 30.0
+    },
+    "flags": [],
+    "error": ""
+   },
+   {
+    "candidate_id": "C2-2d",
+    "config_hash": "829411bad350219388617a248dffdda91c527b844f526b99451f459532c59eb1",
+    "components": 29,
+    "connections": 41,
+    "equipment_mw": {
+     "electric_chiller_mw": 10.0,
+     "peak_boiler_mw": 30.0
+    },
+    "flags": [],
+    "error": ""
+   },
+   {
+    "candidate_id": "C3-2d",
+    "config_hash": "aa90a490e0390c5dd1034e2ac80714d4261d2b3f368742b9a67d8bd5ede3a28e",
+    "components": 32,
+    "connections": 50,
+    "equipment_mw": {
+     "electric_chiller_mw": 10.0,
+     "absorption_chiller_mw": 10.0,
+     "peak_boiler_mw": 30.0
+    },
+    "flags": [],
+    "error": ""
+   },
+   {
+    "candidate_id": "C4-2d",
+    "config_hash": "c5a4969f3addfe64c262f3056ba0c68d55ccd7586e68ac2ae0c29ca900d14a0e",
+    "components": 26,
+    "connections": 36,
+    "equipment_mw": {
+     "electric_chiller_mw": 10.0,
+     "absorption_chiller_mw": 10.0,
+     "peak_boiler_mw": 30.0
+    },
+    "flags": [
+     "degassed brine at 105.1 \u00b0C is let down to 0 bar(g) (CFG-SURFACE): above 100 \u00b0C the saturation pressure exceeds 1 atm and flashing is not checked (no saturation data, RC-01); hold the degasser and HEX above saturation"
+    ],
+    "error": ""
+   },
+   {
+    "candidate_id": "C5-3d",
+    "config_hash": "a9a132373dae3c1cd548a1d607889822dd1309f268934413a97063f096f69889",
+    "components": 29,
+    "connections": 41,
+    "equipment_mw": {
+     "electric_chiller_mw": 10.0,
+     "peak_boiler_mw": 30.0
+    },
+    "flags": [],
+    "error": ""
+   },
+   {
+    "candidate_id": "C6-2d",
+    "config_hash": "829411bad350219388617a248dffdda91c527b844f526b99451f459532c59eb1",
+    "components": 29,
+    "connections": 41,
+    "equipment_mw": {
+     "electric_chiller_mw": 10.0,
+     "peak_boiler_mw": 30.0
+    },
+    "flags": [],
+    "error": ""
+   },
+   {
+    "candidate_id": "C7-2d",
+    "config_hash": "fdce4502e6220c2eea8de791d9a5180644800dfa5311e9732b3504bb8c284649",
+    "components": 25,
+    "connections": 35,
+    "equipment_mw": {
+     "electric_chiller_mw": 10.0,
+     "peak_boiler_mw": 30.0
+    },
+    "flags": [
+     "pressurised loop: brine plate HEX (and HP evaporator) at 54.2 bar(g) exceeds the gasketed plate-HEX rating 20.00 bar(g) (RC-03; GNS p.40, Guidebook p.218) and the loop must stay above p_b 45.0 bar(g): use shell-and-tube or plate-and-shell (no card cost) or degas with inhibitor (DR-07); the verifier fails PH-09 and PD-10 holds with zero margin"
+    ],
+    "error": ""
+   },
+   {
+    "candidate_id": "C8-3d",
+    "config_hash": "4a0dd65315b9941be2853709ccb53a570ed087ed26bfb7809e33aabfae86227d",
+    "components": 36,
+    "connections": 54,
+    "equipment_mw": {
+     "electric_chiller_mw": 10.0,
+     "peak_boiler_mw": 30.0
+    },
+    "flags": [],
+    "error": ""
+   }
+  ]
+ },
+ "summary": "TL-09: 9 candidates C0\u2013C8 (spec \u00a73.4, DB-31 55 \u00b0C, DB-32 26 \u00b0C); GEMINI projects built for 9",
+ "warnings": [
+  "C4-2d: degassed brine at 105.1 \u00b0C is let down to 0 bar(g) (CFG-SURFACE): above 100 \u00b0C the saturation pressure exceeds 1 atm and flashing is not checked (no saturation data, RC-01); hold the degasser and HEX above saturation",
+  "C7-2d: pressurised loop: brine plate HEX (and HP evaporator) at 54.2 bar(g) exceeds the gasketed plate-HEX rating 20.00 bar(g) (RC-03; GNS p.40, Guidebook p.218) and the loop must stay above p_b 45.0 bar(g): use shell-and-tube or plate-and-shell (no card cost) or degas with inhibitor (DR-07); the verifier fails PH-09 and PD-10 holds with zero margin"
+ ],
+ "assumption_ids": [
+  "DB-31",
+  "DB-32",
+  "CFG-LAYOUT",
+  "CFG-SIZING"
+ ],
+ "sources": [
+  "spec \u00a73.4",
+  "spec \u00a73.5",
+  "TL-09 generate_gemini_config"
+ ]
+}

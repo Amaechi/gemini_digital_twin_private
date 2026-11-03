@@ -1,0 +1,92 @@
+{
+ "C2-opt": {
+  "candidate": {
+   "id": "C2-opt",
+   "concept": "C2",
+   "parent_id": null,
+   "description": "TL-13 optimum of C2 (sized from C2-2d)",
+   "doublets": 2,
+   "depth_m": 2500.0,
+   "design_flow_m3h": 300.0,
+   "equipment_sizes": {
+    "hthp_heating_mw": 5.45,
+    "peak_boiler_mw": 3.5,
+    "electric_chiller_mw": 8.2
+   },
+   "gas_handling": "degas_use",
+   "heating_return_degc": 55.0,
+   "cooling_return_degc": 26.0
+  },
+  "concept_candidate_id": "C2-2d",
+  "parent_concept": null,
+  "outage_start_indices": [
+   111,
+   184
+  ],
+  "depth_options_m": [
+   2500.0
+  ],
+  "excluded_depths_m": [],
+  "robust_backup_of": null
+ },
+ "C6-opt": {
+  "candidate": {
+   "id": "C6-opt",
+   "concept": "C6",
+   "parent_id": "C2-2d",
+   "description": "TL-13 optimum of C6 (sized from C6-2d)",
+   "doublets": 2,
+   "depth_m": 2500.0,
+   "design_flow_m3h": 300.0,
+   "equipment_sizes": {
+    "hthp_heating_mw": 5.45,
+    "peak_boiler_mw": 3.5,
+    "electric_chiller_mw": 8.2
+   },
+   "gas_handling": "degas_use",
+   "heating_return_degc": 55.0,
+   "cooling_return_degc": 26.0
+  },
+  "concept_candidate_id": "C6-2d",
+  "parent_concept": "C2",
+  "outage_start_indices": [
+   111,
+   184
+  ],
+  "depth_options_m": [
+   2500.0
+  ],
+  "excluded_depths_m": [],
+  "robust_backup_of": null
+ },
+ "C1-opt": {
+  "candidate": {
+   "id": "C1-opt",
+   "concept": "C1",
+   "parent_id": null,
+   "description": "TL-13 optimum of C1 (sized from C1-3d)",
+   "doublets": 3,
+   "depth_m": 2500.0,
+   "design_flow_m3h": 274.0,
+   "equipment_sizes": {
+    "peak_boiler_mw": 6.75,
+    "electric_chiller_mw": 10.0
+   },
+   "gas_handling": "degas_use",
+   "heating_return_degc": 55.0,
+   "cooling_return_degc": 26.0
+  },
+  "concept_candidate_id": "C1-3d",
+  "parent_concept": null,
+  "outage_start_indices": [
+   189,
+   145,
+   224
+  ],
+  "depth_options_m": [
+   2500.0
+  ],
+  "excluded_depths_m": [],
+  "robust_backup_of": null
+ }
+}

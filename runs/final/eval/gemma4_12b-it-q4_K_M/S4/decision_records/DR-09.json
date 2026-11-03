@@ -1,0 +1,59 @@
+{
+  "dr_id": "DR-09",
+  "title": "Materials",
+  "run_id": "S4",
+  "phase": "P2",
+  "role": "subsurface",
+  "question": "Which materials are used in the brine loop?",
+  "options": [
+    {
+      "id": "titanium-plates-no-cu",
+      "label": "Titanium HEX plates, no copper alloys in contact with brine",
+      "evidence_ids": [
+        "TR-001",
+        "spec:\u00a710.1"
+      ],
+      "recommended": true,
+      "eligible": true,
+      "notes": "spec \u00a710.1 materials check (saline brine)"
+    },
+    {
+      "id": "stainless-plates",
+      "label": "Stainless-steel HEX plates",
+      "evidence_ids": [
+        "TR-001",
+        "spec:\u00a710.1"
+      ],
+      "recommended": false,
+      "eligible": false,
+      "notes": "fails the \u00a710.1 materials check for saline brine"
+    }
+  ],
+  "evidence_ids": [
+    "TR-001",
+    "spec:\u00a710.1"
+  ],
+  "choice": "titanium-plates-no-cu",
+  "choice_label": "Titanium HEX plates, no copper alloys in contact with brine",
+  "criterion": {
+    "id": "spec-materials-check",
+    "key": "brine",
+    "source": "load_design_basis",
+    "text": "materials check of spec \u00a710.1 for saline brine (brine)",
+    "best_option_ids": [
+      "titanium-plates-no-cu"
+    ],
+    "evidence_ids": [
+      "TR-001"
+    ]
+  },
+  "rationale": "The choice is based on the brine materials check among guard-passed options in economics. Option titanium-plates-no-cu is the only eligible selection as it satisfies the saline brine requirements in spec \u00a710.1. Option stainless-plates was rejected because it fails the materials check for saline brine.",
+  "rejected": [
+    {
+      "option_id": "stainless-plates",
+      "reason": "Not chosen."
+    }
+  ],
+  "decision_source": "llm",
+  "stub_evidence": false
+}

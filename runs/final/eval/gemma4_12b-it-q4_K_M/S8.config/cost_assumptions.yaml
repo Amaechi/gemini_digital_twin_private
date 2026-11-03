@@ -1,0 +1,449 @@
+# Cost assumptions (RC-10 Economics; GEOAGENT_DESIGN_SPEC §9.2 ECO-01…ECO-04, DB-35).
+# Every item: value, unit, range, source, tag (P/D/L/W/A). Values are stored in their NATIVE currency, unit and
+# price year exactly as RC-10 states them (`currency`, `price_year`); USD is derived in code (economics tool,
+# WP-08) with `eur_to_usd`, `dea_eur2020_to_eur2025` and `cepci_index` (items with `escalation_index: cepci`).
+# `range` is (low, high) in the unit of `value`, or text; `usd_range` is the RC-10 sensitivity range already in USD.
+# Sensitivity = ±30 % (min_sensitivity_frac) or the stated range, whichever is wider (DB-35, ECO-04).
+# No item may be null: CostAssumptions.unset_placeholders() must be empty (RC-10 validation, WP-13 check).
+# Chiller cost functions (absorption vs electric, 1986 $, RC-05, `VERIFY`) were added by WP-08 (escalated by CEPCI).
+# Read every item ONLY through gemini_agent.tools.economics.CostBook.usd(name) / usd_value(name): item names say
+# what the accessor returns (USD), `.value` is native (e.g. hthp_capex_usd_per_kw_th.value = 1.20 M EUR/MW_th).
+# Schema: gemini_agent.schemas.config.CostAssumptions.
+schema_version: 1
+source: "RC-10 Economics (incl. 'Sourced values', primary documents read 31 Oct 2026); GEOAGENT_DESIGN_SPEC §9.2"
+reporting_currency: USD            # assumption ECO-CUR (config/assumptions.yaml)
+min_sensitivity_frac: 0.30         # DB-35 / ECO-04: ±30 % or the stated range, whichever is wider
+
+items:
+  # ------------------------------------------------------------------ finance
+  discount_rate_frac:
+    value: 0.08
+    unit: 1/yr
+    range: [0.08, 0.112]
+    source: "RC-10 defaults: r = 8 % (Gippsland; Guidebook) [L]"
+    tag: L
+    note: "High end of the range = ESMAP Annex 3 WACC 11.2 % (our choice of sensitivity bound)."
+  wacc_frac:
+    value: 0.112
+    unit: 1/yr
+    range: [0.109, 0.1122]
+    source: "RC-10: ESMAP Annex 3 spreadsheet p.144 WACC 11.22 % (quoted base 11.2 %); simple formula with D = 70 % gives 10.9 % [L]"
+    tag: L
+    note: "Finance view only (ECO-06): WACC = i_d (1 - tax) D + R_e E; i_d 6 %, tax 20 %, R_e 25 %, E 30 %."
+  analysis_period_yr:
+    value: 30.0
+    unit: yr
+    range: [20.0, 30.0]
+    source: "RC-10; spec ECO-01: life 30 yr and a 20-yr case (Guidebook advises <= 20 yr) [L]"
+    tag: L
+  inflation_general_frac:
+    value: 0.025
+    unit: 1/yr
+    range: [0.0175, 0.0325]
+    source: "RC-10 default (no citation on the card)"
+    tag: A
+    note: "Range = ±30 % (DB-35 rule for [A] values)."
+  energy_escalation_frac:
+    value: 0.05
+    unit: 1/yr
+    range: [0.03, 0.07]
+    source: "RC-10: energy escalation 3–7 %"
+    tag: A
+    note: "Value = midpoint of the RC-10 range (our choice)."
+
+  # ------------------------------------------------------------------ exchange rates and price indices
+  eur_to_usd:
+    value: 1.13
+    unit: USD/EUR
+    range: [1.08, 1.13]
+    price_year: 2025
+    source: "RC-10 Sourced values: ECB euro reference rates, 2025 annual average (data.ecb.europa.eu EXR.A.USD.EUR.SP00.A)"
+    tag: L
+    note: "1.1172 on 30 Oct 2026; 2024 average 1.0824 (low end of the range)."
+  dea_eur2020_to_eur2025:
+    value: 1.168
+    unit: EUR2025/EUR2020
+    range: "none stated on RC-10"
+    source: "RC-10 Sourced values: DEA Technology Brief June 2026 (ens.dk/media/8616), DEA's own 2020 € → 2025 € inflation factor"
+    tag: L
+  cepci_index:
+    value: {1986: 318.4, 2002: 395.6, 2011: 585.7, 2014: 576.1, 2023: 797.9}
+    unit: "CEPCI annual index (-) by year"
+    range: "2023 → 2026 drift ignored, ± a few % [A]"
+    source: "RC-10: Chemical Engineering magazine CEPCI annual values [L]"
+    tag: L
+  gas_gcv_to_lhv:
+    value: 1.111
+    unit: "(EUR/MWh_LHV) per (EUR/MWh_GCV)"
+    range: "none stated on RC-10"
+    source: "RC-10 Sourced values: Groningen gas 35.17 MJ/m³ GCV, 31.65 MJ/m³ NCV"
+    tag: L
+    note: "Purchased grid gas only; the associated-gas properties are DB-28."
+
+  # ------------------------------------------------------------------ wells (ECO-02)
+  well_cost_large_diameter_musd:
+    value: {1000: 2.1, 1500: 2.5, 2000: 2.9, 2500: 3.45, 3000: 6.0, 3500: 6.75, 4000: 7.5, 4500: 8.3, 5000: 13.6}
+    unit: "M USD per well vs TVD depth (m)"
+    currency: USD
+    range: "±0.15 M$ per node (chart reading)"
+    source: "NREL 2025 cost curves, Fig. 5 markers, '2025 Revised Baseline' (RC-10) [L]"
+    tag: L
+    note: >-
+      12¼-inch vertical open hole. Interpolate linearly between nodes; casing-program steps between
+      2.5–3 km and 4.5–5 km — never smooth across them. 10 % contingency already included. Dollar-year not
+      stated (implicitly Lowry 2017 basis).
+  well_cost_small_diameter_musd:
+    value: {1500: 1.6, 2000: 1.9, 2500: 2.9, 3000: 4.1, 4500: 5.7, 5000: 10.8}
+    unit: "M USD per well vs TVD depth (m)"
+    currency: USD
+    range: "±0.15 M$ per node (chart reading)"
+    source: "NREL 2025 cost curves, Fig. 5 markers (RC-10) [L]"
+    tag: L
+    note: "8½-inch vertical; same step depths as the large-diameter table; dollar-year not stated."
+  well_cost_smooth_fit:
+    value: {a_musd: 1.45, b_per_m: 0.000366, max_depth_m: 2500.0}
+    unit: "C = a_musd * exp(b_per_m * z_m), M USD per well"
+    currency: USD
+    range: "within ±5 % of the NREL markers at 1–2.5 km"
+    source: "RC-10: fit by us to the NREL 2025 Fig. 5 markers [D]"
+    tag: D
+    note: "Only for sensitivity sweeps <= 2.5 km; invalid above 2.5 km."
+  well_deviated_multiplier:
+    value: 1.125
+    unit: "-"
+    range: [1.10, 1.15]
+    source: "NREL 2025 cost curves (RC-10): horizontal/deviated multiplier 1.10–1.15 [L]"
+    tag: L
+    note: "Value = midpoint (our choice). Vertical wells use 1.0."
+  well_contingency_frac:
+    value: 0.10
+    unit: "-"
+    range: [0.10, 0.10]
+    source: "NREL 2025 cost curves (RC-10) [L]"
+    tag: L
+    note: "Already included in the NREL well-cost tables — do not add again."
+  well_cost_cross_check_musd:
+    value: {per_well_low: 2.0, per_well_high: 6.0, four_wells_2p5_3km_low: 10.0, four_wells_2p5_3km_high: 25.0}
+    unit: "M USD"
+    currency: USD
+    range: "sanity band, not a cost input"
+    source: "ESMAP p.69 (RC-10) [L]"
+    tag: L
+
+  # ------------------------------------------------------------------ heat exchangers and pipes (ECO-03)
+  plate_hex_base_aud:
+    value: 2000.0
+    unit: AUD
+    currency: AUD
+    range: "none stated on RC-10"
+    source: "Gippsland: HEX cost = 2000 + 48 · m_dot[kg/s] · dT[K] AUD (RC-10) [L]"
+    tag: L
+    note: "Small clean-water units; price year not stated on RC-10. Not for the free-cooling HEX."
+  plate_hex_per_kgs_k_aud:
+    value: 48.0
+    unit: "AUD per (kg/s · K)"
+    currency: AUD
+    range: "none stated on RC-10"
+    source: "Gippsland (RC-10) [L]"
+    tag: L
+  plate_hex_titanium_multiplier:
+    value: 1.5
+    unit: "-"
+    range: "none stated on RC-10"
+    source: "Guidebook p.220: titanium plates +50 % (RC-10) [L]"
+    tag: L
+  aud_to_usd:
+    value: 0.63
+    unit: USD/AUD
+    range: "none stated on RC-10"
+    source: "RC-10 (Gippsland cost line): 1 AUD = 0.63 USD"
+    tag: L
+    note: "Date of the rate not stated on the card."
+  pipe_preinsulated_aud_per_m:
+    value: 500.0
+    unit: AUD/m
+    currency: AUD
+    range: "none stated on RC-10"
+    source: "Gippsland (RC-10) [L]"
+    tag: L
+  pipe_hdpe_uninsulated_aud_per_m:
+    value: 100.0
+    unit: AUD/m
+    currency: AUD
+    range: "none stated on RC-10"
+    source: "Gippsland (RC-10) [L]"
+    tag: L
+
+  # ------------------------------------------------------------------ old cost functions + escalation
+  heat_pump_1987_usd_per_kw:
+    value: 91.0
+    unit: "USD/kW"
+    currency: USD
+    price_year: 1987
+    range: "none stated on RC-10"
+    source: "Guidebook Table 13.3: ≈ $91/kW, 2.9 MW centrifugal (RC-10) [L]"
+    tag: L
+    note: >-
+      Outdated for high-temperature heat pumps — use hthp_capex_usd_per_kw_th for HTHP costs. Escalate with
+      cepci_escalation_1986_to_2026 (2.5 [A]); cepci_index has no 1987 entry.
+  cepci_escalation_1986_to_2026:
+    value: 2.5
+    unit: "-"
+    range: [1.75, 3.25]
+    source: "RC-10; spec ECO-04: CEPCI ratio ≈ 2.5 [A] (CEPCI 1986 → 2023 = 797.9/318.4 = 2.51)"
+    tag: A
+    note: "Range = ±30 % (DB-35 rule for [A] values)."
+
+  # ------------------------------------------------------------------ former ECO-04 placeholders: RC-10 "Sourced values"
+  hthp_capex_usd_per_kw_th:
+    value: 1.20
+    unit: M EUR/MW_th
+    currency: EUR
+    price_year: 2025
+    range: [0.9, 1.5]
+    usd_range: [1017.0, 1695.0]
+    source: "RC-10 Sourced values: DEA Industrial Process Heat v0006 Jan 2026, ch. 2 'High-temperature heat pumps', datasheet '2.a High temp. hp up to 125 °C'; PDF Table 2 p. 48"
+    tag: L
+    note: >-
+      Nominal investment (equipment + installation) per MW_th output; 2030: 1.15. Fixed O&M 2,494 EUR/MW/yr,
+      variable O&M 3.6 EUR/MWh_th, life 20 yr; add +0.15 M EUR/MW if lift > 75 K. × eur_to_usd = 1,356 $/kW_th.
+      COP for our ≈ 15–25 K lift is NOT taken from DEA (its table starts at 40 K): use the RC Lorenz/Carnot method.
+      Cross-check: standard DH heat pumps (<= 72 °C sink) 0.95 M EUR2025/MW_th (DEA DH catalogue ch. 40).
+  chp_capex_usd_per_kw_e:
+    value: 1.010
+    unit: M EUR/MW_e
+    currency: EUR
+    price_year: 2020
+    range: [0.957, 1.170]
+    usd_range: [1263.0, 1544.0]
+    source: "RC-10 Sourced values: DEA Electricity & DH catalogue v0019 Aug 2026, ch. 06 'Gas engines', datasheet '06 Gas engines, natural gas, 1–10 MW_e'"
+    tag: L
+    note: >-
+      × dea_eur2020_to_eur2025 = 1.18 M EUR2025/MW_e; × eur_to_usd = 1,333 $/kW_e. DEA 2030 column for O&M and
+      efficiency: fixed O&M 9,889 EUR2020/MW_e/yr at 4,000 h/yr, variable O&M 5.42 EUR2020/MWh_e, life 25 yr;
+      eta_e 0.48 nameplate (0.47 annual), back-pressure
+      coefficient C_b 0.99 at DH 50/100 °C (≈ 1.01 MW_th per MW_e). GEMINI chp.py uses electrical fraction 1/3 vs
+      ≈ 0.50 here — the WP that uses it must state the choice in the assumptions register.
+  electric_boiler_capex_usd_per_kw_th:
+    value: 0.070
+    unit: M EUR/MW_th
+    currency: EUR
+    price_year: 2025
+    range: [0.070, 0.1546]
+    usd_range: [79.0, 175.0]
+    source: "RC-10 Sourced values: DEA Electricity & DH catalogue v0019 Aug 2026, ch. 41 'Electric boilers', datasheets '41 Electric boiler, large / small'"
+    tag: L
+    note: >-
+      0.070 for units > 10 MW (20 MW typical); 0.1546 for <= 10 MW (5 MW typical). Fixed O&M 1,138 EUR/MW/yr,
+      variable 0.84–0.95 EUR/MWh_th (incl. auxiliary electricity), eta 0.99, life 20 yr; installation includes
+      grid-connection fees; costed for ≈ 500 h/yr operation.
+  cooling_tower_capex_usd_per_kw_th:
+    value: 64.0
+    unit: USD/kW_th rejected
+    currency: USD
+    price_year: 2011
+    escalation_index: cepci
+    range: "see usd_range (RC-10 states the range in USD)"
+    usd_range: [40.0, 170.0]
+    source: "RC-10 Sourced values: NETL, Cost and Performance Impact of Dry and Hybrid Cooling on Fossil Energy Power Systems, June 2018, Exh. 3-15 p. 46 and Exh. 2-9 p. 20; IEA SHC Task 48 A3, Nov 2014, §3.6 Fig. 3.12 p. 14"
+    tag: L
+    note: >-
+      Complete wet cooling system (tower + circulating pumps/piping/make-up); tower account alone 45 $2011/kW_th.
+      × CEPCI 2011→2023 (1.362, escalation [A]) = 87 $2023/kW_th. usd_range spans equipment-only wet towers …
+      dry coolers. Dry air-cooled alternative 58–63 $2011/kW_th at ISO design.
+  free_cooling_hex_capex_usd_per_kw_th:
+    value: 147.0
+    unit: USD/kW_th installed
+    currency: USD
+    price_year: 2002
+    escalation_index: cepci
+    range: "see usd_range (RC-10 states the range in USD)"
+    usd_range: [53.0, 300.0]
+    source: "RC-10 Sourced values: Sea Water District Cooling Feasibility Analysis for the State of Hawaii, Oct 2002, §2.3 Eq. 9 p. 48, App. B2 Table 42 p. 154; DEA Technology Data for Heating Installations v0004, ch. 203 p. 45"
+    tag: L
+    note: >-
+      Seawater-grade plate HEX + housing, vendor data at 8,310 ton (29.2 MW): HEX 3,687 k$ + install 369 k$ +
+      building 121 k$ + engineering 122 k$ (HEX alone 126 $2002/kW_th). × CEPCI 2002→2023 (escalation [A]) ≈ 300
+      $2023/kW_th. Lower bound: standard DH substation ≈ 40 EUR2020/kW. Do not use the Gippsland plate-HEX formula.
+  free_cooling_hex_cost_function_usd:
+    value: {per_ton: 513.0, fixed: 59600.0}
+    unit: "USD = per_ton · refrigeration tons + fixed"
+    currency: USD
+    price_year: 2002
+    escalation_index: cepci
+    range: "within 1 % of the vendor total at 8,310 ton"
+    source: "RC-10 Sourced values: Hawaii SWAC feasibility study, Oct 2002, §2.3 Eq. 9 p. 48"
+    tag: L
+  electricity_price_usd_per_mwh:
+    value: 118.2
+    unit: EUR/MWh_e
+    currency: EUR
+    price_year: 2025
+    range: "see usd_range (RC-10 states the range in USD)"
+    usd_range: [107.0, 166.0]
+    source: "RC-10 Sourced values: Eurostat nrg_pc_205 (updated 19 Oct 2026), Netherlands 2025-S2, band IE 20–70 GWh/yr, excl. VAT and recoverable taxes; Belastingdienst 'Energiebelasting' tariff table 2026"
+    tag: L
+    note: >-
+      Excl. all taxes 115.0; all taxes incl. 143.0; band IF 70–150 GWh 121.1/117.9/146.5; band IG >= 150 GWh
+      95.1/91.9/115.1 EUR/MWh. Dutch energy tax 2026 (business, > 10 GWh tranche) 3.10 EUR/MWh. Eurostat flags a
+      NL methodology break at 2025-S1. × eur_to_usd = 133.6 $/MWh.
+  gas_price_usd_per_mwh:
+    value: 15.8011
+    unit: EUR/GJ_GCV
+    currency: EUR
+    price_year: 2025
+    range: "see usd_range (RC-10 states the range in USD)"
+    usd_range: [40.0, 105.0]
+    source: "RC-10 Sourced values: Eurostat nrg_pc_203 (GCV basis, updated 19 Oct 2026), Netherlands 2025-S2, band I4 100,000–1,000,000 GJ/yr, excl. VAT; TTF forwards (ICE Endex via Elexys/Investing.com, 30 Oct 2026, secondary) for the range only"
+    tag: L
+    note: >-
+      Purchased grid gas. × 3.6 = 56.88 EUR/MWh_GCV; × gas_gcv_to_lhv = 63.2 EUR/MWh_LHV; × eur_to_usd = 71.4
+      $/MWh_LHV. Excl. all taxes 36.06 EUR/MWh_GCV; all-in 68.8. Band I5 (1–4 PJ) 37.39/31.88 EUR/MWh_GCV.
+      Energy tax 2026: 0.21396 EUR/m³ (≈ 24.3 EUR/MWh_LHV) for 1–10 million m³, 0.05313 EUR/m³ (≈ 6.0) above.
+      usd_range low = band I5 excl. taxes; high ≈ TTF Cal-27 forward 81.5 EUR/MWh + taxes.
+  co2_price_usd_per_t:
+    value: 79.42
+    unit: EUR/t CO2
+    currency: EUR
+    price_year: 2025
+    range: [63.07, 93.80]
+    usd_range: [71.0, 106.0]
+    source: "RC-10 Sourced values: NEa 'Tarieven CO2-heffing' (emissieautoriteit.nl); Wet belastingen op milieugrondslag art. 71p and 71f (BWBR0007168); ICAP EU ETS factsheet; European Commission ETS2 page; market quotes via Investing.com/Trading Economics (secondary)"
+    tag: L
+    note: >-
+      Statutory EUA reference ('termijnkoers': Dec-26 forward averaged 1 Sep–31 Oct 2025) used for the 2026 Dutch
+      carbon levies. range = EUA 52-week range 63.07–93.80 EUR/t (Dec-26 futures 89.19 on 30 Oct 2026); 2025
+      auction average 73.43. ETS1 covers combustion > 20 MW thermal input; smaller gas boilers fall under ETS2 from
+      2028. × eur_to_usd = 89.74 $/t. price_year 2025 is our reading (averaging period Sep–Oct 2025); RC-10
+      states no price year.
+
+  # ------------------------------------------------------------------ opex and replacement
+  om_frac_of_capex_per_yr:
+    value: 0.015
+    unit: 1/yr
+    range: [0.01, 0.02]
+    source: "RC-10; spec ECO-01: O&M 1–2 % of capex/yr (Gippsland) [L]"
+    tag: L
+    note: "Value = midpoint (our choice)."
+  om_breakdown_guidebook_frac_per_yr:
+    value: {maintenance: 0.01, insurance: 0.0035, property_tax: 0.0015}
+    unit: "fraction of capex per yr"
+    range: "none stated on RC-10"
+    source: "Guidebook Table 18.7 (RC-10) [L]"
+    tag: L
+  plant_maintenance_frac_per_yr:
+    value: 0.02
+    unit: 1/yr
+    range: [0.015, 0.025]
+    source: "ESMAP p.74: plant maintenance 1.5–2.5 % (RC-10) [L]"
+    tag: L
+    note: "Value = midpoint (our choice)."
+  pump_replacement_interval_yr:
+    value: 7.0
+    unit: yr
+    range: [5.0, 10.0]
+    source: "RC-10: Gippsland 7 yr; Guidebook every 5–10 yr [L]"
+    tag: L
+  heat_pump_replacement_interval_yr:
+    value: 15.0
+    unit: yr
+    range: "none stated on RC-10"
+    source: "RC-10; spec ECO-01: heat pump replaced at 15 yr [L]"
+    tag: L
+
+  # ------------------------------------------------------------------ WP-08 additions (TL-14)
+  electric_boiler_small_capex_usd_per_kw_th:
+    value: 0.1546
+    unit: M EUR/MW_th
+    currency: EUR
+    price_year: 2025
+    range: [0.070, 0.1546]
+    usd_range: [79.0, 175.0]
+    source: "RC-10 Sourced values: DEA Electricity & DH catalogue v0019 Aug 2026, ch. 41 'Electric boilers', datasheet '41 Electric boiler, small'"
+    tag: L
+    note: >-
+      Units <= 10 MW_th (5 MW typical); electric_boiler_capex_usd_per_kw_th (0.070) is the > 10 MW unit. Same O&M,
+      efficiency and life as the large unit. × eur_to_usd = 175 $/kW_th.
+  gas_boiler_capex_usd_per_kw_th:
+    value: 270.0
+    unit: USD/kW_th
+    currency: USD
+    price_year: 2014
+    escalation_index: cepci
+    range: "none stated on RC-08 (±30 %, DB-35)"
+    source: "RC-08 Emission factors table: gas boiler benchmark US$270/kW_th, 80 % efficiency, 90 % availability (NREL desalination report) [L]"
+    tag: L
+    note: >-
+      price_year 2014 is our reading [A]: RC-08 states none, RC-10 dates the NREL desalination report's figures
+      as 2014 $. × CEPCI 2014→2023 (797.9/576.1, escalation [A]) = 374 $/kW_th. Used for grid-gas and peak
+      boilers (C0, C1 top-up, C2–C7 peak).
+  absorption_chiller_plant_cost_function_usd:
+    value: {machine_fixed: 83000.0, machine_per_ton: 252.0, plant_fixed: 41000.0, plant_per_ton: 170.0}
+    unit: "USD per plant = machine_fixed + machine_per_ton (Q_t − 100)/F + plant_fixed + plant_per_ton (Q_t − 100); Q_t duty in refrigeration tons, F capacity fraction"
+    currency: USD
+    price_year: 1986
+    escalation_index: cepci
+    range: "VERIFY: decoded from the Guidebook; valid 100–1000 ton"
+    source: "RC-05 Cost: Guidebook Ch14 p.269 (1986 Means $, decoded, VERIFY) [L]; spec ECO-04"
+    tag: L
+    note: >-
+      Machine + cooling tower/pumps/piping (the plant terms), so do not add separate cooling-tower capex for the
+      chiller's heat rejection. × CEPCI 1986→2023 = 797.9/318.4 = 2.51 (spec ECO-04 '×≈2.5'). Sanity bands
+      (RC-10 benchmarks): single-stage LiBr 1,800–2,300 $/ton installed (DOE 2017).
+  electric_chiller_plant_cost_function_usd:
+    value: {fixed: 107000.0, per_ton: 267.0}
+    unit: "USD per plant = fixed + per_ton (Q_t − 100); Q_t duty in refrigeration tons"
+    currency: USD
+    price_year: 1986
+    escalation_index: cepci
+    range: "VERIFY: decoded from the Guidebook; valid 100–1000 ton"
+    source: "RC-05 Cost: Guidebook Ch14 p.269 (1986 Means $, decoded, VERIFY) [L]; spec ECO-04"
+    tag: L
+    note: >-
+      Electric centrifugal plant; assumed to include its own heat rejection like the absorption plant (the
+      Guidebook compares complete plants; VERIFY) [A]. × CEPCI 1986→2023 = 2.51. Sanity band (RC-10 benchmarks): water-cooled
+      centrifugal 740–760 $2022/ton installed (US EIA 2023, chiller only).
+  absorption_titanium_tubes_multiplier:
+    value: 1.125
+    unit: "-"
+    range: [1.10, 1.15]
+    source: "RC-05 Materials: titanium generator tubes +10–15 % machine cost (Guidebook p.266–267) [L]"
+    tag: L
+    note: >-
+      Value = midpoint (our choice). Applied to the absorption machine terms only when the generator is driven
+      directly by brine (no isolation HEX + clean loop).
+  dry_cooler_cost_multiplier:
+    value: 3.0
+    unit: "× wet cooling-tower cost per kW rejected"
+    range: "none stated on RC-07 (±30 %, DB-35)"
+    source: "RC-07: dry cooler cost ≈ 3×, area ≈ 3×, fan power ≈ 3× a wet tower (DiPippo Ch23 Miravalles comparison) [L]"
+    tag: L
+    note: "Applied to cooling_tower_capex_usd_per_kw_th."
+
+  # ------------------------------------------------------------------ benchmarks (sanity only, never cost inputs)
+  heat_price_cap_acm_usd_per_mwh_th:
+    value: 121.9
+    unit: EUR/MWh_th
+    currency: EUR
+    price_year: 2026
+    range: "benchmark, not a cost input"
+    source: "RC-10 Benchmarks: ACM 'ACM stelt maximale warmtetarieven 2026 vast', 5 Dec 2025: 40.97 EUR/GJ incl. VAT = 33.86 EUR/GJ excl. VAT = 121.9 EUR/MWh_th [L]"
+    tag: L
+    note: "NL consumer heat price cap 2026 (maximum variable tariff); × eur_to_usd ≈ 138 $/MWh_th. A competitive LCOH sits below it."
+  benchmark_gippsland_grac_lcoh_usd_per_mwh_th:
+    value: 19.16
+    unit: AUD/GJ_th
+    currency: AUD
+    range: "benchmark, not a cost input"
+    source: "RC-10 Benchmarks: Gippsland GRAC LCOH 19.16 AUD/GJ (gas 31; SGIL 16.81) [L]"
+    tag: L
+    note: "Price year not stated on RC-10. × 3.6 × aud_to_usd ≈ 43.5 $/MWh_th."
+  benchmark_wvu_lcoh_usd_per_mwh_th:
+    value: 41.5
+    unit: USD/MWh_th
+    currency: USD
+    price_year: 2012
+    range: [40.0, 43.0]
+    source: "RC-10 Benchmarks; spec ECO-07: WVU heating + absorption cooling ≈ $40–43/MWh_th, full retrofit, 2012 $ [L]"
+    tag: L
+    note: "Value = midpoint. Not escalated (cepci_index has no 2012 entry); $18–22 for the hot-water case."

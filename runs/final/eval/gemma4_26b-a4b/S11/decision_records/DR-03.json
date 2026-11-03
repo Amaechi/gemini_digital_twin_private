@@ -1,0 +1,120 @@
+{
+  "dr_id": "DR-03",
+  "title": "Heat top-up technology",
+  "run_id": "S11",
+  "phase": "P5",
+  "role": "system_architect",
+  "question": "Which technology lifts heat to the 100 degC supply?",
+  "options": [
+    {
+      "id": "gas-boiler-chp-topup",
+      "label": "Plate HEX + gas boiler/CHP top-up (C1)",
+      "evidence_ids": [
+        "TR-009",
+        "TR-010",
+        "TR-011",
+        "TR-012",
+        "TR-013",
+        "TR-015",
+        "TR-016",
+        "TR-017"
+      ],
+      "recommended": false,
+      "eligible": true,
+      "notes": "candidates: C1-3d, C1-opt"
+    },
+    {
+      "id": "hthp-series",
+      "label": "Plate HEX + HTHP in series + CHP + peak boiler (C2/C3)",
+      "evidence_ids": [
+        "TR-009",
+        "TR-010",
+        "TR-011",
+        "TR-012",
+        "TR-013",
+        "TR-015",
+        "TR-016",
+        "TR-017"
+      ],
+      "recommended": true,
+      "eligible": true,
+      "notes": "candidates: C2-2d, C3-2d, C6-2d, C7-2d, C8-3d, C2-opt, C6-opt; top-ranked (LCOH ranking)"
+    },
+    {
+      "id": "deeper-direct-hex",
+      "label": "Deeper wells, direct plate HEX + small peak boiler (C4)",
+      "evidence_ids": [
+        "TR-009",
+        "TR-010",
+        "TR-011",
+        "TR-012",
+        "TR-015",
+        "TR-016"
+      ],
+      "recommended": false,
+      "eligible": false,
+      "notes": "candidates: none; excluded by DesignGuard/verifier: C4-2d"
+    },
+    {
+      "id": "shallow-large-hp",
+      "label": "Shallow wells + large heat pumps (C5)",
+      "evidence_ids": [
+        "TR-009",
+        "TR-010",
+        "TR-011",
+        "TR-012",
+        "TR-015",
+        "TR-016"
+      ],
+      "recommended": false,
+      "eligible": true,
+      "notes": "candidates: C5-3d"
+    }
+  ],
+  "evidence_ids": [
+    "TR-009",
+    "TR-010",
+    "TR-011",
+    "TR-012",
+    "TR-013",
+    "TR-015",
+    "TR-016",
+    "TR-017"
+  ],
+  "choice": "hthp-series",
+  "choice_label": "Plate HEX + HTHP in series + CHP + peak boiler (C2/C3)",
+  "criterion": {
+    "id": "ranking-lowest-lcoh_per_mwh",
+    "key": "lcoh_per_mwh",
+    "source": "economics",
+    "text": "lowest lcoh_per_mwh + lcoc_per_mwh among guard-passed candidates without unmet demand in economics",
+    "best_option_ids": [
+      "hthp-series"
+    ],
+    "evidence_ids": [
+      "TR-011",
+      "TR-012",
+      "TR-013",
+      "TR-015",
+      "TR-016",
+      "TR-017"
+    ]
+  },
+  "rationale": "Decisive criterion: lowest lcoh_per_mwh + lcoc_per_mwh among guard-passed candidates without unmet demand in economics; it selects hthp-series (TR-011, TR-012, TR-013).",
+  "rejected": [
+    {
+      "option_id": "gas-boiler-chp-topup",
+      "reason": "Not a best option under ranking-lowest-lcoh_per_mwh."
+    },
+    {
+      "option_id": "deeper-direct-hex",
+      "reason": "Not eligible: candidates: none; excluded by DesignGuard/verifier: C4-2d"
+    },
+    {
+      "option_id": "shallow-large-hp",
+      "reason": "Not a best option under ranking-lowest-lcoh_per_mwh."
+    }
+  ],
+  "decision_source": "policy_fallback",
+  "stub_evidence": false
+}

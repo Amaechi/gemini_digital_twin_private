@@ -1,0 +1,75 @@
+{
+  "run_id": "S11",
+  "status": "escalated",
+  "phase": "P6",
+  "engine": "llm+policy_fallback",
+  "input_mode": "assume",
+  "selected_candidate": "C2-opt",
+  "verdict": null,
+  "approval": null,
+  "loop_count": 0,
+  "excluded_candidates": [
+    "C4-2d"
+  ],
+  "llm_fallbacks": 1,
+  "conflicts": [],
+  "assumptions_and_answers": [
+    "DB-30 = {\"interpretation\":\"A\",\"doublet_available_days_per_yr\":330,\"planned_outage_days_per_doublet\":35,\"outages_may_overlap\":false,\"outage_schedule\":\"chosen by the optimiser\",\"demand_met_days_per_yr\":365} (assumed: register default)",
+    "DB-31 = 55.0 degC (assumed: register default)",
+    "DB-32 = 26.0 degC (assumed: register default)"
+  ],
+  "decision_records": [
+    {
+      "dr_id": "DR-09",
+      "choice": "titanium-plates-no-cu",
+      "decision_source": "llm",
+      "stub_evidence": false
+    },
+    {
+      "dr_id": "DR-01",
+      "choice": "2-doublets",
+      "decision_source": "policy_fallback",
+      "stub_evidence": false
+    },
+    {
+      "dr_id": "DR-02",
+      "choice": "depth-2500m",
+      "decision_source": "llm",
+      "stub_evidence": false
+    },
+    {
+      "dr_id": "DR-03",
+      "choice": "hthp-series",
+      "decision_source": "llm",
+      "stub_evidence": false
+    },
+    {
+      "dr_id": "DR-04",
+      "choice": "free-cooling-electric",
+      "decision_source": "llm",
+      "stub_evidence": false
+    },
+    {
+      "dr_id": "DR-05",
+      "choice": "no-storage",
+      "decision_source": "llm",
+      "stub_evidence": false
+    },
+    {
+      "dr_id": "DR-07",
+      "choice": "degas-use",
+      "decision_source": "llm",
+      "stub_evidence": false
+    },
+    {
+      "dr_id": "DR-08",
+      "choice": "dh-return-55",
+      "decision_source": "llm",
+      "stub_evidence": false
+    }
+  ],
+  "tool_calls": 23,
+  "stub_tool_calls": 0,
+  "final_summary": "Escalated to a human in P6 Optimisation: tool-call budget exceeded in P6 (6 calls). Used 7 steps, 6 tool calls, 12340 tokens in this phase.",
+  "escalation_reason": "tool-call budget exceeded in P6 (6 calls)"
+}

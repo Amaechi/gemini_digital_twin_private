@@ -1,0 +1,38 @@
+{
+ "data": {
+  "permeability_md": 200.0,
+  "thickness_m": 100.0,
+  "viscosity_pa_s": 0.0004,
+  "skin": 0.0,
+  "wellbore_radius_m": 0.108,
+  "drainage_radius_m": 1000.0,
+  "log_radius_ratio": 9.133379330840054,
+  "productivity_index_m3h_per_bar": 12.220642151247825,
+  "productivity_index_m3s_per_pa": 3.394622819791062e-08,
+  "injectivity_index_m3h_per_bar": 12.220642151247825,
+  "skin_share_frac": 0.0,
+  "gemini_cross_check_rel_diff": 0.0,
+  "drawdown": [
+   {
+    "flow_m3h": 50.0,
+    "drawdown_bar": 4.091438026020147,
+    "injection_overpressure_bar": 4.091438026020147
+   },
+   {
+    "flow_m3h": 300.0,
+    "drawdown_bar": 24.54862815612088,
+    "injection_overpressure_bar": 24.54862815612088
+   }
+  ]
+ },
+ "summary": "PI 12.22 m\u00b3/h/bar (k 200 mD, h 100 m, S 0, ln(re/rw) 9.13); II = PI; drawdown 24.5 bar and injection overpressure 24.5 bar at 300 m\u00b3/h",
+ "warnings": [],
+ "assumption_ids": [
+  "DB-38",
+  "SUB-II"
+ ],
+ "sources": [
+  "RC-01",
+  "GEMINI bottomhole_skin_dp"
+ ]
+}

@@ -1,0 +1,33 @@
+{
+  "run_id": "S11",
+  "status": "escalated",
+  "phase": "P5",
+  "engine": "llm+policy_fallback",
+  "input_mode": "assume",
+  "selected_candidate": null,
+  "verdict": null,
+  "approval": null,
+  "loop_count": 0,
+  "excluded_candidates": [
+    "C4-2d"
+  ],
+  "llm_fallbacks": 7,
+  "conflicts": [],
+  "assumptions_and_answers": [
+    "DB-30 = {\"interpretation\":\"A\",\"doublet_available_days_per_yr\":330,\"planned_outage_days_per_doublet\":35,\"outages_may_overlap\":false,\"outage_schedule\":\"chosen by the optimiser\",\"demand_met_days_per_yr\":365} (assumed: register default)",
+    "DB-31 = 55.0 degC (assumed: register default)",
+    "DB-32 = 26.0 degC (assumed: register default)"
+  ],
+  "decision_records": [
+    {
+      "dr_id": "DR-09",
+      "choice": "titanium-plates-no-cu",
+      "decision_source": "llm",
+      "stub_evidence": false
+    }
+  ],
+  "tool_calls": 23,
+  "stub_tool_calls": 0,
+  "final_summary": "Escalated to a human in P5 Screening: tool-call budget exceeded in P5 (10 calls). Used 11 steps, 10 tool calls, 17931 tokens in this phase.",
+  "escalation_reason": "tool-call budget exceeded in P5 (10 calls)"
+}

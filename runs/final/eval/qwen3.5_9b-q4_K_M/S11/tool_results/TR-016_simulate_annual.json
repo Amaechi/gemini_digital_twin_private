@@ -1,0 +1,86 @@
+{
+ "data": {
+  "mode": "fast",
+  "kpis": [
+   {
+    "candidate_id": "C0-0d",
+    "unmet_heating_days": 0,
+    "unmet_heating_mwh": 0.0,
+    "unmet_cooling_days": 0,
+    "unmet_cooling_mwh": 0.0,
+    "installed_heating_mw": 30.0,
+    "installed_cooling_mw": 10.0,
+    "heat_by_source_mwh": {
+     "peak_boiler": 111667.68000000014
+    },
+    "cool_by_source_mwh": {
+     "electric_chiller": 23742.528
+    },
+    "doublet_capacity_factors_frac": [],
+    "electricity_consumed_mwh": 3502.02288,
+    "electricity_generated_mwh": 0.0,
+    "gas_fuel_mwh": 124075.20000000001,
+    "co2_t_per_yr": 26332.169616,
+    "co2_reduction_vs_c0_frac": null,
+    "currency": null,
+    "capex_million": null,
+    "opex_million_per_yr": null,
+    "lcoh_per_mwh": null,
+    "lcoc_per_mwh": null,
+    "lcoh_20yr_per_mwh": null,
+    "lcoc_20yr_per_mwh": null,
+    "electricity_purchased_mwh": null,
+    "grid_gas_fuel_mwh": null,
+    "exergy_efficiency_frac": null,
+    "exergy_dead_state": null,
+    "exergy_utilisation_frac": null,
+    "min_constraint_margins": {
+     "heating_supply_margin_k": 0.0,
+     "heat_surplus_margin_mw": -0.0,
+     "peak_boiler_capacity_margin_mw": -3.552713678800501e-15,
+     "cooling_supply_margin_k": 0.0
+    },
+    "thermal_breakthrough_yr": null,
+    "percentiles": {}
+   }
+  ],
+  "simulations": [
+   {
+    "candidate_id": "C0-0d",
+    "mode": "fast",
+    "status": "ok",
+    "reason": "",
+    "config_hash": "55d9ea69789c022233dffa35fc4ecbf9a928dcc997a756a219dc398969e6da05",
+    "simulated_days": 365,
+    "outage_start_indices": [],
+    "max_fast_full_discrepancy_frac": null,
+    "invalid_full_days": 0,
+    "right_sized_mw": {
+     "peak_boiler_mw": 30.000000000000004,
+     "electric_chiller_mw": 10.0
+    },
+    "warnings": [
+     "2027-01-01: geothermal at maximum flow on the available doublets; peak boiler fills [\u00d7365]"
+    ],
+    "files": {}
+   }
+  ],
+  "economics": [],
+  "cost_items": []
+ },
+ "summary": "TL-12 fast: 1 year(s) simulated (C0-0d unmet 0/0 d)",
+ "warnings": [
+  "2027-01-01: geothermal at maximum flow on the available doublets; peak boiler fills [\u00d7365]"
+ ],
+ "assumption_ids": [
+  "DB-30",
+  "SIM-FAST",
+  "SIM-OUTAGE",
+  "DSP-FLOW",
+  "CFG-SIZING"
+ ],
+ "sources": [
+  "spec \u00a78 SIM-01\u202607",
+  "TL-12 simulate_annual"
+ ]
+}

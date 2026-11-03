@@ -1,0 +1,98 @@
+{
+  "dr_id": "DR-10",
+  "title": "Final selection",
+  "run_id": "S10-naive",
+  "phase": "P9",
+  "role": "lead_engineer",
+  "question": "Which design is recommended?",
+  "options": [
+    {
+      "id": "C2-opt-robust",
+      "label": "C2-opt-robust (C2-opt with the TL-15 P90 robust backups (OPT-ROBUST-BACKUP))",
+      "evidence_ids": [
+        "TR-019",
+        "TR-020",
+        "TR-021"
+      ],
+      "recommended": true,
+      "eligible": true,
+      "notes": "verifier verdict: ACCEPTED"
+    },
+    {
+      "id": "C2-opt",
+      "label": "C2-opt (TL-13 optimum of C2 (sized from C2-2d))",
+      "evidence_ids": [
+        "TR-014",
+        "TR-015",
+        "TR-016",
+        "TR-017",
+        "TR-018",
+        "TR-019"
+      ],
+      "recommended": false,
+      "eligible": false,
+      "notes": "not the verified design (only the verified design can be selected)"
+    },
+    {
+      "id": "C6-opt",
+      "label": "C6-opt (TL-13 optimum of C6 (sized from C6-2d))",
+      "evidence_ids": [
+        "TR-014"
+      ],
+      "recommended": false,
+      "eligible": false,
+      "notes": "not the verified design (only the verified design can be selected)"
+    },
+    {
+      "id": "C1-opt",
+      "label": "C1-opt (TL-13 optimum of C1 (sized from C1-3d))",
+      "evidence_ids": [
+        "TR-014"
+      ],
+      "recommended": false,
+      "eligible": false,
+      "notes": "not the verified design (only the verified design can be selected)"
+    }
+  ],
+  "evidence_ids": [
+    "TR-014",
+    "TR-015",
+    "TR-016",
+    "TR-017",
+    "TR-018",
+    "TR-019",
+    "TR-020",
+    "TR-021"
+  ],
+  "choice": "C2-opt-robust",
+  "choice_label": "C2-opt-robust (C2-opt with the TL-15 P90 robust backups (OPT-ROBUST-BACKUP))",
+  "criterion": {
+    "id": "selected-not-rejected",
+    "key": "verdict",
+    "source": "verify_design",
+    "text": "selected design whose latest verifier verdict is not REJECTED",
+    "best_option_ids": [
+      "C2-opt-robust"
+    ],
+    "evidence_ids": [
+      "TR-021"
+    ]
+  },
+  "rationale": "selected-not-rejected criterion was met by C2-opt-robust as it received an ACCEPTED verdict in TR-021. C2-opt, C6-opt, and C1-opt were rejected because they were not the verified design.",
+  "rejected": [
+    {
+      "option_id": "C2-opt",
+      "reason": "Not chosen."
+    },
+    {
+      "option_id": "C6-opt",
+      "reason": "Not chosen."
+    },
+    {
+      "option_id": "C1-opt",
+      "reason": "Not chosen."
+    }
+  ],
+  "decision_source": "llm",
+  "stub_evidence": false
+}
