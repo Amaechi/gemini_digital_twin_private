@@ -27,13 +27,20 @@ Keep it ≤ 20 KB; it is the hand-off between sessions. Old detail: merged PRs a
 | L-1 | Local: pick LLM via S11 eval | done | [#24](https://github.com/Amaechi/gemini_digital_twin_private/pull/24) | gemma4:12b-it-q4_K_M chosen |
 | L-2 | Local: final LLM run + eval transcripts | done (1c5fb18) | [#24](https://github.com/Amaechi/gemini_digital_twin_private/pull/24) | `runs/final/final_llm`, `runs/final/eval` |
 | S7 local | Model Builder demo after #23 | done (evidence `origin/s7-evidence`, copied to `docs/results/s7_demo/`) | | gap detected and closed, 2 drafts, 2 tests passed |
-| WP-15 | Final review, documentation, licensing, packaging | in review | | README, NOTICE, REPORT.md, DECK_OUTLINE.md, clean LLM shutdown |
+| WP-15 | Final review, documentation, licensing, packaging | merged (7b75c62) | [#25](https://github.com/Amaechi/gemini_digital_twin_private/pull/25) | README, NOTICE, REPORT.md, DECK_OUTLINE.md, clean LLM shutdown |
+| Eval F | Close S2 (request inputs), S5 (confirm basis), S8 (cross-run sizing) | in review | | P1 intake questions CFG-INPUT-DEFAULTS / CFG-BASIS-CONFIRM; `cross_run_sizing`; eval rerun pending (L2) |
 
 Status: todo · in progress · in review · merged · blocked (say why).
-Latest full suite (WP-15, 11-03): `PYTHONPATH=src python -m pytest -q unit_test/gemini_model unit_test/gemini_simulator unit_test/gemini_agent -x` → **1334 passed, 7 warnings in 475 s (7 min 56 s)**. `validate_submission --pytest` → **READY, 22 pass / 0 fail / WARN SUB-14 / MANUAL SUB-23; SUB-24 PASS "1334 passed, 7 warnings in 472.38s" (`docs/results/submission_check.md`). CI smoke `--budget smoke`: 22.8 s (WP-12 follow-up measurement). After the reviewer's guard fix in `close_model_clients` only `agents/test_engine.py` + `test_cli.py` were re-run**.
+Latest full suite (Eval F, 11-03): `PYTHONPATH=src python -m pytest -q unit_test/gemini_model unit_test/gemini_simulator unit_test/gemini_agent -x` → **full suite running at commit time; count recorded in the follow-up commit**. Before (WP-15, 11-03): 1334 passed, 7 warnings in 475 s. `validate_submission --pytest` → **READY, 22 pass / 0 fail / WARN SUB-14 / MANUAL SUB-23; SUB-24 PASS "1334 passed, 7 warnings in 472.38s" (`docs/results/submission_check.md`). CI smoke `--budget smoke`: 22.8 s (WP-12 follow-up measurement). After the reviewer's guard fix in `close_model_clients` only `agents/test_engine.py` + `test_cli.py` were re-run**.
 
 ## Decisions log (newest first)
 One line per decision, grouped by WP; dated 11-01 (WP-00: 10-31). Why: the `config/assumptions.yaml` entry or the module docstring.
+
+**Eval F — S2/S5/S8** (11-03)
+- P0 intake lists the challenge inputs a user-written request lacks (`agents/scope.missing_request_inputs`: demand CSVs, cooling demand, reservoir data; keyword rules; the empty prompt = full brief is never scanned) → `RunState.missing_inputs`, `MISSING_INPUTS` event.
+- P1 opens with the runner's own questions (`_intake_requests`: before any tool or register gap, asked once, idempotent over resume): CFG-BASIS-CONFIRM when a CONFLICT names (DB-16)/(DB-17) — `keep` (default, assumed in `--input-mode assume`) continues on the basis, `change` escalates (new limits in config/ + a new run; never designed for) — then ONE CFG-INPUT-DEFAULTS question naming the missing inputs, default "repository defaults" (`defaults`; other text is an InvalidAnswer saying where the inputs go). S1 unaffected: DB-30/31/32 + approval (fixture `runner/fixtures/s1_policy_smoke.json`, recorded before the change).
+- Check `cross_run_sizing` (`baseline: S1`, same eval dir): PI (TL-04), wells (doublets, depth, flow), ESP stages / setting depth (TL-05 `doublet.esp`), peak `elec_esp_*_mw` of the selected design's annual CSV; passes at a lower PI when the wells differ or the ESP is larger (> 5 % peak); fails naming the reason without S1 or without a PI (stubs). Stored gemma4 S8 evidence passes (PI 3.06 vs 12.22; 49 stages @ 1560 m, 1.43 MW vs 16 @ 840 m, 0.46 MW).
+- scenarios.yaml: S2 `pending_question id CFG-INPUT-DEFAULTS`, `question_mentions`, `tool_calls_max 0`; S5 `assumption_or_question CFG-BASIS-CONFIRM`, `status completed`; S8 `cross_run_sizing`; no pending left on S2/S5/S8. Stubs: S2/S5 pass, S8 fails `dr_mentions` + `cross_run_sizing`. `cli.py` untouched.
 
 **WP-15** (11-03)
 - Top-level `README.md` is GeoAgent's (organisers' entry point; SUB-22 needs the word "placeholder"); GEMINI's README kept verbatim as `README_GEMINI.md`.
@@ -84,7 +91,7 @@ One line per decision, grouped by WP; dated 11-01 (WP-00: 10-31). Why: the `conf
 
 ## Assumptions added during build
 (Record id → `config/assumptions.yaml` entry; never only here.)
-- WP-00: DB-30…DB-38, DB-34a–d, DB-34-RH, DB-40 (no DB-39), ECO-CUR. WP-01, WP-13, WP-12, WP-14, follow-ups, WP-15: none.
+- WP-00: DB-30…DB-38, DB-34a–d, DB-34-RH, DB-40 (no DB-39), ECO-CUR. WP-01, WP-13, WP-12, WP-14, follow-ups, WP-15: none. Eval F (WP-13 follow-up): CFG-BASIS-CONFIRM, CFG-INPUT-DEFAULTS (both `added_by: WP-13 follow-up`; no design value depends on them).
 - WP-04: SUB-RHOC, SUB-II, DEM-COP-HD. WP-02: COOL-ABS-B/CAL/CAP/LB/AUX/PL/DRV, COOL-ELC, COOL-ELC-APPROACH, COOL-HR, COOL-FC.
 - WP-09: VER-ESP-PB, VER-ESP-MARGIN, VER-HP-ETA, VER-HP-LIFT. WP-05: SUB-WELL, SUB-PWH, SUB-PBUB, SUB-NPSH, SUB-ESP, SUB-PSUC, SUB-SPACING.
 - WP-03: HP-ETA-L, HP-APPROACH, EB-ETA, STO-REC-HT, STO-REC-COLD, CHP-EL-FRAC. WP-08: ECO-CO2-GAS/AG/SCOPE, ECO-ELEC-NET, ECO-REAL, ECO-ALLOC, ECO-OM, ECO-PUMP-CAPEX, ECO-CHILLER, ECO-SENS-MULT, EXG-FUEL, EXG-KPI, NET-LOSS-FRAC, NET-TRUNK-M, SCL-RULES.
@@ -100,7 +107,7 @@ One line per decision, grouped by WP; dated 11-01 (WP-00: 10-31). Why: the `conf
 **WP-07** — DSP-FLOW alternatives unpriced; DSP-HP-MIN `min_part_load_frac` 0 cheaper on C2 (register undecided); fast year 7–25 s at ≥ 3 km; C6 `storage` fails PH-20/PH-22; treat `simulate_day._flag_text/_heat_pump_margins/_heat_pump_screening`, `Mixer._MIN_TOTAL_FLOW` as API.
 **WP-11** — DR-06 cites TL-13, not the outage days; TL-13 `rejected` ↛ `guard_failed`; no HT-ATES capex (C6 unpriced); WACC view (ECO-06) missing; saturation data > 100 °C or a pressurised degasser re-opens ≥ 3 km (`depth_check`); treat `FastPlant._model/.carries/.run` as API.
 **WP-12** — LLM P4 calls tools directly (no `check_draft`), `register_model` mutates the live registry; promotion = copy folders + registry + `.rst` via PR (S7 draft needs the card's partial free-cooling rule and validation tests first, see `docs/results/s7_demo/README.md`).
-**WP-13** — S5 confirm-basis request; S2 missing-input listing; S8 cross-run re-size check; CI ruff skips `scripts/`.
+**WP-13** — CI ruff skips `scripts/`. Eval F closed S2/S5/S8 in code; the full S1–S11 eval rerun (L2, laptop) is pending — expected S2, S5, S8 → pass; `cross_run_sizing` needs S1 in the same `run_eval` call (a `--scenarios S8` run alone reports "baseline S1 not found"). Missing-input detection is keyword-based (a request that names a "profile" or "aquifer" counts as providing it); the `change` answer escalates rather than re-basing the run.
 **WP-14** — No `AbsorptionPoint` ⇒ C3/C4 UNVERIFIED; `HeatPumpPoint` lacks max sink T; ESP intake +0.86 bar over 1.2·p_b (pure water fails: ESP ≈ 65 m deeper); free cooling 87 % on smoothed normals; HEX rated at 300 m³/h; boiler spare 0.03 MW; CLI `resume` hint omits `--runs-dir`; budget not stored in the run; DR-11 variant priced on the base year only, no own MC (≈ +2 USD/MWh LCOH); `robust_backup` never escalates.
 **Spec/card nits** — GM-05 η ≈ 0.40 (code follows RC-06); DB-25 ≈ 22 bar (card 24.5); RC-09 "0.55 K/km" not reproducible; RC-10 lacks ESP/injection-pump capex; negative `gas_water_ratio` accepted; DPDT stores params before a bad `pvt` raises; kpi defaults 1050 kg/m³ unsuffixed; PH-17 checks pump triples; dissolved-gas NPSH margin unquantified; `resume <unknown id>` creates `runs/<id>/`; `--run-id` unsanitised; `heat_pump_1987_usd_per_kw` unescalated.
 **All WPs** — GEMINI's `run_linter.sh` (black 25.11.0, isort 7.0.0, flake8 7.3.0 + docstrings, 100 cols): 42 pre-existing flake8 findings (WP-04 climate/demand/design_basis + tests); many GEMINI files are CRLF (keep line endings). Act/format split (spec §5.4.3) not implemented.
@@ -122,5 +129,7 @@ Spec §18 with evidence:
 - [x] README with API placeholders (SUB-22 pass), `docs/results/REPORT.md`, `DECK_OUTLINE.md`.
 - [ ] 10 slides + appendix, ≤ 5-min video (SUB-23, user records from `DECK_OUTLINE.md`).
 - [ ] Code pushed: merge this PR, then CLOUD_SETUP §8 / README "Submission": fork the public GEMINI repo, `git push submission main:hackathon/<team-name>`, submit branch URL + deck + video.
+
+Eval F touched: `agents/scope.py`, `runner/design_runner.py`, `runner/state.py`, `eval/scenarios.py`, `evals/scenarios.yaml`, `config/assumptions.yaml` (2 entries appended, no value changed), tests (`agents/test_scope.py`, `runner/test_design_runner.py`, `runner/test_real_tools.py` + fixture, `eval/test_scenarios.py`, `eval/test_harness.py`), `README.md`, this file. Nothing in tools, models, `cli.py`, config values or `runs/`.
 
 WP-15 touched: `README.md` (new; GEMINI's → `README_GEMINI.md`), `NOTICE`, `docs/results/{REPORT.md,DECK_OUTLINE.md,final_llm/,s7_demo/}`, `scripts/build_report_pack.py`, `agents/engine.py` (`close`), `agents/model_builder.py` (main `finally`), `runner/design_runner.py` (`close` → engine), tests `agents/test_engine.py`, `test_cli.py`, this file. Nothing in tools, models, config or `runs/`. wp-reviewer: approved; its 5 findings (README traceability ×3, guard around client close, public loop assertion) fixed. Next: user records deck + video, merges, pushes the fork branch.

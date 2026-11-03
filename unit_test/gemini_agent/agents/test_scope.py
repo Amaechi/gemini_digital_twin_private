@@ -2,7 +2,13 @@
 
 import pytest
 
-from gemini_agent.agents.scope import constraint_conflicts, refusal_message, scope_check
+from gemini_agent.agents.scope import (
+    DEFAULT_BRIEF,
+    constraint_conflicts,
+    missing_request_inputs,
+    refusal_message,
+    scope_check,
+)
 from gemini_agent.schemas.config import load_config
 
 
@@ -133,3 +139,48 @@ def test_stated_gradient_is_checked_against_the_basis():
     assert len(conflicts) == 2
     assert "Stated gradient 35 K/km" in conflicts[0] and "(DB-03)" in conflicts[0]
     assert "Stated 99.5 degC at 2500 m" in conflicts[1] and "87.0 degC" in conflicts[1]
+
+
+@pytest.mark.parametrize(
+    ("prompt", "missing"),
+    [
+        ("Design a geothermal heating system for 30 MW", ["demand", "cooling", "reservoir"]),  # S2
+        ("Supply heating at 120 °C", ["demand", "cooling", "reservoir"]),  # S5
+        ("Use 5 doublets at 500 m³/h", ["demand", "cooling", "reservoir"]),  # S4
+        (
+            "Design the geothermal district heating and cooling system for the new neighbourhood",
+            ["demand", "reservoir"],
+        ),  # S6
+        (
+            (
+                "Design the geothermal heating and cooling system; the reservoir permeability "
+                "is only 50 mD"
+            ),
+            ["demand"],
+        ),  # S8
+        (
+            (
+                "Design the heating and cooling plant from the attached demand CSVs; the "
+                "reservoir data are in the brief"
+            ),
+            [],
+        ),
+        ("Heating and cooling: daily load profiles enclosed, aquifer at 2.5 km", []),
+        ("", []),
+    ],
+)
+def test_missing_request_inputs_lists_what_the_request_lacks(prompt, missing):
+    """S2 (WP-13 follow-up): the inputs a user-written request does not provide, in order."""
+    labels = [item.split(" (")[0] for item in missing_request_inputs(prompt)]
+    expected = {"demand": "demand CSVs", "cooling": "cooling demand", "reservoir": "reservoir data"}
+    assert labels == [expected[name] for name in missing]
+
+
+def test_missing_request_inputs_name_the_repository_paths():
+    """The labels tell the user where the repository defaults live (the question quotes them)."""
+    items = missing_request_inputs("Design a geothermal heating system for 30 MW")
+    assert any("data/demand/" in item for item in items)
+    assert any("config/design_basis.yaml" in item for item in items)
+    # The default brief itself is never scanned by the runner (it comes with every file), but the
+    # function is pure: it reports what the text does not name.
+    assert len(missing_request_inputs(DEFAULT_BRIEF)) == 2

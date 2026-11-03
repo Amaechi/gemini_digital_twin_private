@@ -5,10 +5,15 @@ finished (or paused/refused) run. Behaviour that needs a later work package is l
 ``pending`` with the work packages it needs and the reason; a pending item with a ``check`` is still
 evaluated so the report shows what the run does today, but it never decides the outcome. Nothing is
 stubbed silently: a pending item is reported as pending until it is promoted to ``checks``.
+
+WP-13 follow-up (2026-11-03): ``cross_run_sizing`` compares a run's well and ESP sizing with
+another scenario's run of the same eval directory (S8 vs S1); S2/S5 checks use the P1 intake
+requests (``CFG-INPUT-DEFAULTS``, ``CFG-BASIS-CONFIRM``).
 """
 
 from __future__ import annotations
 
+import csv
 import json
 from dataclasses import dataclass
 from pathlib import Path
@@ -17,6 +22,8 @@ from typing import Any, Literal
 import yaml
 from pydantic import Field, JsonValue, model_validator
 
+from gemini_agent.memory.event_store import SQLiteEventStore
+from gemini_agent.runner import design_runner
 from gemini_agent.runner.design_runner import MAX_VERIFICATION_LOOPS, RunResult
 from gemini_agent.runner.state import InputMode, RunState
 from gemini_agent.schemas.common import StrictModel
@@ -54,6 +61,7 @@ CheckType = Literal[
     "files",
     "token_saving",
     "llm_metrics",
+    "cross_run_sizing",
 ]
 _REQUIRED: dict[str, tuple[str, ...]] = {
     "status": ("equals",),
@@ -73,7 +81,12 @@ _REQUIRED: dict[str, tuple[str, ...]] = {
     "dr_mentions": ("id", "words"),
     "tool_output_mentions": ("tool", "words"),
     "files": ("files",),
+    "cross_run_sizing": ("baseline",),
 }
+ESP_PEAK_TOLERANCE_FRAC = 0.05
+"""``cross_run_sizing``: the peak ESP electric power must rise by more than this share to count
+as an ESP re-sizing (the wells' doublets, depth, flow or ESP stages/setting depth differing
+counts on its own)."""
 
 
 class Check(StrictModel):
@@ -90,6 +103,10 @@ class Check(StrictModel):
     path: str | None = Field(default=None, description="Dotted path, e.g. 'reservoir.x_md'.")
     words: list[str] = Field(default_factory=list)
     files: list[str] = Field(default_factory=list)
+    baseline: str | None = Field(
+        default=None,
+        description="Scenario id of the run to compare with (same eval directory), e.g. 'S1'.",
+    )
 
     @model_validator(mode="after")
     def _check_args(self) -> Check:
@@ -197,12 +214,114 @@ class Observation:
 
     def tool_output(self, tool: str) -> dict[str, Any] | None:
         """Full JSON output of the latest successful call of ``tool`` (None if never called)."""
-        for record in reversed(self.state.tool_results):
-            if record.tool == tool and record.ok and record.path:
-                path = self.run_dir / record.path
-                if path.exists():
-                    return json.loads(path.read_text(encoding="utf-8"))
+        return latest_tool_output(self.state, self.run_dir, tool)
+
+
+def latest_tool_output(state: RunState, run_dir: Path, tool: str) -> dict[str, Any] | None:
+    """Full JSON output of the latest successful call of ``tool`` in a run (None if never)."""
+    for record in reversed(state.tool_results):
+        if record.tool == tool and record.ok and record.path:
+            path = run_dir / record.path
+            if path.exists():
+                return json.loads(path.read_text(encoding="utf-8"))
+    return None
+
+
+def load_run_state(run_dir: Path) -> RunState | None:
+    """Persisted state of a finished run directory (None if it holds no run of that name)."""
+    path = Path(run_dir) / design_runner.STORE_FILE
+    if not path.exists():
         return None
+    store = SQLiteEventStore(path)
+    try:
+        record = store.get_run(Path(run_dir).name)
+    finally:
+        store.close()
+    return RunState.model_validate(record.state) if record is not None else None
+
+
+@dataclass(frozen=True)
+class WellSizing:
+    """What ``cross_run_sizing`` compares between two runs (None = not in the run's evidence)."""
+
+    productivity_index_m3h_per_bar: float | None
+    doublets: int | None
+    depth_m: float | None
+    design_flow_m3h: float | None
+    esp_stages: int | None
+    esp_setting_depth_m: float | None
+    esp_peak_electric_mw: float | None
+
+    @property
+    def wells(self) -> tuple[int | None, float | None, float | None]:
+        """Doublets, depth and design flow of the selected design."""
+        return self.doublets, self.depth_m, self.design_flow_m3h
+
+    def describe(self) -> str:
+        """One-line summary for the check detail."""
+        depth = "?" if self.esp_setting_depth_m is None else f"{self.esp_setting_depth_m:g} m"
+        peak = "?" if self.esp_peak_electric_mw is None else f"{self.esp_peak_electric_mw:.2f} MW"
+        return (
+            f"{self.doublets} x {self.design_flow_m3h} m3/h @ {self.depth_m} m, ESP "
+            f"{self.esp_stages} stages @ {depth}, peak {peak}"
+        )
+
+
+def _number(value: Any) -> float | None:
+    return float(value) if isinstance(value, int | float) and not isinstance(value, bool) else None
+
+
+def esp_peak_electric_mw(run_dir: Path, candidate_id: str | None) -> float | None:
+    """Largest daily ESP electric power of a design's annual CSV (full year, else fast year)."""
+    if not candidate_id:
+        return None
+    for mode in ("full", "fast"):
+        path = Path(run_dir) / f"annual_{candidate_id}_{mode}.csv"
+        if not path.exists():
+            continue
+        with path.open(encoding="utf-8", newline="") as handle:
+            reader = csv.DictReader(handle)
+            columns = [
+                name
+                for name in reader.fieldnames or []
+                if name.startswith("elec_esp_") and name.endswith("_mw")
+            ]
+            values = [
+                float(row[name])
+                for row in reader
+                for name in columns
+                if row.get(name) not in (None, "", "nan")
+            ]
+        if values:
+            return max(values)
+    return None
+
+
+def well_sizing(state: RunState, run_dir: Path) -> WellSizing:
+    """Well and ESP sizing of a run's selected design from its persisted evidence.
+
+    PI: the latest ``productivity_index`` output (TL-04); ESP stages and setting depth: the latest
+    ``doublet_operating_point`` output (TL-05 ``doublet.esp``); wells: the selected candidate;
+    peak ESP power: the selected design's annual CSV (TL-12 ``elec_esp_<n>_mw`` columns).
+    """
+    pi_output = latest_tool_output(state, run_dir, "productivity_index") or {}
+    esp = _dotted(
+        latest_tool_output(state, run_dir, "doublet_operating_point") or {}, "data.doublet.esp"
+    )
+    esp = esp if isinstance(esp, dict) else {}
+    selected = next((c for c in state.candidates if c.id == state.selected_id), None)
+    stages = esp.get("stages")
+    return WellSizing(
+        productivity_index_m3h_per_bar=_number(
+            _dotted(pi_output, "data.productivity_index_m3h_per_bar")
+        ),
+        doublets=selected.doublets if selected is not None else None,
+        depth_m=selected.depth_m if selected is not None else None,
+        design_flow_m3h=selected.design_flow_m3h if selected is not None else None,
+        esp_stages=int(stages) if isinstance(stages, int | float) else None,
+        esp_setting_depth_m=_number(esp.get("setting_depth_m")),
+        esp_peak_electric_mw=esp_peak_electric_mw(run_dir, state.selected_id),
+    )
 
 
 class CheckResult(StrictModel):
@@ -441,6 +560,59 @@ def _llm_metrics(check: Check, obs: Observation) -> tuple[bool, str]:
     return True, f"{obs.llm_valid_calls}/{obs.llm_calls} LLM calls used without fallback"
 
 
+def _cross_run_sizing(check: Check, obs: Observation) -> tuple[bool, str]:
+    """S8: the selected design is re-sized against ``baseline`` (same eval dir) at a lower PI.
+
+    Passes when the baseline's productivity index is higher and the wells (doublets, depth,
+    design flow) differ, or the ESP is larger (more stages, a deeper setting depth, or a peak
+    electric power more than ``ESP_PEAK_TOLERANCE_FRAC`` above the baseline's). Fails, with the
+    reason, when the baseline run is missing from the eval directory or either run's evidence
+    has no PI (stub tools).
+    """
+    baseline_dir = obs.run_dir.parent / str(check.baseline)
+    base_state = load_run_state(baseline_dir)
+    if base_state is None:
+        return False, (
+            f"baseline {check.baseline} not found in {obs.run_dir.parent}; run both scenarios "
+            "in the same eval"
+        )
+    this, base = well_sizing(obs.state, obs.run_dir), well_sizing(base_state, baseline_dir)
+    pi_this, pi_base = this.productivity_index_m3h_per_bar, base.productivity_index_m3h_per_bar
+    if pi_this is None or pi_base is None:
+        return False, "productivity_index output has no PI in this run or the baseline (stubs?)"
+    detail = (
+        f"PI {pi_this:.2f} vs {check.baseline} {pi_base:.2f} m3/h/bar; design {this.describe()} "
+        f"vs {base.describe()}"
+    )
+    if not pi_this < pi_base:
+        return False, f"no lower PI than {check.baseline}: {detail}"
+    wells_changed = this.wells != base.wells
+    peak_this, peak_base = this.esp_peak_electric_mw, base.esp_peak_electric_mw
+    esp_larger = (
+        (
+            this.esp_stages is not None
+            and base.esp_stages is not None
+            and this.esp_stages > base.esp_stages
+        )
+        or (
+            this.esp_setting_depth_m is not None
+            and base.esp_setting_depth_m is not None
+            and this.esp_setting_depth_m > base.esp_setting_depth_m
+        )
+        or (
+            peak_this is not None
+            and peak_base is not None
+            and peak_this > (1.0 + ESP_PEAK_TOLERANCE_FRAC) * peak_base
+        )
+    )
+    how = (
+        "wells re-sized"
+        if wells_changed
+        else "ESP re-sized" if esp_larger else "neither the wells nor the ESP changed"
+    )
+    return wells_changed or esp_larger, f"{how}: {detail}"
+
+
 _EVALUATORS = {
     "status": _status,
     "phase": _phase,
@@ -467,4 +639,5 @@ _EVALUATORS = {
     "files": _files,
     "token_saving": _token_saving,
     "llm_metrics": _llm_metrics,
+    "cross_run_sizing": _cross_run_sizing,
 }

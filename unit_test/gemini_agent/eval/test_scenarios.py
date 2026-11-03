@@ -127,3 +127,150 @@ def test_tool_output_mentions_reads_the_latest_output_at_a_path(tmp_path):
     assert evaluate(check(words=["X"]), obs).passed  # whole output without a path
     missing = evaluate(Check(type="tool_output_mentions", expect="e", tool="co2", words=["a"]), obs)
     assert not missing.passed and "not called" in missing.detail
+
+
+# --------------------------------------------------------------------------- S8 cross-run check
+def _sized_run(
+    root, run_id: str, *, pi: float, stages: int, setting_depth_m: float, peak_mw: float, **wells
+):
+    """A finished run directory: SQLite state, TL-04/TL-05 outputs and the annual CSV."""
+    import json
+
+    from gemini_agent.memory.event_store import SQLiteEventStore
+    from gemini_agent.runner.design_runner import STORE_FILE
+    from gemini_agent.runner.state import RunState, ToolRecord
+    from gemini_agent.schemas.candidate import Candidate
+    from gemini_agent.schemas.common import GasHandling
+    from gemini_agent.schemas.decision import Phase, RunStatus
+
+    run_dir = root / run_id
+    (run_dir / "tool_results").mkdir(parents=True)
+    design = Candidate(
+        id="C2-opt",
+        concept="C2",
+        doublets=wells.get("doublets", 2),
+        depth_m=wells.get("depth_m", 2500.0),
+        design_flow_m3h=wells.get("design_flow_m3h", 300.0),
+        gas_handling=GasHandling.DEGAS_USE,
+        heating_return_degc=55.0,
+        cooling_return_degc=26.0,
+    )
+    state = RunState(
+        run_id=run_id,
+        user_prompt="design",
+        engine="policy",
+        input_mode="assume",
+        status=RunStatus.COMPLETED,
+        candidates=[design],
+        selected_id=design.id,
+    )
+    outputs = {
+        "productivity_index": {"data": {"productivity_index_m3h_per_bar": pi}},
+        "doublet_operating_point": {
+            "data": {"doublet": {"esp": {"stages": stages, "setting_depth_m": setting_depth_m}}}
+        },
+    }
+    for number, (tool, output) in enumerate(outputs.items(), start=1):
+        path = f"tool_results/TR-{number:03d}_{tool}.json"
+        (run_dir / path).write_text(json.dumps(output), encoding="utf-8")
+        state.tool_results.append(
+            ToolRecord(
+                id=f"TR-{number:03d}",
+                tool=tool,
+                phase=Phase.P2,
+                args={},
+                ok=True,
+                source="policy",
+                path=path,
+            )
+        )
+    (run_dir / f"annual_{design.id}_fast.csv").write_text(
+        "day,elec_esp_1_mw,elec_esp_2_mw,heat_pumps_on\n"
+        f"1,{peak_mw / 2},{peak_mw},True\n2,{peak_mw / 3},{peak_mw / 4},False\n",
+        encoding="utf-8",
+    )
+    store = SQLiteEventStore(run_dir / STORE_FILE)
+    store.create_run(run_id, state.status.value, state.model_dump(mode="json"))
+    store.close()
+    return state, run_dir
+
+
+def _observe(state, run_dir):
+    from gemini_agent.eval.scenarios import Observation
+    from gemini_agent.runner.design_runner import RunResult
+
+    result = RunResult(
+        state.run_id, state.status, state.phase, None, state.selected_id, "", run_dir
+    )
+    return Observation(result=result, state=state, run_dir=run_dir, phases_started=[])
+
+
+def test_cross_run_sizing_passes_when_the_esp_or_the_wells_grow_at_a_lower_pi(tmp_path):
+    """S8 (WP-13 follow-up): the run is compared with the baseline scenario of the same eval."""
+    from gemini_agent.eval.scenarios import evaluate, well_sizing
+
+    _sized_run(tmp_path, "S1", pi=12.22, stages=16, setting_depth_m=840.0, peak_mw=0.46)
+    check = Check(type="cross_run_sizing", baseline="S1", expect="re-sized")
+
+    # ESP re-sized (more stages, deeper, more power) at the same wells, as in the final eval.
+    state, run_dir = _sized_run(
+        tmp_path, "S8", pi=3.06, stages=49, setting_depth_m=1560.0, peak_mw=1.43
+    )
+    outcome = evaluate(check, _observe(state, run_dir))
+    assert outcome.passed and outcome.detail.startswith("ESP re-sized: PI 3.06 vs S1 12.22")
+    assert "ESP 49 stages @ 1560 m, peak 1.43 MW" in outcome.detail
+    sizing = well_sizing(state, run_dir)
+    assert (sizing.wells, sizing.esp_stages, sizing.esp_peak_electric_mw) == (
+        (2, 2500.0, 300.0),
+        49,
+        1.43,
+    )
+
+    # Wells re-sized (3 doublets at a lower flow) with the same ESP.
+    state, run_dir = _sized_run(
+        tmp_path, "S8b", pi=3.06, stages=16, setting_depth_m=840.0, peak_mw=0.46, doublets=3
+    )
+    outcome = evaluate(check, _observe(state, run_dir))
+    assert outcome.passed and outcome.detail.startswith("wells re-sized")
+
+    # Nothing changed (peak within the 5 % tolerance): not re-sized.
+    state, run_dir = _sized_run(
+        tmp_path, "S8c", pi=3.06, stages=16, setting_depth_m=840.0, peak_mw=0.47
+    )
+    outcome = evaluate(check, _observe(state, run_dir))
+    assert not outcome.passed and outcome.detail.startswith("neither the wells nor the ESP")
+
+    # No lower PI than the baseline: the comparison is meaningless, so it fails.
+    state, run_dir = _sized_run(
+        tmp_path, "S8d", pi=12.22, stages=49, setting_depth_m=1560.0, peak_mw=1.43
+    )
+    outcome = evaluate(check, _observe(state, run_dir))
+    assert not outcome.passed and outcome.detail.startswith("no lower PI than S1")
+
+
+def test_cross_run_sizing_reports_a_missing_baseline_or_evidence(tmp_path):
+    """Without S1 in the eval directory (or without a PI, e.g. stubs) the check fails, with why."""
+    from gemini_agent.eval.scenarios import evaluate
+    from gemini_agent.runner.state import RunState
+
+    state, run_dir = _sized_run(
+        tmp_path, "S8", pi=3.06, stages=49, setting_depth_m=1560.0, peak_mw=1.43
+    )
+    check = Check(type="cross_run_sizing", baseline="S1", expect="re-sized")
+    outcome = evaluate(check, _observe(state, run_dir))
+    assert not outcome.passed and "baseline S1 not found" in outcome.detail
+
+    (tmp_path / "S1").mkdir()  # a directory without a run
+    assert "baseline S1 not found" in evaluate(check, _observe(state, run_dir)).detail
+
+    bare = RunState(run_id="S1", user_prompt="design", engine="policy", input_mode="assume")
+    from gemini_agent.memory.event_store import SQLiteEventStore
+    from gemini_agent.runner.design_runner import STORE_FILE
+
+    store = SQLiteEventStore(tmp_path / "S1" / STORE_FILE)
+    store.create_run("S1", "completed", bare.model_dump(mode="json"))
+    store.close()
+    outcome = evaluate(check, _observe(state, run_dir))
+    assert not outcome.passed and "no PI" in outcome.detail
+    with pytest.raises(ValidationError, match="needs \\['baseline'\\]"):
+        Check.model_validate({"type": "cross_run_sizing", "expect": "x"})

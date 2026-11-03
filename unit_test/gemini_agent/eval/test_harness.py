@@ -35,10 +35,10 @@ pytestmark = pytest.mark.usefixtures("stub_tools")
 
 EXPECTED_POLICY = {  # on the stub catalogue (``stub_tools``): fast CI of the harness itself
     "S1": Outcome.FAIL,
-    "S2": Outcome.PENDING,
+    "S2": Outcome.PASS,
     "S3": Outcome.PASS,
     "S4": Outcome.PASS,
-    "S5": Outcome.PENDING,
+    "S5": Outcome.PASS,
     "S6": Outcome.FAIL,
     "S7": Outcome.PENDING,
     "S8": Outcome.FAIL,
@@ -49,10 +49,11 @@ EXPECTED_POLICY = {  # on the stub catalogue (``stub_tools``): fast CI of the ha
 STUB_ONLY_FAILURES = {
     "S1": {"verdict", "stub_tool_calls_max"},
     "S6": {"tool_output_mentions"},
-    "S8": {"dr_mentions"},
+    "S8": {"dr_mentions", "cross_run_sizing"},
 }
-"""WP-14 promoted these checks; they need the real tools (``scripts/run_eval.py``), so on the
-stub catalogue exactly they fail — every other active check passes."""
+"""WP-14 (and the WP-13 follow-up's S8 cross-run check) promoted these checks; they need the
+real tools (``scripts/run_eval.py``), so on the stub catalogue exactly they fail — every other
+active check passes (S2 and S5 pass on stubs: the intake questions are the runner's own)."""
 
 
 @pytest.fixture(scope="module")
@@ -104,7 +105,15 @@ def test_policy_suite_artefacts_and_report(policy_results):
     assert "PENDING (L-2): the Model Builder writes the model" in report
     for scenario in ("S1", "S3", "S9"):
         assert (eval_dir / scenario / "events.jsonl").exists()
+    s2 = _run(policy_results, "S2")  # S2: one intake question, nothing loaded or assumed
+    assert s2.status == "paused" and s2.metrics.tool_calls == 0
+    assert any("CFG-INPUT-DEFAULTS" in check.detail for check in s2.checks)
+    s5 = _run(policy_results, "S5")  # S5: the register default keeps the basis in assume mode
+    assert s5.status == "completed"
+    assert any("CFG-BASIS-CONFIRM = keep" in check.detail for check in s5.checks)
     s8 = _run(policy_results, "S8")  # config override applied to a copy, not to config/
+    cross = next(check for check in s8.checks if check.type == "cross_run_sizing")
+    assert "no PI" in cross.detail  # stubs: the S1 baseline is there but has no TL-04 output
     assert yaml.safe_load((eval_dir / "S8.config" / "design_basis.yaml").read_text())["reservoir"][
         "permeability_md"
     ] == pytest.approx(50.0)
