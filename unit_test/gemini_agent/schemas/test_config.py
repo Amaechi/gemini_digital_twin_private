@@ -22,6 +22,7 @@ from gemini_agent.schemas.config import (
     DesignBasis,
     HardLimits,
     LLMConfig,
+    ModelBuilderCallSettings,
     load_all_configs,
     load_config,
 )
@@ -347,6 +348,11 @@ def test_llm_config(configs):
     # L-1 follow-up: per-call limits for structured-output calls
     assert llm.calls.thinking is False
     assert llm.calls.max_output_tokens == 2048 and llm.calls.request_timeout_s == 300.0
+    # WP-12 follow-up: the Model Builder coder is a long-answer role with its own limits
+    builder = llm.calls.model_builder
+    assert builder.thinking is False
+    assert builder.max_output_tokens == 8192 and builder.request_timeout_s == 1200.0
+    assert ModelBuilderCallSettings().model_dump() == builder.model_dump()  # yaml = defaults
 
 
 def test_loader_errors_and_env_override(tmp_path, monkeypatch):

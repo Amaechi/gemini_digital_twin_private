@@ -54,3 +54,11 @@ calls:
   thinking: false
   max_output_tokens: 2048
   request_timeout_s: 300
+  # Model Builder coder call (WP-12): one draft = model file + test + REFERENCE.md, 1.5–3 k output
+  # tokens at laptop speed. The local S7 demo timed out on every draft with the SDK default, so
+  # this long-answer role gets its own deadline and output cap; the loop retries a timed-out
+  # draft up to --max-attempts. Same keys as above; the coder reads nothing else.
+  model_builder:
+    thinking: false
+    max_output_tokens: 8192
+    request_timeout_s: 1200

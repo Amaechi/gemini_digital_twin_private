@@ -30,7 +30,7 @@ from pydantic import BaseModel
 from gemini_agent.agents.roles import ROLES
 from gemini_agent.logging.llm_logger import RETRY_PARTS, LLMCallRecord, LLMLogger
 from gemini_agent.prompts.system import choice_prompt, decision_prompt, system_prompt
-from gemini_agent.schemas.config import LLMConfig
+from gemini_agent.schemas.config import CallLimits, LLMConfig
 from gemini_agent.schemas.decision import (
     KIND_TOOLS,
     NO_TOOL_KINDS,
@@ -355,6 +355,47 @@ def build_ollama_model(
     return OllamaModel(model_tag, provider=provider, profile=profile)
 
 
+def model_settings(
+    llm_config: LLMConfig,
+    calls: CallLimits | None = None,
+    *,
+    temperature: float | None = None,
+) -> dict[str, Any]:
+    """Pydantic AI model settings of one LLM call, the single source of ``config/llm.yaml``.
+
+    ``calls`` picks the per-call limits (default ``calls``; the Model Builder coder passes
+    ``calls.model_builder``) and ``temperature`` the sampling temperature (default
+    ``temperatures.planning``). Verified against pydantic-ai 2.64.0 / openai 3.42.0 (request
+    body) and Ollama main ``openai/openai.go``: ``openai_reasoning_effort`` 'none' →
+    ``reasoning_effort`` → Ollama ``think=false`` (the unified ``thinking`` setting is not sent
+    for Ollama profiles); ``max_tokens`` → ``max_tokens`` (profile override in
+    ``build_ollama_model``); ``request_timeout`` is a pydantic-ai deadline per model request,
+    SDK retries included, and ``timeout`` the HTTP timeout of one attempt. ``keep_alive`` is
+    read by ``/v1``; ``options.num_ctx`` is ignored there (set ``OLLAMA_CONTEXT_LENGTH``, spec
+    §5.4.7).
+    """
+    limits = calls if calls is not None else llm_config.calls
+    ollama = llm_config.ollama
+    settings: dict[str, Any] = {
+        "temperature": (
+            temperature if temperature is not None else llm_config.temperatures.planning
+        ),
+        "seed": llm_config.seed,
+        "max_tokens": limits.max_output_tokens,
+        "request_timeout": limits.request_timeout_s,
+        "timeout": limits.request_timeout_s,
+        "extra_body": {
+            "keep_alive": ollama.keep_alive,
+            "options": {"num_ctx": ollama.num_ctx},
+        },
+    }
+    if not limits.thinking:
+        # Ollama leaves the leading thinking span outside the JSON grammar (ThinkingClose):
+        # with thinking off the reply starts in content and is schema-constrained throughout.
+        settings["openai_reasoning_effort"] = "none"
+    return settings
+
+
 def _last_feedback(messages: list[Any]) -> str:
     """Text of the last validation error sent back to the model ('' if none)."""
     for message in reversed(messages):
@@ -497,34 +538,8 @@ class LLMEngine(DecisionEngine):
         )
 
     def _settings(self) -> dict[str, Any]:
-        """Model settings of every structured-output call (``config/llm.yaml``).
-
-        Verified against pydantic-ai 2.64.0 / openai 3.42.0 (request body) and Ollama main
-        ``openai/openai.go``: ``openai_reasoning_effort`` 'none' → ``reasoning_effort`` → Ollama
-        ``think=false`` (the unified ``thinking`` setting is not sent for Ollama profiles);
-        ``max_tokens`` → ``max_tokens`` (profile override in ``build_ollama_model``);
-        ``request_timeout`` is a pydantic-ai deadline per model request, SDK retries included,
-        and ``timeout`` the HTTP timeout of one attempt. ``keep_alive`` is read by ``/v1``;
-        ``options.num_ctx`` is ignored there (set ``OLLAMA_CONTEXT_LENGTH``, spec §5.4.7).
-        """
-        calls = self.llm_config.calls
-        ollama = self.llm_config.ollama
-        settings: dict[str, Any] = {
-            "temperature": self.llm_config.temperatures.planning,
-            "seed": self.llm_config.seed,
-            "max_tokens": calls.max_output_tokens,
-            "request_timeout": calls.request_timeout_s,
-            "timeout": calls.request_timeout_s,
-            "extra_body": {
-                "keep_alive": ollama.keep_alive,
-                "options": {"num_ctx": ollama.num_ctx},
-            },
-        }
-        if not calls.thinking:
-            # Ollama leaves the leading thinking span outside the JSON grammar (ThinkingClose):
-            # with thinking off the reply starts in content and is schema-constrained throughout.
-            settings["openai_reasoning_effort"] = "none"
-        return settings
+        """Model settings of every structured-output call (:func:`model_settings`)."""
+        return model_settings(self.llm_config)
 
     def _log(
         self,

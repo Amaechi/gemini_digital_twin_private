@@ -13,6 +13,10 @@ COPY of the registry, detects the gap, builds the model in a sandbox and registe
 Tests drive it with a ``FunctionModel``; the real-LLM demo runs locally::
 
     PYTHONPATH=src python -m gemini_agent.agents.model_builder --sandbox runs/s7_demo
+
+The coder call uses the engine's settings path (``engine.model_settings``) with the
+``calls.model_builder`` limits of ``config/llm.yaml`` (long answers: 1200 s, 8192 tokens by
+default). A timed-out draft is a failed attempt that the loop retries up to ``max_attempts``.
 """
 
 from __future__ import annotations
@@ -83,13 +87,32 @@ CODER_INSTRUCTIONS = (
 
 
 class CoderError(RuntimeError):
-    """The coder produced no valid draft (budget, validation or model error)."""
+    """The coder produced no valid draft (budget, validation or model error).
 
-    def __init__(self, message: str, input_tokens: int = 0, output_tokens: int = 0) -> None:
+    ``timed_out`` marks a request that hit ``request_timeout_s`` (or the HTTP timeout): the
+    build loop retries those up to ``max_attempts``; every other failure ends the build.
+    """
+
+    def __init__(
+        self,
+        message: str,
+        input_tokens: int = 0,
+        output_tokens: int = 0,
+        *,
+        timed_out: bool = False,
+    ) -> None:
         """Keep the tokens spent before the failure."""
         super().__init__(message)
         self.input_tokens = input_tokens
         self.output_tokens = output_tokens
+        self.timed_out = timed_out
+
+
+def is_timeout(exc: BaseException) -> bool:
+    """Return True for a pydantic-ai request deadline or HTTP timeout (the loop retries)."""
+    from pydantic_ai.exceptions import ModelRequestTimeout, ModelTimeoutError
+
+    return isinstance(exc, (ModelRequestTimeout, ModelTimeoutError, TimeoutError))
 
 
 # --------------------------------------------------------------------------- schemas
@@ -144,6 +167,10 @@ class BuildAttempt(StrictModel):
     written: list[str] = Field(default_factory=list)
     pytest: PytestReport | None = None
     error: str | None = None
+    timed_out: bool = False
+    input_tokens: int = 0
+    output_tokens: int = 0
+    elapsed_s: float = Field(default=0.0, ge=0, description="Coder call wall time.")
 
 
 class ModelBuildResult(StrictModel):
@@ -256,7 +283,8 @@ class LLMCoder:
     """Pydantic AI coder agent (NativeOutput, output validator, retries, usage limits, logged).
 
     ``model`` is a Pydantic AI model (tests: ``FunctionModel``/``TestModel``); None builds the
-    Ollama ``coder`` model of the active profile. Every call is logged (MEM-04).
+    Ollama ``coder`` model of the active profile. Every call is logged (MEM-04). Model settings
+    come from ``engine.model_settings`` with ``calls.model_builder`` (``config/llm.yaml``).
     """
 
     llm_config: LLMConfig
@@ -268,12 +296,32 @@ class LLMCoder:
     tokens_used: int = 0
     _agent: Any = field(default=None, repr=False)
 
+    def model_name(self) -> str:
+        """Name of the coder model (built on first use)."""
+        model = self._get_model()
+        return str(getattr(model, "model_name", type(model).__name__))
+
     def _get_model(self) -> Any:
         if self.model is None:
             from gemini_agent.agents import engine
 
             self.model = engine.build_ollama_model(self.llm_config, "coder")
         return self.model
+
+    @property
+    def call_limits(self) -> Any:
+        """``calls.model_builder`` of ``config/llm.yaml`` (timeout, output cap, thinking)."""
+        return self.llm_config.calls.model_builder
+
+    def model_settings(self) -> dict[str, Any]:
+        """Return the settings of one coder call (engine path, Model Builder limits)."""
+        from gemini_agent.agents import engine
+
+        return engine.model_settings(
+            self.llm_config,
+            self.call_limits,
+            temperature=self.llm_config.temperatures.extraction,
+        )
 
     def _get_agent(self) -> Any:
         from pydantic_ai import Agent, ModelRetry, NativeOutput, RunContext
@@ -332,16 +380,11 @@ class LLMCoder:
             raise CoderError("model builder token budget exhausted")
         model = self._get_model()
         agent = self._get_agent()
-        ollama = self.llm_config.ollama
-        settings = {
-            "temperature": self.llm_config.temperatures.extraction,
-            "seed": self.llm_config.seed,
-            "extra_body": {"keep_alive": ollama.keep_alive, "options": {"num_ctx": ollama.num_ctx}},
-        }
+        settings = self.model_settings()
         limits = UsageLimits(
             request_limit=self.llm_config.max_output_retries + 2, total_tokens_limit=left
         )
-        model_name = str(getattr(model, "model_name", type(model).__name__))
+        model_name = self.model_name()
         start = time.perf_counter()
         with capture_run_messages() as messages:
             try:
@@ -352,11 +395,20 @@ class LLMCoder:
                     usage_limits=limits,
                     model_settings=settings,
                 )
-            except Exception as exc:  # any LLM failure ends this build (gap stays reported)
+            except Exception as exc:  # timeouts are retried by the loop; anything else ends it
                 error = f"{type(exc).__name__}: {exc}"[:500]
+                timed_out = is_timeout(exc)
+                if timed_out:
+                    error = (
+                        f"{error} (after {time.perf_counter() - start:.0f} s; "
+                        f"calls.model_builder.request_timeout_s = "
+                        f"{self.call_limits.request_timeout_s:g})"
+                    )
                 record = self._log(model_name, messages, None, None, start, "failed", error)
                 self.tokens_used += record.total_tokens
-                raise CoderError(error, record.input_tokens, record.output_tokens) from exc
+                raise CoderError(
+                    error, record.input_tokens, record.output_tokens, timed_out=timed_out
+                ) from exc
         record = self._log(
             model_name, result.all_messages(), result.output, result.usage, start, "llm", None
         )
@@ -450,19 +502,40 @@ class ModelBuilder:
                 allowed_model_imports=sorted(ALLOWED_MODEL_IMPORTS),
                 allowed_test_imports=sorted(ALLOWED_TEST_IMPORTS),
             )
+            started = time.perf_counter()
             try:
                 reply = self.coder(request)
             except CoderError as exc:
                 tokens[0] += exc.input_tokens
                 tokens[1] += exc.output_tokens
                 attempts.append(
-                    BuildAttempt(attempt=number, decision_source="failed", error=str(exc))
+                    BuildAttempt(
+                        attempt=number,
+                        decision_source="failed",
+                        error=str(exc),
+                        timed_out=exc.timed_out,
+                        input_tokens=exc.input_tokens,
+                        output_tokens=exc.output_tokens,
+                        elapsed_s=time.perf_counter() - started,
+                    )
                 )
                 status = "coder_failed"
+                if exc.timed_out:  # a timeout is one failed attempt; the next draft retries
+                    feedback = (
+                        f"Attempt {number} timed out before a complete answer: {exc}. "
+                        "Answer with compact code and tests (no prose outside the JSON)."
+                    )
+                    continue
                 break
             tokens[0] += reply.input_tokens
             tokens[1] += reply.output_tokens
-            attempt = BuildAttempt(attempt=number, decision_source=reply.source)
+            attempt = BuildAttempt(
+                attempt=number,
+                decision_source=reply.source,
+                input_tokens=reply.input_tokens,
+                output_tokens=reply.output_tokens,
+                elapsed_s=time.perf_counter() - started,
+            )
             attempts.append(attempt)
             error = check_draft(request, reply.draft)
             if error is not None:  # a coder that skipped validation still cannot write
@@ -601,16 +674,52 @@ def main(argv: Sequence[str] | None = None) -> int:
         model=engine.build_ollama_model(llm_config, "coder", args.model),
         run_id=sandbox_root.name,
     )
+    started = time.perf_counter()
     demo = run_s7_demo(
         sandbox_root, coder, removed_type=args.remove, max_attempts=args.max_attempts
     )
+    elapsed = time.perf_counter() - started
     (sandbox_root / "s7_report.json").write_text(
         demo.report.model_dump_json(indent=1), encoding="utf-8"
     )
     for result in demo.report.run.results:
         print(result.summary)
     print(f"S7 gap detected: {demo.report.gap_detected}; closed: {demo.report.gap_closed}")
+    if not demo.report.gap_closed:
+        print(failure_report(demo.report, coder, elapsed))
     return 0 if demo.report.gap_closed else 1
+
+
+def failure_report(report: S7DemoReport, coder: LLMCoder, elapsed_s: float) -> str:
+    """Why the demo failed: elapsed time, the coder limits in use and every attempt."""
+    limits = coder.call_limits
+    header = (
+        f"FAILED after {elapsed_s:.0f} s (coder {coder.model_name()}; "
+        f"calls.model_builder: request_timeout_s = {limits.request_timeout_s:g}, "
+        f"max_output_tokens = {limits.max_output_tokens}, thinking = {limits.thinking})"
+    )
+    lines = [header]
+    for result in report.run.results:
+        if result.status == "registered":
+            continue
+        lines.append(
+            f"{result.component_type}: {result.status}, {len(result.attempts)} attempt(s), "
+            f"{result.input_tokens} in / {result.output_tokens} out tokens"
+        )
+        for attempt in result.attempts:
+            state = "timed out" if attempt.timed_out else attempt.decision_source
+            lines.append(
+                f"  attempt {attempt.attempt}: {state} after {attempt.elapsed_s:.0f} s "
+                f"({attempt.input_tokens} in / {attempt.output_tokens} out): "
+                f"{(attempt.error or 'ok')[:200]}"
+            )
+    timed_out = any(a.timed_out for r in report.run.results for a in r.attempts)
+    if timed_out:
+        lines.append(
+            "Raise calls.model_builder.request_timeout_s in config/llm.yaml (or --max-attempts) "
+            "if the model needs longer per draft."
+        )
+    return "\n".join(lines)
 
 
 if __name__ == "__main__":  # pragma: no cover - local demo entry point
