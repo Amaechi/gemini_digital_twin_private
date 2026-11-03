@@ -222,10 +222,13 @@ class DesignRunner:
         return self._stores[run_id]
 
     def close(self) -> None:
-        """Close all open stores."""
+        """Close all open stores and the engine (its HTTP clients and event loop)."""
         for store in self._stores.values():
             store.close()
         self._stores.clear()
+        close = getattr(self.engine, "close", None)
+        if callable(close):
+            close()
 
     def start(
         self,

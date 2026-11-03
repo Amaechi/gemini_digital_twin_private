@@ -1,0 +1,1435 @@
+{
+ "removed_type": "free_cooling",
+ "gap_detected": true,
+ "gap_closed": true,
+ "registered_class": "FreeCoolingRc07",
+ "sandbox": "/Users/amaechihalim/Documents/Coding/VScode/geothermalhack26/gemini_digital_twin_private/runs/s7_demo",
+ "run": {
+  "before": {
+   "registered_types": [
+    "absorption_chiller",
+    "adder",
+    "boiler",
+    "booster_pump",
+    "chp",
+    "co2_corrosion",
+    "compressor",
+    "electric_boiler",
+    "electric_chiller",
+    "esp",
+    "filter",
+    "heat_exchanger",
+    "heat_rejection",
+    "heatpump",
+    "injector_pump",
+    "injector_well",
+    "mixer",
+    "producer_well",
+    "reservoir_bottomhole_skin",
+    "reservoir_ipr",
+    "separator",
+    "splitter",
+    "thermal_storage",
+    "well"
+   ],
+   "required": [
+    {
+     "component_type": "absorption_chiller",
+     "needed_by": [
+      "C3",
+      "C4"
+     ],
+     "registered": true,
+     "model_class": "gemini_model.absorption_chiller.absorption_chiller.AbsorptionChiller",
+     "gm_id": "GM-04",
+     "reference_card": "RC-05",
+     "in_generated_plant": true
+    },
+    {
+     "component_type": "adder",
+     "needed_by": [
+      "C1",
+      "C2",
+      "C3",
+      "C4",
+      "C5",
+      "C6",
+      "C7",
+      "C8"
+     ],
+     "registered": true,
+     "model_class": "gemini_model.adder.adder.Adder",
+     "gm_id": null,
+     "reference_card": null,
+     "in_generated_plant": true
+    },
+    {
+     "component_type": "boiler",
+     "needed_by": [
+      "C0",
+      "C1",
+      "C2",
+      "C3",
+      "C4",
+      "C5",
+      "C6",
+      "C7",
+      "C8"
+     ],
+     "registered": true,
+     "model_class": "gemini_model.boiler.boiler.Boiler",
+     "gm_id": null,
+     "reference_card": "RC-08",
+     "in_generated_plant": true
+    },
+    {
+     "component_type": "chp",
+     "needed_by": [
+      "C1",
+      "C2",
+      "C3",
+      "C4",
+      "C5",
+      "C6",
+      "C8"
+     ],
+     "registered": true,
+     "model_class": "gemini_model.chp.chp.CHP",
+     "gm_id": null,
+     "reference_card": "RC-08",
+     "in_generated_plant": true
+    },
+    {
+     "component_type": "electric_chiller",
+     "needed_by": [
+      "C0",
+      "C1",
+      "C2",
+      "C3",
+      "C4",
+      "C5",
+      "C6",
+      "C7",
+      "C8"
+     ],
+     "registered": true,
+     "model_class": "gemini_model.electric_chiller.electric_chiller.ElectricChiller",
+     "gm_id": "GM-05",
+     "reference_card": "RC-06",
+     "in_generated_plant": true
+    },
+    {
+     "component_type": "filter",
+     "needed_by": [
+      "C1",
+      "C2",
+      "C3",
+      "C4",
+      "C5",
+      "C6",
+      "C7",
+      "C8"
+     ],
+     "registered": true,
+     "model_class": "gemini_model.filter.filter.Filter",
+     "gm_id": null,
+     "reference_card": null,
+     "in_generated_plant": true
+    },
+    {
+     "component_type": "free_cooling",
+     "needed_by": [
+      "C2",
+      "C3",
+      "C4",
+      "C5",
+      "C6",
+      "C7",
+      "C8"
+     ],
+     "registered": false,
+     "model_class": null,
+     "gm_id": "GM-07",
+     "reference_card": "RC-07",
+     "in_generated_plant": true
+    },
+    {
+     "component_type": "heat_exchanger",
+     "needed_by": [
+      "C1",
+      "C2",
+      "C3",
+      "C4",
+      "C6",
+      "C7",
+      "C8"
+     ],
+     "registered": true,
+     "model_class": "gemini_model.heat_exchanger.heat_exchanger.HeatExchanger",
+     "gm_id": null,
+     "reference_card": "RC-03",
+     "in_generated_plant": true
+    },
+    {
+     "component_type": "heat_rejection",
+     "needed_by": [
+      "C0",
+      "C1",
+      "C2",
+      "C3",
+      "C4",
+      "C5",
+      "C6",
+      "C7",
+      "C8"
+     ],
+     "registered": true,
+     "model_class": "gemini_model.heat_rejection.heat_rejection.HeatRejection",
+     "gm_id": "GM-06",
+     "reference_card": "RC-07",
+     "in_generated_plant": true
+    },
+    {
+     "component_type": "heatpump",
+     "needed_by": [
+      "C2",
+      "C3",
+      "C5",
+      "C6",
+      "C7",
+      "C8"
+     ],
+     "registered": true,
+     "model_class": "gemini_model.heatpump.heatpump_basic.HeatpumpBasic",
+     "gm_id": "GM-03",
+     "reference_card": "RC-04",
+     "in_generated_plant": true
+    },
+    {
+     "component_type": "injector_well",
+     "needed_by": [
+      "C1",
+      "C2",
+      "C3",
+      "C4",
+      "C5",
+      "C6",
+      "C7",
+      "C8"
+     ],
+     "registered": true,
+     "model_class": "gemini_simulator.well_components.InjectorWell",
+     "gm_id": "GM-01",
+     "reference_card": "RC-01",
+     "in_generated_plant": true
+    },
+    {
+     "component_type": "mixer",
+     "needed_by": [
+      "C1",
+      "C2",
+      "C3",
+      "C4",
+      "C5",
+      "C6",
+      "C7",
+      "C8"
+     ],
+     "registered": true,
+     "model_class": "gemini_model.mixer.mixer.Mixer",
+     "gm_id": null,
+     "reference_card": null,
+     "in_generated_plant": true
+    },
+    {
+     "component_type": "producer_well",
+     "needed_by": [
+      "C1",
+      "C2",
+      "C3",
+      "C4",
+      "C5",
+      "C6",
+      "C7",
+      "C8"
+     ],
+     "registered": true,
+     "model_class": "gemini_simulator.well_components.ProducerWell",
+     "gm_id": "GM-01",
+     "reference_card": "RC-01",
+     "in_generated_plant": true
+    },
+    {
+     "component_type": "separator",
+     "needed_by": [
+      "C1",
+      "C2",
+      "C3",
+      "C4",
+      "C5",
+      "C6",
+      "C8"
+     ],
+     "registered": true,
+     "model_class": "gemini_model.separator.separator.Separator",
+     "gm_id": "GM-12",
+     "reference_card": "RC-08",
+     "in_generated_plant": true
+    },
+    {
+     "component_type": "splitter",
+     "needed_by": [
+      "C1",
+      "C2",
+      "C3",
+      "C4",
+      "C5",
+      "C6",
+      "C7",
+      "C8"
+     ],
+     "registered": true,
+     "model_class": "gemini_model.splitter.splitter.Splitter",
+     "gm_id": null,
+     "reference_card": null,
+     "in_generated_plant": true
+    },
+    {
+     "component_type": "thermal_storage",
+     "needed_by": [
+      "C6"
+     ],
+     "registered": true,
+     "model_class": "gemini_model.thermal_storage.thermal_storage.ThermalStorage",
+     "gm_id": "GM-09",
+     "reference_card": "RC-09",
+     "in_generated_plant": false
+    }
+   ],
+   "missing_component_types": [
+    "free_cooling"
+   ],
+   "missing": [
+    {
+     "component_type": "free_cooling",
+     "needed_by": [
+      "C2",
+      "C3",
+      "C4",
+      "C5",
+      "C6",
+      "C7",
+      "C8"
+     ],
+     "gm_id": "GM-07",
+     "reference_card": "RC-07",
+     "buildable": true,
+     "suggested_model_name": "free_cooling_rc07",
+     "action": "Model Builder: build from RC-07 in the sandbox, test, register at runtime"
+    }
+   ],
+   "unused_registered_types": [
+    "booster_pump",
+    "co2_corrosion",
+    "compressor",
+    "electric_boiler",
+    "esp",
+    "injector_pump",
+    "reservoir_bottomhole_skin",
+    "reservoir_ipr",
+    "well"
+   ],
+   "blocked_candidates": [
+    "C2",
+    "C3",
+    "C4",
+    "C5",
+    "C6",
+    "C7",
+    "C8"
+   ],
+   "limitations": [
+    {
+     "id": "LIM-SUB-01",
+     "area": "subsurface",
+     "component_types": [
+      "producer_well"
+     ],
+     "title": "ESP has no flow affinity",
+     "detail": "GEMINI's ESP scales head by (f/60)² and power by (f/60)³ at the same flow but has no flow affinity, so its curve power is optimistic at reduced frequency (SUB-ESP).",
+     "impact": "ESP curve power is approximate at part load.",
+     "mitigation": "Plant power uses the DB-13/DB-40 rule QΔp/0.70; the curve power is a comparison only.",
+     "severity": "minor",
+     "source": "WP-05 TL-05, SUB-ESP",
+     "only_concepts": [],
+     "affects": [
+      "C1",
+      "C2",
+      "C3",
+      "C4",
+      "C5",
+      "C6",
+      "C7",
+      "C8"
+     ]
+    },
+    {
+     "id": "LIM-SUB-02",
+     "area": "subsurface",
+     "component_types": [
+      "producer_well",
+      "injector_well"
+     ],
+     "title": "Constant brine PVT",
+     "detail": "ρ, μ, c_p constant (DB-08/DB-33); no μ(T), so cold-injection injectivity is not lowered (II = PI, SUB-II); cold injection adds about +6 bar on the 26.5 bar(g) injection WHP.",
+     "impact": "Injection pressure and pump power underestimated at the injector.",
+     "mitigation": "WP-11 SUB-II sensitivity; report injection WHP with the cold-injection note.",
+     "severity": "moderate",
+     "source": "WP-01 GM-01, WP-05",
+     "only_concepts": [],
+     "affects": [
+      "C1",
+      "C2",
+      "C3",
+      "C4",
+      "C5",
+      "C6",
+      "C7",
+      "C8"
+     ]
+    },
+    {
+     "id": "LIM-SUB-03",
+     "area": "subsurface",
+     "component_types": [
+      "producer_well"
+     ],
+     "title": "Steady wellbore heat loss",
+     "detail": "Steady U = 10 W/m²K: wellhead 77.1 °C at 50 m³/h versus about 81–83 °C transient.",
+     "impact": "Low-flow wellhead temperature is conservative (heat underestimated).",
+     "mitigation": "State as conservative; transient wellbore model out of scope.",
+     "severity": "minor",
+     "source": "WP-05 TL-05/TL-06",
+     "only_concepts": [],
+     "affects": [
+      "C1",
+      "C2",
+      "C3",
+      "C4",
+      "C5",
+      "C6",
+      "C7",
+      "C8"
+     ]
+    },
+    {
+     "id": "LIM-SUB-04",
+     "area": "subsurface",
+     "component_types": [
+      "producer_well"
+     ],
+     "title": "ESP motor heating not modelled",
+     "detail": "Motor/pump losses heat the brine by about 0.4 K; not added to the wellhead temperature.",
+     "impact": "Wellhead temperature slightly underestimated.",
+     "mitigation": "None needed (conservative).",
+     "severity": "minor",
+     "source": "WP-05",
+     "only_concepts": [],
+     "affects": [
+      "C1",
+      "C2",
+      "C3",
+      "C4",
+      "C5",
+      "C6",
+      "C7",
+      "C8"
+     ]
+    },
+    {
+     "id": "LIM-SUB-05",
+     "area": "subsurface",
+     "component_types": [
+      "injector_well"
+     ],
+     "title": "No fracture-pressure limit",
+     "detail": "Injection wellhead pressure is not checked against a formation fracture pressure.",
+     "impact": "A high-rate injection point could exceed a fracture limit unnoticed.",
+     "mitigation": "Ask for the fracture gradient (request_missing_input) before final sizing.",
+     "severity": "moderate",
+     "source": "WP-05 TL-05",
+     "only_concepts": [],
+     "affects": [
+      "C1",
+      "C2",
+      "C3",
+      "C4",
+      "C5",
+      "C6",
+      "C7",
+      "C8"
+     ]
+    },
+    {
+     "id": "LIM-SUB-06",
+     "area": "subsurface",
+     "component_types": [
+      "producer_well"
+     ],
+     "title": "No flashing check above 100 °C",
+     "detail": "Brine above 100 °C (C4: 108 °C reservoir at 3.2 km, DB-29) is not checked for flashing in the surface letdown; CFG-SURFACE only flags brine above 100 °C.",
+     "impact": "Deep-concept surface pressures may be optimistic.",
+     "mitigation": "Keep the surface loop pressurised above saturation; flag C4 in the report.",
+     "severity": "moderate",
+     "source": "WP-05, WP-06 CFG-SURFACE",
+     "only_concepts": [
+      "C4"
+     ],
+     "affects": [
+      "C4"
+     ]
+    },
+    {
+     "id": "LIM-SUB-07",
+     "area": "subsurface",
+     "component_types": [
+      "producer_well"
+     ],
+     "title": "ESP far from BEP at minimum flow",
+     "detail": "At 50 m³/h the ESP runs at Q/(Q_BEP·f/60) 0.33 (TL-05 esp_flow_to_bep_ratio), outside the preferred operating range.",
+     "impact": "Minimum-flow efficiency and pump life uncertain.",
+     "mitigation": "Prefer turndown by switching doublets; note in DR-01.",
+     "severity": "minor",
+     "source": "WP-05 SUB-ESP",
+     "only_concepts": [],
+     "affects": [
+      "C1",
+      "C2",
+      "C3",
+      "C4",
+      "C5",
+      "C6",
+      "C7",
+      "C8"
+     ]
+    },
+    {
+     "id": "LIM-SUB-08",
+     "area": "subsurface",
+     "component_types": [
+      "esp"
+     ],
+     "title": "Standalone esp type is water-only",
+     "detail": "The registry type 'esp' is GEMINI's water ESP: head and power are not scaled by the brine specific gravity (the producer ESP is, via well_flow._FluidESP; brine ESP Δp and power × 1.03).",
+     "impact": "A project using 'esp' directly underestimates brine pump Δp and power.",
+     "mitigation": "Use producer_well (the generator does); scale 'esp' by the pvt SG if it is ever used.",
+     "severity": "minor",
+     "source": "WP-01 review",
+     "only_concepts": [],
+     "affects": []
+    },
+    {
+     "id": "LIM-PLT-01",
+     "area": "plant",
+     "component_types": [
+      "thermal_storage"
+     ],
+     "title": "No storage component in the plant generator",
+     "detail": "C6 runs as its parent plant; the HT-ATES outlet temperature is not modelled and recovered heat below 100 °C would need a booster heat pump.",
+     "impact": "C6 benefit rests on dispatch bookkeeping (STO-REC-HT), not a simulated storage loop.",
+     "mitigation": "Report C6 as indicative; booster HP not sized.",
+     "severity": "major",
+     "source": "WP-06 concept_layout, WP-03 GM-09",
+     "only_concepts": [],
+     "affects": [
+      "C6"
+     ]
+    },
+    {
+     "id": "LIM-PLT-02",
+     "area": "plant",
+     "component_types": [
+      "heatpump"
+     ],
+     "title": "Heat-pump fouling not modelled",
+     "detail": "The closed-form Lorenz heat pump has no fouling factor on evaporator or condenser.",
+     "impact": "COP slightly optimistic over the plant life.",
+     "mitigation": "Covered by the VER-HP-ETA cap and WP-11 sensitivity.",
+     "severity": "minor",
+     "source": "WP-03 GM-03",
+     "only_concepts": [],
+     "affects": [
+      "C2",
+      "C3",
+      "C5",
+      "C6",
+      "C7",
+      "C8"
+     ]
+    },
+    {
+     "id": "LIM-PLT-03",
+     "area": "plant",
+     "component_types": [
+      "heat_exchanger"
+     ],
+     "title": "HEX imprecise for balanced flows",
+     "detail": "The GEMINI ε-NTU rating model is imprecise as C_r → 1.",
+     "impact": "Balanced-flow HEX duty has a small error.",
+     "mitigation": "CFG-HEX sizes UA by inverting RC-03 eq 1 at the design point.",
+     "severity": "minor",
+     "source": "WP-06 CFG-HEX",
+     "only_concepts": [],
+     "affects": [
+      "C1",
+      "C2",
+      "C3",
+      "C4",
+      "C6",
+      "C7",
+      "C8"
+     ]
+    },
+    {
+     "id": "LIM-PLT-04",
+     "area": "plant",
+     "component_types": [
+      "heat_exchanger"
+     ],
+     "title": "HEX temperature difference uses abs()",
+     "detail": "The GEMINI HEX uses abs(T_s,in − T_p,in): a colder primary gives heat in the wrong direction instead of zero duty.",
+     "impact": "A mis-wired or off-design HEX can report positive duty.",
+     "mitigation": "Generator wires brine hot side only; verifier first-law check (PH-22).",
+     "severity": "moderate",
+     "source": "WP-06, WP-09 PH-22",
+     "only_concepts": [],
+     "affects": [
+      "C1",
+      "C2",
+      "C3",
+      "C4",
+      "C6",
+      "C7",
+      "C8"
+     ]
+    },
+    {
+     "id": "LIM-PLT-05",
+     "area": "plant",
+     "component_types": [
+      "absorption_chiller"
+     ],
+     "title": "No absorption isolation loop",
+     "detail": "Brine drives the absorption generator directly (titanium tubes, RC-05); the isolation HEX of spec §3.4 is not modelled.",
+     "impact": "Drive temperature optimistic by one HEX approach.",
+     "mitigation": "Note in DR-04; WP-11 sensitivity on drive temperature.",
+     "severity": "moderate",
+     "source": "WP-02 GM-04, WP-06",
+     "only_concepts": [],
+     "affects": [
+      "C3",
+      "C4"
+     ]
+    },
+    {
+     "id": "LIM-GEM-01",
+     "area": "gemini",
+     "component_types": [
+      "compressor"
+     ],
+     "title": "GEMINI Compressor omits k and drive losses",
+     "detail": "Compressor power omits the isentropic exponent k (about 1.3, power low) and the motor and drive efficiencies 0.93 × 0.97.",
+     "impact": "Unused by the plant; would underestimate power if used.",
+     "mitigation": "If used: fix behind a parameter and add REFERENCE.md.",
+     "severity": "minor",
+     "source": "WP-01 GM-02",
+     "only_concepts": [],
+     "affects": []
+    },
+    {
+     "id": "LIM-TOOL-01",
+     "area": "tooling",
+     "component_types": [
+      "producer_well",
+      "injector_well"
+     ],
+     "title": "Private well_flow helpers used as API",
+     "detail": "tools/doublet.py calls gemini_simulator.well_flow._build_dpdt and _build_esp.",
+     "impact": "Renaming them breaks TL-05/TL-06.",
+     "mitigation": "Treat both as API; this analysis checks they exist.",
+     "severity": "minor",
+     "source": "WP-05 tools/doublet.py",
+     "only_concepts": [],
+     "affects": [
+      "C1",
+      "C2",
+      "C3",
+      "C4",
+      "C5",
+      "C6",
+      "C7",
+      "C8"
+     ]
+    }
+   ],
+   "internal_api": [
+    {
+     "module": "gemini_simulator.well_flow",
+     "names": [
+      "_build_dpdt",
+      "_build_esp"
+     ],
+     "present": true
+    }
+   ],
+   "note": "required types from the WP-06 concept layouts (CFG-LAYOUT); limitations from the WP-01…WP-06 build (PROGRESS)"
+  },
+  "results": [
+   {
+    "component_type": "free_cooling",
+    "model_name": "free_cooling_rc07",
+    "class_name": "FreeCoolingRc07",
+    "reference_card": "RC-07",
+    "status": "registered",
+    "attempts": [
+     {
+      "attempt": 1,
+      "decision_source": "llm",
+      "written": [
+       "src/gemini_model/free_cooling_rc07/__init__.py",
+       "src/gemini_model/free_cooling_rc07/free_cooling_rc07.py",
+       "src/gemini_model/free_cooling_rc07/REFERENCE.md",
+       "unit_test/gemini_model/free_cooling_rc07/__init__.py",
+       "unit_test/gemini_model/free_cooling_rc07/test_free_cooling_rc07.py"
+      ],
+      "pytest": {
+       "model_name": "free_cooling_rc07",
+       "passed": false,
+       "returncode": 1,
+       "timed_out": false,
+       "timeout_s": 120.0,
+       "duration_s": 0.318,
+       "tests": 2,
+       "failures": 1,
+       "errors": 0,
+       "skipped": 0,
+       "failed_tests": [
+        "unit_test.gemini_model.free_cooling_rc07.test_free_cooling_rc07::test_heat_rejection_and_free_cooling"
+       ],
+       "files_sha256": "9f9651c7658be38d8ce5c06b4d008c8c6a37e2f834f3c3e0f35673a6d720fce4",
+       "output_tail": ".F                                                                       [100%]\n=================================== FAILURES ===================================\n_____________________ test_heat_rejection_and_free_cooling _____________________\n\n    def test_heat_rejection_and_free_cooling():\n        \"\"\"Test heat rejection and free cooling logic (REF-02, REF-03)\"\"\"\n        model = FreeCoolingRc07()\n    \n        # Case 1: High COP, no free cooling\n        u1 = {'t_db': 30.0, 'rh': 50.0, 'q_cool': 10000.0, 'cop': 3.0}\n        res1 = model.calculate_output(u1)\n        # Q_reject = 10000 * (1 + 1/3) = 13333.33\n        assert math.isclose(res1['power_th'], 13333.33, rel_tol=1e-3)\n    \n        # Case 2: Full free cooling\n        # T_wb = 13.7 (from test_stull_wb), approach_tower=5, approach_hex=2\n        # 13.7 + 5 + 2 = 20.7. If t_chilled_supply is 21, it's full free cooling.\n        model.parameters['t_chilled_supply'] = 21.0\n        u2 = {'t_db': 20.0, 'rh': 50.0, 'q_cool': 10000.0, 'cop': 3.0}\n        res2 = model.calculate_output(u2)\n>       assert res2['q_free'] == 10000.0\nE       assert 5000.0 == 10000.0\n\nunit_test/gemini_model/free_cooling_rc07/test_free_cooling_rc07.py:28: AssertionError\n=========================== short test summary info ============================\nFAILED unit_test/gemini_model/free_cooling_rc07/test_free_cooling_rc07.py::test_heat_rejection_and_free_cooling\n1 failed, 1 passed in 0.05s\n",
+       "error": null
+      },
+      "error": "tests failed",
+      "timed_out": false,
+      "input_tokens": 1907,
+      "output_tokens": 3068,
+      "elapsed_s": 69.5596684999764
+     },
+     {
+      "attempt": 2,
+      "decision_source": "llm",
+      "written": [
+       "src/gemini_model/free_cooling_rc07/__init__.py",
+       "src/gemini_model/free_cooling_rc07/free_cooling_rc07.py",
+       "src/gemini_model/free_cooling_rc07/REFERENCE.md",
+       "unit_test/gemini_model/free_cooling_rc07/__init__.py",
+       "unit_test/gemini_model/free_cooling_rc07/test_free_cooling_rc07.py"
+      ],
+      "pytest": {
+       "model_name": "free_cooling_rc07",
+       "passed": true,
+       "returncode": 0,
+       "timed_out": false,
+       "timeout_s": 120.0,
+       "duration_s": 0.21,
+       "tests": 2,
+       "failures": 0,
+       "errors": 0,
+       "skipped": 0,
+       "failed_tests": [],
+       "files_sha256": "4d0fce59ec5d3926388f863786970c259ab6f0bcd1085434cf4b32db1091bea8",
+       "output_tail": "..                                                                       [100%]\n2 passed in 0.01s\n",
+       "error": null
+      },
+      "error": null,
+      "timed_out": false,
+      "input_tokens": 2520,
+      "output_tokens": 3086,
+      "elapsed_s": 68.82628529204521
+     }
+    ],
+    "registration": {
+     "model_name": "free_cooling_rc07",
+     "component_type": "free_cooling",
+     "class_name": "FreeCoolingRc07",
+     "module": "_geoagent_sandbox_free_cooling_rc07_4d0fce59ec5d",
+     "source": "src/gemini_model/free_cooling_rc07/free_cooling_rc07.py",
+     "files_sha256": "4d0fce59ec5d3926388f863786970c259ab6f0bcd1085434cf4b32db1091bea8",
+     "tests_passed": 2,
+     "runtime_only": true,
+     "promotion": "runtime only: to keep it, copy src/gemini_model/free_cooling_rc07/ and unit_test/gemini_model/free_cooling_rc07/ into the repository, add the registry entry and the .rst page in a reviewed PR"
+    },
+    "input_tokens": 4427,
+    "output_tokens": 6154,
+    "summary": "free_cooling: FreeCoolingRc07 registered at runtime after 2 draft(s); 2 tests passed."
+   }
+  ],
+  "after": {
+   "registered_types": [
+    "absorption_chiller",
+    "adder",
+    "boiler",
+    "booster_pump",
+    "chp",
+    "co2_corrosion",
+    "compressor",
+    "electric_boiler",
+    "electric_chiller",
+    "esp",
+    "filter",
+    "free_cooling",
+    "heat_exchanger",
+    "heat_rejection",
+    "heatpump",
+    "injector_pump",
+    "injector_well",
+    "mixer",
+    "producer_well",
+    "reservoir_bottomhole_skin",
+    "reservoir_ipr",
+    "separator",
+    "splitter",
+    "thermal_storage",
+    "well"
+   ],
+   "required": [
+    {
+     "component_type": "absorption_chiller",
+     "needed_by": [
+      "C3",
+      "C4"
+     ],
+     "registered": true,
+     "model_class": "gemini_model.absorption_chiller.absorption_chiller.AbsorptionChiller",
+     "gm_id": "GM-04",
+     "reference_card": "RC-05",
+     "in_generated_plant": true
+    },
+    {
+     "component_type": "adder",
+     "needed_by": [
+      "C1",
+      "C2",
+      "C3",
+      "C4",
+      "C5",
+      "C6",
+      "C7",
+      "C8"
+     ],
+     "registered": true,
+     "model_class": "gemini_model.adder.adder.Adder",
+     "gm_id": null,
+     "reference_card": null,
+     "in_generated_plant": true
+    },
+    {
+     "component_type": "boiler",
+     "needed_by": [
+      "C0",
+      "C1",
+      "C2",
+      "C3",
+      "C4",
+      "C5",
+      "C6",
+      "C7",
+      "C8"
+     ],
+     "registered": true,
+     "model_class": "gemini_model.boiler.boiler.Boiler",
+     "gm_id": null,
+     "reference_card": "RC-08",
+     "in_generated_plant": true
+    },
+    {
+     "component_type": "chp",
+     "needed_by": [
+      "C1",
+      "C2",
+      "C3",
+      "C4",
+      "C5",
+      "C6",
+      "C8"
+     ],
+     "registered": true,
+     "model_class": "gemini_model.chp.chp.CHP",
+     "gm_id": null,
+     "reference_card": "RC-08",
+     "in_generated_plant": true
+    },
+    {
+     "component_type": "electric_chiller",
+     "needed_by": [
+      "C0",
+      "C1",
+      "C2",
+      "C3",
+      "C4",
+      "C5",
+      "C6",
+      "C7",
+      "C8"
+     ],
+     "registered": true,
+     "model_class": "gemini_model.electric_chiller.electric_chiller.ElectricChiller",
+     "gm_id": "GM-05",
+     "reference_card": "RC-06",
+     "in_generated_plant": true
+    },
+    {
+     "component_type": "filter",
+     "needed_by": [
+      "C1",
+      "C2",
+      "C3",
+      "C4",
+      "C5",
+      "C6",
+      "C7",
+      "C8"
+     ],
+     "registered": true,
+     "model_class": "gemini_model.filter.filter.Filter",
+     "gm_id": null,
+     "reference_card": null,
+     "in_generated_plant": true
+    },
+    {
+     "component_type": "free_cooling",
+     "needed_by": [
+      "C2",
+      "C3",
+      "C4",
+      "C5",
+      "C6",
+      "C7",
+      "C8"
+     ],
+     "registered": true,
+     "model_class": "_geoagent_sandbox_free_cooling_rc07_4d0fce59ec5d.FreeCoolingRc07",
+     "gm_id": "GM-07",
+     "reference_card": "RC-07",
+     "in_generated_plant": true
+    },
+    {
+     "component_type": "heat_exchanger",
+     "needed_by": [
+      "C1",
+      "C2",
+      "C3",
+      "C4",
+      "C6",
+      "C7",
+      "C8"
+     ],
+     "registered": true,
+     "model_class": "gemini_model.heat_exchanger.heat_exchanger.HeatExchanger",
+     "gm_id": null,
+     "reference_card": "RC-03",
+     "in_generated_plant": true
+    },
+    {
+     "component_type": "heat_rejection",
+     "needed_by": [
+      "C0",
+      "C1",
+      "C2",
+      "C3",
+      "C4",
+      "C5",
+      "C6",
+      "C7",
+      "C8"
+     ],
+     "registered": true,
+     "model_class": "gemini_model.heat_rejection.heat_rejection.HeatRejection",
+     "gm_id": "GM-06",
+     "reference_card": "RC-07",
+     "in_generated_plant": true
+    },
+    {
+     "component_type": "heatpump",
+     "needed_by": [
+      "C2",
+      "C3",
+      "C5",
+      "C6",
+      "C7",
+      "C8"
+     ],
+     "registered": true,
+     "model_class": "gemini_model.heatpump.heatpump_basic.HeatpumpBasic",
+     "gm_id": "GM-03",
+     "reference_card": "RC-04",
+     "in_generated_plant": true
+    },
+    {
+     "component_type": "injector_well",
+     "needed_by": [
+      "C1",
+      "C2",
+      "C3",
+      "C4",
+      "C5",
+      "C6",
+      "C7",
+      "C8"
+     ],
+     "registered": true,
+     "model_class": "gemini_simulator.well_components.InjectorWell",
+     "gm_id": "GM-01",
+     "reference_card": "RC-01",
+     "in_generated_plant": true
+    },
+    {
+     "component_type": "mixer",
+     "needed_by": [
+      "C1",
+      "C2",
+      "C3",
+      "C4",
+      "C5",
+      "C6",
+      "C7",
+      "C8"
+     ],
+     "registered": true,
+     "model_class": "gemini_model.mixer.mixer.Mixer",
+     "gm_id": null,
+     "reference_card": null,
+     "in_generated_plant": true
+    },
+    {
+     "component_type": "producer_well",
+     "needed_by": [
+      "C1",
+      "C2",
+      "C3",
+      "C4",
+      "C5",
+      "C6",
+      "C7",
+      "C8"
+     ],
+     "registered": true,
+     "model_class": "gemini_simulator.well_components.ProducerWell",
+     "gm_id": "GM-01",
+     "reference_card": "RC-01",
+     "in_generated_plant": true
+    },
+    {
+     "component_type": "separator",
+     "needed_by": [
+      "C1",
+      "C2",
+      "C3",
+      "C4",
+      "C5",
+      "C6",
+      "C8"
+     ],
+     "registered": true,
+     "model_class": "gemini_model.separator.separator.Separator",
+     "gm_id": "GM-12",
+     "reference_card": "RC-08",
+     "in_generated_plant": true
+    },
+    {
+     "component_type": "splitter",
+     "needed_by": [
+      "C1",
+      "C2",
+      "C3",
+      "C4",
+      "C5",
+      "C6",
+      "C7",
+      "C8"
+     ],
+     "registered": true,
+     "model_class": "gemini_model.splitter.splitter.Splitter",
+     "gm_id": null,
+     "reference_card": null,
+     "in_generated_plant": true
+    },
+    {
+     "component_type": "thermal_storage",
+     "needed_by": [
+      "C6"
+     ],
+     "registered": true,
+     "model_class": "gemini_model.thermal_storage.thermal_storage.ThermalStorage",
+     "gm_id": "GM-09",
+     "reference_card": "RC-09",
+     "in_generated_plant": false
+    }
+   ],
+   "missing_component_types": [],
+   "missing": [],
+   "unused_registered_types": [
+    "booster_pump",
+    "co2_corrosion",
+    "compressor",
+    "electric_boiler",
+    "esp",
+    "injector_pump",
+    "reservoir_bottomhole_skin",
+    "reservoir_ipr",
+    "well"
+   ],
+   "blocked_candidates": [],
+   "limitations": [
+    {
+     "id": "LIM-SUB-01",
+     "area": "subsurface",
+     "component_types": [
+      "producer_well"
+     ],
+     "title": "ESP has no flow affinity",
+     "detail": "GEMINI's ESP scales head by (f/60)² and power by (f/60)³ at the same flow but has no flow affinity, so its curve power is optimistic at reduced frequency (SUB-ESP).",
+     "impact": "ESP curve power is approximate at part load.",
+     "mitigation": "Plant power uses the DB-13/DB-40 rule QΔp/0.70; the curve power is a comparison only.",
+     "severity": "minor",
+     "source": "WP-05 TL-05, SUB-ESP",
+     "only_concepts": [],
+     "affects": [
+      "C1",
+      "C2",
+      "C3",
+      "C4",
+      "C5",
+      "C6",
+      "C7",
+      "C8"
+     ]
+    },
+    {
+     "id": "LIM-SUB-02",
+     "area": "subsurface",
+     "component_types": [
+      "producer_well",
+      "injector_well"
+     ],
+     "title": "Constant brine PVT",
+     "detail": "ρ, μ, c_p constant (DB-08/DB-33); no μ(T), so cold-injection injectivity is not lowered (II = PI, SUB-II); cold injection adds about +6 bar on the 26.5 bar(g) injection WHP.",
+     "impact": "Injection pressure and pump power underestimated at the injector.",
+     "mitigation": "WP-11 SUB-II sensitivity; report injection WHP with the cold-injection note.",
+     "severity": "moderate",
+     "source": "WP-01 GM-01, WP-05",
+     "only_concepts": [],
+     "affects": [
+      "C1",
+      "C2",
+      "C3",
+      "C4",
+      "C5",
+      "C6",
+      "C7",
+      "C8"
+     ]
+    },
+    {
+     "id": "LIM-SUB-03",
+     "area": "subsurface",
+     "component_types": [
+      "producer_well"
+     ],
+     "title": "Steady wellbore heat loss",
+     "detail": "Steady U = 10 W/m²K: wellhead 77.1 °C at 50 m³/h versus about 81–83 °C transient.",
+     "impact": "Low-flow wellhead temperature is conservative (heat underestimated).",
+     "mitigation": "State as conservative; transient wellbore model out of scope.",
+     "severity": "minor",
+     "source": "WP-05 TL-05/TL-06",
+     "only_concepts": [],
+     "affects": [
+      "C1",
+      "C2",
+      "C3",
+      "C4",
+      "C5",
+      "C6",
+      "C7",
+      "C8"
+     ]
+    },
+    {
+     "id": "LIM-SUB-04",
+     "area": "subsurface",
+     "component_types": [
+      "producer_well"
+     ],
+     "title": "ESP motor heating not modelled",
+     "detail": "Motor/pump losses heat the brine by about 0.4 K; not added to the wellhead temperature.",
+     "impact": "Wellhead temperature slightly underestimated.",
+     "mitigation": "None needed (conservative).",
+     "severity": "minor",
+     "source": "WP-05",
+     "only_concepts": [],
+     "affects": [
+      "C1",
+      "C2",
+      "C3",
+      "C4",
+      "C5",
+      "C6",
+      "C7",
+      "C8"
+     ]
+    },
+    {
+     "id": "LIM-SUB-05",
+     "area": "subsurface",
+     "component_types": [
+      "injector_well"
+     ],
+     "title": "No fracture-pressure limit",
+     "detail": "Injection wellhead pressure is not checked against a formation fracture pressure.",
+     "impact": "A high-rate injection point could exceed a fracture limit unnoticed.",
+     "mitigation": "Ask for the fracture gradient (request_missing_input) before final sizing.",
+     "severity": "moderate",
+     "source": "WP-05 TL-05",
+     "only_concepts": [],
+     "affects": [
+      "C1",
+      "C2",
+      "C3",
+      "C4",
+      "C5",
+      "C6",
+      "C7",
+      "C8"
+     ]
+    },
+    {
+     "id": "LIM-SUB-06",
+     "area": "subsurface",
+     "component_types": [
+      "producer_well"
+     ],
+     "title": "No flashing check above 100 °C",
+     "detail": "Brine above 100 °C (C4: 108 °C reservoir at 3.2 km, DB-29) is not checked for flashing in the surface letdown; CFG-SURFACE only flags brine above 100 °C.",
+     "impact": "Deep-concept surface pressures may be optimistic.",
+     "mitigation": "Keep the surface loop pressurised above saturation; flag C4 in the report.",
+     "severity": "moderate",
+     "source": "WP-05, WP-06 CFG-SURFACE",
+     "only_concepts": [
+      "C4"
+     ],
+     "affects": [
+      "C4"
+     ]
+    },
+    {
+     "id": "LIM-SUB-07",
+     "area": "subsurface",
+     "component_types": [
+      "producer_well"
+     ],
+     "title": "ESP far from BEP at minimum flow",
+     "detail": "At 50 m³/h the ESP runs at Q/(Q_BEP·f/60) 0.33 (TL-05 esp_flow_to_bep_ratio), outside the preferred operating range.",
+     "impact": "Minimum-flow efficiency and pump life uncertain.",
+     "mitigation": "Prefer turndown by switching doublets; note in DR-01.",
+     "severity": "minor",
+     "source": "WP-05 SUB-ESP",
+     "only_concepts": [],
+     "affects": [
+      "C1",
+      "C2",
+      "C3",
+      "C4",
+      "C5",
+      "C6",
+      "C7",
+      "C8"
+     ]
+    },
+    {
+     "id": "LIM-SUB-08",
+     "area": "subsurface",
+     "component_types": [
+      "esp"
+     ],
+     "title": "Standalone esp type is water-only",
+     "detail": "The registry type 'esp' is GEMINI's water ESP: head and power are not scaled by the brine specific gravity (the producer ESP is, via well_flow._FluidESP; brine ESP Δp and power × 1.03).",
+     "impact": "A project using 'esp' directly underestimates brine pump Δp and power.",
+     "mitigation": "Use producer_well (the generator does); scale 'esp' by the pvt SG if it is ever used.",
+     "severity": "minor",
+     "source": "WP-01 review",
+     "only_concepts": [],
+     "affects": []
+    },
+    {
+     "id": "LIM-PLT-01",
+     "area": "plant",
+     "component_types": [
+      "thermal_storage"
+     ],
+     "title": "No storage component in the plant generator",
+     "detail": "C6 runs as its parent plant; the HT-ATES outlet temperature is not modelled and recovered heat below 100 °C would need a booster heat pump.",
+     "impact": "C6 benefit rests on dispatch bookkeeping (STO-REC-HT), not a simulated storage loop.",
+     "mitigation": "Report C6 as indicative; booster HP not sized.",
+     "severity": "major",
+     "source": "WP-06 concept_layout, WP-03 GM-09",
+     "only_concepts": [],
+     "affects": [
+      "C6"
+     ]
+    },
+    {
+     "id": "LIM-PLT-02",
+     "area": "plant",
+     "component_types": [
+      "heatpump"
+     ],
+     "title": "Heat-pump fouling not modelled",
+     "detail": "The closed-form Lorenz heat pump has no fouling factor on evaporator or condenser.",
+     "impact": "COP slightly optimistic over the plant life.",
+     "mitigation": "Covered by the VER-HP-ETA cap and WP-11 sensitivity.",
+     "severity": "minor",
+     "source": "WP-03 GM-03",
+     "only_concepts": [],
+     "affects": [
+      "C2",
+      "C3",
+      "C5",
+      "C6",
+      "C7",
+      "C8"
+     ]
+    },
+    {
+     "id": "LIM-PLT-03",
+     "area": "plant",
+     "component_types": [
+      "heat_exchanger"
+     ],
+     "title": "HEX imprecise for balanced flows",
+     "detail": "The GEMINI ε-NTU rating model is imprecise as C_r → 1.",
+     "impact": "Balanced-flow HEX duty has a small error.",
+     "mitigation": "CFG-HEX sizes UA by inverting RC-03 eq 1 at the design point.",
+     "severity": "minor",
+     "source": "WP-06 CFG-HEX",
+     "only_concepts": [],
+     "affects": [
+      "C1",
+      "C2",
+      "C3",
+      "C4",
+      "C6",
+      "C7",
+      "C8"
+     ]
+    },
+    {
+     "id": "LIM-PLT-04",
+     "area": "plant",
+     "component_types": [
+      "heat_exchanger"
+     ],
+     "title": "HEX temperature difference uses abs()",
+     "detail": "The GEMINI HEX uses abs(T_s,in − T_p,in): a colder primary gives heat in the wrong direction instead of zero duty.",
+     "impact": "A mis-wired or off-design HEX can report positive duty.",
+     "mitigation": "Generator wires brine hot side only; verifier first-law check (PH-22).",
+     "severity": "moderate",
+     "source": "WP-06, WP-09 PH-22",
+     "only_concepts": [],
+     "affects": [
+      "C1",
+      "C2",
+      "C3",
+      "C4",
+      "C6",
+      "C7",
+      "C8"
+     ]
+    },
+    {
+     "id": "LIM-PLT-05",
+     "area": "plant",
+     "component_types": [
+      "absorption_chiller"
+     ],
+     "title": "No absorption isolation loop",
+     "detail": "Brine drives the absorption generator directly (titanium tubes, RC-05); the isolation HEX of spec §3.4 is not modelled.",
+     "impact": "Drive temperature optimistic by one HEX approach.",
+     "mitigation": "Note in DR-04; WP-11 sensitivity on drive temperature.",
+     "severity": "moderate",
+     "source": "WP-02 GM-04, WP-06",
+     "only_concepts": [],
+     "affects": [
+      "C3",
+      "C4"
+     ]
+    },
+    {
+     "id": "LIM-GEM-01",
+     "area": "gemini",
+     "component_types": [
+      "compressor"
+     ],
+     "title": "GEMINI Compressor omits k and drive losses",
+     "detail": "Compressor power omits the isentropic exponent k (about 1.3, power low) and the motor and drive efficiencies 0.93 × 0.97.",
+     "impact": "Unused by the plant; would underestimate power if used.",
+     "mitigation": "If used: fix behind a parameter and add REFERENCE.md.",
+     "severity": "minor",
+     "source": "WP-01 GM-02",
+     "only_concepts": [],
+     "affects": []
+    },
+    {
+     "id": "LIM-TOOL-01",
+     "area": "tooling",
+     "component_types": [
+      "producer_well",
+      "injector_well"
+     ],
+     "title": "Private well_flow helpers used as API",
+     "detail": "tools/doublet.py calls gemini_simulator.well_flow._build_dpdt and _build_esp.",
+     "impact": "Renaming them breaks TL-05/TL-06.",
+     "mitigation": "Treat both as API; this analysis checks they exist.",
+     "severity": "minor",
+     "source": "WP-05 tools/doublet.py",
+     "only_concepts": [],
+     "affects": [
+      "C1",
+      "C2",
+      "C3",
+      "C4",
+      "C5",
+      "C6",
+      "C7",
+      "C8"
+     ]
+    }
+   ],
+   "internal_api": [
+    {
+     "module": "gemini_simulator.well_flow",
+     "names": [
+      "_build_dpdt",
+      "_build_esp"
+     ],
+     "present": true
+    }
+   ],
+   "note": "required types from the WP-06 concept layouts (CFG-LAYOUT); limitations from the WP-01…WP-06 build (PROGRESS)"
+  },
+  "closed": [
+   "free_cooling"
+  ],
+  "still_missing": []
+ }
+}

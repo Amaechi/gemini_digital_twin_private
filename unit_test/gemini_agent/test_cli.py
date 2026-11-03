@@ -111,16 +111,26 @@ def test_pause_then_resume_from_the_cli(tmp_path, capsys):
 
 
 def test_run_llm_engine_offline(tmp_path, capsys, monkeypatch):
-    """`--engine llm` with the Ollama model replaced by a FunctionModel; calls are logged."""
+    """`--engine llm` with the Ollama model replaced by a FunctionModel; calls are logged.
+
+    WP-15: every CLI exit path closes the engine (HTTP clients + event loop) exactly once, and
+    the exit codes are unchanged.
+    """
     tags = []
+    closed = []
 
     def fake_build(llm_config, kind="orchestrator", tag=""):
         tags.append(tag)
         return fake_model()
 
+    def record_close(*models):
+        closed.append(models)
+
     monkeypatch.setattr(engine_module, "build_ollama_model", fake_build)
+    monkeypatch.setattr(engine_module, "close_model_clients", record_close)
     code = main(["run", "--engine", "llm", "--runs-dir", str(tmp_path), "--run-id", "llm1"])
     assert code == EXIT_OK, capsys.readouterr().out
+    assert len(closed) == 1 and closed[0][0] is not None  # the orchestrator model was closed
     calls = (tmp_path / "llm1" / "llm_calls.jsonl").read_text().splitlines()
     assert calls and all(json.loads(line)["decision_source"] == "llm" for line in calls)
 
@@ -134,6 +144,7 @@ def test_run_llm_engine_offline(tmp_path, capsys, monkeypatch):
     assert after > before
     assert tags[-2:] == ["qwen-test", "qwen-test"]
     assert "OLLAMA_CONTEXT_LENGTH" in capsys.readouterr().err
+    assert len(closed) == 3  # run (completed), run (paused) and resume (paused) each closed once
 
 
 def test_missing_brief_is_a_usage_error(tmp_path, capsys):

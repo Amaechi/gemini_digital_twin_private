@@ -17,6 +17,18 @@ from, the third-party works listed below.
               the simulation engine. Per Apache-2.0 §4(b), every GEMINI file we modify carries a
               notice near the top:
               "# Modified by <team> for SPE GeoHackathon 2026, <date>: <what changed>."
+              Modified GEMINI files (audited 2026-11-03, WP-15; validate_submission SUB-21):
+                src/gemini_model/chp/chp.py, compressor/compressor.py,
+                heat_exchanger/heat_exchanger.py, heatpump/heatpump_basic.py,
+                separator/separator.py, well/pressure_drop.py;
+                src/gemini_simulator/kpi.py, nodal_solver.py, registry.py, well_components.py,
+                well_flow.py; unit_test/gemini_model/chp/test_chp.py; pyproject.toml (pytest
+                collection, coverage pin); src/gemini_documentation/source/index_models.rst,
+                model_fluid_pvt.rst, model_surface_equipment.rst, model_well_hydraulics.rst.
+              New GEMINI model packages (ours, Apache-2.0): src/gemini_model/absorption_chiller,
+                electric_chiller, heat_rejection, free_cooling, electric_boiler, thermal_storage,
+                fluid, and new files under heatpump/, separator/ and well/, each with a REFERENCE.md
+                naming its reference card.
 
 -------------------------------------------------------------------------------
 2. Plant Debugger (marcosanyo/PlantDebugger)
@@ -29,10 +41,10 @@ from, the third-party works listed below.
               Code adapted into src/gemini_agent/ starts with the header
               "# Adapted from marcosanyo/PlantDebugger (Apache-2.0), Copyright 2026 Plant Debugger
               contributors, file <original path> @ d69507a. Modified by <team>, <date>: <what changed>."
-              Planned adaptations (spec §11.1; this list is updated as files are adapted):
+              Adapted files (audited 2026-11-03, WP-15; validate_submission SUB-20):
                 agent/decision_engine.py            -> src/gemini_agent/agents/engine.py
                 agent/schemas.py                    -> src/gemini_agent/schemas/decision.py
-                agent/prompt.py (style)             -> src/gemini_agent/prompts/
+                agent/prompt.py (style)             -> src/gemini_agent/prompts/system.py
                 runner/incident_runner.py           -> src/gemini_agent/runner/design_runner.py
                 safety/action_guard.py              -> src/gemini_agent/verify/design_guard.py
                 tools/verify.py                     -> src/gemini_agent/verify/design_verifier.py
@@ -40,8 +52,10 @@ from, the third-party works listed below.
                 persistence/base.py, sqlite_store.py -> src/gemini_agent/memory/event_store.py
                 field_ops/site_knowledge.py, models.py (JSON parts)
                                                     -> src/gemini_agent/memory/project_knowledge.py
-                logging_utils.py                    -> src/gemini_agent/logging/
-                scripts/run_eval.py, validate_submission.py -> scripts/
+                logging_utils.py                    -> src/gemini_agent/logging/json_formatter.py
+                scripts/run_eval.py                 -> src/gemini_agent/eval/harness.py, scripts/run_eval.py
+                scripts/validate_submission.py      -> src/gemini_agent/eval/submission.py,
+                                                       scripts/validate_submission.py
               Ideas only (not copied): agent/adk_agent.py, field_ops/adk_orchestration.py
               (repair turn, plan validation, pause/resume).
 
@@ -58,7 +72,15 @@ from, the third-party works listed below.
      The books and papers themselves are not redistributed.
 
 -------------------------------------------------------------------------------
-4. Python dependencies
+4. LLM-generated code kept as evidence
+-------------------------------------------------------------------------------
+   docs/results/s7_demo/ holds a GEMINI model and test written by the Model Builder agent
+   (gemma4:12b-it-q4_K_M, local Ollama) from reference card RC-07, stored as .py.txt so no test
+   runner collects it. It is evidence of scenario S7, not part of the application, and is
+   licensed like the rest of our code (Apache-2.0).
+
+-------------------------------------------------------------------------------
+5. Python dependencies
 -------------------------------------------------------------------------------
    Installed from PyPI (requirements-hackathon.txt), not redistributed: numpy, scipy, pandas,
    matplotlib (BSD/PSF-style), pydantic and pydantic-ai (MIT), PyYAML (MIT), pytest, pytest-cov,

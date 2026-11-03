@@ -23,6 +23,7 @@ from gemini_agent.agents.engine import (
     build_ollama_model,
     check_choice,
     choice_deps,
+    close_model_clients,
     coerce_step_kinds,
     create_decision_engine,
 )
@@ -640,3 +641,68 @@ def test_step_kinds_names_finalise_first_with_the_meaning_of_each_no_tool_kind()
     assert "refuse (P0 only, off-topic request)" in block
     assert block.index("finalise") < block.index("delegate")
     assert set(NO_TOOL_KIND_NOTES) == NO_TOOL_KINDS  # a new no-tool kind cannot vanish silently
+
+
+class _FakeAsyncClient:
+    """Stands in for ``openai.AsyncOpenAI``: ``close`` is a coroutine that must run on a loop."""
+
+    def __init__(self) -> None:
+        self.closed = False
+
+    async def close(self) -> None:
+        self.closed = True
+
+
+class _FakeModel:
+    def __init__(self) -> None:
+        self.client = _FakeAsyncClient()
+
+
+def test_close_model_clients_closes_the_clients_and_the_event_loop():
+    """WP-15: the clients are closed on the live loop, then the loop (no kqueue traceback)."""
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    model, coder = _FakeModel(), _FakeModel()
+    close_model_clients(model, None, coder, TestModel())  # None and client-less models are skipped
+    assert model.client.closed and coder.client.closed
+    assert loop.is_closed()
+    with pytest.raises(RuntimeError):  # no current loop is left behind
+        asyncio.get_event_loop()
+    close_model_clients(model)  # idempotent: no loop → nothing to do, no error
+
+    # a client whose close() raises never replaces the CLI exit code with a traceback
+    class _Broken:
+        async def close(self) -> None:
+            raise OSError("socket already gone")
+
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    broken = _FakeModel()
+    broken.client = _Broken()
+    close_model_clients(broken)
+    assert loop.is_closed()
+
+    # a running loop is never closed from inside
+    async def _inside() -> None:
+        inner = _FakeModel()
+        close_model_clients(inner)
+        assert not inner.client.closed and not asyncio.get_running_loop().is_closed()
+
+    asyncio.run(_inside())
+
+
+def test_engines_close_without_error_and_a_later_call_still_runs(tmp_path):
+    """``ResilientEngine.close`` reaches both engines; a later call opens a fresh loop.
+
+    A TestModel engine closes harmlessly (no client); pydantic-ai creates a new event loop for
+    the next ``run_sync``.
+    """
+    engine = create_decision_engine(
+        "llm", LLM_CONFIG, model=fake_model(), logger=LLMLogger(tmp_path)
+    )
+    assert isinstance(engine, ResilientEngine)
+    assert engine.decide(_context()).source == "llm"
+    engine.close()
+    PolicyEngine().close()  # the default close is a no-op
+    assert engine.decide(_context()).source == "llm"  # new event loop, same engine
+    engine.close()

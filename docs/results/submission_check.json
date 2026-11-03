@@ -1,20 +1,20 @@
 {
-  "generated_at": "2026-11-02T17:22:46.752370+00:00",
+  "generated_at": "2026-11-03T15:27:16.751407+00:00",
   "repo_root": "/home/user/gemini_digital_twin_private",
-  "run_dir": "/home/user/gemini_digital_twin_private/runs/final_policy",
+  "run_dir": "/home/user/gemini_digital_twin_private/runs/final/final_llm",
   "eval_root": "/home/user/gemini_digital_twin_private/runs/final/eval",
   "checks": [
     {
       "id": "SUB-01",
       "item": "DL-04: final run artefacts (run_summary.json, events.sqlite, events.jsonl)",
       "status": "pass",
-      "detail": "/home/user/gemini_digital_twin_private/runs/final_policy; missing none"
+      "detail": "/home/user/gemini_digital_twin_private/runs/final/final_llm; missing none"
     },
     {
       "id": "SUB-02",
       "item": "Run completed (P0–P10) and the recommended design was approved (P10)",
-      "status": "warn",
-      "detail": "approval pending: non-interactive run; approve with an ask-mode run"
+      "status": "pass",
+      "detail": "completed, approved"
     },
     {
       "id": "SUB-03",
@@ -73,8 +73,8 @@
     {
       "id": "SUB-12",
       "item": "§18: llm_calls.jsonl + token_summary.json (final run)",
-      "status": "fail",
-      "detail": "0 LLM calls; ['no llm_calls.jsonl records (the final run must use --engine llm)']"
+      "status": "pass",
+      "detail": "34 LLM calls; ok"
     },
     {
       "id": "SUB-13",
@@ -91,20 +91,20 @@
     {
       "id": "SUB-15",
       "item": "§18: naive-vs-optimised token comparison (S10, --engine llm)",
-      "status": "fail",
-      "detail": "S10 comparison in models none"
+      "status": "pass",
+      "detail": "S10 comparison in models ['gemma4:12b-it-q4_K_M']"
     },
     {
       "id": "SUB-16",
       "item": "§18: model-size comparison (S11, two --engine llm models)",
-      "status": "fail",
-      "detail": "/home/user/gemini_digital_twin_private/runs/final/eval/model_comparison.json missing (run_eval.py --compare)"
+      "status": "pass",
+      "detail": "LLM models compared: ['gemma4:12b-it-q4_K_M', 'qwen3.6:27b', 'qwen3.6:35b-a3b', 'gemma4:26b-a4b', 'qwen3.5:9b-q4_K_M']"
     },
     {
       "id": "SUB-17",
       "item": "§18: S1–S11 transcripts (prompts, answers, tokens)",
-      "status": "fail",
-      "detail": "no --engine llm eval in /home/user/gemini_digital_twin_private/runs/final/eval"
+      "status": "pass",
+      "detail": "model gemma4:12b-it-q4_K_M: missing none"
     },
     {
       "id": "SUB-18",
@@ -133,8 +133,8 @@
     {
       "id": "SUB-22",
       "item": "§18/DL-03: code pushed with README (API placeholders documented)",
-      "status": "warn",
-      "detail": "README does not mention API placeholders"
+      "status": "pass",
+      "detail": "README.md present, placeholders documented"
     },
     {
       "id": "SUB-23",
@@ -145,8 +145,8 @@
     {
       "id": "SUB-24",
       "item": "EV-02: unit tests green (GEMINI + gemini_agent)",
-      "status": "manual",
-      "detail": "run with --pytest to include the suite"
+      "status": "pass",
+      "detail": "1334 passed, 7 warnings in 472.38s (0:07:52)"
     }
   ]
 }

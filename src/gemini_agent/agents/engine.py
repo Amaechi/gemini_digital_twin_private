@@ -4,7 +4,8 @@
 # (NativeOutput + output validators, <= 2 retries, UsageLimits); PolicyEngine covers phases
 # P0–P10 and Decision Record choices; every LLM call goes through the LLM logger. 2026-11-02
 # (L-1 follow-up): step kinds coerced from tool names, per-call thinking/max-token/timeout settings,
-# Decision Record choices tied to a workflow-offered criterion.
+# Decision Record choices tied to a workflow-offered criterion. 2026-11-03 (WP-15): engines close
+# their HTTP clients and event loop (``close``) so the CLI exits without a shutdown traceback.
 """Decision engines: deterministic policy, Pydantic AI role agents and a resilient fallback.
 
 ``PolicyEngine``, ``LLMEngine`` and ``ResilientEngine`` (which falls back to the policy) follow
@@ -16,8 +17,10 @@ Records). It never computes numbers and never marks a design ACCEPTED.
 
 from __future__ import annotations
 
+import asyncio
 import os
 import time
+import warnings
 from abc import ABC, abstractmethod
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -136,6 +139,9 @@ class DecisionEngine(ABC):
         self, question: DecisionQuestion, context: DecisionContext
     ) -> EngineResult[OptionChoice]:
         """One eligible option for a Decision Record."""
+
+    def close(self) -> None:
+        """Release what the engine holds open (HTTP clients, event loop); a no-op by default."""
 
 
 # --------------------------------------------------------------------------- policy
@@ -355,6 +361,43 @@ def build_ollama_model(
     return OllamaModel(model_tag, provider=provider, profile=profile)
 
 
+def close_model_clients(*models: Any) -> None:
+    """Close the HTTP clients of ``models`` and the event loop their ``run_sync`` calls used.
+
+    Pydantic AI's ``Agent.run_sync`` runs on the thread's current event loop (creating one when
+    none exists) and never closes it or the provider's ``AsyncOpenAI``/httpx client. Left open,
+    both are garbage-collected at interpreter exit, after the loop's selector is gone, and macOS
+    prints ``ValueError: I/O operation on closed kqueue object`` from ``BaseEventLoop.__del__``
+    (``cli run --engine llm``). Closing the clients on the live loop and then the loop itself is
+    the orderly shutdown; models without a ``client`` (``TestModel``, ``FunctionModel``) are
+    skipped. Nothing is closed from inside a running loop. No behaviour change otherwise.
+    """
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", DeprecationWarning)  # no current loop: 3.12 warns
+        try:
+            loop = asyncio.get_event_loop()
+        except RuntimeError:
+            loop = None
+    if loop is None or loop.is_closed() or loop.is_running():
+        return
+    try:
+        for model in models:
+            client = getattr(model, "client", None) if model is not None else None
+            close = getattr(client, "close", None)
+            if close is None:
+                continue
+            try:
+                result = close()
+                if asyncio.iscoroutine(result):
+                    loop.run_until_complete(result)
+            except Exception as exc:  # noqa: BLE001 - shutdown must never replace the exit code
+                warnings.warn(f"LLM client close failed: {exc!r}", RuntimeWarning, stacklevel=2)
+        loop.run_until_complete(loop.shutdown_asyncgens())
+    finally:
+        loop.close()
+        asyncio.set_event_loop(None)
+
+
 def model_settings(
     llm_config: LLMConfig,
     calls: CallLimits | None = None,
@@ -541,6 +584,10 @@ class LLMEngine(DecisionEngine):
         """Model settings of every structured-output call (:func:`model_settings`)."""
         return model_settings(self.llm_config)
 
+    def close(self) -> None:
+        """Close the Ollama HTTP clients and the event loop (:func:`close_model_clients`)."""
+        close_model_clients(self.model, self.coder_model)
+
     def _log(
         self,
         role: Role,
@@ -635,6 +682,11 @@ class ResilientEngine(DecisionEngine):
                 output_tokens=exc.output_tokens,
                 error=str(exc)[:500],
             )
+
+    def close(self) -> None:
+        """Close both engines."""
+        self.primary.close()
+        self.fallback.close()
 
 
 def create_decision_engine(

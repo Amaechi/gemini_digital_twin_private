@@ -1,0 +1,11 @@
+{
+ "model_name": "free_cooling_rc07",
+ "component_type": "free_cooling",
+ "class_name": "FreeCoolingRc07",
+ "module": "_geoagent_sandbox_free_cooling_rc07_4d0fce59ec5d",
+ "source": "src/gemini_model/free_cooling_rc07/free_cooling_rc07.py",
+ "files_sha256": "4d0fce59ec5d3926388f863786970c259ab6f0bcd1085434cf4b32db1091bea8",
+ "tests_passed": 2,
+ "runtime_only": true,
+ "promotion": "runtime only: to keep it, copy src/gemini_model/free_cooling_rc07/ and unit_test/gemini_model/free_cooling_rc07/ into the repository, add the registry entry and the .rst page in a reviewed PR"
+}

@@ -682,9 +682,12 @@ def main(argv: Sequence[str] | None = None) -> int:
         run_id=sandbox_root.name,
     )
     started = time.perf_counter()
-    demo = run_s7_demo(
-        sandbox_root, coder, removed_type=args.remove, max_attempts=args.max_attempts
-    )
+    try:
+        demo = run_s7_demo(
+            sandbox_root, coder, removed_type=args.remove, max_attempts=args.max_attempts
+        )
+    finally:
+        engine.close_model_clients(coder.model)  # orderly shutdown (no kqueue traceback)
     elapsed = time.perf_counter() - started
     (sandbox_root / "s7_report.json").write_text(
         demo.report.model_dump_json(indent=1), encoding="utf-8"
