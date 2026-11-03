@@ -32,7 +32,7 @@ Keep it ≤ 20 KB; it is the hand-off between sessions. Old detail: merged PRs, 
 | Eval F | Close S2 (request inputs), S5 (confirm basis), S8 (cross-run sizing) | in review | | P1 intake questions CFG-INPUT-DEFAULTS / CFG-BASIS-CONFIRM; `cross_run_sizing`; eval rerun pending (L2) |
 
 Status: todo · in progress · in review · merged · blocked.
-Latest full suite (Eval F after merging main, 11-03): `PYTHONPATH=src python -m pytest -q unit_test/gemini_model unit_test/gemini_simulator unit_test/gemini_agent -x` → **FULL_SUITE_RESULT**. `validate_submission --pytest` → **READY, 22 pass / 0 fail / WARN SUB-14 / MANUAL SUB-23; SUB-24 PASS "1334 passed, 7 warnings in 472.38s" (`docs/results/submission_check.md`). CI smoke `--budget smoke`: 22.8 s (WP-12 follow-up measurement). After the reviewer's guard fix in `close_model_clients` only `agents/test_engine.py` + `test_cli.py` were re-run**.
+Latest full suite (Eval F after merging main, 11-03): `PYTHONPATH=src python -m pytest -q unit_test/gemini_model unit_test/gemini_simulator unit_test/gemini_agent -x` → **1359 passed, 8 warnings in 630 s (10 min 30 s)**. `validate_submission --pytest` → **READY, 22 pass / 0 fail / WARN SUB-14 / MANUAL SUB-23; SUB-24 PASS "1334 passed, 7 warnings in 472.38s" (`docs/results/submission_check.md`). CI smoke `--budget smoke`: 22.8 s (WP-12 follow-up measurement). After the reviewer's guard fix in `close_model_clients` only `agents/test_engine.py` + `test_cli.py` were re-run**.
 
 ## Decisions log (newest first)
 One line per decision, grouped by WP; dated 11-01 (WP-00: 10-31). Why: the `config/assumptions.yaml` entry or the module docstring.
