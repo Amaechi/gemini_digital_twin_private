@@ -256,6 +256,33 @@ PYTHONPATH=src python scripts/run_eval.py --engine llm --model <model> --tool-pr
 PYTHONPATH=src python -m gemini_agent.agents.model_builder --sandbox runs/s7_demo --model <model> --max-attempts 3
 ```
 
+### Web view (optional)
+
+`cli serve` (spec §4.2 MAY, post-submission) is a read-only web "Design Commander" for the runs of a
+directory: the shell of Plant Debugger's static Commander page (Apache-2.0, adapted in
+`src/gemini_agent/ui/static/` with the licence header) on a standard-library `http.server` — no new
+dependency. It shows, per run, the phase timeline P0–P10 with the AG-04 budgets used (steps, tool
+calls, tokens), the tool calls with their stub flag, LLM calls / tokens / fallbacks per phase, the
+Decision Record cards (criterion, evidence ids, chosen option, rationale), the DesignVerifier report
+with every check's margin, the figures, and — for a paused run — the pending question with an Answer
+box and, in P10, Approve / Reject buttons. Answering goes through the same `DesignRunner.resume` and
+validation as `cli resume` (an invalid answer returns 400 and the run stays paused); nothing else
+writes into the runs directory (`--read-only` disables even that). The page computes no number: every
+value is read from `events.sqlite`, `run_summary.json`, `decision_records/`, `tool_results/`,
+`figures/` and `token_summary.json`.
+
+```bash
+PYTHONPATH=src python -m gemini_agent.cli serve --runs-dir runs/final --port 8765
+```
+
+Then open <http://127.0.0.1:8765/> (`?run=<id>` selects a run). JSON API: `/api/runs`,
+`/api/runs/<id>` (overview + timeline), `/tools`, `/records`, `/verifier`, `/figures[/<name>]`,
+`/events?after=N`, `/report`; `POST /api/runs/<id>/answer {"answer": "..."}` and
+`POST /api/runs/<id>/approve {"decision": "approve"|"reject"}`. Resuming an LLM run needs the local
+Ollama model the run was started with (or `--engine policy`).
+
+![Web Design Commander view of runs/final/final_llm](docs/results/web_commander.png)
+
 ## Where the evidence is
 
 | Path | Content |
@@ -274,7 +301,7 @@ PYTHONPATH=src python -m gemini_agent.agents.model_builder --sandbox runs/s7_dem
   `runner/` (phases, design runner, toolbox, real tools, Decision Records), `tools/` (TL-01…23),
   `verify/` (DesignGuard, DesignVerifier), `memory/` (event store, project knowledge, design
   cache), `logging/` (LLM call log), `eval/` (S1–S11 harness, submission checks), `schemas/`,
-  `prompts/`, `cli.py`.
+  `prompts/`, `ui/` (web Design Commander: `run_view.py`, `server.py`, `static/`), `cli.py`.
 - `src/gemini_model/` — new GEMINI models with reference cards, tests and `.rst` pages:
   `absorption_chiller`, `electric_chiller`, `heat_rejection`, `free_cooling`, `electric_boiler`,
   `thermal_storage`, `fluid` (configurable brine PVT), plus extensions of `heatpump`
