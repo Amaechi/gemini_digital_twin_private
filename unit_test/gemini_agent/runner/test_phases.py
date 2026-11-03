@@ -3,7 +3,7 @@
 import pytest
 
 from gemini_agent.agents.roles import ROLES
-from gemini_agent.runner.phases import PHASE_ORDER, PHASE_SPECS, next_phase
+from gemini_agent.runner.phases import PHASE_ORDER, PHASE_SPECS, PhaseBudget, next_phase
 from gemini_agent.runner.ranking import has_kpi_evidence, rank_candidates
 from gemini_agent.runner.tool_stubs import stub_toolbox
 from gemini_agent.runner.toolbox import ToolContext
@@ -57,3 +57,13 @@ def test_ranking_adds_lcoc_to_lcoh(tmp_path):
         "C3-2d": KPISet(candidate_id="C3-2d", lcoh_per_mwh=35.0, lcoc_per_mwh=20.0),
     }
     assert rank_candidates(candidates, kpis)[:2] == ["C3-2d", "C2-2d"]
+
+
+def test_p5_has_the_largest_token_budget():
+    """Runner J: P5 (2 tools + 7 Decision Records) gets 90 k tokens; the default stays 60 k."""
+    assert PHASE_SPECS[Phase.P5].budget.max_tokens == 90_000
+    assert PhaseBudget().max_tokens == 60_000
+    assert all(
+        spec.budget.max_tokens <= PHASE_SPECS[Phase.P5].budget.max_tokens
+        for spec in PHASE_SPECS.values()
+    )

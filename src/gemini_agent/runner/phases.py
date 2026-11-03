@@ -9,7 +9,10 @@ to P10 (TL-21 figures from tool outputs). Pre-L-2 added workflow tools — run b
 after the required tools and before the Decision Records, never offered to the agent — and the
 P8 ``robust_backup`` step with DR-11 (OPT-ROBUST-BACKUP). The L-1 P0 follow-up made P0 a pure
 intake check: its only valid steps are ``finalise`` (in scope) and ``refuse`` (off-topic), and the
-runner closes it from the deterministic scope check when the step budget runs out.
+runner closes it from the deterministic scope check when the step budget runs out. Runner J
+(2026-11-03) gave P5 an explicit 90 k token budget: it makes the most LLM calls (two required
+tools plus seven Decision Records, each DR choice 8–9 k tokens with retries on verbose models),
+and both qwen3.6:27b and gemma4:26b-a4b had used ≈ 60 k of the default 60 k when DR-08 came.
 """
 
 from __future__ import annotations
@@ -108,6 +111,9 @@ PHASE_SPECS: dict[Phase, PhaseSpec] = {
                 "simulate_annual": {"candidate_id": "all", "mode": "fast"},
                 "economics": {"candidate_id": "all"},
             },
+            # Runner J: 2 tools + 7 DR choices (8–9 k tokens each with retries) ≈ 80 k on
+            # verbose models; the 60 k default starved DR-08 (qwen3.6:27b, gemma4:26b-a4b).
+            budget=PhaseBudget(max_tokens=90_000),
             decision_records=("DR-01", "DR-02", "DR-03", "DR-04", "DR-05", "DR-07", "DR-08"),
         ),
         PhaseSpec(

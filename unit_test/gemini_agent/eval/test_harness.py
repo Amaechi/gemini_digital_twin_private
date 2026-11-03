@@ -203,10 +203,12 @@ def test_compare_evals_writes_the_model_comparison(policy_results, testmodel_res
     assert models["testmodel"]["fallbacks"] > 0 and models["policy"]["total_tokens"] == 0
     assert models["policy"]["outcomes"]["skipped"] == 2
     assert models["policy"]["kind_coercions"] == 0  # KIND_COERCED events (LLM engines only)
+    assert models["policy"]["token_budget_overruns"] == 0  # TOKEN_BUDGET_OVERRUN (runner J)
     stored = json.loads((tmp_path / "model_comparison.json").read_text())
     assert stored["models"] == comparison["models"]
     table = (tmp_path / "model_comparison.md").read_text()
     assert "| testmodel | testmodel |" in table and "Tool-call validity" in table
+    assert "| Overruns |" in table
 
 
 def test_failing_check_fails_the_scenario(tmp_path):
