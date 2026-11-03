@@ -30,12 +30,19 @@ Keep it ≤ 20 KB; it is the hand-off between sessions. Old detail: merged PRs, 
 | WP-15 | Final review, documentation, licensing, packaging | merged (7b75c62) | [#25](https://github.com/Amaechi/gemini_digital_twin_private/pull/25) | README, NOTICE, REPORT.md, DECK_OUTLINE.md, clean LLM shutdown |
 | Feature B | What-if on a finished run (`cli whatif`) | merged (a8d9aa5) | [#28](https://github.com/Amaechi/gemini_digital_twin_private/pull/28) | `tools/whatif.py`; 9 levers; `runs/<id>/whatif/<n>/` + DR-W<n> |
 | Eval F | Close S2 (request inputs), S5 (confirm basis), S8 (cross-run sizing) | in review | | P1 intake questions CFG-INPUT-DEFAULTS / CFG-BASIS-CONFIRM; `cross_run_sizing`; eval rerun pending (L2) |
+| Feature G | Web Design Commander view (`cli serve`) | in review | | `ui/run_view.py`, `ui/server.py`, `ui/static/` (Plant Debugger shell, Apache header); read-only JSON API; answer/approve via `resume` |
 
 Status: todo · in progress · in review · merged · blocked.
 Latest full suite (Eval F after merging main, 11-03): `PYTHONPATH=src python -m pytest -q unit_test/gemini_model unit_test/gemini_simulator unit_test/gemini_agent -x` → **FULL_SUITE_RESULT**. `validate_submission --pytest` → **READY, 22 pass / 0 fail / WARN SUB-14 / MANUAL SUB-23; SUB-24 PASS "1334 passed, 7 warnings in 472.38s" (`docs/results/submission_check.md`). CI smoke `--budget smoke`: 22.8 s (WP-12 follow-up measurement). After the reviewer's guard fix in `close_model_clients` only `agents/test_engine.py` + `test_cli.py` were re-run**.
 
 ## Decisions log (newest first)
 One line per decision, grouped by WP; dated 11-01 (WP-00: 10-31). Why: the `config/assumptions.yaml` entry or the module docstring.
+
+**Feature G — web Design Commander** (11-03, FINAL_SPRINT §G)
+- `cli serve --runs-dir <dir> [--port 8765] [--host] [--read-only] [--engine …]` = `ui.server` on `http.server` (no new dependency). Shell `ui/static/commander.{html,css,js}` adapted from Plant Debugger's static Commander files @ d69507a (header per `third_party/plantdebugger/README.md`; fetched from upstream, the vendored copy has no static files).
+- `ui/run_view.py` only reads: `events.sqlite` (`mode=ro`; fallback `events.jsonl` + `run_summary.json`), `decision_records/DR-*.json`, the latest `verify_design` result of the selected design, `figures/` (listed png/md/csv only), `token_summary.json` (else `llm_calls.jsonl`). Timeline = `PHASE_SPECS` budgets vs `state.progress`. Display only, nothing computed (rule 1).
+- `POST /api/runs/<id>/answer|approve` build the runner with `cli.resume_runner` (= `cli resume`: stored engine/model) and call `DesignRunner.resume` under a lock → 400 invalid answer, 409 not paused / no approval pending, 404 unknown run, 501 `--read-only`. Run ids `^[A-Za-z0-9][A-Za-z0-9._-]*$`. `cli.py`: `serve` + `resume_runner` only.
+- Tests `unit_test/gemini_agent/ui/`: readers on `runs/final_policy` (mtimes unchanged), http.client on an ephemeral port (static, all routes, traversal 404s, 500 JSON, 413), answer/approve round trip on paused policy smoke runs (stub tools), `cli serve` error paths.
 
 **Eval F — S2/S5/S8** (11-03)
 - P0 intake lists the challenge inputs a user-written request lacks (`agents/scope.missing_request_inputs`: demand CSVs, cooling demand, reservoir data; keyword rules; the empty prompt = full brief is never scanned) → `RunState.missing_inputs`, `MISSING_INPUTS` event.
@@ -74,7 +81,7 @@ One line per decision, grouped by WP; dated 11-01 (WP-00: 10-31). Why: the `conf
 
 ## Assumptions added during build
 (Record id → `config/assumptions.yaml` entry; never only here.)
-- WP-00: DB-30…DB-38, DB-34a–d, DB-34-RH, DB-40 (no DB-39), ECO-CUR. WP-01/12/13/14/15, follow-ups, Feature B: none. Eval F (WP-13 follow-up): CFG-BASIS-CONFIRM, CFG-INPUT-DEFAULTS (`added_by: WP-13 follow-up`; no design value depends on them).
+- WP-00: DB-30…DB-38, DB-34a–d, DB-34-RH, DB-40 (no DB-39), ECO-CUR. WP-01/12/13/14/15, follow-ups, Feature B, Feature G: none. Eval F (WP-13 follow-up): CFG-BASIS-CONFIRM, CFG-INPUT-DEFAULTS (`added_by: WP-13 follow-up`; no design value depends on them).
 - WP-04: SUB-RHOC, SUB-II, DEM-COP-HD. WP-02: COOL-ABS-B/CAL/CAP/LB/AUX/PL/DRV, COOL-ELC, COOL-ELC-APPROACH, COOL-HR, COOL-FC.
 - WP-09: VER-ESP-PB, VER-ESP-MARGIN, VER-HP-ETA, VER-HP-LIFT. WP-05: SUB-WELL, SUB-PWH, SUB-PBUB, SUB-NPSH, SUB-ESP, SUB-PSUC, SUB-SPACING.
 - WP-03: HP-ETA-L, HP-APPROACH, EB-ETA, STO-REC-HT, STO-REC-COLD, CHP-EL-FRAC. WP-08: ECO-CO2-GAS/AG/SCOPE, ECO-ELEC-NET, ECO-REAL, ECO-ALLOC, ECO-OM, ECO-PUMP-CAPEX, ECO-CHILLER, ECO-SENS-MULT, EXG-FUEL, EXG-KPI, NET-LOSS-FRAC, NET-TRUNK-M, SCL-RULES.
@@ -90,6 +97,7 @@ One line per decision, grouped by WP; dated 11-01 (WP-00: 10-31). Why: the `conf
 **WP-12** — LLM P4 calls tools directly (no `check_draft`), `register_model` mutates the live registry; promotion = copy folders + registry + `.rst` via PR (S7 draft needs the card's partial free-cooling rule and tests first, `docs/results/s7_demo/README.md`).
 **WP-13** — CI ruff skips `scripts/`. Eval F closed S2/S5/S8 in code; the full S1–S11 eval rerun (L2, laptop) is pending — expected S2, S5, S8 → pass; `cross_run_sizing` needs S1 in the same `run_eval` call (a `--scenarios S8` run alone reports "baseline S1 not found"). Missing-input detection is keyword-based (a request that names a "profile" or "aquifer" counts as providing it), so every non-brief prompt (S4–S9, user prompts) records one extra assumed `CFG-INPUT-DEFAULTS` answer in assume mode; the `change` answer escalates rather than re-basing the run; `cross_run_sizing` looks for the baseline run dir by scenario id (a baseline with `token_profiles` would be `S1-<profile>`); wp-reviewer (Eval F): yes/no removed from CFG-BASIS-CONFIRM (ambiguous for "confirm the change?"), check made candidate-scoped, same-year-mode and directional.
 **WP-14** — No `AbsorptionPoint` ⇒ C3/C4 UNVERIFIED; `HeatPumpPoint` lacks max sink T; ESP intake +0.86 bar over 1.2·p_b; free cooling 87 % on smoothed normals; HEX rated at 300 m³/h; CLI `resume` hint omits `--runs-dir`; budget not stored in the run; DR-11 variant priced on the base year only, no own MC; `robust_backup` never escalates.
+**Feature G** — no live refresh (REFRESH button); resuming an LLM run from the browser needs the local Ollama model (or `--engine policy`); no authentication — keep the default 127.0.0.1 bind.
 **Spec/card nits** — GM-05 η ≈ 0.40 (code follows RC-06); DB-25 ≈ 22 bar (card 24.5); RC-09 "0.55 K/km" not reproducible; RC-10 lacks ESP/injection-pump capex; negative `gas_water_ratio` accepted; kpi defaults 1050 kg/m³ unsuffixed; dissolved-gas NPSH margin unquantified; `resume <unknown id>` creates `runs/<id>/`; `--run-id` unsanitised; `heat_pump_1987_usd_per_kw` unescalated.
 **All WPs** — GEMINI's `run_linter.sh` (black, isort, flake8 + docstrings, 100 cols): 42 pre-existing flake8 findings (WP-04 + tests); many GEMINI files are CRLF (keep line endings). Act/format split (spec §5.4.3) not implemented.
 
@@ -116,3 +124,5 @@ Eval F touched: `agents/scope.py`, `runner/design_runner.py`, `runner/state.py`,
 WP-15 touched: `README.md` (new; GEMINI's → `README_GEMINI.md`), `NOTICE`, `docs/results/`, `scripts/build_report_pack.py`, `agents/engine.py`, `agents/model_builder.py`, `runner/design_runner.py` (`close`), tests, this file. wp-reviewer approved (5 findings fixed). Next: user records deck + video, merges, pushes the fork branch.
 
 Feature B touched (new): `tools/whatif.py`, `tools/test_whatif.py`; edited: `cli.py` (`whatif`), `README.md` (What-if), `CLOUD_SETUP.md` §7.9, `.gitignore`, this file. Nothing in models, other tools, config or `runs/`.
+
+Feature G touched (new): `src/gemini_agent/ui/` (`run_view.py`, `server.py`, `static/`), `unit_test/gemini_agent/ui/`, `docs/results/web_commander.png`; edited: `cli.py` (`serve`, `resume_runner`), `README.md` (Web view, repository map), this file. Nothing in models, tools, runner, config or `runs/`. Tests: `PYTHONPATH=src python -m pytest -q unit_test/gemini_model unit_test/gemini_simulator unit_test/gemini_agent -x` → **1369 passed, 8 warnings in 511 s** (10 new in `unit_test/gemini_agent/ui/`); ruff, black, isort clean.
