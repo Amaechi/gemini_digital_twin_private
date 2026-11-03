@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>gemini_model.electric_chiller.electric_chiller &mdash; GEMINI Geothermal Digital Twin (claude/serene-gauss-oqsz9c)</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=19f00094" />
+
+  
+  <!--[if lt IE 9]>
+    <script src="../../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+        <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+        <script src="../../../_static/documentation_options.js?v=949a1bcc"></script>
+        <script src="../../../_static/doctools.js?v=9a2dae69"></script>
+        <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            GEMINI Geothermal Digital Twin
+          </a>
+              <div class="version">
+                claude/serene-gauss-oqsz9c
+              </div>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Table of Contents</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../index_about_gemini.html">1. About GEMINI</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../index_getting_started.html">2. Getting started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../index_setup.html">3. Set-up</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../index_applications.html">4. Applications</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../index_models.html">5. Models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../index_sourcecode.html">6. Source code documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../glossary.html">7. Glossary</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">GEMINI Geothermal Digital Twin</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">gemini_model.electric_chiller.electric_chiller</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for gemini_model.electric_chiller.electric_chiller</h1><div class="highlight"><pre>
+<span></span><span class="sd">"""Electric (vapour-compression) chiller with a Carnot-efficiency COP (GM-05).</span>
+
+<span class="sd">Source: RC-06 (``data/knowledge/reference_cards/RC-06_electric_chiller.md``, copied in</span>
+<span class="sd">``REFERENCE.md``); Geothermal Direct Use Engineering &amp; Design Guidebook (Geo-Heat Center</span>
+<span class="sd">1989) p.257-258, 262, 266; spec §3.3 and §7.2 GM-05.</span>
+
+<span class="sd">- ``COP = η T_evap / (T_cond - T_evap)`` (K) on the **refrigerant basis** (T_evap and T_cond</span>
+<span class="sd">  below include the -4 K / +3 K offsets). RC-06 "Temperature basis of η": the Guidebook's</span>
+<span class="sd">  0.39-0.40 (COP 4.39 at 45 °F chilled / 90 °F condenser leaving water, p.257-258) is on the</span>
+<span class="sd">  water basis; on the model's basis the same point gives η = 4.39 × 32 / 276.35 = 0.508 [D].</span>
+<span class="sd">  With ``carnot_efficiency: None`` (default) η is calibrated by</span>
+<span class="sd">  :func:`calibrated_carnot_efficiency` from the model's own approach parameters, so the</span>
+<span class="sd">  Guidebook point is always reproduced (COOL-ELC); an explicit value overrides it (keep it</span>
+<span class="sd">  on the refrigerant basis -- do not mix bases).</span>
+<span class="sd">- ``T_evap = T_chilled,supply - 4 K`` [A] (20 °C supply -&gt; 16 °C).</span>
+<span class="sd">- ``T_cond = T_cw,leaving + 3 K`` with a cooling tower, ``T_cw,leaving = T_wb + approach</span>
+<span class="sd">  (4-5 K, default 4.5) + range (~5 K)`` [A]; or ``T_cond = T_db + 8 K`` with a dry cooler [A].</span>
+<span class="sd">  If ``cooling_water_temperature_in_degc`` (water from a tower or dry cooler) is given,</span>
+<span class="sd">  ``T_cond = T_cw,in + range + 3 K`` (water-cooled condenser) for either option. The</span>
+<span class="sd">  ``dry_cooler`` option is RC-06's air-cooled condensing (T_db + 8 K); a water-loop dry</span>
+<span class="sd">  cooler (``heat_rejection`` dry cooler, T_db + 5 K) feeding the condenser gives T_db + 13 K</span>
+<span class="sd">  (COP 5.26 vs 6.80 at 25 °C) -- a warning says which formula was used.</span>
+<span class="sd">- COP capped at 8 and floored at 3 [A]; ``P_el = Q_cool / COP`` is compressor power only (tower</span>
+<span class="sd">  fan and condenser-water pump belong to a ``heat_rejection`` component, RC-06);</span>
+<span class="sd">  ``Q_reject = Q_cool + P_el``. With η 0.508 the cap of 8 binds at the Dutch design points.</span>
+
+<span class="sd">Condenser sensitivity: the model gives ``d ln COP / dT_cond = -1/(T_cond - T_evap)``</span>
+<span class="sd">(output ``condenser_sensitivity_per_k``), -3.1 %/K at the Guidebook point (lift 32 K on the</span>
+<span class="sd">refrigerant basis), steeper than the Guidebook data (≈ -2.6 %/K of condenser-water</span>
+<span class="sd">temperature, p.257-258): the model's COP falls faster in hot weather (documented check).</span>
+
+<span class="sd">Capacity is the nominal capacity (no temperature derating); unmet load is reported.</span>
+<span class="sd">At 20 °C chilled supply and Dutch summer conditions RC-06 expects COP ≈ 6-8; with the</span>
+<span class="sd">calibrated η the model reaches the cap (8) there and drops below it only in hotter weather</span>
+<span class="sd">(e.g. 6.7 with a dry cooler at 30 °C dry-bulb).</span>
+<span class="sd">"""</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">math</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">gemini_model.fluid.pvt_config</span><span class="w"> </span><span class="kn">import</span> <span class="n">liquid_properties</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">gemini_model.model_abstract</span><span class="w"> </span><span class="kn">import</span> <span class="n">StaticModel</span>
+
+<span class="n">KELVIN</span> <span class="o">=</span> <span class="mf">273.15</span>
+<span class="n">HEAT_REJECTION_OPTIONS</span> <span class="o">=</span> <span class="p">(</span><span class="s2">"cooling_tower"</span><span class="p">,</span> <span class="s2">"dry_cooler"</span><span class="p">)</span>
+<span class="c1"># RC-06 calibration point (Guidebook p.257-258): COP 4.39 at 45 °F chilled water and 90 °F</span>
+<span class="c1"># condenser leaving water (water temperatures; the card rounds them to 7.2 / 32.2 °C).</span>
+<span class="n">GUIDEBOOK_COP</span> <span class="o">=</span> <span class="mf">4.39</span>
+<span class="n">GUIDEBOOK_CHILLED_WATER_DEGC</span> <span class="o">=</span> <span class="mf">7.2</span>
+<span class="n">GUIDEBOOK_CONDENSER_WATER_OUT_DEGC</span> <span class="o">=</span> <span class="mf">32.2</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_finite</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">name</span><span class="p">):</span>
+    <span class="n">value</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">math</span><span class="o">.</span><span class="n">isfinite</span><span class="p">(</span><span class="n">value</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2"> must be finite, got </span><span class="si">{</span><span class="n">value</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">value</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_non_negative</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">name</span><span class="p">):</span>
+    <span class="n">value</span> <span class="o">=</span> <span class="n">_finite</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">name</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">value</span> <span class="o">&lt;</span> <span class="mf">0.0</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2"> must be &gt;= 0, got </span><span class="si">{</span><span class="n">value</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">value</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_positive</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">name</span><span class="p">):</span>
+    <span class="k">if</span> <span class="n">value</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2"> must be set"</span><span class="p">)</span>
+    <span class="n">value</span> <span class="o">=</span> <span class="n">_finite</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">name</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">value</span> <span class="o">&lt;=</span> <span class="mf">0.0</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2"> must be &gt; 0, got </span><span class="si">{</span><span class="n">value</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">value</span>
+
+
+<div class="viewcode-block" id="carnot_cop">
+<a class="viewcode-back" href="../../../codedocumentation/gemini_model.electric_chiller.electric_chiller.html#gemini_model.electric_chiller.electric_chiller.carnot_cop">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">carnot_cop</span><span class="p">(</span><span class="n">evaporator_temperature_degc</span><span class="p">,</span> <span class="n">condenser_temperature_degc</span><span class="p">,</span> <span class="n">carnot_efficiency</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Return η T_evap / (T_cond - T_evap) (RC-06), uncapped; inf if T_cond &lt;= T_evap."""</span>
+    <span class="n">t_evap</span> <span class="o">=</span> <span class="n">evaporator_temperature_degc</span> <span class="o">+</span> <span class="n">KELVIN</span>
+    <span class="n">lift</span> <span class="o">=</span> <span class="n">condenser_temperature_degc</span> <span class="o">-</span> <span class="n">evaporator_temperature_degc</span>
+    <span class="k">if</span> <span class="n">lift</span> <span class="o">&lt;=</span> <span class="mf">0.0</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">math</span><span class="o">.</span><span class="n">inf</span>
+    <span class="k">return</span> <span class="n">carnot_efficiency</span> <span class="o">*</span> <span class="n">t_evap</span> <span class="o">/</span> <span class="n">lift</span></div>
+
+
+
+<div class="viewcode-block" id="calibrated_carnot_efficiency">
+<a class="viewcode-back" href="../../../codedocumentation/gemini_model.electric_chiller.electric_chiller.html#gemini_model.electric_chiller.electric_chiller.calibrated_carnot_efficiency">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">calibrated_carnot_efficiency</span><span class="p">(</span>
+    <span class="n">evaporator_approach_k</span><span class="o">=</span><span class="mf">4.0</span><span class="p">,</span>
+    <span class="n">condenser_approach_k</span><span class="o">=</span><span class="mf">3.0</span><span class="p">,</span>
+    <span class="n">cop</span><span class="o">=</span><span class="n">GUIDEBOOK_COP</span><span class="p">,</span>
+    <span class="n">chilled_water_degc</span><span class="o">=</span><span class="n">GUIDEBOOK_CHILLED_WATER_DEGC</span><span class="p">,</span>
+    <span class="n">condenser_water_out_degc</span><span class="o">=</span><span class="n">GUIDEBOOK_CONDENSER_WATER_OUT_DEGC</span><span class="p">,</span>
+<span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Return η on the model's refrigerant basis that reproduces a COP at water temperatures.</span>
+
+<span class="sd">    T_evap = chilled water - evaporator approach, T_cond = condenser leaving water +</span>
+<span class="sd">    condenser approach; ``η = COP (T_cond - T_evap) / T_evap`` (K). With the RC-06 defaults</span>
+<span class="sd">    (COP 4.39 at 7.2 / 32.2 °C, approaches 4 K / 3 K) η = 4.39 × 32 / 276.35 = 0.508 [D].</span>
+<span class="sd">    """</span>
+    <span class="n">t_evap</span> <span class="o">=</span> <span class="n">chilled_water_degc</span> <span class="o">-</span> <span class="n">evaporator_approach_k</span>
+    <span class="n">t_cond</span> <span class="o">=</span> <span class="n">condenser_water_out_degc</span> <span class="o">+</span> <span class="n">condenser_approach_k</span>
+    <span class="k">if</span> <span class="n">t_cond</span> <span class="o">&lt;=</span> <span class="n">t_evap</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"calibration point needs T_cond &gt; T_evap"</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">cop</span> <span class="o">*</span> <span class="p">(</span><span class="n">t_cond</span> <span class="o">-</span> <span class="n">t_evap</span><span class="p">)</span> <span class="o">/</span> <span class="p">(</span><span class="n">t_evap</span> <span class="o">+</span> <span class="n">KELVIN</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="ElectricChiller">
+<a class="viewcode-back" href="../../../codedocumentation/gemini_model.electric_chiller.electric_chiller.html#gemini_model.electric_chiller.electric_chiller.ElectricChiller">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">ElectricChiller</span><span class="p">(</span><span class="n">StaticModel</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Electric vapour-compression chiller (RC-06)."""</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">"""Model initialization with RC-06 defaults (nominal capacity must be set)."""</span>
+        <span class="n">density</span><span class="p">,</span> <span class="n">specific_heat</span> <span class="o">=</span> <span class="n">liquid_properties</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s2">"nominal_capacity_w"</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
+            <span class="s2">"carnot_efficiency"</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>  <span class="c1"># None -&gt; calibrated, refrigerant basis (0.508) [D]</span>
+            <span class="s2">"heat_rejection"</span><span class="p">:</span> <span class="s2">"cooling_tower"</span><span class="p">,</span>  <span class="c1"># or "dry_cooler"</span>
+            <span class="s2">"evaporator_approach_k"</span><span class="p">:</span> <span class="mf">4.0</span><span class="p">,</span>  <span class="c1"># [A] T_evap = T_supply - 4 K</span>
+            <span class="s2">"condenser_approach_k"</span><span class="p">:</span> <span class="mf">3.0</span><span class="p">,</span>  <span class="c1"># [A] T_cond = T_cw,leaving + 3 K</span>
+            <span class="s2">"tower_approach_k"</span><span class="p">:</span> <span class="mf">4.5</span><span class="p">,</span>  <span class="c1"># [A] 4-5 K</span>
+            <span class="s2">"cooling_water_range_k"</span><span class="p">:</span> <span class="mf">5.0</span><span class="p">,</span>  <span class="c1"># [A] ~5 K</span>
+            <span class="s2">"dry_cooler_condenser_offset_k"</span><span class="p">:</span> <span class="mf">8.0</span><span class="p">,</span>  <span class="c1"># [A] T_cond = T_db + 8 K</span>
+            <span class="s2">"cop_max"</span><span class="p">:</span> <span class="mf">8.0</span><span class="p">,</span>  <span class="c1"># [A]</span>
+            <span class="s2">"cop_min"</span><span class="p">:</span> <span class="mf">3.0</span><span class="p">,</span>  <span class="c1"># [A]</span>
+            <span class="s2">"chilled_water_temperature_out_degc"</span><span class="p">:</span> <span class="mf">20.0</span><span class="p">,</span>  <span class="c1"># supply set point (spec)</span>
+            <span class="s2">"chilled_water_temperature_in_degc"</span><span class="p">:</span> <span class="mf">26.0</span><span class="p">,</span>  <span class="c1"># return, DB-32 [A]</span>
+            <span class="s2">"chilled_water_density_kg_m3"</span><span class="p">:</span> <span class="n">density</span><span class="p">,</span>
+            <span class="s2">"chilled_water_specific_heat_j_kgk"</span><span class="p">:</span> <span class="n">specific_heat</span><span class="p">,</span>
+        <span class="p">}</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">output</span> <span class="o">=</span> <span class="p">{}</span>
+
+<div class="viewcode-block" id="ElectricChiller.update_parameters">
+<a class="viewcode-back" href="../../../codedocumentation/gemini_model.electric_chiller.electric_chiller.html#gemini_model.electric_chiller.electric_chiller.ElectricChiller.update_parameters">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">update_parameters</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">parameters</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">"""Update model parameters.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        parameters: dict</span>
+<span class="sd">            Parameters dict as defined by the model.</span>
+<span class="sd">        """</span>
+        <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">parameters</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="n">value</span></div>
+
+
+<div class="viewcode-block" id="ElectricChiller.initialize_state">
+<a class="viewcode-back" href="../../../codedocumentation/gemini_model.electric_chiller.electric_chiller.html#gemini_model.electric_chiller.electric_chiller.ElectricChiller.initialize_state">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">initialize_state</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">"""Not applicable: static model."""</span></div>
+
+
+<div class="viewcode-block" id="ElectricChiller.update_state">
+<a class="viewcode-back" href="../../../codedocumentation/gemini_model.electric_chiller.electric_chiller.html#gemini_model.electric_chiller.electric_chiller.ElectricChiller.update_state">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">update_state</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">u</span><span class="p">,</span> <span class="n">x</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">"""Not applicable: static model."""</span></div>
+
+
+<div class="viewcode-block" id="ElectricChiller.carnot_efficiency">
+<a class="viewcode-back" href="../../../codedocumentation/gemini_model.electric_chiller.electric_chiller.html#gemini_model.electric_chiller.electric_chiller.ElectricChiller.carnot_efficiency">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">carnot_efficiency</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">"""Return η in use: the parameter, or the RC-06 calibration on the model's basis."""</span>
+        <span class="n">p</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span>
+        <span class="k">if</span> <span class="n">p</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"carnot_efficiency"</span><span class="p">)</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">_positive</span><span class="p">(</span><span class="n">p</span><span class="p">[</span><span class="s2">"carnot_efficiency"</span><span class="p">],</span> <span class="s2">"carnot_efficiency"</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">calibrated_carnot_efficiency</span><span class="p">(</span>
+            <span class="n">_non_negative</span><span class="p">(</span><span class="n">p</span><span class="p">[</span><span class="s2">"evaporator_approach_k"</span><span class="p">],</span> <span class="s2">"evaporator_approach_k"</span><span class="p">),</span>
+            <span class="n">_non_negative</span><span class="p">(</span><span class="n">p</span><span class="p">[</span><span class="s2">"condenser_approach_k"</span><span class="p">],</span> <span class="s2">"condenser_approach_k"</span><span class="p">),</span>
+        <span class="p">)</span></div>
+
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_rho_cp</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">"""Return ρ c_p (J/(m³ K)) of the chilled water."""</span>
+        <span class="n">p</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span>
+        <span class="k">return</span> <span class="n">_positive</span><span class="p">(</span><span class="n">p</span><span class="p">[</span><span class="s2">"chilled_water_density_kg_m3"</span><span class="p">],</span> <span class="s2">"chilled_water_density_kg_m3"</span><span class="p">)</span> <span class="o">*</span> <span class="p">(</span>
+            <span class="n">_positive</span><span class="p">(</span><span class="n">p</span><span class="p">[</span><span class="s2">"chilled_water_specific_heat_j_kgk"</span><span class="p">],</span> <span class="s2">"chilled_water_specific_heat_j_kgk"</span><span class="p">)</span>
+        <span class="p">)</span>
+
+<div class="viewcode-block" id="ElectricChiller.condenser_temperature_degc">
+<a class="viewcode-back" href="../../../codedocumentation/gemini_model.electric_chiller.electric_chiller.html#gemini_model.electric_chiller.electric_chiller.ElectricChiller.condenser_temperature_degc">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">condenser_temperature_degc</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">u</span><span class="p">,</span> <span class="n">warnings</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">"""Return the condensing temperature (°C) from the inputs (RC-06).</span>
+
+<span class="sd">        Appends a note to ``warnings`` (a list) when a dry cooler is configured but the</span>
+<span class="sd">        water-cooled formula is used because condenser water is given.</span>
+<span class="sd">        """</span>
+        <span class="n">p</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span>
+        <span class="k">if</span> <span class="n">u</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"condenser_temperature_degc"</span><span class="p">)</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">_finite</span><span class="p">(</span><span class="n">u</span><span class="p">[</span><span class="s2">"condenser_temperature_degc"</span><span class="p">],</span> <span class="s2">"condenser_temperature_degc"</span><span class="p">)</span>
+        <span class="n">approach</span> <span class="o">=</span> <span class="n">_non_negative</span><span class="p">(</span><span class="n">p</span><span class="p">[</span><span class="s2">"condenser_approach_k"</span><span class="p">],</span> <span class="s2">"condenser_approach_k"</span><span class="p">)</span>
+        <span class="n">cw_range</span> <span class="o">=</span> <span class="n">_non_negative</span><span class="p">(</span><span class="n">p</span><span class="p">[</span><span class="s2">"cooling_water_range_k"</span><span class="p">],</span> <span class="s2">"cooling_water_range_k"</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">u</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"cooling_water_temperature_in_degc"</span><span class="p">)</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">t_cw_in</span> <span class="o">=</span> <span class="n">_finite</span><span class="p">(</span>
+                <span class="n">u</span><span class="p">[</span><span class="s2">"cooling_water_temperature_in_degc"</span><span class="p">],</span> <span class="s2">"cooling_water_temperature_in_degc"</span>
+            <span class="p">)</span>
+            <span class="k">if</span> <span class="n">p</span><span class="p">[</span><span class="s2">"heat_rejection"</span><span class="p">]</span> <span class="o">==</span> <span class="s2">"dry_cooler"</span> <span class="ow">and</span> <span class="n">warnings</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">warnings</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                    <span class="s2">"dry_cooler with condenser water given: water-cooled formula "</span>
+                    <span class="s2">"T_cw,in + range + 3 K used, not the RC-06 air-cooled T_db + 8 K"</span>
+                <span class="p">)</span>
+            <span class="k">return</span> <span class="n">t_cw_in</span> <span class="o">+</span> <span class="n">cw_range</span> <span class="o">+</span> <span class="n">approach</span>
+        <span class="n">option</span> <span class="o">=</span> <span class="n">p</span><span class="p">[</span><span class="s2">"heat_rejection"</span><span class="p">]</span>
+        <span class="k">if</span> <span class="n">option</span> <span class="o">==</span> <span class="s2">"cooling_tower"</span><span class="p">:</span>
+            <span class="n">t_wb</span> <span class="o">=</span> <span class="n">_finite</span><span class="p">(</span><span class="n">u</span><span class="p">[</span><span class="s2">"ambient_wet_bulb_degc"</span><span class="p">],</span> <span class="s2">"ambient_wet_bulb_degc"</span><span class="p">)</span>
+            <span class="n">tower_approach</span> <span class="o">=</span> <span class="n">_non_negative</span><span class="p">(</span><span class="n">p</span><span class="p">[</span><span class="s2">"tower_approach_k"</span><span class="p">],</span> <span class="s2">"tower_approach_k"</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">t_wb</span> <span class="o">+</span> <span class="n">tower_approach</span> <span class="o">+</span> <span class="n">cw_range</span> <span class="o">+</span> <span class="n">approach</span>
+        <span class="k">if</span> <span class="n">option</span> <span class="o">==</span> <span class="s2">"dry_cooler"</span><span class="p">:</span>
+            <span class="n">t_db</span> <span class="o">=</span> <span class="n">_finite</span><span class="p">(</span><span class="n">u</span><span class="p">[</span><span class="s2">"ambient_dry_bulb_degc"</span><span class="p">],</span> <span class="s2">"ambient_dry_bulb_degc"</span><span class="p">)</span>
+            <span class="n">offset</span> <span class="o">=</span> <span class="n">_non_negative</span><span class="p">(</span>
+                <span class="n">p</span><span class="p">[</span><span class="s2">"dry_cooler_condenser_offset_k"</span><span class="p">],</span> <span class="s2">"dry_cooler_condenser_offset_k"</span>
+            <span class="p">)</span>
+            <span class="k">return</span> <span class="n">t_db</span> <span class="o">+</span> <span class="n">offset</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"heat_rejection must be one of </span><span class="si">{</span><span class="n">HEAT_REJECTION_OPTIONS</span><span class="si">}</span><span class="s2">, got </span><span class="si">{</span><span class="n">option</span><span class="si">!r}</span><span class="s2">"</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="ElectricChiller.calculate_output">
+<a class="viewcode-back" href="../../../codedocumentation/gemini_model.electric_chiller.electric_chiller.html#gemini_model.electric_chiller.electric_chiller.ElectricChiller.calculate_output">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">calculate_output</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">u</span><span class="p">,</span> <span class="n">x</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">"""Calculate cooling duty, COP, electric power and rejected heat.</span>
+
+<span class="sd">        Inputs ``u``: exactly one of ``cooling_load_w`` (W) or ``chilled_water_flow_rate_m3s``</span>
+<span class="sd">        (m³/s, load = ρ c_p V (T_return - T_supply)); ``ambient_wet_bulb_degc`` (cooling</span>
+<span class="sd">        tower) or ``ambient_dry_bulb_degc`` (dry cooler); optional</span>
+<span class="sd">        ``cooling_water_temperature_in_degc`` (condenser water from a heat-rejection unit),</span>
+<span class="sd">        ``chilled_water_temperature_in_degc`` / ``_out_degc`` (return / supply set point),</span>
+<span class="sd">        and direct overrides ``evaporator_temperature_degc`` / ``condenser_temperature_degc``.</span>
+<span class="sd">        """</span>
+        <span class="n">p</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span>
+        <span class="n">q_nom</span> <span class="o">=</span> <span class="n">_positive</span><span class="p">(</span><span class="n">p</span><span class="p">[</span><span class="s2">"nominal_capacity_w"</span><span class="p">],</span> <span class="s2">"nominal_capacity_w"</span><span class="p">)</span>
+        <span class="n">eta</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">carnot_efficiency</span><span class="p">()</span>
+        <span class="n">cop_max</span> <span class="o">=</span> <span class="n">_positive</span><span class="p">(</span><span class="n">p</span><span class="p">[</span><span class="s2">"cop_max"</span><span class="p">],</span> <span class="s2">"cop_max"</span><span class="p">)</span>
+        <span class="n">cop_min</span> <span class="o">=</span> <span class="n">_positive</span><span class="p">(</span><span class="n">p</span><span class="p">[</span><span class="s2">"cop_min"</span><span class="p">],</span> <span class="s2">"cop_min"</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">cop_min</span> <span class="o">&gt;</span> <span class="n">cop_max</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"cop_min (</span><span class="si">{</span><span class="n">cop_min</span><span class="si">}</span><span class="s2">) must not exceed cop_max (</span><span class="si">{</span><span class="n">cop_max</span><span class="si">}</span><span class="s2">)"</span><span class="p">)</span>
+
+        <span class="n">t_in</span> <span class="o">=</span> <span class="n">_finite</span><span class="p">(</span>
+            <span class="n">u</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"chilled_water_temperature_in_degc"</span><span class="p">,</span> <span class="n">p</span><span class="p">[</span><span class="s2">"chilled_water_temperature_in_degc"</span><span class="p">]),</span>
+            <span class="s2">"chilled_water_temperature_in_degc"</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="n">t_set</span> <span class="o">=</span> <span class="n">_finite</span><span class="p">(</span>
+            <span class="n">u</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"chilled_water_temperature_out_degc"</span><span class="p">,</span> <span class="n">p</span><span class="p">[</span><span class="s2">"chilled_water_temperature_out_degc"</span><span class="p">]),</span>
+            <span class="s2">"chilled_water_temperature_out_degc"</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="n">has_load</span> <span class="o">=</span> <span class="n">u</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"cooling_load_w"</span><span class="p">)</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+        <span class="n">has_flow</span> <span class="o">=</span> <span class="n">u</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"chilled_water_flow_rate_m3s"</span><span class="p">)</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+        <span class="k">if</span> <span class="n">has_load</span> <span class="o">==</span> <span class="n">has_flow</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"give exactly one of cooling_load_w or chilled_water_flow_rate_m3s"</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">has_flow</span><span class="p">:</span>
+            <span class="n">flow</span> <span class="o">=</span> <span class="n">_non_negative</span><span class="p">(</span><span class="n">u</span><span class="p">[</span><span class="s2">"chilled_water_flow_rate_m3s"</span><span class="p">],</span> <span class="s2">"chilled_water_flow_rate_m3s"</span><span class="p">)</span>
+            <span class="n">load</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_rho_cp</span><span class="p">()</span> <span class="o">*</span> <span class="n">flow</span> <span class="o">*</span> <span class="nb">max</span><span class="p">(</span><span class="n">t_in</span> <span class="o">-</span> <span class="n">t_set</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">load</span> <span class="o">=</span> <span class="n">_non_negative</span><span class="p">(</span><span class="n">u</span><span class="p">[</span><span class="s2">"cooling_load_w"</span><span class="p">],</span> <span class="s2">"cooling_load_w"</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">load</span> <span class="o">&gt;</span> <span class="mf">0.0</span> <span class="ow">and</span> <span class="n">t_in</span> <span class="o">&lt;=</span> <span class="n">t_set</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">"chilled-water return (</span><span class="si">{</span><span class="n">t_in</span><span class="si">}</span><span class="s2"> °C) must be above the supply set point "</span>
+                    <span class="sa">f</span><span class="s2">"(</span><span class="si">{</span><span class="n">t_set</span><span class="si">}</span><span class="s2"> °C) when cooling_load_w &gt; 0"</span>
+                <span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">u</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"evaporator_temperature_degc"</span><span class="p">)</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">t_evap</span> <span class="o">=</span> <span class="n">_finite</span><span class="p">(</span><span class="n">u</span><span class="p">[</span><span class="s2">"evaporator_temperature_degc"</span><span class="p">],</span> <span class="s2">"evaporator_temperature_degc"</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">t_evap</span> <span class="o">=</span> <span class="n">t_set</span> <span class="o">-</span> <span class="n">_non_negative</span><span class="p">(</span><span class="n">p</span><span class="p">[</span><span class="s2">"evaporator_approach_k"</span><span class="p">],</span> <span class="s2">"evaporator_approach_k"</span><span class="p">)</span>
+        <span class="n">warnings</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">t_cond</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">condenser_temperature_degc</span><span class="p">(</span><span class="n">u</span><span class="p">,</span> <span class="n">warnings</span><span class="p">)</span>
+        <span class="n">cop_carnot</span> <span class="o">=</span> <span class="n">carnot_cop</span><span class="p">(</span><span class="n">t_evap</span><span class="p">,</span> <span class="n">t_cond</span><span class="p">,</span> <span class="n">eta</span><span class="p">)</span>
+        <span class="n">cop</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="nb">max</span><span class="p">(</span><span class="n">cop_carnot</span><span class="p">,</span> <span class="n">cop_min</span><span class="p">),</span> <span class="n">cop_max</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">cop_carnot</span> <span class="o">&gt;</span> <span class="n">cop_max</span><span class="p">:</span>
+            <span class="n">warnings</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">"COP </span><span class="si">{</span><span class="n">cop_carnot</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2"> capped at </span><span class="si">{</span><span class="n">cop_max</span><span class="si">:</span><span class="s2">g</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="n">cop_carnot</span> <span class="o">&lt;</span> <span class="n">cop_min</span><span class="p">:</span>
+            <span class="n">warnings</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">"COP </span><span class="si">{</span><span class="n">cop_carnot</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2"> floored at </span><span class="si">{</span><span class="n">cop_min</span><span class="si">:</span><span class="s2">g</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+        <span class="n">sensitivity</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="o">-</span><span class="mf">1.0</span> <span class="o">/</span> <span class="p">(</span><span class="n">t_cond</span> <span class="o">-</span> <span class="n">t_evap</span><span class="p">)</span> <span class="k">if</span> <span class="n">cop_min</span> <span class="o">&lt;</span> <span class="n">cop_carnot</span> <span class="o">&lt;</span> <span class="n">cop_max</span> <span class="ow">and</span> <span class="n">t_cond</span> <span class="o">&gt;</span> <span class="n">t_evap</span> <span class="k">else</span> <span class="mf">0.0</span>
+        <span class="p">)</span>
+
+        <span class="n">q_cool</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="n">load</span><span class="p">,</span> <span class="n">q_nom</span><span class="p">)</span>
+        <span class="n">power_el</span> <span class="o">=</span> <span class="n">q_cool</span> <span class="o">/</span> <span class="n">cop</span>
+        <span class="k">if</span> <span class="n">has_flow</span><span class="p">:</span>
+            <span class="n">t_out</span> <span class="o">=</span> <span class="n">t_in</span> <span class="o">-</span> <span class="n">q_cool</span> <span class="o">/</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_rho_cp</span><span class="p">()</span> <span class="o">*</span> <span class="n">flow</span><span class="p">)</span> <span class="k">if</span> <span class="n">flow</span> <span class="o">&gt;</span> <span class="mf">0.0</span> <span class="k">else</span> <span class="n">t_in</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">t_out</span> <span class="o">=</span> <span class="n">t_set</span>
+            <span class="n">flow</span> <span class="o">=</span> <span class="n">q_cool</span> <span class="o">/</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_rho_cp</span><span class="p">()</span> <span class="o">*</span> <span class="p">(</span><span class="n">t_in</span> <span class="o">-</span> <span class="n">t_set</span><span class="p">))</span> <span class="k">if</span> <span class="n">q_cool</span> <span class="o">&gt;</span> <span class="mf">0.0</span> <span class="k">else</span> <span class="mf">0.0</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">output</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s2">"cooling_power_w"</span><span class="p">:</span> <span class="n">q_cool</span><span class="p">,</span>
+            <span class="s2">"cooling_load_w"</span><span class="p">:</span> <span class="n">load</span><span class="p">,</span>
+            <span class="s2">"unmet_cooling_w"</span><span class="p">:</span> <span class="nb">max</span><span class="p">(</span><span class="n">load</span> <span class="o">-</span> <span class="n">q_cool</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">),</span>
+            <span class="s2">"load_ratio"</span><span class="p">:</span> <span class="n">q_cool</span> <span class="o">/</span> <span class="n">q_nom</span><span class="p">,</span>
+            <span class="s2">"cop"</span><span class="p">:</span> <span class="n">cop</span><span class="p">,</span>
+            <span class="s2">"cop_uncapped"</span><span class="p">:</span> <span class="n">cop_carnot</span><span class="p">,</span>
+            <span class="s2">"carnot_efficiency"</span><span class="p">:</span> <span class="n">eta</span><span class="p">,</span>
+            <span class="s2">"evaporator_temperature_degc"</span><span class="p">:</span> <span class="n">t_evap</span><span class="p">,</span>
+            <span class="s2">"condenser_temperature_degc"</span><span class="p">:</span> <span class="n">t_cond</span><span class="p">,</span>
+            <span class="s2">"condenser_sensitivity_per_k"</span><span class="p">:</span> <span class="n">sensitivity</span><span class="p">,</span>
+            <span class="s2">"heat_rejected_w"</span><span class="p">:</span> <span class="n">q_cool</span> <span class="o">+</span> <span class="n">power_el</span><span class="p">,</span>
+            <span class="s2">"chilled_water_temperature_in_degc"</span><span class="p">:</span> <span class="n">t_in</span><span class="p">,</span>
+            <span class="s2">"chilled_water_temperature_out_degc"</span><span class="p">:</span> <span class="n">t_out</span><span class="p">,</span>
+            <span class="s2">"chilled_water_flow_rate_m3s"</span><span class="p">:</span> <span class="n">flow</span><span class="p">,</span>
+            <span class="s2">"validity_warnings"</span><span class="p">:</span> <span class="n">warnings</span><span class="p">,</span>
+            <span class="s2">"power_el"</span><span class="p">:</span> <span class="n">power_el</span><span class="p">,</span>
+            <span class="s2">"power_th"</span><span class="p">:</span> <span class="n">q_cool</span><span class="p">,</span>
+            <span class="s2">"emission"</span><span class="p">:</span> <span class="mf">0.0</span><span class="p">,</span>
+        <span class="p">}</span></div>
+</div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, TNO.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
