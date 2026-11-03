@@ -320,11 +320,16 @@ credential exists anywhere in the repository (`.env.template` is GEMINI's and un
 - **S7 in `runs/final/eval` reads "fail"**: every coder draft timed out before the Model Builder
   fix [#23](https://github.com/Amaechi/gemini_digital_twin_private/pull/23); the post-#23 local
   run closed the gap in 2 drafts, evidence in [`docs/results/s7_demo/`](docs/results/s7_demo/README.md).
-- **P5 DR-08 token-limit escalation on gemma4:26b-a4b**: the chosen model never hit a budget. On
-  gemma4:26b-a4b the per-call usage limit for the Decision Record choice was exceeded
-  (`total_tokens_limit` 765 vs 1 900 used) and the run escalated instead of falling back; that
-  limit is the phase's remaining token budget (AG-04). Two other models escalated on the
-  tool-call budget (P5/P6).
+- **P5 DR-08 token-limit escalation on gemma4:26b-a4b** (fixed on 2026-11-03; the submitted
+  runs in `runs/final*` and `runs/final/eval` predate the fix): the chosen model never hit a
+  budget. On gemma4:26b-a4b (and on qwen3.6:27b in a later full run) the per-call usage limit of
+  the Decision Record choice was the phase's remaining token budget (`total_tokens_limit` 765
+  vs 1 900 used) and the run escalated inside a DR the workflow requires. Now a DR choice call's
+  usage limit is floored at the call's own token ceiling (every allowed request at the prompt
+  size plus `calls.max_output_tokens`), a DR past the phase budget is recorded as a
+  `TOKEN_BUDGET_OVERRUN` event (an eval-harness metric, like the fallbacks) and P5 has an
+  explicit 90 k token budget; ordinary decisions still escalate at the budget (AG-04). Two other
+  models escalated on the tool-call budget (P5/P6).
 - **Heat-exchanger fluid properties**: the GEMINI plate HEX takes one ρ/c_p per side (brine
   1030 kg/m³, 4100 J/kgK from DB-33; district water 1000 kg/m³, 4217 J/kgK), constant with
   temperature; `kpi.py` reads the producer PVT, GEMINI's boiler and CHP keep their water defaults

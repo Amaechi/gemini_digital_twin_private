@@ -10,7 +10,9 @@
 # closes from the deterministic intake when its step budget runs out (never escalates in scope).
 # 2026-11-03 (WP-13 follow-up, S2/S5): P1 intake requests — confirm a supply-temperature conflict
 # with the basis (CFG-BASIS-CONFIRM) and list the inputs the request does not provide
-# (CFG-INPUT-DEFAULTS) — asked once, before any tool runs or default is assumed.
+# (CFG-INPUT-DEFAULTS) — asked once, before any tool runs or default is assumed. 2026-11-03
+# (runner J): a Decision Record call past the phase token budget records TOKEN_BUDGET_OVERRUN
+# instead of escalating mid-DR (the engine floors its usage limit); decisions keep AG-04.
 """Workflow runner: deterministic phases P0–P10 (spec §4.1, §5.2).
 
 The runner decides WHICH phase runs, enforces budgets (AG-04), executes every tool call,
@@ -1064,10 +1066,22 @@ class DesignRunner:
             )
         budget = self._budget(spec)
         if prog.tokens_used > budget.max_tokens:
-            return self._escalate(
+            # Runner J: the DR is a phase-close step the workflow requires, so the engine floors
+            # its usage limit and the overrun is recorded (counted by the eval harness like the
+            # fallbacks) rather than escalated mid-DR. Decisions still escalate (AG-04).
+            overrun = prog.tokens_used - budget.max_tokens
+            self._event(
                 state,
-                f"token budget exceeded in {spec.phase.value} "
-                f"({prog.tokens_used} > {budget.max_tokens})",
+                "TOKEN_BUDGET_OVERRUN",
+                {
+                    "dr_id": dr_id,
+                    "tokens_used": prog.tokens_used,
+                    "max_tokens": budget.max_tokens,
+                    "overrun": overrun,
+                    "message": f"{dr_id} written {overrun} tokens past the {spec.phase.value} "
+                    f"token budget ({prog.tokens_used} > {budget.max_tokens}); a required "
+                    "Decision Record is not starved (AG-04 applies to the agent's steps)",
+                },
             )
         return "continue"
 
@@ -1190,6 +1204,11 @@ class DesignRunner:
         self._event(state, "REFUSE", {"message": state.final_summary, "reason": reason[:300]})
         return "stopped"
 
+    def token_budget_overruns(self, run_id: str) -> int:
+        """Decision Record calls made past their phase token budget (``TOKEN_BUDGET_OVERRUN``)."""
+        events = self.store(run_id).list_events(run_id)
+        return sum(1 for event in events if event.type == "TOKEN_BUDGET_OVERRUN")
+
     def _escalate(self, state: RunState, reason: str) -> Outcome:
         prog = state.phase_progress(state.phase)
         state.status = RunStatus.ESCALATED
@@ -1213,6 +1232,9 @@ class DesignRunner:
         )
         if state.engine != "policy":
             state.final_summary += f" LLM fallbacks to policy: {state.fallback_count()}."
+            overruns = self.token_budget_overruns(state.run_id)
+            if overruns:
+                state.final_summary += f" Decision Records past a phase token budget: {overruns}."
         self._event(state, "RUN_END", {"message": state.final_summary})
 
     # ------------------------------------------------------------------ context and storage

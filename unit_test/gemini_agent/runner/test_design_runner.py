@@ -4,6 +4,7 @@ import json
 
 import pytest
 from pydantic_ai.messages import ModelResponse, TextPart
+from pydantic_ai.usage import RequestUsage
 
 from gemini_agent.agents.engine import (
     EngineResult,
@@ -11,6 +12,7 @@ from gemini_agent.agents.engine import (
     PolicyEngine,
     ResilientEngine,
 )
+from gemini_agent.eval.harness import _metrics
 from gemini_agent.logging.llm_logger import LLMLogger
 from gemini_agent.runner.design_runner import (
     BASIS_CONFIRM_ID,
@@ -554,6 +556,68 @@ def test_a_rejected_design_never_gets_a_final_selection_record(tmp_path):
     assert not (tmp_path / "dr10" / "decision_records" / "DR-10.json").exists()
     skipped = [e for e in runner.store("dr10").list_events("dr10") if e.type == "DR_SKIPPED"]
     assert len(skipped) == 4 and all("DR-10" in e.payload["message"] for e in skipped)
+
+
+def test_p5_decision_records_are_not_starved_by_the_phase_token_budget(tmp_path):
+    """Runner J (evidence: qwen3.6:27b and gemma4:26b-a4b escalated on DR-08 with ≈ 60 k of
+    P5's 60 k used): with 59 k used when DR-08 comes, the DR is still written by the LLM, the
+    overrun is recorded as TOKEN_BUDGET_OVERRUN (counted by the eval harness) and the run
+    completes."""
+
+    def func(messages, info):
+        response = policy_like(messages, info)
+        prompt = user_prompt(messages)
+        if prompt.startswith("DR-07 "):  # P5 at ≈ 59 k of 60 k after this call
+            response.usage = RequestUsage(input_tokens=58_000, output_tokens=900)
+        elif prompt.startswith("DR-08 "):  # more than the ≈ 1 k left (gemma4: 1 900 vs 765)
+            response.usage = RequestUsage(input_tokens=1_700, output_tokens=200)
+        else:
+            response.usage = RequestUsage(input_tokens=10, output_tokens=5)
+        return response
+
+    engine, logger = _llm_engine(tmp_path, "j1", func)
+    budgets = {Phase.P5: PhaseBudget(max_tokens=60_000)}
+    runner = _runner(tmp_path, engine=engine, budgets=budgets)
+    result = runner.start("", run_id="j1")
+    assert result.status == RunStatus.COMPLETED
+    state = runner.load_state("j1")
+    dr08 = next(r for r in state.decision_records if r.dr_id == "DR-08")
+    assert dr08.decision_source == "llm"
+    assert {r.decision_source for r in logger.records()} == {"llm"}
+    p5 = state.progress[Phase.P5]
+    assert 60_000 < p5.tokens_used < 61_500
+    overruns = [e for e in runner.store("j1").list_events("j1") if e.type == "TOKEN_BUDGET_OVERRUN"]
+    assert [e.phase for e in overruns] == ["P5"]
+    payload = overruns[0].payload
+    assert payload["dr_id"] == "DR-08" and payload["max_tokens"] == 60_000
+    assert payload["tokens_used"] == p5.tokens_used
+    assert payload["overrun"] == p5.tokens_used - 60_000
+    assert "DR-08" in payload["message"] and "token budget" in payload["message"]
+    assert runner.token_budget_overruns("j1") == 1
+    assert "Decision Records past a phase token budget: 1" in result.summary
+    assert _metrics(runner, "j1", 0.0).token_budget_overruns == 1
+
+
+def test_ordinary_step_with_no_tokens_left_still_escalates(tmp_path):
+    """AG-04 unchanged by runner J: the floor is for Decision Record calls only; a decision with
+    the phase budget used up escalates before any LLM call is made."""
+
+    def func(messages, info):
+        response = policy_like(messages, info)
+        if user_prompt(messages).startswith("PHASE P2 "):  # one decision uses the whole budget
+            response.usage = RequestUsage(input_tokens=60_000, output_tokens=0)
+        return response
+
+    engine, logger = _llm_engine(tmp_path, "z1", func)
+    budgets = {Phase.P2: PhaseBudget(max_tokens=60_000)}
+    runner = _runner(tmp_path, engine=engine, budgets=budgets)
+    result = runner.start("", run_id="z1")
+    assert result.status == RunStatus.ESCALATED and result.phase == Phase.P2
+    assert "no tokens left in the phase budget" in result.summary
+    records = [r for r in logger.records() if r.phase == "P2"]
+    assert len(records) == 1 and records[0].decision_source == "llm"  # no second call was made
+    assert runner.token_budget_overruns("z1") == 0
+    assert "past a phase token budget" not in result.summary
 
 
 def test_llm_escalation_reason_with_numbers_never_reaches_the_summary(tmp_path):
