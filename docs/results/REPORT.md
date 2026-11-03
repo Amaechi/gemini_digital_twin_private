@@ -535,7 +535,7 @@ Copies of `runs/final/final_llm/figures/*.png` in `docs/results/final_llm/` (TR-
 | `docs/results/final_llm/fig_energy_balance.png` | Annual energy balance: heat delivered by source, cooling delivered by source, and the inputs (brine heat drawn, gas fuel, electricity consumed), GWh/yr. |
 | `docs/results/final_llm/fig_uncertainty.png` | TL-15 Monte Carlo (200 samples, C2-opt): cumulative distributions of LCOH and LCOC with the P10–P90 band, P50 and the base value. |
 | `docs/results/final_llm/fig_tornado.png` | TL-15 one-at-a-time sensitivity: swing of the objective (LCOH + LCOC + unmet penalty) per input at its low and high value. |
-| `docs/results/final_llm/fig_tokens.png` | Placeholder drawn by the run (the P10 plot runs before token_summary.json is written at run end; see Limitations). The filled chart is fig_tokens_by_phase.png. |
+| `docs/results/final_llm/fig_tokens.png` | LLM tokens (input + output) per phase, the run's own TL-21 chart (redrawn from token_summary.json after submission, scripts/regenerate_fig_tokens.py; the run had drawn the placeholder because the P10 plot preceded the summary). |
 | `docs/results/final_llm/fig_tokens_by_phase.png` | LLM tokens of the final run per phase (input and output, stacked) and per agent, drawn by this script from token_summary.json. |
 
 ## 14. Assumptions and answers recorded in the run
