@@ -119,7 +119,11 @@ Builder fix [#23](https://github.com/Amaechi/gemini_digital_twin_private/pull/23
 draft timed out at the SDK default deadline. Re-run locally after #23, the Model Builder detected
 the gap and closed it in 2 drafts with 2 passing tests: evidence and review notes in
 [`docs/results/s7_demo/`](docs/results/s7_demo/README.md). `runs/final/eval` is left unchanged
-because the transcripts check (SUB-17) reads it.
+because the transcripts check (SUB-17) reads it. S2/S5/S8 closed on 2026-11-03 (P1 intake
+questions `CFG-INPUT-DEFAULTS` / `CFG-BASIS-CONFIRM`, `cross_run_sizing` check against S1):
+eval rerun pending — the table above is the eval before the change; the new S8 check passes on
+its stored evidence (ESP 49 stages at 1560 m, 1.43 MW peak at 50 mD vs 16 stages at 840 m,
+0.46 MW in S1).
 
 **S10 naive vs optimised context** (`runs/final/eval/gemma4_12b-it-q4_K_M/S10-token_comparison.json`):
 183 874 → 101 042 tokens for the same 34 calls, a **45 % saving** from the compacted history and
@@ -306,10 +310,13 @@ credential exists anywhere in the repository (`.env.template` is GEMINI's and un
   by CEPCI 1986→2023 (× 2.51), inside the RC-10 benchmark bands but not confirmed from a second
   source (`config/cost_assumptions.yaml`, `*_chiller_plant_cost_function_usd`). LCOC carries
   that uncertainty; the Monte Carlo range covers ± 30 %.
-- **S2, S5 and S8 are "pending"**: the runner asks for DB-30/31/32 but does not yet list inputs
-  missing from the request itself (S2), records a basis conflict without a confirm-basis question
-  (S5), and no cross-run check compares the S8 re-sizing with S1 (S8). The behaviour is in the
-  transcripts; only the automatic check is missing.
+- **S2, S5 and S8 read "pending" in `runs/final/eval`**: that eval predates the P1 intake
+  questions (S2 lists the inputs a request lacks and offers the repository defaults; S5 asks to
+  confirm a DB-16/DB-17 change of basis, default keep) and the S8 cross-run sizing check against
+  S1; closed on 2026-11-03, eval rerun pending. The missing-input detection is keyword-based on
+  the request text (`agents/scope.missing_request_inputs`); a change of basis stops the run
+  (the limits are changed in `config/` and a new run started), it is never designed for; every
+  prompt other than the brief records one assumed `CFG-INPUT-DEFAULTS` answer in assume mode.
 - **S7 in `runs/final/eval` reads "fail"**: every coder draft timed out before the Model Builder
   fix [#23](https://github.com/Amaechi/gemini_digital_twin_private/pull/23); the post-#23 local
   run closed the gap in 2 drafts, evidence in [`docs/results/s7_demo/`](docs/results/s7_demo/README.md).

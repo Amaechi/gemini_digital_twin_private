@@ -12,7 +12,12 @@ from gemini_agent.agents.engine import (
     ResilientEngine,
 )
 from gemini_agent.logging.llm_logger import LLMLogger
-from gemini_agent.runner.design_runner import DesignRunner, InvalidAnswer
+from gemini_agent.runner.design_runner import (
+    BASIS_CONFIRM_ID,
+    INPUT_DEFAULTS_ID,
+    DesignRunner,
+    InvalidAnswer,
+)
 from gemini_agent.runner.phases import PHASE_SPECS, PhaseBudget
 from gemini_agent.runner.state import ToolRecord
 from gemini_agent.runner.tool_stubs import VerificationOutput, stub_toolbox
@@ -94,14 +99,19 @@ def test_policy_run_completes_p0_to_p10_with_artefacts(tmp_path):
 
 
 def test_pause_and_resume_across_runner_instances(tmp_path):
-    """AG-05: request_missing_input pauses (state in SQLite) and a new process resumes it."""
+    """AG-05: request_missing_input pauses (state in SQLite) and a new process resumes it.
+
+    A request written without the challenge files is first asked whether the repository
+    inputs apply (S2, WP-13 follow-up); the register gaps DB-30…32 follow.
+    """
     first = _runner(tmp_path)
     result = first.start("design the geothermal plant", run_id="p1", input_mode="pause")
     assert result.status == RunStatus.PAUSED and result.phase == Phase.P1
-    assert result.pending.assumption_id == "DB-30"
+    assert result.pending.assumption_id == INPUT_DEFAULTS_ID
     first.close()
 
     second = _runner(tmp_path)  # simulates a new CLI process
+    assert second.resume("p1", "defaults").pending.assumption_id == "DB-30"
     with pytest.raises(InvalidAnswer):
         second.resume("p1", "C")  # DB-30 must be A or B
     assert second.load_state("p1").status == RunStatus.PAUSED
@@ -120,12 +130,126 @@ def test_pause_and_resume_across_runner_instances(tmp_path):
 
     state = second.load_state("p1")
     assert state.approval == "approved"
-    assert [a.source for a in state.answers] == ["user"] * 4
+    assert [a.source for a in state.answers] == ["user"] * 5
     assert {c.heating_return_degc for c in state.candidates} == {60.0}
     dr08 = next(r for r in state.decision_records if r.dr_id == "DR-08")
     assert dr08.choice == "dh-return-60"
     durable = [e for e in second.store("p1").list_events("p1") if e.type == "USER_ANSWER"]
-    assert len(durable) == 4 and all(e.payload["durable"] for e in durable)
+    assert len(durable) == 5 and all(e.payload["durable"] for e in durable)
+
+
+def test_full_brief_asks_only_the_register_gaps_and_approval(tmp_path):
+    """S1: the default brief comes with every file, so no intake question is added (final run)."""
+    runner = _runner(tmp_path)
+    result = runner.start("", run_id="s1", input_mode="pause")
+    assert result.pending.assumption_id == "DB-30"
+    for answer in ("A", "55", "26"):
+        result = runner.resume("s1", answer)
+    assert result.pending.request_id == "APPROVAL"
+    state = runner.load_state("s1")
+    assert state.missing_inputs == [] and state.conflicts == []
+    assert [a.assumption_id for a in state.answers] == ["DB-30", "DB-31", "DB-32"]
+    result = runner.start("", run_id="s1a")  # assume mode: the final-run questions
+    assert result.status == RunStatus.COMPLETED and result.selected_id == "C1-3d"
+    labels = [a.label for a in runner.load_state("s1a").answers]
+    assert [label.split(" =")[0].split(":")[0] for label in labels] == [
+        "DB-30",
+        "DB-31",
+        "DB-32",
+        "Human approval pending (non-interactive run)",
+    ]
+
+
+def test_s2_request_without_the_files_asks_once_before_anything_is_loaded(tmp_path):
+    """S2 (WP-13 follow-up): ONE question lists the missing inputs; nothing runs or is assumed."""
+    runner = _runner(tmp_path)
+    result = runner.start(
+        "Design a geothermal heating system for 30 MW", run_id="s2", input_mode="pause"
+    )
+    assert result.status == RunStatus.PAUSED and result.phase == Phase.P1
+    pending = result.pending
+    assert pending.assumption_id == INPUT_DEFAULTS_ID and pending.request_id == (
+        f"REQ-01-{INPUT_DEFAULTS_ID}"
+    )
+    assert pending.default == "repository defaults"
+    for word in ("demand CSVs", "cooling demand", "reservoir data", "data/demand/", "config/"):
+        assert word in pending.question
+    state = runner.load_state("s2")
+    assert state.answers == [] and state.tool_results == []  # does not invent
+    assert [item.split(" (")[0] for item in state.missing_inputs] == [
+        "demand CSVs",
+        "cooling demand",
+        "reservoir data",
+    ]
+    events = runner.store("s2").list_events("s2")
+    assert [e.type for e in events if e.phase == "P0"][:4] == [
+        "RUN_START",
+        "PHASE_START",
+        "SCOPE",
+        "MISSING_INPUTS",
+    ]
+    with pytest.raises(InvalidAnswer, match="answer 'defaults'"):
+        runner.resume("s2", "the CSVs are on my desktop")
+    result = runner.resume("s2", "defaults")
+    assert result.pending.assumption_id == "DB-30"  # then the register gaps as before
+    answer = runner.load_state("s2").answers[0]
+    assert answer.source == "user" and answer.answer == "repository defaults"
+    # The same request in assume mode records the register default and completes.
+    result = runner.start("Design a geothermal heating system for 30 MW", run_id="s2a")
+    assert result.status == RunStatus.COMPLETED
+    labels = [a.label for a in runner.load_state("s2a").answers]
+    assert labels[0] == f"{INPUT_DEFAULTS_ID} = repository defaults (assumed: register default)"
+
+
+def test_s2_question_comes_before_the_llm_agent_sees_p1(tmp_path):
+    """The intake question is the runner's own step: the LLM path pauses identically (S2)."""
+    counter = Counting(policy_like)
+    engine, logger = _llm_engine(tmp_path, "s2l", counter)
+    runner = _runner(tmp_path, engine=engine)
+    result = runner.start(
+        "Design a geothermal heating system for 30 MW", run_id="s2l", input_mode="pause"
+    )
+    assert result.status == RunStatus.PAUSED and result.pending.assumption_id == INPUT_DEFAULTS_ID
+    assert [r.phase for r in logger.records()] == ["P0"]  # one intake call, nothing in P1 yet
+    assert runner.resume("s2l", "defaults").pending.assumption_id == "DB-30"
+    phases = [r.phase for r in logger.records()]  # P1 tools, then the agent asks DB-30
+    assert phases[0] == "P0" and set(phases[1:]) == {"P1"}
+
+
+def test_s5_supply_temperature_conflict_asks_to_confirm_the_basis(tmp_path):
+    """S5 (WP-13 follow-up): the DB-16 conflict is confirmed in P1; 'keep' is the default."""
+    runner = _runner(tmp_path)
+    result = runner.start("Supply heating at 120 °C", run_id="s5")  # assume mode (final run)
+    assert result.status == RunStatus.COMPLETED
+    state = runner.load_state("s5")
+    assert "(DB-16)" in state.conflicts[0]
+    labels = [a.label for a in state.answers]
+    assert labels[0] == f"{BASIS_CONFIRM_ID} = keep (assumed: register default)"
+    assert labels[1].startswith(INPUT_DEFAULTS_ID)  # basis first, then the request inputs
+
+    result = runner.start("Supply heating at 120 °C", run_id="s5p", input_mode="pause")
+    pending = result.pending
+    assert result.status == RunStatus.PAUSED and pending.assumption_id == BASIS_CONFIRM_ID
+    assert pending.default == "keep" and "120 degC" in pending.question
+    assert "(DB-16)" in pending.question and "'change'" in pending.question
+    for ambiguous in ("maybe", "yes", "no"):  # only the two offered words are accepted
+        with pytest.raises(InvalidAnswer, match="'keep'"):
+            runner.resume("s5p", ambiguous)
+    assert runner.resume("s5p", "keep").pending.assumption_id == INPUT_DEFAULTS_ID
+    assert runner.load_state("s5p").answers[0].answer == "keep"
+
+    runner.start("Supply heating at 120 °C", run_id="s5c", input_mode="pause")
+    result = runner.resume("s5c", "change")  # a change of basis is a new run, not this one
+    assert result.status == RunStatus.ESCALATED
+    assert "change of basis requested" in result.summary and "config/limits.yaml" in result.summary
+    assert runner.load_state("s5c").tool_results == []
+
+
+def test_s5_change_answer_in_ask_mode_escalates_too(tmp_path):
+    """--input-mode ask: the terminal answer 'change' stops the run like a resumed answer."""
+    runner = _runner(tmp_path, ask_fn=lambda request: "change")
+    result = runner.start("cooling supply at 15 degC please", run_id="s5a", input_mode="ask")
+    assert result.status == RunStatus.ESCALATED and "(DB-17)" in result.summary
 
 
 def test_ask_mode_uses_the_terminal_callback(tmp_path):

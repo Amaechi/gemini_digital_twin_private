@@ -8,6 +8,9 @@
 # 2026-11-02 (pre-L-2): phase workflow tools (P8 robust_backup) and DR-11, whose choice selects
 # the installed design for P9. 2026-11-02 (L-1 P0 follow-up): P0 accepts only finalise/refuse and
 # closes from the deterministic intake when its step budget runs out (never escalates in scope).
+# 2026-11-03 (WP-13 follow-up, S2/S5): P1 intake requests — confirm a supply-temperature conflict
+# with the basis (CFG-BASIS-CONFIRM) and list the inputs the request does not provide
+# (CFG-INPUT-DEFAULTS) — asked once, before any tool runs or default is assumed.
 """Workflow runner: deterministic phases P0–P10 (spec §4.1, §5.2).
 
 The runner decides WHICH phase runs, enforces budgets (AG-04), executes every tool call,
@@ -38,6 +41,7 @@ from gemini_agent.agents.roles import ROLES
 from gemini_agent.agents.scope import (
     DEFAULT_BRIEF,
     constraint_conflicts,
+    missing_request_inputs,
     refusal_message,
     scope_check,
 )
@@ -94,6 +98,22 @@ MAX_DUPLICATE_REJECTIONS = 2
 _CONSTANT_CONTEXT = frozenset({"run_id", "run_dir", "config_dir"})
 """``ToolContext`` fields that never change within a run (left out of the fingerprint)."""
 APPROVAL_ID = "APPROVAL"
+BASIS_CONFIRM_ID = "CFG-BASIS-CONFIRM"
+"""Register entry behind the S5 question: a requested supply temperature that is not DB-16/DB-17
+is asked to be confirmed in P1; the default ``keep`` continues on the design basis, ``change``
+stops the run (the basis is changed in ``config/`` and a new run started)."""
+INPUT_DEFAULTS_ID = "CFG-INPUT-DEFAULTS"
+"""Register entry behind the S2 question: the challenge inputs a request does not provide are
+listed in ONE P1 question; the default uses the repository inputs (config/, data/demand/)."""
+_BASIS_CONFLICT_MARKS = ("(DB-16)", "(DB-17)")
+"""Conflict texts (``agents/scope.constraint_conflicts``) that need the confirm-basis question."""
+_KEEP = frozenset({"keep", "default"})
+_CHANGE = frozenset({"change"})
+"""Only the two words the question offers: 'yes'/'no' would be ambiguous for "confirm the change
+of basis?" (yes = change it?) and are rejected with the question repeated (reviewer finding)."""
+_DEFAULTS = frozenset(
+    {"defaults", "default", "repository", "repository defaults", "y", "yes", "ok"}
+)
 P0_STEP_KINDS = frozenset({"finalise", "refuse"})
 """The only step kinds P0 accepts (L-1 P0 follow-up): the runner's intake already decided scope,
 so an agent can only confirm it (``finalise``) or refuse an off-topic request. Any tool or other
@@ -325,6 +345,12 @@ class DesignRunner:
             )
             if spec.phase == Phase.P0:
                 self._intake(state)
+        if spec.phase == Phase.P1 and not prog.engine_done:
+            # WP-13 follow-up (S5, S2): the intake's questions come before any P1 tool or default.
+            outcome = self._intake_requests(state, spec)
+            if outcome in ("paused", "stopped"):
+                self._save(state)
+                return outcome
         while not prog.engine_done:
             if prog.steps_used >= budget.max_steps:
                 outcome = self._out_of_steps(state, spec, budget)
@@ -796,6 +822,71 @@ class DesignRunner:
             unit=entry.unit,
         )
 
+    def _register_request(
+        self, state: RunState, phase: Phase, assumption_id: str, question: str
+    ) -> InputRequest:
+        """Runner-worded question whose default is the register value of ``assumption_id``."""
+        try:
+            entry = load_config("assumptions", self.config_dir).get(assumption_id)
+        except KeyError as exc:
+            raise KeyError(
+                f"register entry {assumption_id} missing in {self.config_dir or 'config/'}"
+                "/assumptions.yaml (the P1 intake questions need it)"
+            ) from exc
+        return InputRequest(
+            request_id=f"REQ-{len(state.answers) + 1:02d}-{assumption_id}",
+            phase=phase,
+            question=question,
+            assumption_id=assumption_id,
+            default=entry.value,
+            unit=entry.unit,
+        )
+
+    def _intake_requests(self, state: RunState, spec: PhaseSpec) -> Outcome:
+        """P1 questions raised by the P0 intake (WP-13 follow-up): S5 then S2.
+
+        A supply temperature that conflicts with DB-16/DB-17 is asked to be confirmed first
+        (``CFG-BASIS-CONFIRM``: ``keep`` = design basis, ``change`` = stop the run); then the
+        inputs the request does not provide are listed in one question (``CFG-INPUT-DEFAULTS``:
+        the repository inputs). Each is asked once; an answered id is skipped after a resume.
+        Nothing is loaded or assumed before the answers (S2: "does not invent").
+        """
+        answered = {answer.assumption_id for answer in state.answers}
+        conflicts = [c for c in state.conflicts if any(m in c for m in _BASIS_CONFLICT_MARKS)]
+        if conflicts and BASIS_CONFIRM_ID not in answered:
+            request = self._register_request(
+                state,
+                spec.phase,
+                BASIS_CONFIRM_ID,
+                " ".join(conflicts) + " Confirm the change of basis? Answer 'keep' to continue "
+                "on the design basis (default) or 'change' to stop this run so the basis can be "
+                "changed in config/limits.yaml and config/design_basis.yaml before a new run.",
+            )
+            if self._handle_request(state, request) == "paused":
+                return "paused"
+        if conflicts and state.answer_values().get(BASIS_CONFIRM_ID) == "change":
+            # Answered now, or by ``resume`` just before this pass (AG-05).
+            return self._escalate(
+                state,
+                "change of basis requested by the user: "
+                + " ".join(conflicts)[:300]
+                + " Change config/limits.yaml and config/design_basis.yaml, then start a "
+                "new run",
+            )
+        if state.missing_inputs and INPUT_DEFAULTS_ID not in answered:
+            request = self._register_request(
+                state,
+                spec.phase,
+                INPUT_DEFAULTS_ID,
+                "The request does not provide: " + "; ".join(state.missing_inputs) + ". Use the "
+                "repository defaults (design basis in config/ and the demand CSVs in "
+                "data/demand/)? Answer 'defaults' (default) to continue with them; other inputs "
+                "must be placed there before a new run.",
+            )
+            if self._handle_request(state, request) == "paused":
+                return "paused"
+        return "continue"
+
     def _handle_request(self, state: RunState, request: InputRequest) -> Outcome:
         if state.input_mode == "assume":
             self._record_answer(state, request, request.default, "assumption")
@@ -821,6 +912,22 @@ class DesignRunner:
     def _coerce_answer(self, request: InputRequest, raw: str) -> Any:
         text = raw.strip()
         default = request.default
+        if request.assumption_id == BASIS_CONFIRM_ID:
+            if text.lower() in _KEEP:
+                return "keep"
+            if text.lower() in _CHANGE:
+                return "change"
+            raise InvalidAnswer(
+                f"{BASIS_CONFIRM_ID} answer must be 'keep' (continue on the design basis) or "
+                "'change' (stop the run; change the basis in config/ before a new run)"
+            )
+        if request.assumption_id == INPUT_DEFAULTS_ID:
+            if text.lower() in _DEFAULTS:
+                return default
+            raise InvalidAnswer(
+                f"{INPUT_DEFAULTS_ID}: answer 'defaults' to continue with the repository inputs "
+                "(config/ and data/demand/); other inputs must be placed there before a new run"
+            )
         if isinstance(default, int | float) and not isinstance(default, bool):
             unit = f" ({request.unit})" if request.unit else ""
             try:
@@ -1064,6 +1171,18 @@ class DesignRunner:
             for conflict in constraint_conflicts(state.user_prompt, limits, basis):
                 state.conflicts.append(conflict)
                 self._event(state, "CONFLICT", {"message": conflict})
+            if state.user_prompt != DEFAULT_BRIEF:  # the brief comes with every file (S1)
+                state.missing_inputs = missing_request_inputs(state.user_prompt)
+            if state.missing_inputs:
+                self._event(
+                    state,
+                    "MISSING_INPUTS",
+                    {
+                        "inputs": list(state.missing_inputs),
+                        "message": "the request does not provide: "
+                        + "; ".join(state.missing_inputs),
+                    },
+                )
 
     def _refuse(self, state: RunState, reason: str) -> Outcome:
         state.status = RunStatus.REFUSED

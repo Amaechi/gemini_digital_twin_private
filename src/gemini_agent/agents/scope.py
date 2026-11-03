@@ -6,6 +6,11 @@ additionally refuse in P0, but it can never pull an off-topic request back into 
 WP-13 (2026-11-01) added two conflict rules for the spec §12 scenarios: a requested supply
 temperature that differs from DB-16/DB-17 (S5) and a stated reservoir temperature at a depth (or a
 stated gradient) that disagrees with DB-01/03/04 (S9). The design always keeps the design basis.
+
+WP-13 follow-up (2026-11-03, S2): ``missing_request_inputs`` lists which of the challenge inputs
+(demand CSVs, cooling demand, reservoir data) a user-written request does not provide, so the
+runner can ask once in P1 before anything is loaded or assumed (the default brief is the full
+brief with all files and never asks).
 """
 
 from __future__ import annotations
@@ -255,3 +260,49 @@ def _reservoir_conflicts(prompt: str, basis: DesignBasis) -> list[str]:
                 "(RC-01); the design uses the design basis until the data are confirmed."
             )
     return conflicts
+
+
+# --------------------------------------------------------------------------- S2: request inputs
+REQUEST_INPUTS: tuple[tuple[str, re.Pattern[str]], ...] = (
+    (
+        "demand CSVs (daily heating and cooling demand, data/demand/)",
+        re.compile(
+            r"\b(csvs?|spreadsheets?|time[- ]?series|(?:hourly|daily|monthly|annual)\s+"
+            r"(?:demand|loads?|data|profiles?)|demand\s+(?:data|files?|profiles?|curves?)|"
+            r"load\s+(?:data|files?|profiles?|curves?|duration)|attached|attachments?|"
+            r"enclosed|data[- ]?files?)\b",
+            re.IGNORECASE,
+        ),
+    ),
+    (
+        "cooling demand (cooling supply 20 degC, DB-17/DB-19)",
+        re.compile(r"\b(cool\w*|chill\w*|cold)\b", re.IGNORECASE),
+    ),
+    (
+        (
+            "reservoir data (depth, temperature, gradient, permeability, thickness; "
+            "config/design_basis.yaml)"
+        ),
+        re.compile(
+            r"\b(reservoirs?|aquifers?|formations?|permeabilit\w*|transmissivit\w*|"
+            r"porosit\w*|gradients?|millidarcy|md|thickness|bottom[- ]?hole|downhole|"
+            r"well\s+(?:data|logs?|tests?)|geolog\w*|subsurface)\b",
+            re.IGNORECASE,
+        ),
+    ),
+)
+"""The challenge inputs a request can provide, each with the words that count as providing it."""
+
+
+def missing_request_inputs(prompt: str) -> list[str]:
+    """S2: the challenge inputs a user-written request does not provide (spec §12 S2).
+
+    A request provides an input when it names it (a demand file or profile, cooling, the
+    reservoir or its properties). An empty request is the default brief, which comes with every
+    file; the runner never calls this for it. The list is for one question in P1 ("use the
+    repository defaults?"); nothing is assumed before the answer.
+    """
+    text = prompt.strip()
+    if not text:
+        return []
+    return [label for label, pattern in REQUEST_INPUTS if not pattern.search(text)]

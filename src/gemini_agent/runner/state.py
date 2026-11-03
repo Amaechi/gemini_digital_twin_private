@@ -115,6 +115,10 @@ class RunState(StrictModel):
     in_scope: bool = True
     scope_reason: str = ""
     conflicts: list[str] = Field(default_factory=list)
+    missing_inputs: list[str] = Field(
+        default_factory=list,
+        description="S2: challenge inputs the request does not provide (P0 intake; asked in P1).",
+    )
     progress: dict[str, PhaseProgress] = Field(default_factory=dict)
     tool_results: list[ToolRecord] = Field(default_factory=list)
     candidates: list[Candidate] = Field(default_factory=list)
@@ -205,6 +209,7 @@ class RunState(StrictModel):
             "excluded_candidates": sorted(self.excluded_ids()),
             "llm_fallbacks": self.fallback_count(),
             "conflicts": self.conflicts,
+            "missing_inputs": self.missing_inputs,
             "assumptions_and_answers": [a.label for a in self.answers],
             "decision_records": [
                 {

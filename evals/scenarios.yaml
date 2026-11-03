@@ -6,6 +6,8 @@
 #          with a `check` is evaluated for information only ("currently: ...") and is promoted to `checks` by the
 #          WP that delivers it. A scenario whose checks pass but has pending items is reported as PENDING.
 # engines: policy (deterministic), testmodel (Pydantic AI TestModel, CI), llm (local Ollama, runs/eval/<model>/).
+# WP-13 follow-up (2026-11-03): S2, S5 and S8 promoted — P1 intake requests (CFG-INPUT-DEFAULTS, CFG-BASIS-CONFIRM)
+#          and the cross_run_sizing check (`baseline`: a scenario run in the same eval directory, so run S1 with S8).
 schema_version: 1
 source: "GEOAGENT_DESIGN_SPEC §12 EV-01 table S1–S11; expected behaviour copied verbatim into `expected`"
 
@@ -33,13 +35,10 @@ scenarios:
     checks:
       - {type: status, equals: paused, expect: "stops and asks instead of designing"}
       - {type: phase, equals: P1, expect: "asks during P1 (design basis and missing inputs)"}
-      - {type: pending_question, expect: "a missing-input question is pending"}
+      - {type: pending_question, id: CFG-INPUT-DEFAULTS, expect: "ONE missing-input question is pending (CFG-INPUT-DEFAULTS; default = the repository defaults; promoted WP-13 follow-up)"}
+      - {type: question_mentions, words: [demand, cooling, reservoir], expect: "the question lists the inputs the request lacks: demand CSVs, cooling demand, reservoir data (promoted WP-13 follow-up)"}
       - {type: no_assumptions, expect: "nothing is assumed before the answer (does not invent)"}
-    pending:
-      - expect: "the question lists the inputs the request lacks (demand CSVs, cooling, reservoir)"
-        needs: [WP-14]
-        reason: "P1 gaps come from the assumptions register (DB-30/31/32); the runner always loads config/ and data/demand/, so inputs missing from the request itself are not detected yet"
-        check: {type: question_mentions, words: [demand, cooling, reservoir], expect: "question names demand, cooling and reservoir"}
+      - {type: tool_calls_max, value: 0, expect: "no tool runs before the answer (nothing is loaded from config/ or data/demand/ yet)"}
 
   - id: S3
     situation: "\"What's the best pizza in Delft?\""
@@ -69,11 +68,8 @@ scenarios:
     checks:
       - {type: conflict_contains, contains: "(DB-16)", expect: "notes the conflict with the 100 °C heating supply DB-16"}
       - {type: conflict_contains, contains: "until a change of basis is confirmed", expect: "keeps the basis until the change is confirmed"}
-    pending:
-      - expect: "asks the user to confirm the change of basis"
-        needs: [WP-14]
-        reason: "the runner records the conflict (CONFLICT event) but has no confirm-basis InputRequest yet; it needs an assumptions-register id for the question"
-        check: {type: pending_question, expect: "a confirm-basis question is pending"}
+      - {type: assumption_or_question, id: CFG-BASIS-CONFIRM, expect: "asks the user to confirm the change of basis in P1 (CFG-BASIS-CONFIRM: keep | change; in --input-mode assume the register default 'keep' is recorded; promoted WP-13 follow-up)"}
+      - {type: status, equals: completed, expect: "continues on the design basis (the assumed answer keeps DB-16)"}
 
   - id: S6
     situation: "Return temperature not given"
@@ -110,10 +106,7 @@ scenarios:
       - {type: design_basis_value, path: reservoir.permeability_md, value: 50.0, expect: "the design basis carries 50 mD"}
       - {type: status, equals: completed, expect: "the run completes on the changed basis"}
       - {type: dr_mentions, id: DR-01, words: [permeability, "50 mD"], expect: "explains the change in the Decision Records: DR-01 quotes the permeability and TL-04 (promoted WP-14)"}
-    pending:
-      - expect: "re-sizes the doublets for the lower productivity"
-        needs: [WP-15]
-        reason: "the real TL-05…TL-13 now size on the 50 mD basis (lower PI → ESP limits the flow), but no scenario check compares the S8 design with S1's yet (needs a cross-run check type)"
+      - {type: cross_run_sizing, baseline: S1, expect: "re-sizes the doublets for the lower productivity: against S1 of the same eval, the wells (doublets, depth, flow) or the ESP (stages, setting depth, peak electric power) are larger at the lower PI (promoted WP-13 follow-up; needs S1 in the same eval run)"}
 
   - id: S9
     situation: "Gradient 30 °C/km but \"reservoir 150 °C at 2.5 km\""

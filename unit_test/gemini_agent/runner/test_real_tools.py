@@ -270,6 +270,34 @@ def test_policy_pipeline_on_real_tools_is_accepted_without_stubs(smoke_run):
         assert (run_dir / name).is_file(), name
 
 
+S1_FIXTURE = Path(__file__).parent / "fixtures" / "s1_policy_smoke.json"
+
+
+def test_s1_policy_smoke_run_matches_the_recorded_fixture(smoke_run):
+    """S1 regression (WP-13 follow-up): the P1 intake questions never touch the full brief.
+
+    The fixture was recorded before CFG-BASIS-CONFIRM / CFG-INPUT-DEFAULTS existed: the same
+    selected design, wells, equipment, KPIs and exactly DB-30/31/32 + approval as questions.
+    """
+    _, state, _ = smoke_run
+    fixture = json.loads(S1_FIXTURE.read_text(encoding="utf-8"))
+    selected = next(c for c in state.candidates if c.id == state.selected_id)
+    assert state.status.value == fixture["status"]
+    assert state.verdict_value() == fixture["verdict"]
+    assert state.selected_id == fixture["selected_id"]
+    assert (selected.doublets, selected.depth_m, selected.design_flow_m3h) == (
+        fixture["doublets"],
+        fixture["depth_m"],
+        fixture["design_flow_m3h"],
+    )
+    assert selected.equipment_sizes == pytest.approx(fixture["equipment_sizes"])
+    assert [a.label for a in state.answers] == fixture["answers"]
+    kpis = state.kpis[state.analysed_id(state.selected_id)]
+    assert kpis.lcoh_per_mwh == pytest.approx(fixture["lcoh_per_mwh"], rel=1e-6)
+    assert kpis.capex_million == pytest.approx(fixture["capex_million"], rel=1e-6)
+    assert state.missing_inputs == [] and state.conflicts == []
+
+
 def test_results_pack_renders_from_the_finished_run(smoke_run, tmp_path):
     """TL-21 from the run's files alone: figures, tables, report with the selected design."""
     _, state, run_dir = smoke_run

@@ -1,0 +1,21 @@
+{
+ "_note": "S1 (empty prompt = the full brief) on the policy engine, real tools, smoke budget; recorded 2026-11-03 before the S2/S5/S8 intake requests were added. The selected design, its wells and its questions must not change.",
+ "status": "completed",
+ "verdict": "ACCEPTED",
+ "selected_id": "C1-opt",
+ "doublets": 3,
+ "depth_m": 2500.0,
+ "design_flow_m3h": 274.0,
+ "equipment_sizes": {
+  "peak_boiler_mw": 5.45,
+  "electric_chiller_mw": 10.0
+ },
+ "answers": [
+  "DB-30 = {\"interpretation\":\"A\",\"doublet_available_days_per_yr\":330,\"planned_outage_days_per_doublet\":35,\"outages_may_overlap\":false,\"outage_schedule\":\"chosen by the optimiser\",\"demand_met_days_per_yr\":365} (assumed: register default)",
+  "DB-31 = 55.0 degC (assumed: register default)",
+  "DB-32 = 26.0 degC (assumed: register default)",
+  "Human approval pending (non-interactive run)"
+ ],
+ "lcoh_per_mwh": 653.6444141189463,
+ "capex_million": 27.769753143876297
+}
