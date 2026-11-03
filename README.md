@@ -252,7 +252,8 @@ credential exists anywhere in the repository (`.env.template` is GEMINI's and un
   confirm a DB-16/DB-17 change of basis, default keep) and the S8 cross-run sizing check against
   S1; closed on 2026-11-03, eval rerun pending. The missing-input detection is keyword-based on
   the request text (`agents/scope.missing_request_inputs`); a change of basis stops the run
-  (the limits are changed in `config/` and a new run started), it is never designed for.
+  (the limits are changed in `config/` and a new run started), it is never designed for; every
+  prompt other than the brief records one assumed `CFG-INPUT-DEFAULTS` answer in assume mode.
 - **P5 DR-08 token-limit escalation on gemma4:26b-a4b**: the per-call usage limit for the
   Decision Record choice was exceeded (`total_tokens_limit` 765 vs 1 900 used) and the run
   escalated instead of falling back; that limit is the phase's remaining token budget (AG-04). Two

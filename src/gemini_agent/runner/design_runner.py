@@ -107,8 +107,10 @@ INPUT_DEFAULTS_ID = "CFG-INPUT-DEFAULTS"
 listed in ONE P1 question; the default uses the repository inputs (config/, data/demand/)."""
 _BASIS_CONFLICT_MARKS = ("(DB-16)", "(DB-17)")
 """Conflict texts (``agents/scope.constraint_conflicts``) that need the confirm-basis question."""
-_KEEP = frozenset({"keep", "y", "yes", "confirm", "confirmed", "ok", "default"})
-_CHANGE = frozenset({"change", "n", "no"})
+_KEEP = frozenset({"keep", "default"})
+_CHANGE = frozenset({"change"})
+"""Only the two words the question offers: 'yes'/'no' would be ambiguous for "confirm the change
+of basis?" (yes = change it?) and are rejected with the question repeated (reviewer finding)."""
 _DEFAULTS = frozenset(
     {"defaults", "default", "repository", "repository defaults", "y", "yes", "ok"}
 )
@@ -824,7 +826,13 @@ class DesignRunner:
         self, state: RunState, phase: Phase, assumption_id: str, question: str
     ) -> InputRequest:
         """Runner-worded question whose default is the register value of ``assumption_id``."""
-        entry = load_config("assumptions", self.config_dir).get(assumption_id)
+        try:
+            entry = load_config("assumptions", self.config_dir).get(assumption_id)
+        except KeyError as exc:
+            raise KeyError(
+                f"register entry {assumption_id} missing in {self.config_dir or 'config/'}"
+                "/assumptions.yaml (the P1 intake questions need it)"
+            ) from exc
         return InputRequest(
             request_id=f"REQ-{len(state.answers) + 1:02d}-{assumption_id}",
             phase=phase,

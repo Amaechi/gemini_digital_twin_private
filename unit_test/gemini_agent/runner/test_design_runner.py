@@ -232,8 +232,9 @@ def test_s5_supply_temperature_conflict_asks_to_confirm_the_basis(tmp_path):
     assert result.status == RunStatus.PAUSED and pending.assumption_id == BASIS_CONFIRM_ID
     assert pending.default == "keep" and "120 degC" in pending.question
     assert "(DB-16)" in pending.question and "'change'" in pending.question
-    with pytest.raises(InvalidAnswer, match="'keep'"):
-        runner.resume("s5p", "maybe")
+    for ambiguous in ("maybe", "yes", "no"):  # only the two offered words are accepted
+        with pytest.raises(InvalidAnswer, match="'keep'"):
+            runner.resume("s5p", ambiguous)
     assert runner.resume("s5p", "keep").pending.assumption_id == INPUT_DEFAULTS_ID
     assert runner.load_state("s5p").answers[0].answer == "keep"
 

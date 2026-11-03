@@ -218,7 +218,7 @@ def test_cross_run_sizing_passes_when_the_esp_or_the_wells_grow_at_a_lower_pi(tm
     )
     outcome = evaluate(check, _observe(state, run_dir))
     assert outcome.passed and outcome.detail.startswith("ESP re-sized: PI 3.06 vs S1 12.22")
-    assert "ESP 49 stages @ 1560 m, peak 1.43 MW" in outcome.detail
+    assert "ESP 49 stages @ 1560 m, peak 1.43 MW (fast year)" in outcome.detail
     sizing = well_sizing(state, run_dir)
     assert (sizing.wells, sizing.esp_stages, sizing.esp_peak_electric_mw) == (
         (2, 2500.0, 300.0),
@@ -233,9 +233,9 @@ def test_cross_run_sizing_passes_when_the_esp_or_the_wells_grow_at_a_lower_pi(tm
     outcome = evaluate(check, _observe(state, run_dir))
     assert outcome.passed and outcome.detail.startswith("wells re-sized")
 
-    # Nothing changed (peak within the 5 % tolerance): not re-sized.
+    # Nothing grew (peak within the 5 % tolerance, fewer doublets): not re-sized for a lower PI.
     state, run_dir = _sized_run(
-        tmp_path, "S8c", pi=3.06, stages=16, setting_depth_m=840.0, peak_mw=0.47
+        tmp_path, "S8c", pi=3.06, stages=16, setting_depth_m=840.0, peak_mw=0.47, doublets=1
     )
     outcome = evaluate(check, _observe(state, run_dir))
     assert not outcome.passed and outcome.detail.startswith("neither the wells nor the ESP")

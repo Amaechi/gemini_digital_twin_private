@@ -217,13 +217,22 @@ class Observation:
         return latest_tool_output(self.state, self.run_dir, tool)
 
 
-def latest_tool_output(state: RunState, run_dir: Path, tool: str) -> dict[str, Any] | None:
-    """Full JSON output of the latest successful call of ``tool`` in a run (None if never)."""
-    for record in reversed(state.tool_results):
-        if record.tool == tool and record.ok and record.path:
-            path = run_dir / record.path
-            if path.exists():
-                return json.loads(path.read_text(encoding="utf-8"))
+def latest_tool_output(
+    state: RunState, run_dir: Path, tool: str, candidate_id: str | None = None
+) -> dict[str, Any] | None:
+    """Full JSON output of the latest successful call of ``tool`` in a run (None if never).
+
+    With ``candidate_id`` the latest call that lists that candidate is preferred (a call that
+    names no candidate, e.g. a P2 resource tool, is the fallback).
+    """
+    records = [r for r in state.tool_results if r.tool == tool and r.ok and r.path]
+    if candidate_id is not None:
+        tagged = [r for r in records if candidate_id in r.candidate_ids]
+        records = tagged or records
+    for record in reversed(records):
+        path = run_dir / record.path
+        if path.exists():
+            return json.loads(path.read_text(encoding="utf-8"))
     return None
 
 
@@ -250,17 +259,26 @@ class WellSizing:
     design_flow_m3h: float | None
     esp_stages: int | None
     esp_setting_depth_m: float | None
-    esp_peak_electric_mw: float | None
+    esp_peak_electric_mw_by_mode: dict[str, float]
 
     @property
     def wells(self) -> tuple[int | None, float | None, float | None]:
         """Doublets, depth and design flow of the selected design."""
         return self.doublets, self.depth_m, self.design_flow_m3h
 
-    def describe(self) -> str:
-        """One-line summary for the check detail."""
+    @property
+    def esp_peak_electric_mw(self) -> float | None:
+        """Peak ESP electric power of the full year, else of the fast year (None without a CSV)."""
+        for mode in ("full", "fast"):
+            if mode in self.esp_peak_electric_mw_by_mode:
+                return self.esp_peak_electric_mw_by_mode[mode]
+        return None
+
+    def describe(self, mode: str | None = None) -> str:
+        """One-line summary for the check detail (peak of ``mode``, default full else fast)."""
         depth = "?" if self.esp_setting_depth_m is None else f"{self.esp_setting_depth_m:g} m"
-        peak = "?" if self.esp_peak_electric_mw is None else f"{self.esp_peak_electric_mw:.2f} MW"
+        peak_mw = self.esp_peak_electric_mw_by_mode.get(mode) if mode else self.esp_peak_electric_mw
+        peak = "?" if peak_mw is None else f"{peak_mw:.2f} MW ({mode or 'full/fast'} year)"
         return (
             f"{self.doublets} x {self.design_flow_m3h} m3/h @ {self.depth_m} m, ESP "
             f"{self.esp_stages} stages @ {depth}, peak {peak}"
@@ -271,10 +289,11 @@ def _number(value: Any) -> float | None:
     return float(value) if isinstance(value, int | float) and not isinstance(value, bool) else None
 
 
-def esp_peak_electric_mw(run_dir: Path, candidate_id: str | None) -> float | None:
-    """Largest daily ESP electric power of a design's annual CSV (full year, else fast year)."""
+def esp_peak_electric_mw(run_dir: Path, candidate_id: str | None) -> dict[str, float]:
+    """Largest daily ESP electric power of a design's annual CSVs, per year mode (full, fast)."""
+    peaks: dict[str, float] = {}
     if not candidate_id:
-        return None
+        return peaks
     for mode in ("full", "fast"):
         path = Path(run_dir) / f"annual_{candidate_id}_{mode}.csv"
         if not path.exists():
@@ -293,8 +312,8 @@ def esp_peak_electric_mw(run_dir: Path, candidate_id: str | None) -> float | Non
                 if row.get(name) not in (None, "", "nan")
             ]
         if values:
-            return max(values)
-    return None
+            peaks[mode] = max(values)
+    return peaks
 
 
 def well_sizing(state: RunState, run_dir: Path) -> WellSizing:
@@ -304,12 +323,14 @@ def well_sizing(state: RunState, run_dir: Path) -> WellSizing:
     ``doublet_operating_point`` output (TL-05 ``doublet.esp``); wells: the selected candidate;
     peak ESP power: the selected design's annual CSV (TL-12 ``elec_esp_<n>_mw`` columns).
     """
-    pi_output = latest_tool_output(state, run_dir, "productivity_index") or {}
+    selected_id = state.selected_id
+    pi_output = latest_tool_output(state, run_dir, "productivity_index", selected_id) or {}
     esp = _dotted(
-        latest_tool_output(state, run_dir, "doublet_operating_point") or {}, "data.doublet.esp"
+        latest_tool_output(state, run_dir, "doublet_operating_point", selected_id) or {},
+        "data.doublet.esp",
     )
     esp = esp if isinstance(esp, dict) else {}
-    selected = next((c for c in state.candidates if c.id == state.selected_id), None)
+    selected = next((c for c in state.candidates if c.id == selected_id), None)
     stages = esp.get("stages")
     return WellSizing(
         productivity_index_m3h_per_bar=_number(
@@ -320,7 +341,7 @@ def well_sizing(state: RunState, run_dir: Path) -> WellSizing:
         design_flow_m3h=selected.design_flow_m3h if selected is not None else None,
         esp_stages=int(stages) if isinstance(stages, int | float) else None,
         esp_setting_depth_m=_number(esp.get("setting_depth_m")),
-        esp_peak_electric_mw=esp_peak_electric_mw(run_dir, state.selected_id),
+        esp_peak_electric_mw_by_mode=esp_peak_electric_mw(run_dir, selected_id),
     )
 
 
@@ -563,11 +584,12 @@ def _llm_metrics(check: Check, obs: Observation) -> tuple[bool, str]:
 def _cross_run_sizing(check: Check, obs: Observation) -> tuple[bool, str]:
     """S8: the selected design is re-sized against ``baseline`` (same eval dir) at a lower PI.
 
-    Passes when the baseline's productivity index is higher and the wells (doublets, depth,
-    design flow) differ, or the ESP is larger (more stages, a deeper setting depth, or a peak
-    electric power more than ``ESP_PEAK_TOLERANCE_FRAC`` above the baseline's). Fails, with the
-    reason, when the baseline run is missing from the eval directory or either run's evidence
-    has no PI (stub tools).
+    Passes when the baseline's productivity index is higher and the wells are re-sized for it
+    (more doublets, a lower design flow per doublet, or another depth) or the ESP is larger
+    (more stages, a deeper setting depth, or a peak electric power more than
+    ``ESP_PEAK_TOLERANCE_FRAC`` above the baseline's, both peaks from the same year mode).
+    Fails, with the reason, when the baseline run is missing from the eval directory or either
+    run's evidence has no PI (stub tools).
     """
     baseline_dir = obs.run_dir.parent / str(check.baseline)
     base_state = load_run_state(baseline_dir)
@@ -580,14 +602,29 @@ def _cross_run_sizing(check: Check, obs: Observation) -> tuple[bool, str]:
     pi_this, pi_base = this.productivity_index_m3h_per_bar, base.productivity_index_m3h_per_bar
     if pi_this is None or pi_base is None:
         return False, "productivity_index output has no PI in this run or the baseline (stubs?)"
+    modes = [
+        m
+        for m in ("full", "fast")
+        if m in this.esp_peak_electric_mw_by_mode and m in base.esp_peak_electric_mw_by_mode
+    ]
+    mode = modes[0] if modes else None
     detail = (
-        f"PI {pi_this:.2f} vs {check.baseline} {pi_base:.2f} m3/h/bar; design {this.describe()} "
-        f"vs {base.describe()}"
+        f"PI {pi_this:.2f} vs {check.baseline} {pi_base:.2f} m3/h/bar; design "
+        f"{this.describe(mode)} vs {base.describe(mode)}"
     )
     if not pi_this < pi_base:
         return False, f"no lower PI than {check.baseline}: {detail}"
-    wells_changed = this.wells != base.wells
-    peak_this, peak_base = this.esp_peak_electric_mw, base.esp_peak_electric_mw
+    wells_changed = (
+        (this.doublets is not None and base.doublets is not None and this.doublets > base.doublets)
+        or (
+            this.design_flow_m3h is not None
+            and base.design_flow_m3h is not None
+            and this.design_flow_m3h < base.design_flow_m3h
+        )
+        or (this.depth_m is not None and base.depth_m is not None and this.depth_m != base.depth_m)
+    )
+    peak_this = this.esp_peak_electric_mw_by_mode.get(mode) if mode else None
+    peak_base = base.esp_peak_electric_mw_by_mode.get(mode) if mode else None
     esp_larger = (
         (
             this.esp_stages is not None
@@ -608,7 +645,7 @@ def _cross_run_sizing(check: Check, obs: Observation) -> tuple[bool, str]:
     how = (
         "wells re-sized"
         if wells_changed
-        else "ESP re-sized" if esp_larger else "neither the wells nor the ESP changed"
+        else "ESP re-sized" if esp_larger else "neither the wells nor the ESP grew"
     )
     return wells_changed or esp_larger, f"{how}: {detail}"
 
