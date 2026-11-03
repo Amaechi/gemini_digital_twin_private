@@ -98,7 +98,14 @@ def _fake_say(monkeypatch) -> list[str]:
     """Record ``say`` calls; any other subprocess (matplotlib's font lookup in P10) runs."""
     spoken: list[str] = []
     real_run = subprocess.run
-    monkeypatch.setattr(speech.shutil, "which", lambda command: f"/usr/bin/{command}")
+    real_which = speech.shutil.which
+    monkeypatch.setattr(
+        speech.shutil,
+        "which",
+        lambda cmd, *a, **k: (
+            "/usr/bin/say" if cmd == speech.SAY_COMMAND else real_which(cmd, *a, **k)
+        ),
+    )
 
     def run(argv, **kwargs):
         if argv[:2] != [speech.SAY_COMMAND, "--"]:
@@ -153,7 +160,7 @@ def test_answer_spec_mirrors_the_runners_coercion():
     assert voice.answer_spec(BASIS).options == ("keep", "change")
     assert voice.answer_spec(BASIS).default_text == "keep"
     assert voice.answer_spec(INPUTS) == voice.AnswerSpec(
-        kind="choice", options=("defaults",), default_text="defaults"
+        kind="choice", options=("defaults", "yes"), default_text="defaults"
     )
     number = voice.answer_spec(_request())
     assert number == voice.AnswerSpec(kind="number", unit="degC", default_text="55")
@@ -175,6 +182,11 @@ def test_canonical_value_and_check_normalised():
     number = voice.answer_spec(_request())
     assert voice.canonical_value(number, "about 65 degrees") == "65"
     assert voice.canonical_value(number, "62,5") == "62.5"
+    assert voice.canonical_value(number, "DB-31 is 65") == "65"  # no sign glued to a word
+    assert voice.canonical_value(number, "-5") == "-5"
+    for negated in ("do not approve", "don't approve", "not approved", "never approve it"):
+        with pytest.raises(ValueError, match="negated"):
+            voice.canonical_value(yes_no, negated)
     with pytest.raises(ValueError):
         voice.canonical_value(number, "warm")
     choice = voice.answer_spec(DB30)
@@ -214,6 +226,12 @@ def test_canonical_value_and_check_normalised():
         (APPROVAL, "Yes please", "value", "yes"),
         (APPROVAL, "No, reject it", "value", "no"),
         (APPROVAL, "default", "unclear", None),  # the approval has no default
+        (APPROVAL, "do not approve", "unclear", None),  # negated yes-word is never yes
+        (APPROVAL, "I don't approve this", "unclear", None),
+        (APPROVAL, "no, do not approve", "unclear", None),  # mixed: asked again
+        (_request(), "not the default", "unclear", None),
+        (_request(), "DB-31 is 65", "value", "65"),
+        (INPUTS, "yes", "value", "yes"),
         (APPROVAL, "", "unclear", None),
     ],
 )
@@ -422,6 +440,26 @@ def test_ask_speaks_listens_normalises_echoes_and_confirms():
     assert session.ask(APPROVAL) == "yes"
     assert echoes[-1] == "I understood yes - apply?"
 
+    class VerboseEar:
+        """A normaliser whose values pass the validator but are not yet in the runner's form."""
+
+        name = "verbose"
+        replies: typing.ClassVar[deque] = deque(["65 degrees", "Yes.", "warm"])
+
+        def normalise(self, request, transcript):
+            return voice.NormalisedAnswer(
+                heard=transcript, interpretation="value", value=self.replies.popleft()
+            )
+
+    session = _session(lambda: "spoken", confirm, normaliser=VerboseEar())
+    assert session.ask(_request()) == "65"  # not "65 degrees": the runner would reject it
+    assert echoes[-1] == "I understood 65 degC - apply?"
+    assert session.ask(APPROVAL) == "yes"
+    assert echoes[-1] == "I understood yes - apply?"
+    session.max_attempts = 1
+    assert session.ask(_request()) is None  # "warm" cannot be canonicalised → re-ask → default
+    assert any(s.startswith("I could not use that answer") for s in session.speaker.spoken)
+
     silent = _session(lambda: "", lambda q: True)
     assert silent.ask(_request()) is None
     assert silent.answers == [("REQ-01-DB-31", None)]
@@ -558,7 +596,12 @@ def test_talk_with_the_llm_engine_logs_the_normaliser_calls(tmp_path, monkeypatc
         built.append((kind, tag))
         return fake_model(voice_like)
 
+    order = []
     monkeypatch.setattr(engine_module, "build_ollama_model", fake_build)
+    monkeypatch.setattr(
+        engine_module, "close_model_clients", lambda *models: order.append("closed")
+    )
+    monkeypatch.setattr(voice.VoiceSession, "after_run", lambda self, result: order.append("hook"))
     monkeypatch.setattr(voice, "whisper_listener", lambda model_size: heard.popleft)
     monkeypatch.setattr(voice, "import_voice_module", lambda module: module)
     prompts: list[str] = []
@@ -579,6 +622,7 @@ def test_talk_with_the_llm_engine_logs_the_normaliser_calls(tmp_path, monkeypatc
     out = capsys.readouterr().out
     assert code == EXIT_OK, out
     assert built == [("orchestrator", "ear-test")]  # one model, shared by engine and normaliser
+    assert order == ["hook", "closed"]  # the §I hook runs while the shared model is still open
     assert "voice: 5 normaliser LLM calls, 0 policy fallbacks (6 transcripts)" in out
     records = [
         json.loads(line) for line in (tmp_path / "t2" / "llm_calls.jsonl").read_text().splitlines()
@@ -604,6 +648,15 @@ def test_talk_without_a_confirmed_request_can_use_the_brief(tmp_path, monkeypatc
     assert code == EXIT_USAGE
     assert "no request; nothing started" in capsys.readouterr().err
     assert "No request was confirmed. Use the default challenge brief? [Y/n] " in keyboard.prompts
+    assert not any(path.is_dir() for path in tmp_path.iterdir())
+    # --engine llm: the normaliser's logger (which creates runs/<id>/) is built only after the
+    # request is confirmed, so declining still writes nothing and builds no model.
+    monkeypatch.setattr(
+        engine_module, "build_ollama_model", lambda *a, **k: pytest.fail("no model")
+    )
+    monkeypatch.setattr("builtins.input", ScriptedKeyboard(["a", "b", "c"], ["n", "n", "n", "n"]))
+    args = ["talk", "--engine", "llm", "--typed", "--runs-dir", str(tmp_path), "--mute"]
+    assert main(args) == EXIT_USAGE
     assert not any(path.is_dir() for path in tmp_path.iterdir())
 
 

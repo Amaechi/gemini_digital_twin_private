@@ -259,7 +259,7 @@ def answer_spec(request: InputRequest) -> AnswerSpec:
     if request.assumption_id == BASIS_CONFIRM_ID:
         return AnswerSpec(kind="choice", options=("keep", "change"), default_text="keep")
     if request.assumption_id == INPUT_DEFAULTS_ID:
-        return AnswerSpec(kind="choice", options=("defaults",), default_text="defaults")
+        return AnswerSpec(kind="choice", options=("defaults", "yes"), default_text="defaults")
     if isinstance(default, int | float) and not isinstance(default, bool):
         return AnswerSpec(kind="number", unit=request.unit, default_text=f"{default:g}")
     if isinstance(default, dict) and "interpretation" in default:
@@ -270,7 +270,8 @@ def answer_spec(request: InputRequest) -> AnswerSpec:
     return AnswerSpec(kind="text", unit=request.unit, default_text=shown)
 
 
-_NUMBER = re.compile(r"[-+]?\d+(?:[.,]\d+)?")
+_NUMBER = re.compile(r"(?<![\w-])[-+]?\d+(?:[.,]\d+)?")
+"""First numeric token; a sign glued to a word is not one ('DB-31 is 65' → 65)."""
 _WORD_PREFIXES = re.compile(
     r"^(?:option|interpretation|letter|choice|answer|the|number|value|it is|it s|i say|i d say|"
     r"i want|i choose|choose|pick|use|take|go with|say|please|so|well|um|uh)\b\s*"
@@ -279,6 +280,9 @@ _PUNCTUATION = re.compile(r"[^\w\s.,+-]")
 _YES_WORDS = frozenset({"yes", "yeah", "yep", "yup", "approve", "approved", "ok", "okay", "sure"})
 _NO_WORDS = frozenset({"no", "nope", "reject", "rejected", "negative", "disapprove"})
 _DEFAULT_WORDS = frozenset({"default", "defaults"})
+_NEGATION_WORDS = frozenset({"not", "don", "dont", "never", "cancel", "decline", "neither", "nor"})
+"""A negation next to a yes-word ('do not approve', "don't approve") is never read as yes:
+the answer is unclear and asked again (reviewer finding; Enter on the echo would approve)."""
 
 
 def canonical_value(spec: AnswerSpec, value: str) -> str:
@@ -293,6 +297,8 @@ def canonical_value(spec: AnswerSpec, value: str) -> str:
         raise ValueError("empty answer")
     if spec.kind == "yes_no":
         words = {word.strip(".,+-") for word in _PUNCTUATION.sub(" ", text.lower()).split()}
+        if words & _NEGATION_WORDS and words & _YES_WORDS:
+            raise ValueError(f"'{text}' sounds negated; say yes or no")
         if words & _YES_WORDS and not words & _NO_WORDS:
             return "yes"
         if words & _NO_WORDS and not words & _YES_WORDS:
@@ -380,6 +386,7 @@ class PolicyNormaliser:
         if (
             spec.default_text is not None
             and words
+            and not set(words) & _NEGATION_WORDS
             and (words[-1] in _DEFAULT_WORDS or (len(words) <= 3 and set(words) & _DEFAULT_WORDS))
         ):
             return NormalisedAnswer(heard=heard, interpretation="default")
@@ -586,9 +593,11 @@ class VoiceSession:
     transcripts: list[str] = field(default_factory=list)
     answers: list[tuple[str, str | None]] = field(default_factory=list)
     dialogue_hook: DialogueHook | None = None
-    """FINAL_SPRINT §I hook: called once with the ``RunResult`` after the run (and its report).
-    The dialogue loop (speak "What would you like to change?" → record → lever mapping →
-    what-if → adopt/try another/stop) is implemented there; this PR only reserves the call."""
+    """FINAL_SPRINT §I hook: called once with the ``RunResult`` after the run and its report,
+    while the runner (and the Ollama model shared with ``normaliser``) is still open, so the hook
+    may make LLM calls. The dialogue loop (speak "What would you like to change?" → record →
+    lever mapping → what-if → adopt/try another/stop) is implemented there; this PR only
+    reserves the call."""
 
     def say(self, text: str) -> None:
         """Print ``text`` and speak it (nothing is spoken that is not printed)."""
@@ -655,14 +664,17 @@ class VoiceSession:
             if understood.interpretation == "unclear":
                 self.say(f'I heard "{heard}" but expected {spec.describe()}. Please repeat.')
                 continue
-            value = (
-                spec.default_text
-                if understood.interpretation == "default"
-                else str(understood.value)
-            )
-            if value is None:  # defensive: 'default' on the approval is rejected by check_
-                self.say(f"This question has no default; please answer {spec.describe()}.")
-                continue
+            if understood.interpretation == "default":
+                value = spec.default_text
+                if value is None:  # defensive: check_normalised rejects this for the approval
+                    self.say(f"This question has no default; please answer {spec.describe()}.")
+                    continue
+            else:
+                try:  # the runner's form ("65 degrees" → "65", "Yes." → "yes"), never the raw text
+                    value = canonical_value(spec, str(understood.value))
+                except ValueError as exc:
+                    self.say(f"I could not use that answer ({exc}). Please repeat.")
+                    continue
             echo_unit = f" {spec.unit}" if spec.kind == "number" and spec.unit else ""
             print(f'I heard: "{heard}"', file=self.out or sys.stdout)
             if self.confirm(f"I understood {value}{echo_unit} - apply?"):

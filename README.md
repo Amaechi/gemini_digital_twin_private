@@ -305,8 +305,8 @@ How a session goes:
 
 1. **Request.** "Describe the design request" — press Enter, speak, press Enter again. The clip is
    transcribed offline by [faster-whisper](https://github.com/SYSTRAN/faster-whisper) (model
-   `small`, CPU int8) and echoed: `I heard: "…" — use it? [Y/n]`. The confirmed text is the run's
-   `--prompt`.
+   `small`, CPU int8) and echoed: `I heard: "…"` then `use it? [Y/n]`. The confirmed text is the
+   run's `--prompt`.
 2. **Questions.** Every `InputRequest` of the run (DB-30 interpretation, return temperatures, the
    S2/S5 intake questions) is spoken with its default, then recorded. One LLM call with the
    `NativeOutput` schema `NormalisedAnswer` turns the transcript into the expected form —
@@ -314,7 +314,7 @@ How a session goes:
    register default — and is validated against what the runner accepts, logged in
    `llm_calls.jsonl` (`agent` = `voice_normaliser`) and, on failure, replaced by a keyword
    normaliser (`--engine policy` uses only the keywords, so numbers must be spoken as digits).
-   The result is echoed, `I understood 65 degC — apply? [Y/n]`, and only a confirmed value reaches
+   The result is echoed, `I understood 65 degC - apply? [Y/n]`, and only a confirmed value reaches
    the runner, which validates it exactly like a typed answer (three unusable attempts → the
    register default is recorded as an assumption, as when Enter is pressed in ask mode).
 3. **Approval.** In P10 the verifier's stored summary and the recommended design are spoken, and

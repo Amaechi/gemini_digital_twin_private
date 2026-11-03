@@ -569,16 +569,11 @@ def _talk(args: argparse.Namespace) -> int:
     except voice_ui.VoiceDependencyError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return EXIT_USAGE
-    model: Any = None
-    normaliser: voice_ui.Normaliser = voice_ui.PolicyNormaliser()
-    if engine_name == "llm":
-        # Looked up on the module so tests (and the test-wide real-LLM block) can replace it.
-        model = agent_engine.build_ollama_model(llm_config, "orchestrator", args.model or "")
-        normaliser = voice_ui.LLMNormaliser(
-            llm_config, model, LLMLogger(runs_root / run_id), run_id=run_id
-        )
     session = voice_ui.VoiceSession(
-        speaker=speaker, listen=listen, normaliser=normaliser, run_dir=runs_root / run_id
+        speaker=speaker,
+        listen=listen,
+        normaliser=voice_ui.PolicyNormaliser(),
+        run_dir=runs_root / run_id,
     )
     prompt = session.request_prompt()
     if prompt is None:
@@ -586,22 +581,33 @@ def _talk(args: argparse.Namespace) -> int:
             print("talk: no request; nothing started", file=sys.stderr)
             return EXIT_USAGE
         prompt = ""
+    # Only now is anything written under runs/<run_id>/ (the normaliser's logger creates it).
+    model: Any = None
+    normaliser: voice_ui.Normaliser = session.normaliser
+    if engine_name == "llm":
+        # Looked up on the module so tests (and the test-wide real-LLM block) can replace it.
+        model = agent_engine.build_ollama_model(llm_config, "orchestrator", args.model or "")
+        normaliser = voice_ui.LLMNormaliser(
+            llm_config, model, LLMLogger(runs_root / run_id), run_id=run_id
+        )
+        session.normaliser = normaliser
     runner = _runner(args, run_id, ask_fn=session.ask, model=model)
     try:
         result = runner.start(prompt, run_id=run_id, input_mode="ask", model_tag=args.model or "")
+        code = _report(result, speaker)
+        if isinstance(normaliser, voice_ui.LLMNormaliser):
+            print(
+                f"voice: {normaliser.calls} normaliser LLM calls, {normaliser.fallbacks} policy "
+                f"fallbacks ({len(session.transcripts)} transcripts)"
+            )
+        # FINAL_SPRINT §I: the post-run voice dialogue loop (what-if by voice) starts here,
+        # before the runner closes the shared model, so the loop can still make LLM calls.
+        session.after_run(result)
     except ValueError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return EXIT_USAGE
     finally:
         runner.close()
-    code = _report(result, speaker)
-    if isinstance(normaliser, voice_ui.LLMNormaliser):
-        print(
-            f"voice: {normaliser.calls} normaliser LLM calls, {normaliser.fallbacks} policy "
-            f"fallbacks ({len(session.transcripts)} transcripts)"
-        )
-    # FINAL_SPRINT §I: the post-run voice dialogue loop (what-if by voice) starts here.
-    session.after_run(result)
     return code
 
 
