@@ -92,6 +92,9 @@ from gemini_agent.schemas.results import KPISet
 
 RUNS_ROOT = REPO_ROOT / "runs"
 STORE_FILE = "events.sqlite"
+TOKEN_FIGURE_TOOL = "plot_figures"
+"""P10 tool that draws ``figures/fig_tokens.png``; an interim ``token_summary.json`` precedes it."""
+TOKENS_FIGURE = "fig_tokens.png"
 MAX_VERIFICATION_LOOPS = 3
 """Spec §5.2 P7: FAIL ⇒ violations back to P6 (≤ 3 loops), then escalate."""
 HISTORY_EVENTS = 12
@@ -651,6 +654,11 @@ class DesignRunner:
         signature = self._signature(state, tool, args)
         args = self._resolve_args(state, args)
         tool_spec = self.toolbox.spec(tool)
+        if tool == TOKEN_FIGURE_TOOL:
+            # Post-submission fix: the P10 token chart reads token_summary.json, which used to
+            # be written only at run end (placeholder in every LLM run). Interim summary here;
+            # _write_outputs redraws the chart from the final summary.
+            LLMLogger(self.run_dir(state.run_id)).write_token_summary()
         try:
             result = self.toolbox.execute(tool, args, self._tool_context(state))
         except Exception as exc:  # noqa: BLE001 - a failing tool is evidence, not a crash
@@ -1340,3 +1348,12 @@ class DesignRunner:
             "".join(event.model_dump_json() + "\n" for event in events), "utf-8"
         )
         LLMLogger(run_dir).write_token_summary()
+        if (run_dir / "figures" / TOKENS_FIGURE).is_file():
+            # P10 plotted before the run's last LLM calls: redraw from the final summary. A
+            # drawing failure must not lose the run outputs written above (state is saved).
+            from gemini_agent.tools.plots import render_tokens_figure
+
+            try:
+                render_tokens_figure(run_dir)
+            except (OSError, ValueError) as exc:  # corrupt summary, unwritable figure
+                self._event(state, "WARNING", {"message": f"fig_tokens not redrawn: {exc}"})

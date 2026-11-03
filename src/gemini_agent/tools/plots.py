@@ -9,7 +9,9 @@ look-ups of those outputs for display.
 
 Figures (PNG, modest DPI): candidate comparison, daily stacked heat and cooling supply vs demand,
 load-duration curves, annual energy balance (stacked-bar alternative to a Sankey), Monte Carlo
-uncertainty fan, tornado, token chart (placeholder until the local LLM run, L-2). Tables
+uncertainty fan, tornado, token chart (per-phase LLM tokens from ``token_summary.json``; the
+runner writes an interim summary before P10 plots and redraws the chart from the final summary
+at run end, ``render_tokens_figure``; a policy run draws a placeholder). Tables
 (Markdown + CSV): candidates C0–C8 (+ sized optima), final design sizing, verification report,
 uncertainty, Decision Records. Colours: one fixed categorical order per energy source (colour
 follows the source, never its rank); a single y-axis per panel.
@@ -425,16 +427,25 @@ def plot_tornado(view: RunView, out_dir: Path, files: list[str]) -> None:
     _save(fig, out_dir, "fig_tornado.png", files)
 
 
-def plot_tokens(view: RunView, out_dir: Path, files: list[str]) -> None:
-    """Token chart: per-phase tokens from ``token_summary.json``; placeholder for policy runs."""
-    summary = view.json_file("token_summary.json") or {}
-    by_phase = summary.get("by_phase") or {}
-    tokens = {
+TOKENS_FIGURE = "fig_tokens.png"
+TOKEN_SUMMARY = "token_summary.json"
+
+
+def tokens_by_phase(summary: dict[str, Any] | None) -> dict[str, float]:
+    """Input + output tokens per phase from a ``token_summary`` dict (empty → no LLM tokens)."""
+    by_phase = (summary or {}).get("by_phase") or {}
+    return {
         p: (v.get("input_tokens", 0) + v.get("output_tokens", 0)) if isinstance(v, dict) else 0
         for p, v in by_phase.items()
     }
+
+
+def plot_token_summary(summary: dict[str, Any] | None, out_dir: Path, files: list[str]) -> bool:
+    """Draw ``fig_tokens.png`` from a token summary; return True when it holds real tokens."""
+    tokens = tokens_by_phase(summary)
+    filled = any(tokens.values())
     fig, ax = _figure(1, width=9.0, height=3.2)
-    if any(tokens.values()):
+    if filled:
         ax.bar(list(tokens), list(tokens.values()), color=SERIES[0], width=0.6)
         _style(ax, "LLM tokens per phase", ylabel="tokens")
     else:
@@ -442,14 +453,35 @@ def plot_tokens(view: RunView, out_dir: Path, files: list[str]) -> None:
         ax.text(
             0.5,
             0.5,
-            "Token chart placeholder\nthis run used the deterministic policy engine (0 LLM "
-            "tokens);\nthe local Ollama run (L-2) fills it from token_summary.json",
+            "Token chart placeholder\nno LLM tokens were logged for this run (deterministic "
+            "policy engine);\nan LLM run fills it from token_summary.json",
             ha="center",
             va="center",
             fontsize=11,
             color=INK_2,
         )
-    _save(fig, out_dir, "fig_tokens.png", files)
+    _save(fig, out_dir, TOKENS_FIGURE, files)
+    return filled
+
+
+def plot_tokens(view: RunView, out_dir: Path, files: list[str]) -> None:
+    """Token chart: per-phase tokens from ``token_summary.json``; placeholder for policy runs."""
+    plot_token_summary(view.json_file(TOKEN_SUMMARY), out_dir, files)
+
+
+def render_tokens_figure(run_dir: Path | str, figures_dir: Path | str | None = None) -> bool:
+    """Redraw ``figures/fig_tokens.png`` of a run from its ``token_summary.json`` (figure only).
+
+    Used by the runner at run end (the P10 plot ran before the last LLM calls of the run were
+    summarised) and by ``scripts/regenerate_fig_tokens.py``. Returns True when the chart holds
+    real tokens; nothing else in the run folder is touched.
+    """
+    run_dir = Path(run_dir)
+    out_dir = Path(figures_dir) if figures_dir is not None else run_dir / "figures"
+    path = run_dir / TOKEN_SUMMARY
+    summary = json.loads(path.read_text(encoding="utf-8")) if path.is_file() else None
+    out_dir.mkdir(parents=True, exist_ok=True)
+    return plot_token_summary(summary, out_dir, [])
 
 
 # =========================================================================== tables
@@ -826,13 +858,17 @@ def report_markdown(view: RunView, figure_dir: str = "figures/") -> tuple[str, l
 
 __all__ = [
     "FIGURES",
+    "TOKENS_FIGURE",
     "RunView",
     "candidates_table",
     "decision_records_markdown",
     "latest_tool_data",
+    "plot_token_summary",
     "render_all",
+    "render_tokens_figure",
     "report_markdown",
     "sizing_table",
+    "tokens_by_phase",
     "tornado_bars",
     "uncertainty_table",
     "verification_table",

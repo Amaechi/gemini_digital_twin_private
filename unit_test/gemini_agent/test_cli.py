@@ -184,3 +184,69 @@ def test_budget_option_reaches_the_toolbox_and_sigterm_is_restored(tmp_path, mon
     with pytest.raises(SystemExit) as exc:
         cli._exit_on_sigterm(signal.SIGTERM, None)
     assert exc.value.code == 128 + signal.SIGTERM
+
+
+def _fake_say(monkeypatch):
+    """Put a fake ``say`` on the PATH and record what the CLI speaks (post-submission --speak)."""
+    from gemini_agent import speech
+
+    spoken = []
+    monkeypatch.setattr(speech.shutil, "which", lambda command: f"/usr/bin/{command}")
+
+    def run(argv, **kwargs):
+        assert argv[:2] == ["say", "--"]
+        spoken.append(argv[2])
+        return subprocess.CompletedProcess(argv, 0)
+
+    monkeypatch.setattr(speech.subprocess, "run", run)
+    return spoken
+
+
+def test_speak_reads_the_summary_verdict_and_dr11_rationale(tmp_path, capsys, monkeypatch):
+    """`run --speak`: the P10 summary + verdict and the DR-11 rationale are spoken, output unchanged."""
+    spoken = _fake_say(monkeypatch)
+    base = ["--engine", "policy", "--runs-dir", str(tmp_path)]
+    code = main(["run", *base, "--run-id", "s1", "--speak"])
+    out = capsys.readouterr().out
+    assert code == EXIT_OK, out
+    assert "run s1: completed (phase P10)" in out and "speech is disabled" not in out
+    assert len(spoken) == 2
+    assert spoken[0].startswith("Run s1 completed. Completed P0–P10: selected C1-3d")
+    assert "verifier verdict UNVERIFIED" in spoken[0]
+    record = json.loads((tmp_path / "s1" / "decision_records" / "DR-11.json").read_text())
+    assert spoken[1] == (
+        f"Decision record DR-11, {record['title']}: {record['choice_label']}. "
+        + " ".join(record["rationale"].split())
+    )
+    # Without --speak nothing is spoken; the printed output is the same.
+    assert main(["run", *base, "--run-id", "s2"]) == EXIT_OK
+    assert "run s2: completed (phase P10)" in capsys.readouterr().out and len(spoken) == 2
+
+
+def test_speak_reads_each_pending_question_with_its_default(tmp_path, capsys, monkeypatch):
+    """`--input-mode pause --speak` / `resume --speak`: every InputRequest is spoken with its default."""
+    spoken = _fake_say(monkeypatch)
+    base = ["--engine", "policy", "--runs-dir", str(tmp_path), "--speak"]
+    assert main(["run", *base, "--run-id", "p", "--input-mode", "pause"]) == EXIT_PAUSED
+    assert "pending question [REQ-01-DB-30]" in capsys.readouterr().out
+    assert len(spoken) == 1 and "The default is" in spoken[0]
+    assert main(["resume", *base, "--run-id", "p", "--answer", "A"]) == EXIT_PAUSED
+    assert len(spoken) == 2 and spoken[1] != spoken[0]
+    for answer in ("55", "26"):
+        assert main(["resume", *base, "--run-id", "p", "--answer", answer]) == EXIT_PAUSED
+    approval = spoken[-1]
+    assert "Approve the recommended design" in approval and "The default is pending" in approval
+    assert main(["resume", *base, "--run-id", "p", "--answer", "no"]) == EXIT_NOT_APPROVED
+    assert spoken[-1] == "The recommended design was not approved by the user."
+    assert any(s.startswith("Decision record DR-11") for s in spoken)
+
+
+def test_speak_without_say_is_a_noop_with_a_note(tmp_path, capsys, monkeypatch):
+    """Where `say` is absent (Linux, CI) --speak prints one note and runs no subprocess."""
+    from gemini_agent import speech
+
+    monkeypatch.setattr(speech.shutil, "which", lambda command: None)
+    monkeypatch.setattr(speech.subprocess, "run", lambda *a, **k: pytest.fail("no subprocess"))
+    code = main(["run", "--engine", "policy", "--runs-dir", str(tmp_path), "--speak"])
+    out = capsys.readouterr().out
+    assert code == EXIT_OK and out.count("speech is disabled") == 1

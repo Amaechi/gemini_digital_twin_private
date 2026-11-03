@@ -247,6 +247,12 @@ def test_required_backups_and_robust_nameplates(report):
     assert report.cost_ranges and all(lo < 1.0 < hi for lo, hi in report.cost_ranges.values())
 
 
+def _chp_ratio(kpis) -> float:
+    """CHP electricity generated / CHP heat delivered of a year (both from TL-12 KPIs)."""
+    assert kpis is not None and kpis.electricity_generated_mwh
+    return kpis.electricity_generated_mwh / kpis.heat_by_source_mwh["chp"]
+
+
 def test_discrete_cases_include_db31_eco_co2_and_chp(report):
     """UQ-CASES: DB-31 45/65/75 (eval S6), ECO-CO2-GAS 51.53, CHP-EL-FRAC 0.50, DB-30 B."""
     cases = {c.case: c for c in report.cases}
@@ -264,6 +270,10 @@ def test_discrete_cases_include_db31_eco_co2_and_chp(report):
     chp = cases["CHP-EL-FRAC=0.5"]
     assert chp.evaluation.status == "ok" and chp.delta_cost_per_mwh is not None
     assert chp.delta_lcoh_per_mwh != 0.0 and chp.delta_co2_t_per_yr != 0.0  # reaches chp.py
+    # Post-submission check (FINAL_SPRINT §C): the case reaches chp.py's electrical_fraction.
+    # CHP electricity / CHP heat = f / (1 - f): 0.5 at the base 1/3, 1.0 at the 0.50 case.
+    assert _chp_ratio(report.base.kpis) == pytest.approx(0.5, rel=1e-6)
+    assert _chp_ratio(chp.evaluation.kpis) == pytest.approx(1.0, rel=1e-6)
     base_margins = report.base.kpis.min_constraint_margins  # type: ignore[union-attr]
     pure_case = cases["SUB-PBUB.basis=pure_water"].evaluation
     assert pure_case.kpis is not None
