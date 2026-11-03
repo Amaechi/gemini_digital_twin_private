@@ -24,6 +24,7 @@ State at the start: every WP merged, `scripts/validate_submission.py` READY (20 
 
 Dependencies: C needs B (both edit `cli.py`); E needs B (uses what-if) and F (both edit the runner);
 I needs B + D + E; H needs L4; L2 needs F. G is independent.
+**J (runner DR-call budget floor)** runs right after F is merged and before E (both edit the runner); L3 is rerun after J.
 
 ---
 ## Prompts (copy-paste into a new session on branch `main` unless stated)
@@ -104,6 +105,27 @@ TestModel, smoke budget) for each; the S1 policy run must produce the same selec
 the fixture). Expected after the laptop rerun: S2, S5, S8 pass. Run black + isort, the full test command and
 wp-reviewer; update PROGRESS.md and README (eval table note: "S2/S5/S8 closed on <date>, eval rerun pending/done");
 open a PR titled "Eval: close S2 (request inputs), S5 (confirm basis), S8 (cross-run sizing)".
+```
+
+### J — Decision Record calls starved by the phase token budget (after F is merged, before E)
+```text
+Runner fix (follow-up to WP-10 #19; runner/engine files). Read PROGRESS.md and docs/hackathon/FINAL_SPRINT.md.
+Evidence on origin/qwen27b-evidence (runs/final_qwen27b/final_llm, read with git show/checkout into a scratch
+dir; never merge that branch) and in runs/final/eval/gemma4_26b-a4b/S11: two different models escalate in P5
+with "LLM usage limit exceeded for DR-08: system_architect choice: Exceeded the total_tokens_limit of 4283
+(total_tokens=5949)". Cause: every call gets total_tokens_limit = tokens left in the phase (engine.py ≈529–534
+from design_runner.py ≈1132), P5 keeps the PhaseBudget default max_tokens 60 000, and verbose models have
+≈60 k used by the time the mandatory Decision Record choice call (a phase-close step) arrives, so a DR the
+workflow REQUIRES is starved. Fix without weakening AG-04: Decision Record choice calls (and request_input
+normalisation) get a floor — min(limit, max(tokens_left, calls.max_output_tokens + prompt size estimate, e.g.
+8 000)) — and a phase that then overruns its token budget records a TOKEN_BUDGET_OVERRUN event (counted by the
+eval harness like fallbacks) instead of escalating mid-DR; ordinary decide() calls keep the current behaviour.
+Also set an explicit max_tokens for P5 (e.g. 90 000) with a one-line justification, since P5 makes the most
+calls. Tests (FunctionModel): a P5 with 59 k used still writes DR-08 and closes; overrun is recorded; an
+ordinary step at 0 tokens left still escalates (AG-04). Do not touch runs/final*, runs/final/eval or config
+values other than phases.py budgets. Run black + isort, the full test command and wp-reviewer; update
+PROGRESS.md and the README Limitations P5 DR-08 bullet (fixed on <date>; the submitted runs predate it); open
+a PR titled "Runner: Decision Record calls are not starved by the phase token budget".
 ```
 
 ### C — small wins (after B is merged)
@@ -215,6 +237,7 @@ From `docs/results/DECK_OUTLINE.md` and the figures in `docs/results/`. Export P
 video link in `docs/deck/VIDEO.md`; branch `deck` → PR → merge.
 
 ### L3 — second full model run (optional, while recording; ~15–35 min)
+First attempt (3 Nov) escalated at P5 (DR-08 usage limit) — evidence on `origin/qwen27b-evidence`. Rerun **after J is merged** (`git pull`, `rm -rf runs/final_qwen27b`):
 ```bash
 PYTHONPATH=src python -m gemini_agent.cli run --engine llm --model qwen3.6:27b --budget full --runs-dir runs/final_qwen27b --run-id final_llm --input-mode ask
 ```
