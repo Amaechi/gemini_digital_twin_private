@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>6.1.24.1. gemini_model.thermal_storage.thermal_storage &mdash; GEMINI Geothermal Digital Twin (claude/eager-curie-zhkgq6)</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=19f00094" />
+
+  
+  <!--[if lt IE 9]>
+    <script src="../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="../_static/jquery.js?v=5d32c60e"></script>
+        <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+        <script src="../_static/documentation_options.js?v=b6550020"></script>
+        <script src="../_static/doctools.js?v=9a2dae69"></script>
+        <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="6.1.25. gemini_model.well" href="gemini_model.well.html" />
+    <link rel="prev" title="6.1.24. gemini_model.thermal_storage" href="gemini_model.thermal_storage.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            GEMINI Geothermal Digital Twin
+          </a>
+              <div class="version">
+                claude/eager-curie-zhkgq6
+              </div>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Table of Contents</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../index_about_gemini.html">1. About GEMINI</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../index_getting_started.html">2. Getting started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../index_setup.html">3. Set-up</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../index_applications.html">4. Applications</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../index_models.html">5. Models</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../index_sourcecode.html">6. Source code documentation</a><ul class="current">
+<li class="toctree-l2 current"><a class="reference internal" href="gemini_model.html">6.1. gemini_model</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="gemini_model.absorption_chiller.html">6.1.1. gemini_model.absorption_chiller</a></li>
+<li class="toctree-l3"><a class="reference internal" href="gemini_model.adder.html">6.1.2. gemini_model.adder</a></li>
+<li class="toctree-l3"><a class="reference internal" href="gemini_model.boiler.html">6.1.3. gemini_model.boiler</a></li>
+<li class="toctree-l3"><a class="reference internal" href="gemini_model.booster_pump.html">6.1.4. gemini_model.booster_pump</a></li>
+<li class="toctree-l3"><a class="reference internal" href="gemini_model.chp.html">6.1.5. gemini_model.chp</a></li>
+<li class="toctree-l3"><a class="reference internal" href="gemini_model.compressor.html">6.1.6. gemini_model.compressor</a></li>
+<li class="toctree-l3"><a class="reference internal" href="gemini_model.corrosion.html">6.1.7. gemini_model.corrosion</a></li>
+<li class="toctree-l3"><a class="reference internal" href="gemini_model.electric_boiler.html">6.1.8. gemini_model.electric_boiler</a></li>
+<li class="toctree-l3"><a class="reference internal" href="gemini_model.electric_chiller.html">6.1.9. gemini_model.electric_chiller</a></li>
+<li class="toctree-l3"><a class="reference internal" href="gemini_model.erosion.html">6.1.10. gemini_model.erosion</a></li>
+<li class="toctree-l3"><a class="reference internal" href="gemini_model.filter.html">6.1.11. gemini_model.filter</a></li>
+<li class="toctree-l3"><a class="reference internal" href="gemini_model.fluid.html">6.1.12. gemini_model.fluid</a></li>
+<li class="toctree-l3"><a class="reference internal" href="gemini_model.free_cooling.html">6.1.13. gemini_model.free_cooling</a></li>
+<li class="toctree-l3"><a class="reference internal" href="gemini_model.heat_exchanger.html">6.1.14. gemini_model.heat_exchanger</a></li>
+<li class="toctree-l3"><a class="reference internal" href="gemini_model.heat_rejection.html">6.1.15. gemini_model.heat_rejection</a></li>
+<li class="toctree-l3"><a class="reference internal" href="gemini_model.heatpump.html">6.1.16. gemini_model.heatpump</a></li>
+<li class="toctree-l3"><a class="reference internal" href="gemini_model.injector_pump.html">6.1.17. gemini_model.injector_pump</a></li>
+<li class="toctree-l3"><a class="reference internal" href="gemini_model.mixer.html">6.1.18. gemini_model.mixer</a></li>
+<li class="toctree-l3"><a class="reference internal" href="gemini_model.model_abstract.html">6.1.19. gemini_model.model_abstract</a></li>
+<li class="toctree-l3"><a class="reference internal" href="gemini_model.pump.html">6.1.20. gemini_model.pump</a></li>
+<li class="toctree-l3"><a class="reference internal" href="gemini_model.reservoir.html">6.1.21. gemini_model.reservoir</a></li>
+<li class="toctree-l3"><a class="reference internal" href="gemini_model.separator.html">6.1.22. gemini_model.separator</a></li>
+<li class="toctree-l3"><a class="reference internal" href="gemini_model.splitter.html">6.1.23. gemini_model.splitter</a></li>
+<li class="toctree-l3 current"><a class="reference internal" href="gemini_model.thermal_storage.html">6.1.24. gemini_model.thermal_storage</a><ul class="current">
+<li class="toctree-l4 current"><a class="current reference internal" href="#">6.1.24.1. gemini_model.thermal_storage.thermal_storage</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="gemini_model.well.html">6.1.25. gemini_model.well</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="gemini_framework.html">6.2. gemini_framework</a></li>
+<li class="toctree-l2"><a class="reference internal" href="gemini_application.html">6.3. gemini_application</a></li>
+<li class="toctree-l2"><a class="reference internal" href="gemini_interface.html">6.4. gemini_interface</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../glossary.html">7. Glossary</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">GEMINI Geothermal Digital Twin</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index_sourcecode.html"><span class="section-number">6. </span>Source code documentation</a></li>
+          <li class="breadcrumb-item"><a href="gemini_model.html"><span class="section-number">6.1. </span>gemini_model</a></li>
+          <li class="breadcrumb-item"><a href="gemini_model.thermal_storage.html"><span class="section-number">6.1.24. </span>gemini_model.thermal_storage</a></li>
+      <li class="breadcrumb-item active"><span class="section-number">6.1.24.1. </span>gemini_model.thermal_storage.thermal_storage</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/codedocumentation/gemini_model.thermal_storage.thermal_storage.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="module-gemini_model.thermal_storage.thermal_storage">
+<span id="gemini-model-thermal-storage-thermal-storage"></span><h1><span class="section-number">6.1.24.1. </span>gemini_model.thermal_storage.thermal_storage<a class="headerlink" href="#module-gemini_model.thermal_storage.thermal_storage" title="Link to this heading"></a></h1>
+<p>Thermal energy storage (heat or cold) as a GEMINI DynamicModel (GM-09).</p>
+<p>Source: RC-09 “Thermal storage” (<code class="docutils literal notranslate"><span class="pre">data/knowledge/reference_cards/RC-09_district_network_</span>
+<span class="pre">storage.md</span></code>, copied in <code class="docutils literal notranslate"><span class="pre">REFERENCE.md</span></code>); spec §7.2 GM-09 and candidate C6 (seasonal HT-ATES).</p>
+<ul class="simple">
+<li><p>State update (RC-09): <code class="docutils literal notranslate"><span class="pre">E_{t+1}</span> <span class="pre">=</span> <span class="pre">E_t</span> <span class="pre">+</span> <span class="pre">η_c</span> <span class="pre">P_c</span> <span class="pre">Δt</span> <span class="pre">-</span> <span class="pre">P_d</span> <span class="pre">Δt</span> <span class="pre">/</span> <span class="pre">η_d</span> <span class="pre">-</span> <span class="pre">losses</span></code>; here
+<code class="docutils literal notranslate"><span class="pre">losses</span> <span class="pre">=</span> <span class="pre">λ</span> <span class="pre">(Δt</span> <span class="pre">/</span> <span class="pre">1</span> <span class="pre">day)</span> <span class="pre">E_t</span></code> (standing loss, default λ = 0).</p></li>
+<li><p>Recovery (energy delivered / energy charged over a cycle) = <code class="docutils literal notranslate"><span class="pre">η_c</span> <span class="pre">η_d</span></code>. Defaults put all of it
+on discharge (<code class="docutils literal notranslate"><span class="pre">η_c</span> <span class="pre">=</span> <span class="pre">1</span></code>, <code class="docutils literal notranslate"><span class="pre">η_d</span></code> = recovery) so a full cycle returns exactly the literature
+recovery: HT-ATES 0.63 after 10 years (TU Delft; register STO-REC-HT) or cold storage 0.96
+(lower end of 0.96-0.99, RTES citing Pepin 2021; register STO-REC-COLD).</p></li>
+<li><p>Charge and discharge are limited by the power limits and by the stored energy / free capacity;
+the curtailed charge and unmet discharge are reported. Charge and discharge in the same step are
+refused (a dispatch error).</p></li>
+</ul>
+<p>Daily storage adds little at daily resolution (RC-09); seasonal ATES needs an annual heat/cold
+balance (regulators): the cumulative charged and discharged energy are outputs for that check.
+The stored energy counts heat before the recovery loss: at most <code class="docutils literal notranslate"><span class="pre">η_d</span></code> × capacity can be
+delivered, so size <code class="docutils literal notranslate"><span class="pre">capacity_mwh</span></code> as injected energy. Outlet temperature is not modelled (an
+HT-ATES returns below the 100 °C supply: a booster or temperature check is needed).
+Units: powers in W, energies in MWh at the boundary, J internally; time step in s (default 1 day).</p>
+<p class="rubric">Module Attributes</p>
+<table class="autosummary longtable docutils align-default">
+<tbody>
+<tr class="row-odd"><td><p><a class="reference internal" href="#gemini_model.thermal_storage.thermal_storage.RECOVERY_BY_TYPE" title="gemini_model.thermal_storage.thermal_storage.RECOVERY_BY_TYPE"><code class="xref py py-obj docutils literal notranslate"><span class="pre">RECOVERY_BY_TYPE</span></code></a></p></td>
+<td><p>HT-ATES 0.63 [L TU Delft] (STO-REC-HT); cold 0.96 [L RTES, lower end of 0.96-0.99] (STO-REC-COLD).</p></td>
+</tr>
+</tbody>
+</table>
+<p class="rubric">Classes</p>
+<table class="autosummary longtable docutils align-default">
+<tbody>
+<tr class="row-odd"><td><p><a class="reference internal" href="#gemini_model.thermal_storage.thermal_storage.ThermalStorage" title="gemini_model.thermal_storage.thermal_storage.ThermalStorage"><code class="xref py py-obj docutils literal notranslate"><span class="pre">ThermalStorage</span></code></a>()</p></td>
+<td><p>Thermal storage with state of charge, power limits and cycle recovery (RC-09).</p></td>
+</tr>
+</tbody>
+</table>
+<dl class="py data">
+<dt class="sig sig-object py" id="gemini_model.thermal_storage.thermal_storage.RECOVERY_BY_TYPE">
+<span class="sig-prename descclassname"><span class="pre">gemini_model.thermal_storage.thermal_storage.</span></span><span class="sig-name descname"><span class="pre">RECOVERY_BY_TYPE</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">{'cold':</span> <span class="pre">0.96,</span> <span class="pre">'ht_ates':</span> <span class="pre">0.63}</span></em><a class="headerlink" href="#gemini_model.thermal_storage.thermal_storage.RECOVERY_BY_TYPE" title="Link to this definition"></a></dt>
+<dd><p>HT-ATES 0.63 [L TU Delft] (STO-REC-HT); cold 0.96 [L RTES, lower end
+of 0.96-0.99] (STO-REC-COLD).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Cycle recovery defaults</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="gemini_model.thermal_storage.thermal_storage.ThermalStorage">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">gemini_model.thermal_storage.thermal_storage.</span></span><span class="sig-name descname"><span class="pre">ThermalStorage</span></span><a class="reference internal" href="../_modules/gemini_model/thermal_storage/thermal_storage.html#ThermalStorage"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#gemini_model.thermal_storage.thermal_storage.ThermalStorage" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference internal" href="gemini_model.model_abstract.html#gemini_model.model_abstract.DynamicModel" title="gemini_model.model_abstract.DynamicModel"><code class="xref py py-class docutils literal notranslate"><span class="pre">DynamicModel</span></code></a></p>
+<p>Thermal storage with state of charge, power limits and cycle recovery (RC-09).</p>
+<p>Model initialization (capacity must be set; default type HT-ATES).</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="gemini_model.thermal_storage.thermal_storage.ThermalStorage.calculate_output">
+<span class="sig-name descname"><span class="pre">calculate_output</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">u</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">x</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/gemini_model/thermal_storage/thermal_storage.html#ThermalStorage.calculate_output"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#gemini_model.thermal_storage.thermal_storage.ThermalStorage.calculate_output" title="Link to this definition"></a></dt>
+<dd><p>Calculate the step: actual charge/discharge power, end-of-step energy and losses.</p>
+<p>Inputs <code class="docutils literal notranslate"><span class="pre">u</span></code>: <code class="docutils literal notranslate"><span class="pre">charge_power_w</span></code> or <code class="docutils literal notranslate"><span class="pre">discharge_power_w</span></code> (requested, W, ≥ 0; not both),
+optional <code class="docutils literal notranslate"><span class="pre">time_step_s</span></code>. <code class="docutils literal notranslate"><span class="pre">x</span></code> is the state from <a class="reference internal" href="#gemini_model.thermal_storage.thermal_storage.ThermalStorage.initialize_state" title="gemini_model.thermal_storage.thermal_storage.ThermalStorage.initialize_state"><code class="xref py py-meth docutils literal notranslate"><span class="pre">initialize_state()</span></code></a> /
+<a class="reference internal" href="#gemini_model.thermal_storage.thermal_storage.ThermalStorage.update_state" title="gemini_model.thermal_storage.thermal_storage.ThermalStorage.update_state"><code class="xref py py-meth docutils literal notranslate"><span class="pre">update_state()</span></code></a> (None → initial state). <code class="docutils literal notranslate"><span class="pre">power_th</span></code> is the heat (or cold)
+delivered by discharging; charging draws <code class="docutils literal notranslate"><span class="pre">charge_power_w</span></code> from the plant. Do not add
+<code class="docutils literal notranslate"><span class="pre">power_th</span></code> to the plant’s production totals (the stored heat was produced upstream and
+would be counted twice): use <code class="docutils literal notranslate"><span class="pre">net_heat_to_plant_w</span></code> = discharge - charge.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="gemini_model.thermal_storage.thermal_storage.ThermalStorage.capacity_j">
+<span class="sig-name descname"><span class="pre">capacity_j</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/gemini_model/thermal_storage/thermal_storage.html#ThermalStorage.capacity_j"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#gemini_model.thermal_storage.thermal_storage.ThermalStorage.capacity_j" title="Link to this definition"></a></dt>
+<dd><p>Return the capacity in J.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="gemini_model.thermal_storage.thermal_storage.ThermalStorage.efficiencies">
+<span class="sig-name descname"><span class="pre">efficiencies</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/gemini_model/thermal_storage/thermal_storage.html#ThermalStorage.efficiencies"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#gemini_model.thermal_storage.thermal_storage.ThermalStorage.efficiencies" title="Link to this definition"></a></dt>
+<dd><p>Return <code class="docutils literal notranslate"><span class="pre">(η_c,</span> <span class="pre">η_d)</span></code>; η_d defaults to the storage type’s cycle recovery.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="gemini_model.thermal_storage.thermal_storage.ThermalStorage.initialize_state">
+<span class="sig-name descname"><span class="pre">initialize_state</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">x</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/gemini_model/thermal_storage/thermal_storage.html#ThermalStorage.initialize_state"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#gemini_model.thermal_storage.thermal_storage.ThermalStorage.initialize_state" title="Link to this definition"></a></dt>
+<dd><p>Return the initial state; <code class="docutils literal notranslate"><span class="pre">x</span></code> may carry <code class="docutils literal notranslate"><span class="pre">energy_mwh</span></code> (else <code class="docutils literal notranslate"><span class="pre">initial_soc</span></code>).</p>
+<p>The GEMINI solver passes the component’s inputs here, so other keys are ignored.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="gemini_model.thermal_storage.thermal_storage.ThermalStorage.update_parameters">
+<span class="sig-name descname"><span class="pre">update_parameters</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">parameters</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/gemini_model/thermal_storage/thermal_storage.html#ThermalStorage.update_parameters"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#gemini_model.thermal_storage.thermal_storage.ThermalStorage.update_parameters" title="Link to this definition"></a></dt>
+<dd><p>Update model parameters.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>parameters</strong> (<em>dict</em>) – Parameters dict as defined by the model.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="gemini_model.thermal_storage.thermal_storage.ThermalStorage.update_state">
+<span class="sig-name descname"><span class="pre">update_state</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">u</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">x</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/gemini_model/thermal_storage/thermal_storage.html#ThermalStorage.update_state"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#gemini_model.thermal_storage.thermal_storage.ThermalStorage.update_state" title="Link to this definition"></a></dt>
+<dd><p>Return the state at the end of the step (same computation as calculate_output).</p>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="gemini_model.thermal_storage.html" class="btn btn-neutral float-left" title="6.1.24. gemini_model.thermal_storage" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="gemini_model.well.html" class="btn btn-neutral float-right" title="6.1.25. gemini_model.well" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, TNO.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
