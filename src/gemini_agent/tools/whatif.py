@@ -1078,34 +1078,31 @@ def build_record(
         rejected=[
             RejectedOption(
                 option_id="before",
-                reason="Baseline: the design the run selected, kept for the comparison.",
+                reason="Comparison baseline (not rejected): the design the run selected.",
             )
         ],
     )
 
 
-def _fmt(value: float | None, metric: str) -> str:
-    if value is None:
-        return "n/a"
+def _spec(metric: str) -> str:
+    """Format spec per metric kind: money per MWh 2 dp, days/energy/CO₂ integers, fractions 3 dp."""
+    if metric.endswith("_per_mwh"):
+        return ".2f"
     if metric.endswith("_days"):
-        return f"{value:.0f}"
+        return ".0f"
     if metric.endswith("_frac") or metric == "probability_demand_met":
-        return f"{value:.3f}"
+        return ".3f"
     if metric.startswith("co2") or metric.endswith("_mwh"):
-        return f"{value:,.0f}"
-    return f"{value:.2f}"
+        return ",.0f"
+    return ".2f"
+
+
+def _fmt(value: float | None, metric: str) -> str:
+    return "n/a" if value is None else format(value, _spec(metric))
 
 
 def _fmt_delta(row: TableRow) -> str:
-    if row.delta is None:
-        return "n/a"
-    if row.metric.endswith("_days"):
-        return f"{row.delta:+.0f}"
-    if row.metric.endswith("_frac") or row.metric == "probability_demand_met":
-        return f"{row.delta:+.3f}"
-    if row.metric.startswith("co2") or row.metric.endswith("_mwh"):
-        return f"{row.delta:+,.0f}"
-    return f"{row.delta:+.2f}"
+    return "n/a" if row.delta is None else format(row.delta, "+" + _spec(row.metric))
 
 
 def render_table(result: WhatIfResult) -> str:
@@ -1220,7 +1217,10 @@ def _summary(result: WhatIfResult) -> str:
         row = rows[metric]
         text += f"{label} {_fmt(row.before, metric)} → {_fmt(row.after, metric)}; "
     heat, cool = rows["unmet_heating_days"], rows["unmet_cooling_days"]
-    text += f"unmet {_fmt(heat.after, 'd')}/{_fmt(cool.after, 'd')} d; verdict {verdict}"
+    text += (
+        f"unmet {_fmt(heat.after, heat.metric)}/{_fmt(cool.after, cool.metric)} d; "
+        f"verdict {verdict}"
+    )
     return text[:SUMMARY_MAX_CHARS]
 
 

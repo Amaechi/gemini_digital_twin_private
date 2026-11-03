@@ -114,13 +114,16 @@ def test_db31_lever_changes_lcoh_and_the_run_keeps_its_verdict(smoke_run):
     summary = json.loads((run_dir / "run_summary.json").read_text("utf-8"))
     assert before.verdict == DesignVerdict(summary["verdict"]) == DesignVerdict.ACCEPTED
     assert before.guard_approved and after.guard_approved
-    assert isinstance(after.verdict, DesignVerdict)
-    if after.kpis.unmet_heating_mwh:  # a capped boiler: the hint names the nameplate needed
-        assert (
-            after.required_backup_mw["peak_boiler_mw"]
-            > after.candidate.equipment_sizes["peak_boiler_mw"]
-        )
-        assert any("nameplates that would meet it" in w for w in result.warnings)
+    # On the smoke fixture (C1-opt: HEX + CHP + boiler sized to the base year, no P90 reserve)
+    # a 65 °C return starves the direct HEX and the capped boiler leaves heat unmet, so the
+    # changed design is REJECTED by the verifier (PH-21/PD-01) and the hint names the boiler
+    # nameplate that would meet it. (On the submitted run the DR-11 P90 boiler absorbs it.)
+    assert after.verdict == DesignVerdict.REJECTED and after.kpis.unmet_heating_days > 0
+    assert (
+        after.required_backup_mw["peak_boiler_mw"]
+        > after.candidate.equipment_sizes["peak_boiler_mw"]
+    )
+    assert any("nameplates that would meet it" in w for w in result.warnings)
     assert result.recorded_kpis is not None and result.recorded_kpis.candidate_id == (
         before.candidate.id
     )
@@ -144,9 +147,8 @@ def test_db31_lever_changes_lcoh_and_the_run_keeps_its_verdict(smoke_run):
         for tr_id in option["evidence_ids"]:
             assert list((folder / "tool_results").glob(f"{tr_id}_*.json")), tr_id
     recommended = [o["id"] for o in record["options"] if o["recommended"]]
-    assert len(recommended) == 1
-    if after.verdict == DesignVerdict.REJECTED:
-        assert recommended == ["before"] and "differs" in (folder / "DR-W1.md").read_text("utf-8")
+    assert recommended == ["before"]  # optimiser rule: the REJECTED what-if is not eligible
+    assert "differs" in (folder / "DR-W1.md").read_text("utf-8")
     assert reject_llm_quantities(record["rationale"]) == record["rationale"]  # AG-02: no numbers
 
 
@@ -200,6 +202,8 @@ def test_cli_whatif_prints_the_table_and_exit_codes(smoke_run, capsys):
     result = WhatIfResult.model_validate_json(
         (run_dir / "whatif" / "3" / "whatif.json").read_text("utf-8")
     )
+    lcoh = next(r for r in result.table if r.metric == "lcoh_per_mwh")
+    assert f"| {lcoh.before:.2f} | {lcoh.after:.2f} | {lcoh.delta:+.2f} |" in out  # 2 dp
     assert result.scenario.assumptions == {"DB-32": 24.0, "ECO-CO2-GAS": 51.53}
     assert result.scenario.edits_config and result.after.candidate.cooling_return_degc == 24.0
     assert result.after.kpis is not None and result.after.status == "ok", result.after.reason

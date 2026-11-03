@@ -177,8 +177,8 @@ Output on the submitted run (39 s; margin rows other than the boiler's omitted h
 
 | Metric | Unit | before (C2-opt-robust) | after (C2-opt-robust-w1) | Δ |
 |---|---|---|---|---|
-| LCOH | USD/MWh | 45 | 58 | +14 |
-| LCOC | USD/MWh | 26 | 27 | +0 |
+| LCOH | USD/MWh | 44.59 | 58.42 | +13.83 |
+| LCOC | USD/MWh | 26.31 | 26.51 | +0.20 |
 | CAPEX | MUSD | 30.07 | 29.99 | -0.08 |
 | OPEX | MUSD/yr | 2.28 | 3.51 | +1.22 |
 | CO2 | t/yr | 7,360 | 10,609 | +3,249 |
@@ -199,7 +199,8 @@ Levers (`--set`, repeatable; `whatif --help` lists them with their bounds): `DB-
 (DesignGuard DB-10/11), `concept=<id>` (re-pick a screened candidate of the run). An out-of-limit
 lever is refused with the guard's reason (`doublets=5` → "DB-10: 5 doublets outside 1–3", exit 5);
 an unknown lever lists the valid ones (exit 2). `--budget full` also reruns the TL-15 Monte Carlo
-on the changed design for its P(demand met); `--budget smoke` is the CI day subset (no `DB-30=B`).
+on the changed design for its P(demand met) (the before value is the run's own TL-15 result, as
+`probability_source` records); `--budget smoke` is the CI day subset (no `DB-30=B`).
 The same function is `gemini_agent.tools.whatif.whatif(run_dir, levers, budget) -> WhatIfResult`.
 
 **Laptop LLM run** (needs [Ollama](https://ollama.com); full detail and timings in
