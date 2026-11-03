@@ -16,6 +16,8 @@ runs/*
 !runs/final_policy/
 # tool memo caches (design_cache.sqlite) are not evidence; keep them out of the final run
 runs/final/**/cache/
+runs/final/**/whatif/
+runs/final_policy/whatif/
 .venv/
 .ruff_cache/
 .pytest_cache/

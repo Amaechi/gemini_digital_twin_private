@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 from pathlib import Path
 
@@ -286,16 +287,22 @@ def draw_token_figure(token_summary: dict, out_path: Path) -> None:
     plt.close(fig)
 
 
-def decision_records(run_dir: Path) -> str:
-    """Concatenate the run's Decision Record index and DR-01…DR-11 files, in order."""
+def decision_records(run_dir: Path, out_path: Path = OUT) -> str:
+    """Concatenate the run's Decision Record index and DR-01…DR-11 files, in order.
+
+    The index links ``DR-xx.md`` relative to the run's ``decision_records/`` folder; they are
+    rewritten relative to the report pack's own folder so they resolve from ``out_path``.
+    """
     folder = run_dir / "decision_records"
-    parts = [_read(folder / "index.md").strip()]
+    link_base = os.path.relpath(folder.resolve(), out_path.resolve().parent).replace(os.sep, "/")
+    index = re.sub(r"\]\((DR-\d+\.md)\)", rf"]({link_base}/\1)", _read(folder / "index.md").strip())
+    parts = [index]
     for path in sorted(folder.glob("DR-*.md"), key=lambda p: int(p.stem.split("-")[1])):
         parts.append(_read(path).strip())
     return "\n\n".join(parts)
 
 
-def build(run_dir: Path) -> str:
+def build(run_dir: Path, out_path: Path = OUT) -> str:
     """Build the whole report pack as Markdown."""
     draft = _read(run_dir / "report_draft.md")
     run_summary = _json(run_dir / "run_summary.json")
@@ -352,7 +359,7 @@ def build(run_dir: Path) -> str:
 
     out.append("## 7. Decision Records DR-01…DR-11\n")
     out.append(f"Source: `{cite}/decision_records/` (index and one file per record).\n")
-    out.append(decision_records(run_dir) + "\n")
+    out.append(decision_records(run_dir, out_path) + "\n")
 
     out.append("## 8. LLM calls and tokens of the final run\n")
     out.append(f"Source: `{cite}/token_summary.json` (every call: `{cite}/llm_calls.jsonl`).\n")
@@ -407,7 +414,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--run-dir", type=Path, default=DEFAULT_RUN)
     parser.add_argument("--out", type=Path, default=OUT)
     args = parser.parse_args(argv)
-    text = build(args.run_dir.resolve())
+    text = build(args.run_dir.resolve(), args.out.resolve())
     args.out.write_text(text, encoding="utf-8")
     print(f"wrote {args.out} ({len(text.encode('utf-8')) / 1024:.1f} KB)")
     return 0

@@ -264,6 +264,13 @@ A commercial comparison model is not available: `config/llm.yaml` has only the O
 
 What was not checked: real Ollama calls, the settings in 7.2, real timings, and the git commands (the `.gitignore` rule for `runs/final/**/cache/` was checked with `git check-ignore`).
 
+### 7.9 What-if on the final run (post-submission, optional)
+`cli whatif` changes one or more bounded design levers of a finished run's selected design, reruns the TL-12 year, TL-14 economics (+ CO₂ vs C0, exergy) and the DesignGuard/DesignVerifier on the changed design, and prints a before → after table. It reads `runs/final/final_llm/` and writes only `runs/final/final_llm/whatif/<n>/` (git-ignored; the submitted files stay byte-identical), so it is safe on the submitted run. No LLM is involved.
+```bash
+PYTHONPATH=src python -m gemini_agent.cli whatif --run-id final_llm --runs-dir runs/final --set DB-31=65 --budget quick
+```
+Levers (`--set`, repeatable; `whatif --help` lists them with their bounds): `DB-31`, `DB-32` (return temperatures, register range), `DB-30=A|B`, `ECO-CO2-GAS`, `CHP-EL-FRAC` (register range), `OPT-ROBUST-BACKUP=on|off` (the run's TL-15 robust nameplates), `design_flow_m3h`, `doublets` (DesignGuard DB-10/11), `concept=<id>` (re-pick a screened candidate of the run). `--budget quick` (default) simulates the full year on both sides (≈ 1–3 min on a laptop); `--budget full` also reruns the TL-15 Monte Carlo on the changed design for P(demand met) (≈ the P8 time of the run). An out-of-limit lever is refused with the guard's reason (exit 5); an unknown lever lists the valid ones (exit 2). Outputs: `whatif.json`, `whatif.md`, `DR-W<n>.json/.md` (Decision-Record layout, evidence keys), `tool_results/`.
+
 ## 8. Submission
 1. GitHub → fork `GEMINI-Digital-Twin/gemini-geothermal-suite-open` to your account (public).
 2. Push the final branch there:

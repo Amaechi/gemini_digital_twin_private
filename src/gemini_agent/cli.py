@@ -7,6 +7,8 @@ Usage::
     PYTHONPATH=src python -m gemini_agent.cli run --engine policy
     PYTHONPATH=src python -m gemini_agent.cli run --engine policy --input-mode pause --run-id r1
     PYTHONPATH=src python -m gemini_agent.cli resume --run-id r1 --answer 55
+    PYTHONPATH=src python -m gemini_agent.cli whatif --run-id final_llm --runs-dir runs/final \
+        --set DB-31=65 --budget quick
 
 ``--engine policy`` is the deterministic engine used in cloud sessions, tests and CI; it never
 calls an LLM. ``--engine llm`` uses a local Ollama model (spec §4.3) and only runs on a laptop;
@@ -15,6 +17,11 @@ if the model fails after its bounded retries, each step falls back to the policy
 Input modes (AG-05): ``assume`` records labelled register defaults (non-interactive, default when
 stdin is not a terminal), ``ask`` prompts on the terminal, ``pause`` saves the run and exits with
 code 3 until ``resume --answer`` is given.
+
+``whatif`` (post-submission) changes bounded design levers of a finished run's selected design,
+reruns the year, economics and the verifier, and writes ``runs/<id>/whatif/<n>/`` without
+touching the run (``gemini_agent.tools.whatif``). Exit codes: 0 done, 2 usage (unknown lever,
+bad value, not a run), 5 refused (lever outside its bound, with the guard's reason).
 """
 
 from __future__ import annotations
@@ -45,6 +52,7 @@ from gemini_agent.runner.design_runner import (
 from gemini_agent.runner.toolbox import default_toolbox
 from gemini_agent.schemas.config import CONFIG_MODELS, load_config
 from gemini_agent.schemas.decision import InputRequest, RunStatus
+from gemini_agent.tools import whatif as whatif_tool
 
 EXIT_OK = 0
 EXIT_CONFIG_ERROR = 1
@@ -119,6 +127,38 @@ def build_parser() -> argparse.ArgumentParser:
 
     check = sub.add_parser("validate-config", help="load every config/*.yaml into its schema")
     check.add_argument("--config-dir", type=Path, default=None, help="override config/ directory")
+
+    what = sub.add_parser(
+        "whatif",
+        help="what-if on a finished run: change a design lever, rerun year + economics + verifier",
+        description=(
+            "Apply bounded design levers to the selected design of a finished run, rerun the "
+            "TL-12 year, TL-14 economics (+ CO2, exergy) and the DesignGuard/DesignVerifier, and "
+            "print a before -> after table. Writes runs/<id>/whatif/<n>/; the run's own files "
+            "are never changed.\nLevers:\n" + whatif_tool.lever_help()
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    what.add_argument("--run-id", required=True, help="finished run (runs/<run-id>/)")
+    what.add_argument(
+        "--runs-dir", type=Path, default=None, help=f"runs directory (default {RUNS_ROOT})"
+    )
+    what.add_argument("--config-dir", type=Path, default=None, help="override config/ directory")
+    what.add_argument(
+        "--set",
+        dest="levers",
+        action="append",
+        metavar="LEVER=VALUE",
+        default=[],
+        help="lever to change (repeatable), e.g. --set DB-31=65 --set doublets=3",
+    )
+    what.add_argument(
+        "--budget",
+        choices=list(whatif_tool.BUDGETS),
+        default=whatif_tool.DEFAULT_BUDGET,
+        help="quick = full year (default); full = also the TL-15 Monte Carlo (P(demand met)); "
+        "smoke = CI day subset",
+    )
     return parser
 
 
@@ -260,6 +300,40 @@ def _resume(args: argparse.Namespace) -> int:
     return _report(result)
 
 
+def _whatif(args: argparse.Namespace) -> int:
+    runs_root = args.runs_dir or RUNS_ROOT
+    try:
+        result = whatif_tool.whatif(
+            runs_root / args.run_id, args.levers, args.budget, config_dir=args.config_dir
+        )
+    except whatif_tool.WhatIfRefused as exc:
+        print(f"refused: {exc}", file=sys.stderr)
+        return EXIT_REFUSED
+    except (whatif_tool.UnknownLever, ValueError, OSError) as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return EXIT_USAGE
+    print(
+        f"what-if {result.index} on run {result.run_id}: {whatif_tool.format_levers(result.levers)}"
+    )
+    for item in result.applied:
+        print(f"  {item.lever}: {item.base_value!r} -> {item.value!r} ({item.mechanism})")
+    print()
+    print(whatif_tool.render_table(result))
+    print()
+    for outcome in (result.before, result.after):
+        line = f"{outcome.label}: {outcome.status}"
+        if outcome.reason:
+            line += f" - {outcome.reason}"
+        if outcome.verifier_summary:
+            line += f"; {outcome.verifier_summary}"
+        print(line)
+    for warning in result.warnings:
+        print(f"warning: {warning}")
+    print(f"record: {result.record.dr_id} ({result.record.title})")
+    print(f"outputs: {runs_root / args.run_id / whatif_tool.WHATIF_DIR / str(result.index)}")
+    return EXIT_OK
+
+
 def _exit_on_sigterm(signum: int, frame: object) -> None:
     """SIGTERM (CI time limit, kill) → SystemExit, so context managers stop worker pools."""
     raise SystemExit(128 + signum)
@@ -278,6 +352,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             return _run(args)
         if args.command == "resume":
             return _resume(args)
+        if args.command == "whatif":
+            return _whatif(args)
         parser.print_help()
         return EXIT_OK
     finally:
