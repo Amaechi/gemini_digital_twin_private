@@ -27,7 +27,9 @@ the user said ("sixty-five" → "65"), the runner keeps every limit check, the `
 text is the verifier's own stored summary (``ui.run_view.run_verifier``) plus the runner's
 question.
 
-Post-run dialogue (FINAL_SPRINT §I) plugs into :attr:`VoiceSession.dialogue_hook`.
+The post-run dialogue (FINAL_SPRINT §I, ``gemini_agent.ui.dialogue``: what-if by voice) plugs
+into :attr:`VoiceSession.dialogue_hook`; :data:`DIALOGUE_DECISION_ID` is its one question form
+(adopt / another / stop) the normalisers understand.
 """
 
 from __future__ import annotations
@@ -73,6 +75,10 @@ MISSING_DEPENDENCY = (
 )
 NORMALISER_AGENT = "voice_normaliser"
 """``agent`` field of the normaliser's records in ``llm_calls.jsonl``."""
+DIALOGUE_DECISION_ID = "DIALOGUE-DECISION"
+"""Request id of the dialogue's "Adopt it, try another, or stop?" question (``ui.dialogue``)."""
+DIALOGUE_DECISIONS: tuple[str, ...] = ("adopt", "another", "stop")
+"""Its three answers, in the runner-free form the dialogue acts on."""
 
 
 class VoiceDependencyError(RuntimeError):
@@ -256,6 +262,8 @@ def answer_spec(request: InputRequest) -> AnswerSpec:
     default = request.default
     if request.request_id == APPROVAL_ID:
         return AnswerSpec(kind="yes_no", options=("yes", "no"))
+    if request.request_id == DIALOGUE_DECISION_ID:  # no default: nothing is adopted by silence
+        return AnswerSpec(kind="choice", options=DIALOGUE_DECISIONS)
     if request.assumption_id == BASIS_CONFIRM_ID:
         return AnswerSpec(kind="choice", options=("keep", "change"), default_text="keep")
     if request.assumption_id == INPUT_DEFAULTS_ID:
@@ -554,7 +562,7 @@ class LLMNormaliser:
 # ----------------------------------------------------------------------------- the session
 
 ConfirmFn = Callable[[str], bool]
-DialogueHook = Callable[[RunResult], None]
+DialogueHook = Callable[[RunResult], Any]
 MAX_ATTEMPTS = 3
 """Recordings per question before the runner's default applies (as an empty typed answer)."""
 REQUEST_PROMPT = (
@@ -595,16 +603,17 @@ class VoiceSession:
     dialogue_hook: DialogueHook | None = None
     """FINAL_SPRINT §I hook: called once with the ``RunResult`` after the run and its report,
     while the runner (and the Ollama model shared with ``normaliser``) is still open, so the hook
-    may make LLM calls. The dialogue loop (speak "What would you like to change?" → record →
-    lever mapping → what-if → adopt/try another/stop) is implemented there; this PR only
-    reserves the call."""
+    may make LLM calls. ``cli talk`` installs ``ui.dialogue.DialogueLoop.run`` here (speak "What
+    would you like to change?" → record → lever mapping → what-if → adopt / try another / stop);
+    its return value is kept by the loop object, not by this session."""
 
     def say(self, text: str) -> None:
         """Print ``text`` and speak it (nothing is spoken that is not printed)."""
         print(text, file=self.out or sys.stdout)
         self.speaker.say(text)
 
-    def _hear(self) -> str:
+    def hear(self) -> str:
+        """One transcript (whitespace-normalised, '' when nothing was heard), recorded."""
         heard = " ".join(str(self.listen() or "").split())
         if heard:
             self.transcripts.append(heard)
@@ -614,7 +623,7 @@ class VoiceSession:
         """Record the design request (step a) and confirm its transcript; None if given up."""
         self.say(REQUEST_PROMPT)
         for _ in range(self.max_attempts):
-            heard = self._hear()
+            heard = self.hear()
             if not heard:
                 self.say(NOTHING_HEARD)
                 continue
@@ -656,7 +665,7 @@ class VoiceSession:
         )
         self.speaker.say(self.question_text(request))
         for _ in range(self.max_attempts):
-            heard = self._hear()
+            heard = self.hear()
             if not heard:
                 self.say(NOTHING_HEARD)
                 continue
@@ -692,6 +701,8 @@ class VoiceSession:
 
 
 __all__ = [
+    "DIALOGUE_DECISIONS",
+    "DIALOGUE_DECISION_ID",
     "AnswerSpec",
     "LLMNormaliser",
     "Microphone",

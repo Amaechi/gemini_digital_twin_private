@@ -48,6 +48,11 @@ keywords with ``--engine policy``), echoed and confirmed on the keyboard before 
 validates it as usual; the P10 approval is spoken with the verifier's summary. The optional
 packages live in ``requirements-voice.txt``; ``--typed`` uses the keyboard instead of a
 microphone. The runner, DesignGuard, verifier and approval are the same as for ``run``.
+After the P10 approval — or at once when ``--run-id`` names a completed run — the voice dialogue
+(``gemini_agent.ui.dialogue``) asks "What would you like to change?", maps each request to one
+bounded what-if lever with the review loop's Lead Engineer schema, runs the what-if, speaks a
+three-sentence before → after summary and asks "Adopt it, try another, or stop?" (adopt = the
+review loop's P6–P9 rerun and DR-12; max 5 rounds; ``--no-dialogue`` skips it).
 """
 
 from __future__ import annotations
@@ -83,6 +88,7 @@ from gemini_agent.schemas.config import CONFIG_MODELS, load_config
 from gemini_agent.schemas.decision import InputRequest, RunStatus
 from gemini_agent.speech import Speaker, request_text, speaking_ask
 from gemini_agent.tools import whatif as whatif_tool
+from gemini_agent.ui import dialogue as voice_dialogue
 from gemini_agent.ui import server as ui_server
 from gemini_agent.ui import voice as voice_ui
 
@@ -239,12 +245,26 @@ def build_parser() -> argparse.ArgumentParser:
             "recording; faster-whisper transcribes it offline), confirm the transcript, then "
             "answer every question of the run by voice (spoken with its default, normalised into "
             "the expected form, echoed and confirmed with [Y/n]) up to the P10 approval. Speech "
-            "output uses the macOS `say` command (printed only elsewhere). Needs the optional "
-            f"packages of {voice_ui.VOICE_REQUIREMENTS} unless --typed is given."
+            "output uses the macOS `say` command (printed only elsewhere). After the approval "
+            "(or at once on a completed run given with --run-id) the voice dialogue asks what to "
+            "change, computes each change as a what-if and offers to adopt it (P6-P9 rerun, "
+            f"DR-12; max {voice_dialogue.MAX_ROUNDS} rounds). Needs the optional packages of "
+            f"{voice_ui.VOICE_REQUIREMENTS} unless --typed is given."
         ),
     )
     _add_engine_args(talk, speak=False)
-    talk.add_argument("--run-id", default=None, help="run identifier (outputs in runs/<run_id>/)")
+    talk.add_argument(
+        "--run-id",
+        default=None,
+        help="run identifier (outputs in runs/<run_id>/); a completed run starts the what-if "
+        "dialogue on it directly (nothing outside runs/<run_id>/whatif/ is written unless a "
+        "change is adopted)",
+    )
+    talk.add_argument(
+        "--no-dialogue",
+        action="store_true",
+        help="end after the P10 approval without the post-run what-if dialogue",
+    )
     talk.add_argument(
         "--stt-model",
         default=voice_ui.STT_MODEL,
@@ -309,6 +329,19 @@ def _stored_engine(runs_root: Path, run_id: str) -> tuple[str | None, str]:
     return engine, str(record.state.get("model_tag", "") or "")
 
 
+def _run_status(runs_root: Path, run_id: str) -> str | None:
+    """Stored status of ``runs/<run_id>/`` (None when no run is stored there)."""
+    path = runs_root / run_id / STORE_FILE
+    if not path.exists():
+        return None
+    store = SQLiteEventStore(path)
+    try:
+        record = store.get_run(run_id)
+    finally:
+        store.close()
+    return None if record is None else str(record.state.get("status", "")) or None
+
+
 def _speaker(args: argparse.Namespace) -> Speaker:
     return Speaker(bool(getattr(args, "speak", False)))
 
@@ -321,12 +354,15 @@ def _runner(
     speaker: Speaker | None = None,
     ask_fn: AskFn | None = None,
     model: Any = None,
+    log_dir: Path | None = None,
 ) -> DesignRunner:
     """Build the runner of ``run``/``resume``/``serve``/``talk``.
 
     ``ask_fn`` replaces the terminal prompt (``talk`` passes the voice session's ``ask``);
     ``model`` is a prebuilt Pydantic AI model shared with another caller (``talk`` shares the
-    Ollama model with its normaliser so the HTTP client is closed exactly once, by the engine).
+    Ollama model with its normaliser so the HTTP client is closed exactly once, by the engine);
+    ``log_dir`` moves the engine's ``llm_calls.jsonl`` (default ``runs/<run_id>/``; the dialogue
+    on a completed run logs under its ``whatif/`` so the run's own files stay untouched).
     """
     llm_config = load_config("llm", args.config_dir)
     runs_root = args.runs_dir or RUNS_ROOT
@@ -338,7 +374,7 @@ def _runner(
     engine = create_decision_engine(
         engine_name,
         llm_config,
-        logger=LLMLogger(runs_root / run_id),
+        logger=LLMLogger(log_dir or runs_root / run_id),
         run_id=run_id,
         model=model,
         model_tag=args.model or stored_tag,
@@ -566,7 +602,13 @@ def _serve(args: argparse.Namespace) -> int:
 
 
 def _talk(args: argparse.Namespace) -> int:
-    """``talk``: the push-to-talk loop around the ordinary ``run`` (``gemini_agent.ui.voice``)."""
+    """``talk``: the push-to-talk loop around the ordinary ``run`` (``gemini_agent.ui.voice``).
+
+    With ``--run-id`` naming a completed run the request and the run are skipped and only the
+    what-if dialogue (``gemini_agent.ui.dialogue``) runs on it; a stored run in any other state
+    is refused (resume it with ``resume`` first). A new run gets the dialogue after its approval
+    unless ``--no-dialogue`` is given.
+    """
     try:
         llm_config = load_config("llm", args.config_dir)
     except (OSError, yaml.YAMLError, ValidationError) as exc:
@@ -575,6 +617,16 @@ def _talk(args: argparse.Namespace) -> int:
     engine_name = args.engine or llm_config.engine
     run_id = args.run_id or f"{datetime.now(UTC):%Y%m%dT%H%M%SZ}-{engine_name}-talk"
     runs_root = args.runs_dir or RUNS_ROOT
+    run_dir = runs_root / run_id
+    status = _run_status(runs_root, run_id) if args.run_id else None
+    finished = status == RunStatus.COMPLETED.value
+    if status is not None and not finished:
+        print(
+            f"error: run '{run_id}' is {status}; the voice dialogue needs a completed run "
+            "(answer a paused run with `resume` first)",
+            file=sys.stderr,
+        )
+        return EXIT_USAGE
     speaker = Speaker(not args.mute)
     try:
         listen = (
@@ -591,36 +643,68 @@ def _talk(args: argparse.Namespace) -> int:
         speaker=speaker,
         listen=listen,
         normaliser=voice_ui.PolicyNormaliser(),
-        run_dir=runs_root / run_id,
+        run_dir=run_dir,
     )
-    prompt = session.request_prompt()
-    if prompt is None:
-        if not session.confirm("No request was confirmed. Use the default challenge brief?"):
-            print("talk: no request; nothing started", file=sys.stderr)
-            return EXIT_USAGE
-        prompt = ""
+    prompt = ""
+    if not finished:
+        prompt = session.request_prompt()
+        if prompt is None:
+            if not session.confirm("No request was confirmed. Use the default challenge brief?"):
+                print("talk: no request; nothing started", file=sys.stderr)
+                return EXIT_USAGE
+            prompt = ""
     # Only now is anything written under runs/<run_id>/ (the normaliser's logger creates it).
+    # On a completed run every log of the dialogue goes under its whatif/ folder.
+    log_dir = run_dir / whatif_tool.WHATIF_DIR if finished else run_dir
     model: Any = None
     normaliser: voice_ui.Normaliser = session.normaliser
-    if engine_name == "llm":
+    stored_engine, stored_tag = _stored_engine(runs_root, run_id) if finished else (None, "")
+    if (args.engine or stored_engine or llm_config.engine) == "llm":
         # Looked up on the module so tests (and the test-wide real-LLM block) can replace it.
-        model = agent_engine.build_ollama_model(llm_config, "orchestrator", args.model or "")
-        normaliser = voice_ui.LLMNormaliser(
-            llm_config, model, LLMLogger(runs_root / run_id), run_id=run_id
+        # On a completed run the normaliser shares the run's stored model tag with the runner.
+        model = agent_engine.build_ollama_model(
+            llm_config, "orchestrator", args.model or stored_tag
         )
+        normaliser = voice_ui.LLMNormaliser(llm_config, model, LLMLogger(log_dir), run_id=run_id)
         session.normaliser = normaliser
-    runner = _runner(args, run_id, ask_fn=session.ask, model=model)
+    runner = _runner(
+        args, run_id, resuming=finished, ask_fn=session.ask, model=model, log_dir=log_dir
+    )
+    budget = getattr(args, "budget", None)
+    loop: voice_dialogue.DialogueLoop | None = None
+    if not args.no_dialogue:
+        loop = voice_dialogue.DialogueLoop(
+            session,
+            runner,
+            run_id,
+            budget=budget if budget in whatif_tool.BUDGETS else whatif_tool.DEFAULT_BUDGET,
+            log_path=run_dir / whatif_tool.WHATIF_DIR / voice_dialogue.DIALOGUE_FILE,
+            adopt_block=voice_dialogue.submitted_run_reason(run_dir),
+        )
+        session.dialogue_hook = loop.run
     try:
-        result = runner.start(prompt, run_id=run_id, input_mode="ask", model_tag=args.model or "")
-        code = _report(result, speaker)
+        if finished:
+            result = runner.result(run_id)
+            print(
+                f"run {run_id}: {result.status.value} (phase {result.phase.value}); selected "
+                f"{result.selected_id}, verdict {result.verdict}, approval {result.approval}"
+            )
+            code = EXIT_OK
+        else:
+            result = runner.start(
+                prompt, run_id=run_id, input_mode="ask", model_tag=args.model or ""
+            )
+            code = _report(result, speaker)
+        # FINAL_SPRINT §I: the post-run voice dialogue (what-if by voice) runs here, before the
+        # runner closes the shared model, so the loop can still make LLM calls.
+        session.after_run(result)
+        if loop is not None and loop.summary.adopted and loop.summary.last_result is not None:
+            code = _report(loop.summary.last_result, speaker)  # the rerun's status and approval
         if isinstance(normaliser, voice_ui.LLMNormaliser):
             print(
                 f"voice: {normaliser.calls} normaliser LLM calls, {normaliser.fallbacks} policy "
                 f"fallbacks ({len(session.transcripts)} transcripts)"
             )
-        # FINAL_SPRINT §I: the post-run voice dialogue loop (what-if by voice) starts here,
-        # before the runner closes the shared model, so the loop can still make LLM calls.
-        session.after_run(result)
     except ValueError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return EXIT_USAGE
