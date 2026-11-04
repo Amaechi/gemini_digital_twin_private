@@ -299,3 +299,26 @@ A3 `config/assumptions.yaml` · A4 `runs/final/final_llm/tool_results/` · A5 DR
 `REPORT.md` §7 · A6 reference cards · A7 `docs/results/s7_demo/` · A8 README limitations and
 API placeholders · settings study `docs/results/SETTINGS_STUDY.md` (thinking on: 68 % validity,
 11 fallbacks, 1 006 s; 32 K context: identical to 64 K).
+
+---
+
+## Slide 11 — Talking to a finished run (added after review)
+
+**Claim.** Three front-ends share one bounded schema: `cli whatif --set LEVER=value`, the web
+Design Commander (`cli serve`: runs, phases, tokens, records, answer and approve; no lever
+controls) and push-to-talk voice (`cli talk`: Enter to record, Enter to stop, Whisper
+transcribes, the assistant echoes "I heard …" and asks "apply? [Y/n]").
+
+**Sentence shape.** One lever keyword, one direction or one number in digits, nothing else:
+"change the return temperature to 65", "cooling return 26", "one more doublet", "the boiler is
+too big", "drill deeper", "flow 200 per doublet", "try C3 instead". Decisions are single words:
+yes / no at the approval; adopt / another / stop after a what-if.
+
+**Gotchas.** Digits not words; no unit conversion; one lever per sentence; Enter at the final
+approval records "pending"; the model never computes, it only maps words to a lever id.
+
+Full detail, including the sentences that fail and why: `docs/results/DECK_QA.md` §3.
+
+## Slide 12 — Appendix
+Unchanged from the appendix pointers above; row A10 now points to `SPEAKER_NOTES.md` and
+`DECK_QA.md` (glossary and questions).
