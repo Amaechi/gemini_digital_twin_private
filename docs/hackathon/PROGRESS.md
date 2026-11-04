@@ -37,6 +37,8 @@ Keep it ≤ 20 KB (the hand-off between sessions; old detail: merged PRs, `git l
 | Feature E | Interactive design review loop (DR-12) | in review | [#36](/Amaechi/gemini_digital_twin_private/pull/36) | `cli run --review`; P9b objection → one what-if lever → `whatif` → adopt (P6–P9 rerun, TL-13 pinned) or keep; DR-12 |
 | L-3 | Local: second full LLM run (qwen3.6:27b, `--budget full`) | done (fac3846) | [#37](/Amaechi/gemini_digital_twin_private/pull/37) | `runs/final_qwen27b/final_llm`: C2-opt-robust ACCEPTED, approval pending (Enter at P10); 37 calls, 136 882 tokens, 7 fallbacks (all DR criterion-id rejections: DR-01/02/03/05/08/09/10), 0/26 stubs vs gemma4 34 / 99 301 / 2; cache dropped (`runs/**/cache/`); README S11 paragraph |
 
+Latest full suite (L-3, second-model + main, 11-04): `PYTHONPATH=src python -m pytest -q unit_test/gemini_model unit_test/gemini_simulator unit_test/gemini_agent -x` → **1467 passed, 8 warnings in 566 s**. `validate_submission` READY (21 pass, 0 fail, WARN SUB-14, MANUAL SUB-23/24); final run resolved to `runs/final/final_llm` only (`runs/final_qwen27b` is not read).
+
 Latest full suite (Feature E after merging main with #34/#35, 11-04): `PYTHONPATH=src python -m pytest -q unit_test/gemini_model unit_test/gemini_simulator unit_test/gemini_agent -x` → **1467 passed, 8 warnings in 498 s** (incl. 42 review + 38 voice tests). `validate_submission --pytest` READY (22 pass, 0 fail, WARN SUB-14, MANUAL SUB-23, SUB-24 PASS).
 
 ## Decisions log (newest first)
