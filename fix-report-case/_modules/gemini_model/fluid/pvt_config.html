@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>gemini_model.fluid.pvt_config &mdash; GEMINI Geothermal Digital Twin (fix-report-case)</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=19f00094" />
+
+  
+  <!--[if lt IE 9]>
+    <script src="../../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+        <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+        <script src="../../../_static/documentation_options.js?v=bffb45cf"></script>
+        <script src="../../../_static/doctools.js?v=9a2dae69"></script>
+        <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            GEMINI Geothermal Digital Twin
+          </a>
+              <div class="version">
+                fix-report-case
+              </div>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Table of Contents</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../index_about_gemini.html">1. About GEMINI</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../index_getting_started.html">2. Getting started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../index_setup.html">3. Set-up</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../index_applications.html">4. Applications</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../index_models.html">5. Models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../index_sourcecode.html">6. Source code documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../glossary.html">7. Glossary</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">GEMINI Geothermal Digital Twin</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">gemini_model.fluid.pvt_config</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for gemini_model.fluid.pvt_config</h1><div class="highlight"><pre>
+<span></span><span class="sd">"""Project-JSON-settable PVT properties for the well models (GM-01).</span>
+
+<span class="sd">GEMINI's :class:`~gemini_model.fluid.pvt_water_stp.PVTConstantSTP` hard-codes</span>
+<span class="sd">fresh water at standard conditions (rho 1000 kg/m3, mu 1e-3 Pa.s, c_p</span>
+<span class="sd">4217.4 J/kg.K). The design-basis brine is heavier and less viscous</span>
+<span class="sd">(rho 1030 kg/m3, mu 0.40e-3 Pa.s [P, DB-08]; c_p 4100 J/kg.K [A, DB-33]),</span>
+<span class="sd">which adds about 7.4 bar of hydrostatic head over 2.5 km.</span>
+
+<span class="sd">This module turns an optional ``"pvt"`` block in a component's project-JSON</span>
+<span class="sd">parameters into a configured ``PVTConstantSTP``. The same block is the single</span>
+<span class="sd">source of truth for the primary-loop liquid density and heat capacity:</span>
+<span class="sd">:mod:`gemini_simulator.kpi` reads it from the producer well, and</span>
+<span class="sd">:func:`heat_exchanger_fluid_parameters` gives the matching parameters to set on</span>
+<span class="sd">the heat exchanger, boiler or CHP (the project builder must copy them there;</span>
+<span class="sd">``kpi.fluid_consistency_issues`` reports a mismatch).</span>
+
+<span class="sd">A ``"pvt"`` block may use the native ``PVTConstantSTP`` keys (``RHOL``,</span>
+<span class="sd">``VISL``, ``CPL`` ...) or the unit-suffixed aliases in</span>
+<span class="sd">:data:`PVT_PARAMETER_ALIASES`. Keys that start with ``_`` are comments and are</span>
+<span class="sd">ignored. An empty or missing block gives exactly the GEMINI defaults.</span>
+
+<span class="sd">Source: RC-01 "Inputs" and validation tests (hydrostatic head 252.6 bar for</span>
+<span class="sd">1030 kg/m3 over 2500 m; 7.36 bar more than water).</span>
+<span class="sd">"""</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">math</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">numbers</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">gemini_model.fluid.pvt_water_stp</span><span class="w"> </span><span class="kn">import</span> <span class="n">PVTConstantSTP</span>
+
+<span class="c1"># Unit-suffixed alias -&gt; native PVTConstantSTP parameter key.</span>
+<span class="n">PVT_PARAMETER_ALIASES</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s2">"liquid_density_kg_m3"</span><span class="p">:</span> <span class="s2">"RHOL"</span><span class="p">,</span>
+    <span class="s2">"liquid_viscosity_pa_s"</span><span class="p">:</span> <span class="s2">"VISL"</span><span class="p">,</span>
+    <span class="s2">"liquid_specific_heat_j_kgk"</span><span class="p">:</span> <span class="s2">"CPL"</span><span class="p">,</span>
+    <span class="s2">"liquid_thermal_conductivity_w_mk"</span><span class="p">:</span> <span class="s2">"TCL"</span><span class="p">,</span>
+    <span class="s2">"gas_density_kg_m3"</span><span class="p">:</span> <span class="s2">"RHOG"</span><span class="p">,</span>
+    <span class="s2">"gas_viscosity_pa_s"</span><span class="p">:</span> <span class="s2">"VISG"</span><span class="p">,</span>
+    <span class="s2">"gas_specific_heat_j_kgk"</span><span class="p">:</span> <span class="s2">"CPG"</span><span class="p">,</span>
+    <span class="s2">"gas_thermal_conductivity_w_mk"</span><span class="p">:</span> <span class="s2">"TCG"</span><span class="p">,</span>
+    <span class="s2">"gas_mass_fraction"</span><span class="p">:</span> <span class="s2">"GMF"</span><span class="p">,</span>
+    <span class="s2">"surface_tension_n_m"</span><span class="p">:</span> <span class="s2">"SIGMA"</span><span class="p">,</span>
+<span class="p">}</span>
+
+<span class="c1"># Native keys that must be strictly positive (a zero or negative value would</span>
+<span class="c1"># divide by zero or flip the sign of a pressure/heat term; Beggs-Brill uses</span>
+<span class="c1"># (rho_l / SIGMA) ** 0.25).</span>
+<span class="n">_STRICTLY_POSITIVE_KEYS</span> <span class="o">=</span> <span class="p">(</span><span class="s2">"RHOL"</span><span class="p">,</span> <span class="s2">"RHOG"</span><span class="p">,</span> <span class="s2">"VISL"</span><span class="p">,</span> <span class="s2">"VISG"</span><span class="p">,</span> <span class="s2">"CPL"</span><span class="p">,</span> <span class="s2">"CPG"</span><span class="p">,</span> <span class="s2">"TCL"</span><span class="p">,</span> <span class="s2">"TCG"</span><span class="p">,</span> <span class="s2">"SIGMA"</span><span class="p">)</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_native_keys</span><span class="p">():</span>
+<span class="w">    </span><span class="sd">"""Return the parameter keys a default ``PVTConstantSTP`` accepts."""</span>
+    <span class="k">return</span> <span class="nb">frozenset</span><span class="p">(</span><span class="n">PVTConstantSTP</span><span class="p">()</span><span class="o">.</span><span class="n">parameters</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="normalise_pvt_parameters">
+<a class="viewcode-back" href="../../../codedocumentation/gemini_model.fluid.pvt_config.html#gemini_model.fluid.pvt_config.normalise_pvt_parameters">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">normalise_pvt_parameters</span><span class="p">(</span><span class="n">pvt_parameters</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Validate a ``"pvt"`` block and map it onto native ``PVTConstantSTP`` keys.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    pvt_parameters: dict or None</span>
+<span class="sd">        The ``"pvt"`` block from a component's project-JSON parameters.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    dict</span>
+<span class="sd">        Native-key overrides (empty for ``None`` or an empty block).</span>
+
+<span class="sd">    Raises</span>
+<span class="sd">    ------</span>
+<span class="sd">    TypeError</span>
+<span class="sd">        If the block is not a dict, a key is not a string, or a value is not</span>
+<span class="sd">        a real number.</span>
+<span class="sd">    ValueError</span>
+<span class="sd">        If a key is unknown, an alias and its native key disagree, a value is</span>
+<span class="sd">        not finite, a density/viscosity/heat capacity/conductivity/surface</span>
+<span class="sd">        tension is not positive, or ``GMF`` is outside ``[0, 1)``.</span>
+
+<span class="sd">    Python and numpy real numbers (``int``, ``float``, ``np.int64``,</span>
+<span class="sd">    ``np.float32`` ...) are accepted; booleans are not.</span>
+<span class="sd">    """</span>
+    <span class="k">if</span> <span class="n">pvt_parameters</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">return</span> <span class="p">{}</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">pvt_parameters</span><span class="p">,</span> <span class="nb">dict</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"'pvt' must be a dict, got </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">pvt_parameters</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2">."</span><span class="p">)</span>
+
+    <span class="n">native_keys</span> <span class="o">=</span> <span class="n">_native_keys</span><span class="p">()</span>
+    <span class="n">normalised</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">pvt_parameters</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"'pvt' keys must be strings, got </span><span class="si">{</span><span class="n">key</span><span class="si">!r}</span><span class="s2">."</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">key</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">"_"</span><span class="p">):</span>
+            <span class="k">continue</span>  <span class="c1"># comment/description key, same convention as project JSON</span>
+        <span class="n">native</span> <span class="o">=</span> <span class="n">PVT_PARAMETER_ALIASES</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="n">key</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">native</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">native_keys</span><span class="p">:</span>
+            <span class="n">allowed</span> <span class="o">=</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">native_keys</span> <span class="o">|</span> <span class="nb">set</span><span class="p">(</span><span class="n">PVT_PARAMETER_ALIASES</span><span class="p">))</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Unknown 'pvt' key '</span><span class="si">{</span><span class="n">key</span><span class="si">}</span><span class="s2">'. Allowed keys: </span><span class="si">{</span><span class="s1">', '</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">allowed</span><span class="p">)</span><span class="si">}</span><span class="s2">."</span><span class="p">)</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="nb">bool</span><span class="p">)</span> <span class="ow">or</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">numbers</span><span class="o">.</span><span class="n">Real</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"'pvt' value for '</span><span class="si">{</span><span class="n">key</span><span class="si">}</span><span class="s2">' must be a number, got </span><span class="si">{</span><span class="n">value</span><span class="si">!r}</span><span class="s2">."</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">math</span><span class="o">.</span><span class="n">isfinite</span><span class="p">(</span><span class="n">value</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"'pvt' value for '</span><span class="si">{</span><span class="n">key</span><span class="si">}</span><span class="s2">' must be finite, got </span><span class="si">{</span><span class="n">value</span><span class="si">!r}</span><span class="s2">."</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">native</span> <span class="ow">in</span> <span class="n">normalised</span> <span class="ow">and</span> <span class="n">normalised</span><span class="p">[</span><span class="n">native</span><span class="p">]</span> <span class="o">!=</span> <span class="n">value</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">"'pvt' sets '</span><span class="si">{</span><span class="n">native</span><span class="si">}</span><span class="s2">' twice with different values "</span>
+                <span class="sa">f</span><span class="s2">"(</span><span class="si">{</span><span class="n">normalised</span><span class="p">[</span><span class="n">native</span><span class="p">]</span><span class="si">!r}</span><span class="s2"> and </span><span class="si">{</span><span class="n">value</span><span class="si">!r}</span><span class="s2">)."</span>
+            <span class="p">)</span>
+        <span class="n">normalised</span><span class="p">[</span><span class="n">native</span><span class="p">]</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+
+    <span class="k">for</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">_STRICTLY_POSITIVE_KEYS</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">normalised</span> <span class="ow">and</span> <span class="n">normalised</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">&lt;=</span> <span class="mf">0.0</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"'pvt' value for '</span><span class="si">{</span><span class="n">key</span><span class="si">}</span><span class="s2">' must be &gt; 0, got </span><span class="si">{</span><span class="n">normalised</span><span class="p">[</span><span class="n">key</span><span class="p">]</span><span class="si">!r}</span><span class="s2">."</span><span class="p">)</span>
+    <span class="k">if</span> <span class="s2">"GMF"</span> <span class="ow">in</span> <span class="n">normalised</span> <span class="ow">and</span> <span class="ow">not</span> <span class="mf">0.0</span> <span class="o">&lt;=</span> <span class="n">normalised</span><span class="p">[</span><span class="s2">"GMF"</span><span class="p">]</span> <span class="o">&lt;</span> <span class="mf">1.0</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"'pvt' GMF must be in [0, 1), got </span><span class="si">{</span><span class="n">normalised</span><span class="p">[</span><span class="s1">'GMF'</span><span class="p">]</span><span class="si">!r}</span><span class="s2">."</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">normalised</span></div>
+
+
+
+<div class="viewcode-block" id="build_pvt">
+<a class="viewcode-back" href="../../../codedocumentation/gemini_model.fluid.pvt_config.html#gemini_model.fluid.pvt_config.build_pvt">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">build_pvt</span><span class="p">(</span><span class="n">pvt_parameters</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Return a fresh ``PVTConstantSTP`` with a ``"pvt"`` block applied.</span>
+
+<span class="sd">    ``build_pvt(None)`` is identical to ``PVTConstantSTP()`` (GEMINI default,</span>
+<span class="sd">    fresh water at STP).</span>
+<span class="sd">    """</span>
+    <span class="n">pvt</span> <span class="o">=</span> <span class="n">PVTConstantSTP</span><span class="p">()</span>
+    <span class="n">overrides</span> <span class="o">=</span> <span class="n">normalise_pvt_parameters</span><span class="p">(</span><span class="n">pvt_parameters</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">overrides</span><span class="p">:</span>
+        <span class="n">pvt</span><span class="o">.</span><span class="n">update_parameters</span><span class="p">(</span><span class="n">overrides</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">pvt</span></div>
+
+
+
+<div class="viewcode-block" id="liquid_properties">
+<a class="viewcode-back" href="../../../codedocumentation/gemini_model.fluid.pvt_config.html#gemini_model.fluid.pvt_config.liquid_properties">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">liquid_properties</span><span class="p">(</span><span class="n">pvt_parameters</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Return ``(density_kg_m3, specific_heat_j_kgk)`` of the liquid phase.</span>
+
+<span class="sd">    These are the values the well models use for the same ``"pvt"`` block;</span>
+<span class="sd">    keys the block does not set keep the ``PVTConstantSTP`` defaults.</span>
+<span class="sd">    """</span>
+    <span class="n">parameters</span> <span class="o">=</span> <span class="n">build_pvt</span><span class="p">(</span><span class="n">pvt_parameters</span><span class="p">)</span><span class="o">.</span><span class="n">parameters</span>
+    <span class="k">return</span> <span class="nb">float</span><span class="p">(</span><span class="n">parameters</span><span class="p">[</span><span class="s2">"RHOL"</span><span class="p">]),</span> <span class="nb">float</span><span class="p">(</span><span class="n">parameters</span><span class="p">[</span><span class="s2">"CPL"</span><span class="p">])</span></div>
+
+
+
+<div class="viewcode-block" id="heat_exchanger_fluid_parameters">
+<a class="viewcode-back" href="../../../codedocumentation/gemini_model.fluid.pvt_config.html#gemini_model.fluid.pvt_config.heat_exchanger_fluid_parameters">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">heat_exchanger_fluid_parameters</span><span class="p">(</span><span class="n">pvt_parameters</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Return the ``fluid_density``/``specific_heat`` parameters for HEX, boiler and CHP.</span>
+
+<span class="sd">    GEMINI's ``HeatExchanger``, ``Boiler`` and ``CHP`` take the liquid density</span>
+<span class="sd">    and heat capacity as ``fluid_density`` (kg/m3) and ``specific_heat``</span>
+<span class="sd">    (J/kg.K) parameters. Use this helper so a component on the brine loop gets</span>
+<span class="sd">    the same values as the wells (single source of truth, GM-01). Note that</span>
+<span class="sd">    GEMINI's ``HeatExchanger`` applies one ``fluid_density``/``specific_heat``</span>
+<span class="sd">    to both its primary (brine) and secondary (water) sides.</span>
+<span class="sd">    """</span>
+    <span class="n">density_kg_m3</span><span class="p">,</span> <span class="n">specific_heat_j_kgk</span> <span class="o">=</span> <span class="n">liquid_properties</span><span class="p">(</span><span class="n">pvt_parameters</span><span class="p">)</span>
+    <span class="k">return</span> <span class="p">{</span><span class="s2">"fluid_density"</span><span class="p">:</span> <span class="n">density_kg_m3</span><span class="p">,</span> <span class="s2">"specific_heat"</span><span class="p">:</span> <span class="n">specific_heat_j_kgk</span><span class="p">}</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, TNO.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

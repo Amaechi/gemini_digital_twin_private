@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>6.1.1.1. gemini_model.absorption_chiller.absorption_chiller &mdash; GEMINI Geothermal Digital Twin (fix-report-case)</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=19f00094" />
+
+  
+  <!--[if lt IE 9]>
+    <script src="../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="../_static/jquery.js?v=5d32c60e"></script>
+        <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+        <script src="../_static/documentation_options.js?v=bffb45cf"></script>
+        <script src="../_static/doctools.js?v=9a2dae69"></script>
+        <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="6.1.1.2. gemini_model.absorption_chiller.characteristic" href="gemini_model.absorption_chiller.characteristic.html" />
+    <link rel="prev" title="6.1.1. gemini_model.absorption_chiller" href="gemini_model.absorption_chiller.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            GEMINI Geothermal Digital Twin
+          </a>
+              <div class="version">
+                fix-report-case
+              </div>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Table of Contents</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../index_about_gemini.html">1. About GEMINI</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../index_getting_started.html">2. Getting started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../index_setup.html">3. Set-up</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../index_applications.html">4. Applications</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../index_models.html">5. Models</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../index_sourcecode.html">6. Source code documentation</a><ul class="current">
+<li class="toctree-l2 current"><a class="reference internal" href="gemini_model.html">6.1. gemini_model</a><ul class="current">
+<li class="toctree-l3 current"><a class="reference internal" href="gemini_model.absorption_chiller.html">6.1.1. gemini_model.absorption_chiller</a><ul class="current">
+<li class="toctree-l4 current"><a class="current reference internal" href="#">6.1.1.1. gemini_model.absorption_chiller.absorption_chiller</a></li>
+<li class="toctree-l4"><a class="reference internal" href="gemini_model.absorption_chiller.characteristic.html">6.1.1.2. gemini_model.absorption_chiller.characteristic</a></li>
+<li class="toctree-l4"><a class="reference internal" href="gemini_model.absorption_chiller.ghc1989.html">6.1.1.3. gemini_model.absorption_chiller.ghc1989</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="gemini_model.adder.html">6.1.2. gemini_model.adder</a></li>
+<li class="toctree-l3"><a class="reference internal" href="gemini_model.boiler.html">6.1.3. gemini_model.boiler</a></li>
+<li class="toctree-l3"><a class="reference internal" href="gemini_model.booster_pump.html">6.1.4. gemini_model.booster_pump</a></li>
+<li class="toctree-l3"><a class="reference internal" href="gemini_model.chp.html">6.1.5. gemini_model.chp</a></li>
+<li class="toctree-l3"><a class="reference internal" href="gemini_model.compressor.html">6.1.6. gemini_model.compressor</a></li>
+<li class="toctree-l3"><a class="reference internal" href="gemini_model.corrosion.html">6.1.7. gemini_model.corrosion</a></li>
+<li class="toctree-l3"><a class="reference internal" href="gemini_model.electric_boiler.html">6.1.8. gemini_model.electric_boiler</a></li>
+<li class="toctree-l3"><a class="reference internal" href="gemini_model.electric_chiller.html">6.1.9. gemini_model.electric_chiller</a></li>
+<li class="toctree-l3"><a class="reference internal" href="gemini_model.erosion.html">6.1.10. gemini_model.erosion</a></li>
+<li class="toctree-l3"><a class="reference internal" href="gemini_model.filter.html">6.1.11. gemini_model.filter</a></li>
+<li class="toctree-l3"><a class="reference internal" href="gemini_model.fluid.html">6.1.12. gemini_model.fluid</a></li>
+<li class="toctree-l3"><a class="reference internal" href="gemini_model.free_cooling.html">6.1.13. gemini_model.free_cooling</a></li>
+<li class="toctree-l3"><a class="reference internal" href="gemini_model.heat_exchanger.html">6.1.14. gemini_model.heat_exchanger</a></li>
+<li class="toctree-l3"><a class="reference internal" href="gemini_model.heat_rejection.html">6.1.15. gemini_model.heat_rejection</a></li>
+<li class="toctree-l3"><a class="reference internal" href="gemini_model.heatpump.html">6.1.16. gemini_model.heatpump</a></li>
+<li class="toctree-l3"><a class="reference internal" href="gemini_model.injector_pump.html">6.1.17. gemini_model.injector_pump</a></li>
+<li class="toctree-l3"><a class="reference internal" href="gemini_model.mixer.html">6.1.18. gemini_model.mixer</a></li>
+<li class="toctree-l3"><a class="reference internal" href="gemini_model.model_abstract.html">6.1.19. gemini_model.model_abstract</a></li>
+<li class="toctree-l3"><a class="reference internal" href="gemini_model.pump.html">6.1.20. gemini_model.pump</a></li>
+<li class="toctree-l3"><a class="reference internal" href="gemini_model.reservoir.html">6.1.21. gemini_model.reservoir</a></li>
+<li class="toctree-l3"><a class="reference internal" href="gemini_model.separator.html">6.1.22. gemini_model.separator</a></li>
+<li class="toctree-l3"><a class="reference internal" href="gemini_model.splitter.html">6.1.23. gemini_model.splitter</a></li>
+<li class="toctree-l3"><a class="reference internal" href="gemini_model.thermal_storage.html">6.1.24. gemini_model.thermal_storage</a></li>
+<li class="toctree-l3"><a class="reference internal" href="gemini_model.well.html">6.1.25. gemini_model.well</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="gemini_framework.html">6.2. gemini_framework</a></li>
+<li class="toctree-l2"><a class="reference internal" href="gemini_application.html">6.3. gemini_application</a></li>
+<li class="toctree-l2"><a class="reference internal" href="gemini_interface.html">6.4. gemini_interface</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../glossary.html">7. Glossary</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">GEMINI Geothermal Digital Twin</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index_sourcecode.html"><span class="section-number">6. </span>Source code documentation</a></li>
+          <li class="breadcrumb-item"><a href="gemini_model.html"><span class="section-number">6.1. </span>gemini_model</a></li>
+          <li class="breadcrumb-item"><a href="gemini_model.absorption_chiller.html"><span class="section-number">6.1.1. </span>gemini_model.absorption_chiller</a></li>
+      <li class="breadcrumb-item active"><span class="section-number">6.1.1.1. </span>gemini_model.absorption_chiller.absorption_chiller</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/codedocumentation/gemini_model.absorption_chiller.absorption_chiller.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="module-gemini_model.absorption_chiller.absorption_chiller">
+<span id="gemini-model-absorption-chiller-absorption-chiller"></span><h1><span class="section-number">6.1.1.1. </span>gemini_model.absorption_chiller.absorption_chiller<a class="headerlink" href="#module-gemini_model.absorption_chiller.absorption_chiller" title="Link to this heading"></a></h1>
+<p>Single-effect LiBr/H2O absorption chiller driven by geothermal hot water (GM-04).</p>
+<p>Source: RC-05 (<code class="docutils literal notranslate"><span class="pre">data/knowledge/reference_cards/RC-05_absorption_chiller.md</span></code>) and the
+copy in <code class="docutils literal notranslate"><span class="pre">REFERENCE.md</span></code>; Geothermal Direct Use Engineering &amp; Design Guidebook
+(Geo-Heat Center 1989) Ch14 p.261-270; spec §3.3 and §7.2 GM-04.</p>
+<p>Two methods (parameter <code class="docutils literal notranslate"><span class="pre">method</span></code>):</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">&quot;ghc1989&quot;</span></code> – Method A, the Guidebook correlation (<a class="reference internal" href="gemini_model.absorption_chiller.ghc1989.html#module-gemini_model.absorption_chiller.ghc1989" title="gemini_model.absorption_chiller.ghc1989"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ghc1989</span></code></a>). Capacity
+<code class="docutils literal notranslate"><span class="pre">F</span> <span class="pre">Q_nom</span></code> with <code class="docutils literal notranslate"><span class="pre">F</span> <span class="pre">=</span> <span class="pre">F_T(T_hw)</span> <span class="pre">F_c(T_chw,</span> <span class="pre">T_cw)</span></code>, <code class="docutils literal notranslate"><span class="pre">COP(T_hw)</span></code>. Valid for 40-50 °F
+chilled and 75-90 °F cooling water; outside, it is a conservative lower bound (RC-05):
+with <code class="docutils literal notranslate"><span class="pre">ghc1989_conservative_clamp</span></code> (default) chilled water above 50 °F is evaluated at
+50 °F and cooling water below 75 °F at 75 °F (F rises with T_chw and falls with T_cw, so
+this never overstates capacity); other excursions are extrapolated. Part load: COP(T_hw).</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">&quot;characteristic&quot;</span></code> (default) – Method B, the ΔΔt characteristic equation
+(<a class="reference internal" href="gemini_model.absorption_chiller.characteristic.html#module-gemini_model.absorption_chiller.characteristic" title="gemini_model.absorption_chiller.characteristic"><code class="xref py py-mod docutils literal notranslate"><span class="pre">characteristic</span></code></a>), needed for our 20 °C chilled water. Coefficients are calibrated
+to Method A at its rating points by <a class="reference internal" href="gemini_model.absorption_chiller.characteristic.html#gemini_model.absorption_chiller.characteristic.calibrate_to_ghc1989" title="gemini_model.absorption_chiller.characteristic.calibrate_to_ghc1989"><code class="xref py py-func docutils literal notranslate"><span class="pre">characteristic.calibrate_to_ghc1989()</span></code></a> unless
+<code class="docutils literal notranslate"><span class="pre">characteristic_coefficients</span></code> gives datasheet values. Part load is a reduction of ΔΔt
+(drive-temperature control): <code class="docutils literal notranslate"><span class="pre">ΔΔt</span> <span class="pre">=</span> <span class="pre">ΔΔt_min</span> <span class="pre">+</span> <span class="pre">Q_E/s_E</span></code> and <code class="docutils literal notranslate"><span class="pre">Q_G</span> <span class="pre">=</span> <span class="pre">s_G</span> <span class="pre">(ΔΔt</span> <span class="pre">-</span>
+<span class="pre">ΔΔt_min,G)</span></code>, so the COP falls slightly at part load. Results at 20 °C chilled water are
+extrapolated from the 6.7 °C calibration and are uncertain (RC-05 screening [D]: 85 °C
+drive at 20 °C chilled ≈ capacity fraction 0.6-0.7, COP 0.63-0.70).</p></li>
+</ul>
+<p>Drive-side consistency (COOL-ABS-DRV): with a given drive flow, Method B needs a drive
+capacity rate of at least s_G/2 (output <code class="docutils literal notranslate"><span class="pre">minimum_drive_flow_rate_m3s</span></code>), otherwise the drive
+outlet would fall below the machine’s minimum generator temperature and the machine is treated
+as off; Method A limits the drive heat so that the outlet stays at or above its zero-capacity
+temperature (71.4 °C). Part load (COOL-ABS-PL): Method B’s COP falls at low load (≈ 0.47 at
+10 % load at 85 °C drive) and the drive heat drops to 0 only when the machine stops.</p>
+<p>External circuits: each circuit either has a given flow (its outlet temperature follows
+from the energy balance and, for Method B, its mean temperature is solved together with
+the duty – the equations are linear, so the solution is closed-form) or no flow (fixed
+temperature change: generator <code class="docutils literal notranslate"><span class="pre">generator_delta_t_k</span></code> 7.2 K [L p.267], cooling water
+<code class="docutils literal notranslate"><span class="pre">cooling_water_range_k</span></code> 5 K [A RC-07]; the required flow is reported). The chilled side
+is set either by <code class="docutils literal notranslate"><span class="pre">cooling_load_w</span></code> (supply held at the set point, flow = Q_E / (ρ c_p ΔT);
+unmet load is reported, not passed through) or by
+<code class="docutils literal notranslate"><span class="pre">chilled_water_flow_rate_m3s</span></code> (load = ρ c_p V (T_return - T_supply,set)). Each circuit has
+its own density and heat capacity (defaults: GEMINI water PVT, 1000 kg/m³, 4217.4 J/(kg K));
+set the drive side to the brine values (1030, 4100) when brine flows through titanium
+generator tubes.</p>
+<p>Outputs: <code class="docutils literal notranslate"><span class="pre">cooling_power_w</span></code> Q_E, <code class="docutils literal notranslate"><span class="pre">drive_heat_w</span></code> Q_G = Q_E/COP, <code class="docutils literal notranslate"><span class="pre">heat_rejected_w</span></code>
+= Q_E + Q_G + P_aux (exact), <code class="docutils literal notranslate"><span class="pre">power_el</span></code> = P_aux = <code class="docutils literal notranslate"><span class="pre">aux_power_fraction</span></code> Q_E
+(0.077 kW/ton ≈ 2.2 %: extra tower fan + cooling-water pump vs an electric chiller,
+Guidebook p.269), <code class="docutils literal notranslate"><span class="pre">power_th</span></code> = Q_E (useful cooling), <code class="docutils literal notranslate"><span class="pre">emission</span></code> 0, circuit outlet
+temperatures and flows, <code class="docutils literal notranslate"><span class="pre">validity_warnings</span></code>. <code class="docutils literal notranslate"><span class="pre">include_heat_rejection_auxiliaries</span></code>
+(default True) switches P_aux on; set it to False when a <code class="docutils literal notranslate"><span class="pre">heat_rejection</span></code> component is
+connected, which counts the tower fan and pumps itself (RC-05/RC-06 no-double-counting rule;
+P_aux = 0 and Q_reject = Q_E + Q_G).</p>
+<p>Materials (RC-05, p.266-267): Cu / 90-10 CuNi generator tubes are incompatible with
+geothermal brine -&gt; titanium generator tubes (+10-15 % machine cost) or an isolation HEX
+with a clean loop (then the drive inlet is the clean-loop temperature).</p>
+<p>OIT case (Guidebook p.263) – documented comparison, not a pass/fail test: the book
+selected a nominal 312 ton machine for a 150 ton duty at 190 °F (F ≈ 0.48), whereas
+Method A at 44/85 °F gives F = 0.382 (≈ 392 ton) and at 48 °F chilled water F = 0.416;
+the case conditions are not fully stated in the extracted text. Method A is conservative.</p>
+<p class="rubric">Classes</p>
+<table class="autosummary longtable docutils align-default">
+<tbody>
+<tr class="row-odd"><td><p><a class="reference internal" href="#gemini_model.absorption_chiller.absorption_chiller.AbsorptionChiller" title="gemini_model.absorption_chiller.absorption_chiller.AbsorptionChiller"><code class="xref py py-obj docutils literal notranslate"><span class="pre">AbsorptionChiller</span></code></a>()</p></td>
+<td><p>Single-effect LiBr absorption chiller (RC-05 Method A or Method B).</p></td>
+</tr>
+</tbody>
+</table>
+<dl class="py class">
+<dt class="sig sig-object py" id="gemini_model.absorption_chiller.absorption_chiller.AbsorptionChiller">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">gemini_model.absorption_chiller.absorption_chiller.</span></span><span class="sig-name descname"><span class="pre">AbsorptionChiller</span></span><a class="reference internal" href="../_modules/gemini_model/absorption_chiller/absorption_chiller.html#AbsorptionChiller"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#gemini_model.absorption_chiller.absorption_chiller.AbsorptionChiller" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference internal" href="gemini_model.model_abstract.html#gemini_model.model_abstract.StaticModel" title="gemini_model.model_abstract.StaticModel"><code class="xref py py-class docutils literal notranslate"><span class="pre">StaticModel</span></code></a></p>
+<p>Single-effect LiBr absorption chiller (RC-05 Method A or Method B).</p>
+<p>Model initialization with RC-05 defaults (nominal capacity must be set).</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="gemini_model.absorption_chiller.absorption_chiller.AbsorptionChiller.calculate_output">
+<span class="sig-name descname"><span class="pre">calculate_output</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">u</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">x</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/gemini_model/absorption_chiller/absorption_chiller.html#AbsorptionChiller.calculate_output"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#gemini_model.absorption_chiller.absorption_chiller.AbsorptionChiller.calculate_output" title="Link to this definition"></a></dt>
+<dd><p>Calculate the chiller duty, drive heat, rejected heat and outlet temperatures.</p>
+<p>Inputs <code class="docutils literal notranslate"><span class="pre">u</span></code>: <code class="docutils literal notranslate"><span class="pre">drive_temperature_in_degc</span></code> and <code class="docutils literal notranslate"><span class="pre">cooling_water_temperature_in_degc</span></code>
+(required); <code class="docutils literal notranslate"><span class="pre">drive_flow_rate_m3s</span></code> and <code class="docutils literal notranslate"><span class="pre">cooling_water_flow_rate_m3s</span></code> (optional,
+m³/s); exactly one of <code class="docutils literal notranslate"><span class="pre">cooling_load_w</span></code> (W) or <code class="docutils literal notranslate"><span class="pre">chilled_water_flow_rate_m3s</span></code>;
+optional <code class="docutils literal notranslate"><span class="pre">chilled_water_temperature_in_degc</span></code> (return) and
+<code class="docutils literal notranslate"><span class="pre">chilled_water_temperature_out_degc</span></code> (supply set point) overriding the parameters.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="gemini_model.absorption_chiller.absorption_chiller.AbsorptionChiller.characteristic_coefficients">
+<span class="sig-name descname"><span class="pre">characteristic_coefficients</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/gemini_model/absorption_chiller/absorption_chiller.html#AbsorptionChiller.characteristic_coefficients"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#gemini_model.absorption_chiller.absorption_chiller.AbsorptionChiller.characteristic_coefficients" title="Link to this definition"></a></dt>
+<dd><p>Return the Method B coefficients in use (datasheet values or the Method A fit).</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="gemini_model.absorption_chiller.absorption_chiller.AbsorptionChiller.initialize_state">
+<span class="sig-name descname"><span class="pre">initialize_state</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">x</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/gemini_model/absorption_chiller/absorption_chiller.html#AbsorptionChiller.initialize_state"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#gemini_model.absorption_chiller.absorption_chiller.AbsorptionChiller.initialize_state" title="Link to this definition"></a></dt>
+<dd><p>Not applicable: static model.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="gemini_model.absorption_chiller.absorption_chiller.AbsorptionChiller.update_parameters">
+<span class="sig-name descname"><span class="pre">update_parameters</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">parameters</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/gemini_model/absorption_chiller/absorption_chiller.html#AbsorptionChiller.update_parameters"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#gemini_model.absorption_chiller.absorption_chiller.AbsorptionChiller.update_parameters" title="Link to this definition"></a></dt>
+<dd><p>Update model parameters.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>parameters</strong> (<em>dict</em>) – Parameters dict as defined by the model.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="gemini_model.absorption_chiller.absorption_chiller.AbsorptionChiller.update_state">
+<span class="sig-name descname"><span class="pre">update_state</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">u</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">x</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/gemini_model/absorption_chiller/absorption_chiller.html#AbsorptionChiller.update_state"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#gemini_model.absorption_chiller.absorption_chiller.AbsorptionChiller.update_state" title="Link to this definition"></a></dt>
+<dd><p>Not applicable: static model.</p>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="gemini_model.absorption_chiller.html" class="btn btn-neutral float-left" title="6.1.1. gemini_model.absorption_chiller" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="gemini_model.absorption_chiller.characteristic.html" class="btn btn-neutral float-right" title="6.1.1.2. gemini_model.absorption_chiller.characteristic" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, TNO.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
