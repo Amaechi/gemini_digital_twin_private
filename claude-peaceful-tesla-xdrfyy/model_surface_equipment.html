@@ -22,7 +22,7 @@
     <script src="_static/js/theme.js"></script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
-    <link rel="next" title="6. Source code documentation" href="index_sourcecode.html" />
+    <link rel="next" title="5.8. Cooling" href="model_cooling.html" />
     <link rel="prev" title="5.6. Erosion: Erosional Velocity/Rate" href="model_erosion.html" /> 
 </head>
 
@@ -68,6 +68,7 @@
 <li class="toctree-l4"><a class="reference internal" href="#inputs">5.7.2.2. Inputs</a></li>
 <li class="toctree-l4"><a class="reference internal" href="#outputs">5.7.2.3. Outputs</a></li>
 <li class="toctree-l4"><a class="reference internal" href="#equations">5.7.2.4. Equations</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#associated-gas-geohackathon-extension">5.7.2.5. Associated gas (GeoHackathon extension)</a></li>
 </ul>
 </li>
 <li class="toctree-l3"><a class="reference internal" href="#filter">5.7.3. Filter</a><ul>
@@ -142,6 +143,8 @@
 </li>
 </ul>
 </li>
+<li class="toctree-l2"><a class="reference internal" href="model_cooling.html">5.8. Cooling</a></li>
+<li class="toctree-l2"><a class="reference internal" href="model_heating.html">5.9. Heat pump, electric boiler and thermal storage</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="index_sourcecode.html">6. Source code documentation</a></li>
@@ -214,6 +217,18 @@ flow-dependent pressure resistance and a fixed temperature drop.</p>
 <tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">temperature_drop</span></code></p></td>
 <td><p>Fixed temperature drop across the vessel <span class="math notranslate nohighlight">\(\Delta T\)</span> (K)</p></td>
 </tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">gas_water_ratio</span></code></p></td>
+<td><p>Optional gas-liquid ratio (Nm³ gas per m³ liquid), default 0</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">ch4_fraction</span></code> / <code class="docutils literal notranslate"><span class="pre">co2_fraction</span></code></p></td>
+<td><p>Optional CH4/CO2 mole fractions of the gas (must add up to 1)</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">gas_density</span></code></p></td>
+<td><p>Optional gas density (kg/Nm³); derived from the composition if not given</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">fuel_lhv_j_kg</span></code></p></td>
+<td><p>Optional fuel lower heating value (J/kg); derived from the composition if not given</p></td>
+</tr>
 </tbody>
 </table>
 </section>
@@ -272,6 +287,17 @@ is the known input</p></td>
 <h3><span class="section-number">5.7.2.4. </span>Equations<a class="headerlink" href="#equations" title="Link to this heading"></a></h3>
 <div class="math notranslate nohighlight">
 \[P_{out} = P_{in} - Q \cdot R_1 \qquad T_{out} = T_{in} - \Delta T\]</div>
+</section>
+<section id="associated-gas-geohackathon-extension">
+<h3><span class="section-number">5.7.2.5. </span>Associated gas (GeoHackathon extension)<a class="headerlink" href="#associated-gas-geohackathon-extension" title="Link to this heading"></a></h3>
+<p>With <code class="docutils literal notranslate"><span class="pre">ch4_fraction</span></code>/<code class="docutils literal notranslate"><span class="pre">co2_fraction</span></code> set, the separator also reports the
+separated gas: <code class="docutils literal notranslate"><span class="pre">gas_density_kg_nm3</span></code>, <code class="docutils literal notranslate"><span class="pre">fuel_lhv_j_kg</span></code>, <code class="docutils literal notranslate"><span class="pre">fuel_power_w</span></code>
+(<span class="math notranslate nohighlight">\(\dot m_g \cdot LHV\)</span>, W), <code class="docutils literal notranslate"><span class="pre">ch4_mass_flow_kg_s</span></code>, <code class="docutils literal notranslate"><span class="pre">inherent_co2_kg_s</span></code>
+(CO2 already in the gas) and <code class="docutils literal notranslate"><span class="pre">co2_if_burned_kg_s</span></code>. With 22.414 Nm³/kmol and
+a CH4 LHV of 35.8 MJ/Nm³, an 80/20 CH4/CO2 gas has 0.965 kg/Nm³, 29.7 MJ/kg and
+68.6 kg CO2/GJ when burned; at 300 m³/h and GLR 0.8 the fuel power is 1.91 MW.
+The separator’s own <code class="docutils literal notranslate"><span class="pre">emission</span></code> stays 0. See
+<code class="docutils literal notranslate"><span class="pre">src/gemini_model/separator/REFERENCE.md</span></code>.</p>
 </section>
 </section>
 <section id="filter">
@@ -354,6 +380,10 @@ parallel- or counter-flow configuration.</p>
 <tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">fluid_density</span></code>, <code class="docutils literal notranslate"><span class="pre">specific_heat</span></code></p></td>
 <td><p><em>(optional)</em> fluid properties <span class="math notranslate nohighlight">\(\rho\)</span>, <span class="math notranslate nohighlight">\(c_p\)</span>, default to
 water at STP</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">secondary_fluid_density</span></code>, <code class="docutils literal notranslate"><span class="pre">secondary_specific_heat</span></code></p></td>
+<td><p><em>(optional)</em> secondary-side <span class="math notranslate nohighlight">\(\rho\)</span>, <span class="math notranslate nohighlight">\(c_p\)</span> (e.g. district water when
+the primary side is brine); default to the primary-side values</p></td>
 </tr>
 </tbody>
 </table>
@@ -844,6 +874,9 @@ stage.</p>
 <tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">mass_flow</span></code></p></td>
 <td><p>Gas mass flow rate (pass-through, kg/s)</p></td>
 </tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">power_el</span></code> / <code class="docutils literal notranslate"><span class="pre">power_th</span></code> / <code class="docutils literal notranslate"><span class="pre">emission</span></code></p></td>
+<td><p>Electrical power (= <code class="docutils literal notranslate"><span class="pre">compressor_power</span></code>, W), 0, 0; registry type <code class="docutils literal notranslate"><span class="pre">&quot;compressor&quot;</span></code></p></td>
+</tr>
 </tbody>
 </table>
 </section>
@@ -1149,7 +1182,7 @@ computed by this model.</p>
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
         <a href="model_erosion.html" class="btn btn-neutral float-left" title="5.6. Erosion: Erosional Velocity/Rate" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
-        <a href="index_sourcecode.html" class="btn btn-neutral float-right" title="6. Source code documentation" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="model_cooling.html" class="btn btn-neutral float-right" title="5.8. Cooling" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 
   <hr/>

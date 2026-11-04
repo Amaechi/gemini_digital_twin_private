@@ -1,3 +1,8 @@
+.. Modified by the GeoAgent team for SPE GeoHackathon 2026, 2026-11-01: separator gas
+   composition (GM-12) and compressor power_el output (GM-02).
+.. Modified by the GeoAgent team for SPE GeoHackathon 2026, 2026-11-01: heat-exchanger
+   secondary-side fluid properties (WP-02).
+
 Surface Equipment
 ==============================================
 
@@ -38,6 +43,14 @@ Parameters
      - Linear pressure-resistance coefficient :math:`R_1` (Pa/(m³/s))
    * - ``temperature_drop``
      - Fixed temperature drop across the vessel :math:`\Delta T` (K)
+   * - ``gas_water_ratio``
+     - Optional gas-liquid ratio (Nm³ gas per m³ liquid), default 0
+   * - ``ch4_fraction`` / ``co2_fraction``
+     - Optional CH4/CO2 mole fractions of the gas (must add up to 1)
+   * - ``gas_density``
+     - Optional gas density (kg/Nm³); derived from the composition if not given
+   * - ``fuel_lhv_j_kg``
+     - Optional fuel lower heating value (J/kg); derived from the composition if not given
 
 Inputs
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -78,6 +91,18 @@ Equations
 .. math::
 
     P_{out} = P_{in} - Q \cdot R_1 \qquad T_{out} = T_{in} - \Delta T
+
+Associated gas (GeoHackathon extension)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+With ``ch4_fraction``/``co2_fraction`` set, the separator also reports the
+separated gas: ``gas_density_kg_nm3``, ``fuel_lhv_j_kg``, ``fuel_power_w``
+(:math:`\dot m_g \cdot LHV`, W), ``ch4_mass_flow_kg_s``, ``inherent_co2_kg_s``
+(CO2 already in the gas) and ``co2_if_burned_kg_s``. With 22.414 Nm³/kmol and
+a CH4 LHV of 35.8 MJ/Nm³, an 80/20 CH4/CO2 gas has 0.965 kg/Nm³, 29.7 MJ/kg and
+68.6 kg CO2/GJ when burned; at 300 m³/h and GLR 0.8 the fuel power is 1.91 MW.
+The separator's own ``emission`` stays 0. See
+``src/gemini_model/separator/REFERENCE.md``.
 
 Filter
 ---------------------------
@@ -149,6 +174,9 @@ Parameters
    * - ``fluid_density``, ``specific_heat``
      - *(optional)* fluid properties :math:`\rho`, :math:`c_p`, default to
        water at STP
+   * - ``secondary_fluid_density``, ``secondary_specific_heat``
+     - *(optional)* secondary-side :math:`\rho`, :math:`c_p` (e.g. district water when
+       the primary side is brine); default to the primary-side values
 
 Inputs
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -530,6 +558,8 @@ Outputs
      - Total shaft power over all stages :math:`P_{shaft}` (W)
    * - ``mass_flow``
      - Gas mass flow rate (pass-through, kg/s)
+   * - ``power_el`` / ``power_th`` / ``emission``
+     - Electrical power (= ``compressor_power``, W), 0, 0; registry type ``"compressor"``
 
 Equations
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

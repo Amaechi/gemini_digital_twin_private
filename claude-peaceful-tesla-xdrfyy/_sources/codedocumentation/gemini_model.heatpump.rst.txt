@@ -10,4 +10,5 @@ gemini\_model.heatpump
    :toctree:
    :recursive:
 
+   closed_form
    heatpump_basic
