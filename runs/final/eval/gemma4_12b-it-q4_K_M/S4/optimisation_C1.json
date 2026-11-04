@@ -21,7 +21,7 @@
    "nfev": 10,
    "nit": 1,
    "message": "Maximum number of iterations has been exceeded.",
-   "elapsed_s": 0.8662596250651404
+   "elapsed_s": 0.8703601250890642
   },
   {
    "stage": "outage",
@@ -53,7 +53,7 @@
    "nfev": 10,
    "nit": 1,
    "message": "Optimization terminated successfully.",
-   "elapsed_s": 0.8948747919639573
+   "elapsed_s": 1.048648624913767
   }
  ],
  "best": {
@@ -167,7 +167,7 @@
    "thermal_breakthrough_yr": 47.47074715401575,
    "percentiles": {}
   },
-  "elapsed_s": 0.36856087495107204
+  "elapsed_s": 0.3732974170707166
  },
  "default_outage": null,
  "dispatch_variants": [],
@@ -175,7 +175,7 @@
  "n_evaluations": 21,
  "n_rejected": 0,
  "n_infeasible": 0,
- "elapsed_s": 3.094257958000526,
+ "elapsed_s": 3.029524124925956,
  "outputs": {},
  "warnings": [],
  "n_screening": 1

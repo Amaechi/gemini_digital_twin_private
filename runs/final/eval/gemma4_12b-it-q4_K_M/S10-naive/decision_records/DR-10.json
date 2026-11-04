@@ -10,9 +10,9 @@
       "id": "C2-opt-robust",
       "label": "C2-opt-robust (C2-opt with the TL-15 P90 robust backups (OPT-ROBUST-BACKUP))",
       "evidence_ids": [
-        "TR-019",
         "TR-020",
-        "TR-021"
+        "TR-021",
+        "TR-022"
       ],
       "recommended": true,
       "eligible": true,
@@ -27,7 +27,8 @@
         "TR-016",
         "TR-017",
         "TR-018",
-        "TR-019"
+        "TR-019",
+        "TR-020"
       ],
       "recommended": false,
       "eligible": false,
@@ -62,7 +63,8 @@
     "TR-018",
     "TR-019",
     "TR-020",
-    "TR-021"
+    "TR-021",
+    "TR-022"
   ],
   "choice": "C2-opt-robust",
   "choice_label": "C2-opt-robust (C2-opt with the TL-15 P90 robust backups (OPT-ROBUST-BACKUP))",
@@ -75,22 +77,22 @@
       "C2-opt-robust"
     ],
     "evidence_ids": [
-      "TR-021"
+      "TR-022"
     ]
   },
-  "rationale": "selected-not-rejected criterion was met by C2-opt-robust as it received an ACCEPTED verdict in TR-021. C2-opt, C6-opt, and C1-opt were rejected because they were not the verified design.",
+  "rationale": "selected design whose latest verifier verdict is not REJECTED among guard-passed options in economics",
   "rejected": [
     {
       "option_id": "C2-opt",
-      "reason": "Not chosen."
+      "reason": "not the verified design"
     },
     {
       "option_id": "C6-opt",
-      "reason": "Not chosen."
+      "reason": "not the verified design"
     },
     {
       "option_id": "C1-opt",
-      "reason": "Not chosen."
+      "reason": "not the verified design"
     }
   ],
   "decision_source": "llm",

@@ -10,7 +10,6 @@
       "id": "optimiser-lowest-load",
       "label": "Outages placed by the optimiser in the lowest-load windows, never overlapping (DB-30)",
       "evidence_ids": [
-        "TR-014",
         "TR-018",
         "config:assumptions.yaml#DB-30"
       ],
@@ -22,7 +21,6 @@
       "id": "common-summer-block",
       "label": "One common summer block for all doublets",
       "evidence_ids": [
-        "TR-014",
         "TR-018",
         "config:assumptions.yaml#DB-30"
       ],
@@ -32,7 +30,6 @@
     }
   ],
   "evidence_ids": [
-    "TR-014",
     "TR-018",
     "config:assumptions.yaml#DB-30"
   ],
@@ -47,18 +44,17 @@
       "optimiser-lowest-load"
     ],
     "evidence_ids": [
-      "TR-014",
       "TR-018",
       "config:assumptions.yaml#DB-30"
     ]
   },
-  "rationale": "lowest lcoh_per_mwh among guard-passed options in economics because it satisfies DB-30 non-overlapping outages in lowest-load windows as required by TR-014 and TR-018.",
+  "rationale": "Decisive criterion: only option meeting DB-30: non-overlapping outages in the lowest-load windows; it selects optimiser-lowest-load (TR-018, config:assumptions.yaml#DB-30).",
   "rejected": [
     {
       "option_id": "common-summer-block",
-      "reason": "rejected because it violates DB-30 by allowing overlapping outages."
+      "reason": "Not eligible: outages would overlap; DB-30 requires non-overlapping outages"
     }
   ],
-  "decision_source": "llm",
+  "decision_source": "policy_fallback",
   "stub_evidence": false
 }

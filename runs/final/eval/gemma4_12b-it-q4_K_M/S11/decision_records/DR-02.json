@@ -12,19 +12,13 @@
       "evidence_ids": [
         "TR-009",
         "TR-010",
-        "TR-011",
         "TR-012",
         "TR-013",
-        "TR-014",
-        "TR-015",
-        "TR-016",
-        "TR-018",
-        "TR-019",
         "config:design_basis.yaml#DB-01"
       ],
       "recommended": true,
       "eligible": true,
-      "notes": "candidates: C1-3d, C2-2d, C3-2d, C6-2d, C7-2d, C8-3d, C2-opt, C6-opt, C1-opt; top-ranked (LCOH ranking)"
+      "notes": "candidates: C1-3d, C2-2d, C3-2d, C6-2d, C7-2d, C8-3d; top-ranked (LCOH ranking)"
     },
     {
       "id": "depth-3200m",
@@ -32,13 +26,8 @@
       "evidence_ids": [
         "TR-009",
         "TR-010",
-        "TR-011",
         "TR-012",
-        "TR-013",
-        "TR-014",
-        "TR-015",
-        "TR-018",
-        "TR-019"
+        "TR-013"
       ],
       "recommended": false,
       "eligible": false,
@@ -50,13 +39,8 @@
       "evidence_ids": [
         "TR-009",
         "TR-010",
-        "TR-011",
         "TR-012",
-        "TR-013",
-        "TR-014",
-        "TR-015",
-        "TR-018",
-        "TR-019"
+        "TR-013"
       ],
       "recommended": false,
       "eligible": true,
@@ -66,14 +50,8 @@
   "evidence_ids": [
     "TR-009",
     "TR-010",
-    "TR-011",
     "TR-012",
     "TR-013",
-    "TR-014",
-    "TR-015",
-    "TR-016",
-    "TR-018",
-    "TR-019",
     "config:design_basis.yaml#DB-01"
   ],
   "choice": "depth-2500m",
@@ -87,15 +65,11 @@
       "depth-2500m"
     ],
     "evidence_ids": [
-      "TR-013",
-      "TR-014",
-      "TR-015",
-      "TR-016",
-      "TR-018",
-      "TR-019"
+      "TR-012",
+      "TR-013"
     ]
   },
-  "rationale": "Selected based on ranking-lowest-lcoh_per_mwh among guard-passed options in economics as indicated by evidence TR-013, TR-014, TR-015, TR-016, TR-018, and TR-019. Option depth-3200m was rejected because it is ineligible. Option depth-1500m was rejected because it did not achieve the best ranking in the specified economic criterion.",
+  "rationale": "lowest lcoh_per_mwh among guard-passed options in economics as identified by TR-013. depth-3200m was rejected because it was excluded by the design guard as shown in TR-013. depth-1500m was rejected because it did not rank as a top-performing candidate in the economic evaluation.",
   "rejected": [
     {
       "option_id": "depth-3200m",

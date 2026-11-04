@@ -11,12 +11,18 @@
   "excluded_candidates": [
     "C4-2d"
   ],
-  "llm_fallbacks": 3,
+  "llm_fallbacks": 1,
   "conflicts": [
     "Requested 5 doublets conflicts with the hard limit 1\u20133 doublets (DB-10); candidates stay within the limit.",
     "Requested 500 m3/h conflicts with the per-doublet flow limit 50\u2013300 m3/h (DB-11); flows stay within the limit."
   ],
+  "missing_inputs": [
+    "demand CSVs (daily heating and cooling demand, data/demand/)",
+    "cooling demand (cooling supply 20 degC, DB-17/DB-19)",
+    "reservoir data (depth, temperature, gradient, permeability, thickness; config/design_basis.yaml)"
+  ],
   "assumptions_and_answers": [
+    "CFG-INPUT-DEFAULTS = repository defaults (assumed: register default)",
     "DB-30 = {\"interpretation\":\"A\",\"doublet_available_days_per_yr\":330,\"planned_outage_days_per_doublet\":35,\"outages_may_overlap\":false,\"outage_schedule\":\"chosen by the optimiser\",\"demand_met_days_per_yr\":365} (assumed: register default)",
     "DB-31 = 55.0 degC (assumed: register default)",
     "DB-32 = 26.0 degC (assumed: register default)",
@@ -86,12 +92,12 @@
     {
       "dr_id": "DR-10",
       "choice": "C2-opt-robust",
-      "decision_source": "policy_fallback",
+      "decision_source": "llm",
       "stub_evidence": false
     }
   ],
-  "tool_calls": 25,
+  "tool_calls": 29,
   "stub_tool_calls": 0,
-  "final_summary": "Completed P0\u2013P10: selected C2-opt-robust (verifier verdict ACCEPTED); 11 Decision Records; approval pending; 0/25 tool calls were stubs. LLM fallbacks to policy: 3.",
+  "final_summary": "Completed P0\u2013P10: selected C2-opt-robust (verifier verdict ACCEPTED); 11 Decision Records; approval pending; 0/29 tool calls were stubs. LLM fallbacks to policy: 1.",
   "escalation_reason": ""
 }

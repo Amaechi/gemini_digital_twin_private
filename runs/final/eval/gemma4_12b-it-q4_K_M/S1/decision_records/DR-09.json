@@ -47,11 +47,11 @@
       "TR-001"
     ]
   },
-  "rationale": "The option was selected based on the brine materials check among guard-passed options in economics, as evidenced by TR-001 and spec:\u00a710.1.",
+  "rationale": "The selection is based on the brine materials check among guard-passed options in economics. Option titanium-plates-no-cu satisfies the brine requirement in spec \u00a710.1 as shown in TR-001. Option stainless-plates was rejected because it fails the materials check for saline brine in spec \u00a710.1.",
   "rejected": [
     {
       "option_id": "stainless-plates",
-      "reason": "The material fails the brine materials check specified in spec:\u00a710.1."
+      "reason": "Not chosen."
     }
   ],
   "decision_source": "llm",

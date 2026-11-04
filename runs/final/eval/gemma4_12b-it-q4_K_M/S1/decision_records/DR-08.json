@@ -11,7 +11,7 @@
       "label": "District-heating return 55 degC",
       "evidence_ids": [
         "config:assumptions.yaml#DB-31",
-        "TR-012",
+        "TR-013",
         "TR-016"
       ],
       "recommended": true,
@@ -23,7 +23,7 @@
       "label": "District-heating return 45 degC",
       "evidence_ids": [
         "config:assumptions.yaml#DB-31",
-        "TR-012",
+        "TR-013",
         "TR-016"
       ],
       "recommended": false,
@@ -35,7 +35,7 @@
       "label": "District-heating return 65 degC",
       "evidence_ids": [
         "config:assumptions.yaml#DB-31",
-        "TR-012",
+        "TR-013",
         "TR-016"
       ],
       "recommended": false,
@@ -47,7 +47,7 @@
       "label": "District-heating return 75 degC",
       "evidence_ids": [
         "config:assumptions.yaml#DB-31",
-        "TR-012",
+        "TR-013",
         "TR-016"
       ],
       "recommended": false,
@@ -56,7 +56,7 @@
     }
   ],
   "evidence_ids": [
-    "TR-012",
+    "TR-013",
     "TR-016",
     "config:assumptions.yaml#DB-31"
   ],
@@ -71,12 +71,12 @@
       "dh-return-55"
     ],
     "evidence_ids": [
-      "TR-012",
+      "TR-013",
       "TR-016",
       "config:assumptions.yaml#DB-31"
     ]
   },
-  "rationale": "The chosen option matches the register default for the district-heating return temperature (DB-31) as identified in the assumptions register.",
+  "rationale": "The chosen option matches the register default for the district-heating return temperature (DB-31) as specified in the assumptions register.",
   "rejected": [
     {
       "option_id": "dh-return-45",

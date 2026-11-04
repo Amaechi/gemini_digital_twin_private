@@ -14,13 +14,17 @@
         "TR-010",
         "TR-011",
         "TR-012",
+        "TR-013",
         "TR-014",
         "TR-015",
+        "TR-016",
+        "TR-018",
+        "TR-019",
         "config:design_basis.yaml#DB-01"
       ],
       "recommended": true,
       "eligible": true,
-      "notes": "candidates: C1-3d, C2-2d, C3-2d, C6-2d, C7-2d, C8-3d; top-ranked (LCOH ranking)"
+      "notes": "candidates: C1-3d, C2-2d, C3-2d, C6-2d, C7-2d, C8-3d, C2-opt, C6-opt, C1-opt; top-ranked (LCOH ranking)"
     },
     {
       "id": "depth-3200m",
@@ -30,8 +34,11 @@
         "TR-010",
         "TR-011",
         "TR-012",
+        "TR-013",
         "TR-014",
-        "TR-015"
+        "TR-015",
+        "TR-018",
+        "TR-019"
       ],
       "recommended": false,
       "eligible": false,
@@ -45,8 +52,11 @@
         "TR-010",
         "TR-011",
         "TR-012",
+        "TR-013",
         "TR-014",
-        "TR-015"
+        "TR-015",
+        "TR-018",
+        "TR-019"
       ],
       "recommended": false,
       "eligible": true,
@@ -58,8 +68,12 @@
     "TR-010",
     "TR-011",
     "TR-012",
+    "TR-013",
     "TR-014",
     "TR-015",
+    "TR-016",
+    "TR-018",
+    "TR-019",
     "config:design_basis.yaml#DB-01"
   ],
   "choice": "depth-2500m",
@@ -73,21 +87,23 @@
       "depth-2500m"
     ],
     "evidence_ids": [
-      "TR-011",
-      "TR-012",
+      "TR-013",
       "TR-014",
-      "TR-015"
+      "TR-015",
+      "TR-016",
+      "TR-018",
+      "TR-019"
     ]
   },
-  "rationale": "lowest lcoh_per_mwh among guard-passed options in economics as identified by TR-015 and the ranking in the criteria. depth-3200m was rejected because it was excluded by the DesignGuard. depth-1500m was rejected because it did not achieve the best ranking in the specified economic criterion.",
+  "rationale": "Selected based on lowest lcoh_per_mwh among guard-passed options in economics as evidenced by TR-013, TR-014, TR-015, TR-016, TR-018, and TR-019.",
   "rejected": [
     {
       "option_id": "depth-3200m",
-      "reason": "Not chosen."
+      "reason": "Excluded by DesignGuard/verifier as per TR-013, TR-014, TR-015, TR-016, TR-018, and TR-019."
     },
     {
       "option_id": "depth-1500m",
-      "reason": "Not chosen."
+      "reason": "Not the best option under the lowest lcoh_per_mwh criterion in economics."
     }
   ],
   "decision_source": "llm",

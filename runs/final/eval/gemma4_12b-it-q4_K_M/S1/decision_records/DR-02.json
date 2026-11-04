@@ -22,7 +22,7 @@
       ],
       "recommended": true,
       "eligible": true,
-      "notes": "candidates: C1-3d, C2-2d, C3-2d, C6-2d, C7-2d, C8-3d, C2-opt, C6-opt, C1-opt; top-ranked (LCOH ranking)"
+      "notes": "candidates: C1-3d, C2-2d, C3-2d, C6-2d, C7-2d, C8-3d; top-ranked (LCOH ranking)"
     },
     {
       "id": "depth-3200m",
@@ -33,6 +33,7 @@
         "TR-011",
         "TR-012",
         "TR-013",
+        "TR-014",
         "TR-016",
         "TR-017"
       ],
@@ -49,6 +50,7 @@
         "TR-011",
         "TR-012",
         "TR-013",
+        "TR-014",
         "TR-016",
         "TR-017"
       ],
@@ -79,14 +81,13 @@
       "depth-2500m"
     ],
     "evidence_ids": [
-      "TR-012",
       "TR-013",
       "TR-014",
       "TR-016",
       "TR-017"
     ]
   },
-  "rationale": "Selected based on ranking-lowest-lcoh_per_mwh among guard-passed options in economics as it contains the top-ranked candidates. depth-3200m was rejected because it was excluded by the design guard. depth-1500m was rejected because it contained only candidate C5-3d, which was lower in the ranking than the candidates in the selected option.",
+  "rationale": "Selected based on lowest lcoh_per_mwh among guard-passed options in economics as specified in ranking-lowest-lcoh_per_mwh. Option depth-3200m was rejected because it was excluded by the design guard. Option depth-1500m was rejected because it did not achieve the best ranking in the specified economic criteria.",
   "rejected": [
     {
       "option_id": "depth-3200m",

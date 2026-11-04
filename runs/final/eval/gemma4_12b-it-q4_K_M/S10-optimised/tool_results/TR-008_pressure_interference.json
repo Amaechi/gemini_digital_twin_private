@@ -1,61 +1,61 @@
 {
  "data": {
   "doublets": 3,
-  "flow_m3h": 200.0,
+  "flow_m3h": 150.0,
   "spacing_m": 1200.0,
   "layout": "parallel",
-  "unit_pressure_bar": 1.7918616441145152,
+  "unit_pressure_bar": 1.3438962330858863,
   "limit_bar": 1.0,
-  "min_separation_m": 1388.1300919806677,
-  "separation_m": 1388.1300919806677,
+  "min_separation_m": 1141.7924015224849,
+  "separation_m": 1141.7924015224849,
   "wells": [
    {
     "doublet": 0,
     "kind": "producer",
     "x_m": 0.0,
     "y_m": 0.0,
-    "pressure_change_bar": -0.6534588602461676
+    "pressure_change_bar": -0.6638473854848442
    },
    {
     "doublet": 0,
     "kind": "injector",
     "x_m": 0.0,
     "y_m": 1200.0,
-    "pressure_change_bar": 0.6534588602461675
+    "pressure_change_bar": 0.6638473854848443
    },
    {
     "doublet": 1,
     "kind": "producer",
-    "x_m": 1388.1300919806677,
+    "x_m": 1141.7924015224849,
     "y_m": 0.0,
-    "pressure_change_bar": -1.0000000000000007
+    "pressure_change_bar": -0.9999999999999992
    },
    {
     "doublet": 1,
     "kind": "injector",
-    "x_m": 1388.1300919806677,
+    "x_m": 1141.7924015224849,
     "y_m": 1200.0,
-    "pressure_change_bar": 1.0000000000000004
+    "pressure_change_bar": 0.9999999999999993
    },
    {
     "doublet": 2,
     "kind": "producer",
-    "x_m": 2776.2601839613353,
+    "x_m": 2283.5848030449697,
     "y_m": 0.0,
-    "pressure_change_bar": -0.6534588602461676
+    "pressure_change_bar": -0.6638473854848442
    },
    {
     "doublet": 2,
     "kind": "injector",
-    "x_m": 2776.2601839613353,
+    "x_m": 2283.5848030449697,
     "y_m": 1200.0,
-    "pressure_change_bar": 0.6534588602461675
+    "pressure_change_bar": 0.6638473854848443
    }
   ],
-  "max_abs_pressure_change_bar": 1.0000000000000007,
+  "max_abs_pressure_change_bar": 0.9999999999999993,
   "within_limit": true
  },
- "summary": "3 doublets (parallel, D 1200 m, Q 200 m\u00b3/h): max |\u0394P| 1.00 bar at separation 1388 m (limit 1 bar \u21d2 min 1388 m); within limit: True",
+ "summary": "3 doublets (parallel, D 1200 m, Q 150 m\u00b3/h): max |\u0394P| 1.00 bar at separation 1142 m (limit 1 bar \u21d2 min 1142 m); within limit: True",
  "warnings": [],
  "assumption_ids": [
   "SUB-SPACING"

@@ -1,40 +1,41 @@
 {
-  "generated_at": "2026-11-03T10:23:31.989786+00:00",
+  "generated_at": "2026-11-04T07:59:01.288960+00:00",
   "models": [
     {
       "model": "gemma4:12b-it-q4_K_M",
       "engine": "llm",
       "eval_dir": "runs/final/eval/gemma4_12b-it-q4_K_M",
       "outcomes": {
-        "pass": 5,
-        "pending": 5,
-        "fail": 1,
+        "pass": 8,
+        "pending": 3,
+        "fail": 0,
         "skipped": 0,
         "error": 0
       },
       "scenarios": {
         "S1": "pass",
-        "S2": "pending",
+        "S2": "pass",
         "S3": "pass",
         "S4": "pass",
-        "S5": "pending",
+        "S5": "pass",
         "S6": "pass",
-        "S7": "fail",
-        "S8": "pending",
+        "S7": "pending",
+        "S8": "pass",
         "S9": "pass",
         "S10": "pending",
         "S11": "pending"
       },
-      "checks_passed": 40,
-      "checks_total": 41,
-      "tool_call_validity_frac": 0.92,
-      "llm_calls": 325,
-      "retries": 114,
-      "fallbacks": 26,
-      "step_rejections": 10,
-      "kind_coercions": 59,
-      "total_tokens": 1073346,
-      "runtime_s": 3727.928
+      "checks_passed": 46,
+      "checks_total": 46,
+      "tool_call_validity_frac": 0.9408,
+      "llm_calls": 338,
+      "retries": 111,
+      "fallbacks": 20,
+      "step_rejections": 8,
+      "kind_coercions": 60,
+      "token_budget_overruns": 0,
+      "total_tokens": 1089550,
+      "runtime_s": 4166.744
     },
     {
       "model": "qwen3.6:27b",
@@ -58,6 +59,7 @@
       "fallbacks": 7,
       "step_rejections": 1,
       "kind_coercions": 0,
+      "token_budget_overruns": 0,
       "total_tokens": 126855,
       "runtime_s": 672.538
     },
@@ -83,6 +85,7 @@
       "fallbacks": 1,
       "step_rejections": 1,
       "kind_coercions": 0,
+      "token_budget_overruns": 0,
       "total_tokens": 79061,
       "runtime_s": 167.335
     },
@@ -108,6 +111,7 @@
       "fallbacks": 7,
       "step_rejections": 2,
       "kind_coercions": 4,
+      "token_budget_overruns": 0,
       "total_tokens": 101871,
       "runtime_s": 175.731
     },
@@ -133,6 +137,7 @@
       "fallbacks": 7,
       "step_rejections": 1,
       "kind_coercions": 0,
+      "token_budget_overruns": 0,
       "total_tokens": 83724,
       "runtime_s": 203.201
     }

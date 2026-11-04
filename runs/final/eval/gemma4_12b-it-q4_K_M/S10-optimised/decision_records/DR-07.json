@@ -79,7 +79,7 @@
   "rejected": [
     {
       "option_id": "pressurised-reinject",
-      "reason": "higher lcoh_per_mwh than degas-use based on TR-019."
+      "reason": "higher lcoh_per_mwh compared to degas-use in TR-019."
     }
   ],
   "decision_source": "llm",

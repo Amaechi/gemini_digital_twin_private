@@ -8,7 +8,7 @@
     "retries": 0,
     "fallbacks": 0,
     "errors": 0,
-    "latency_s": 4.3305
+    "latency_s": 2.7118
   },
   "by_agent": {
     "lead_engineer": {
@@ -20,7 +20,7 @@
       "retries": 0,
       "fallbacks": 0,
       "errors": 0,
-      "latency_s": 4.3305
+      "latency_s": 2.7118
     }
   },
   "by_phase": {
@@ -33,7 +33,7 @@
       "retries": 0,
       "fallbacks": 0,
       "errors": 0,
-      "latency_s": 4.3305
+      "latency_s": 2.7118
     }
   },
   "by_agent_phase": {
@@ -47,7 +47,7 @@
         "retries": 0,
         "fallbacks": 0,
         "errors": 0,
-        "latency_s": 4.3305
+        "latency_s": 2.7118
       }
     }
   },
@@ -61,7 +61,7 @@
       "retries": 0,
       "fallbacks": 0,
       "errors": 0,
-      "latency_s": 4.3305
+      "latency_s": 2.7118
     }
   },
   "by_model": {
@@ -74,7 +74,7 @@
       "retries": 0,
       "fallbacks": 0,
       "errors": 0,
-      "latency_s": 4.3305
+      "latency_s": 2.7118
     }
   },
   "corrupt_lines": 0

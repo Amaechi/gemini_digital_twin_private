@@ -82,19 +82,19 @@
       "config:assumptions.yaml#DB-31"
     ]
   },
-  "rationale": "register default kept for the district-heating return temperature (DB-31) as specified in the assumptions register.",
+  "rationale": "The option follows the register default kept for the district-heating return temperature (DB-31) as indicated in the assumptions register.",
   "rejected": [
     {
       "option_id": "dh-return-45",
-      "reason": "Does not match the register default for the district-heating return temperature (DB-31)."
+      "reason": "Does not match the register default kept for the district-heating return temperature (DB-31)."
     },
     {
       "option_id": "dh-return-65",
-      "reason": "Does not match the register default for the district-heating return temperature (DB-31)."
+      "reason": "Does not match the register default kept for the district-heating return temperature (DB-31)."
     },
     {
       "option_id": "dh-return-75",
-      "reason": "Does not match the register default for the district-heating return temperature (DB-31)."
+      "reason": "Does not match the register default kept for the district-heating return temperature (DB-31)."
     }
   ],
   "decision_source": "llm",

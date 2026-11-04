@@ -1,0 +1,117 @@
+{
+ "data": {
+  "mode": "full",
+  "kpis": [
+   {
+    "candidate_id": "C2-opt",
+    "unmet_heating_days": 0,
+    "unmet_heating_mwh": 0.0,
+    "unmet_cooling_days": 0,
+    "unmet_cooling_mwh": 0.0,
+    "installed_heating_mw": 30.551795791982137,
+    "installed_cooling_mw": 16.79078720356259,
+    "heat_by_source_mwh": {
+     "hex_1": 34480.221656045156,
+     "hex_2": 33291.222364051304,
+     "hthp_1": 17367.9427175552,
+     "hthp_2": 15696.265714132749,
+     "chp": 9514.882233325772,
+     "peak_boiler": 1317.1453148898518
+    },
+    "cool_by_source_mwh": {
+     "free_cooling": 20587.903541325963,
+     "electric_chiller": 3154.6244586740345
+    },
+    "doublet_capacity_factors_frac": [
+     0.45520131010919473,
+     0.4336673266266838
+    ],
+    "electricity_consumed_mwh": 14201.00476238566,
+    "electricity_generated_mwh": 4757.441116662885,
+    "gas_fuel_mwh": 16330.498283893572,
+    "co2_t_per_yr": 6800.585245432872,
+    "co2_reduction_vs_c0_frac": 0.7417385143493574,
+    "currency": "USD",
+    "capex_million": 29.156472136856095,
+    "opex_million_per_yr": 2.1592630222920963,
+    "lcoh_per_mwh": 42.952756858447366,
+    "lcoc_per_mwh": 26.325376211555238,
+    "lcoh_20yr_per_mwh": 44.97370386901676,
+    "lcoc_20yr_per_mwh": 28.654128315964037,
+    "electricity_purchased_mwh": 9443.5636457228,
+    "grid_gas_fuel_mwh": 1463.4947943220575,
+    "exergy_efficiency_frac": 0.4826838746603928,
+    "exergy_dead_state": "T0 = daily dry-bulb (DB-34d), De Bilt (KNMI) 2027: mean 10.5 \u00b0C, range 3.6\u201318.2 \u00b0C",
+    "exergy_utilisation_frac": 0.5170785592638195,
+    "min_constraint_margins": {
+     "esp_1_intake_margin_bar": 0.45871344168681816,
+     "doublet_1_brine_cooling_margin_k": 0.0,
+     "doublet_1_flow_margin_m3h": -1.7238050986634335e-09,
+     "doublet_1_injection_balance_margin_m3h": -0.0,
+     "esp_2_intake_margin_bar": 0.45871344168681816,
+     "doublet_2_brine_cooling_margin_k": 0.0,
+     "doublet_2_flow_margin_m3h": -6.95195012667682e-11,
+     "doublet_2_injection_balance_margin_m3h": -0.0,
+     "hthp_1_rc04_limits_margin_count": 0.0,
+     "hthp_1_lift_margin_k": 0.004186047985591301,
+     "hthp_2_rc04_limits_margin_count": 0.0,
+     "hthp_2_lift_margin_k": 0.014785110322272033,
+     "heating_supply_margin_k": -1.4210854715202004e-14,
+     "heat_surplus_margin_mw": -0.0,
+     "hthp_capacity_margin_mw": 1.208028156618468e-05,
+     "peak_boiler_capacity_margin_mw": 0.0429224343277026,
+     "cooling_supply_margin_k": 0.0
+    },
+    "thermal_breakthrough_yr": 74.57337746599926,
+    "percentiles": {}
+   }
+  ],
+  "simulations": [
+   {
+    "candidate_id": "C2-opt",
+    "mode": "full",
+    "status": "ok",
+    "reason": "",
+    "config_hash": "a7e58ab5bd0116d81544afa3db84158ca0bf353cb912e402c5858118de072b3e",
+    "simulated_days": 365,
+    "outage_start_indices": [
+     111,
+     184
+    ],
+    "max_fast_full_discrepancy_frac": 0.003518327303305918,
+    "invalid_full_days": 0,
+    "right_sized_mw": {},
+    "warnings": [
+     "hthp_1: MISSING HTHP datasheet values ['max_lift_k', 'max_sink_temperature_degc', 'max_carnot_fraction']: RC-04 defaults VER-HP-ETA, VER-HP-LIFT; max sink temperature not checked [\u00d71180]",
+     "hthp_1: COP 5.22 capped at 0.6 x Carnot = 4.39 (RC-04) [\u00d71180]",
+     "hthp_1: sink water \u0394T 11.5 K > 11 K: needs a 4/8-pass evaporator/condenser (Guidebook p.250) [\u00d7996]",
+     "hthp_1: source water \u0394T 12.1 K > 11 K: needs a 4/8-pass evaporator/condenser (Guidebook p.250) [\u00d7632]",
+     "electric_chiller: COP 2147.95 capped at 8 [\u00d7283]"
+    ],
+    "files": {
+     "csv_full": "annual_C2-opt_full.csv",
+     "csv_fast": "annual_C2-opt_fast.csv",
+     "summary": "annual_C2-opt_full_summary.json"
+    }
+   }
+  ],
+  "economics": [],
+  "cost_items": []
+ },
+ "summary": "TL-12 full: 1 year(s) simulated (C2-opt unmet 0/0 d)",
+ "warnings": [
+  "hthp_1: MISSING HTHP datasheet values ['max_lift_k', 'max_sink_temperature_degc', 'max_carnot_fraction']: RC-04 defaults VER-HP-ETA, VER-HP-LIFT; max sink temperature not checked [\u00d71180]",
+  "hthp_1: COP 5.22 capped at 0.6 x Carnot = 4.39 (RC-04) [\u00d71180]"
+ ],
+ "assumption_ids": [
+  "DB-30",
+  "SIM-FAST",
+  "SIM-OUTAGE",
+  "DSP-FLOW",
+  "CFG-SIZING"
+ ],
+ "sources": [
+  "spec \u00a78 SIM-01\u202607",
+  "TL-12 simulate_annual"
+ ]
+}

@@ -51,7 +51,7 @@
   "rejected": [
     {
       "option_id": "stainless-plates",
-      "reason": "Fails the materials check for saline brine in spec \u00a710.1."
+      "reason": "Fails the materials check for saline brine as specified in spec \u00a710.1."
     }
   ],
   "decision_source": "llm",

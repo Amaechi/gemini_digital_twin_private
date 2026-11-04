@@ -56,7 +56,7 @@
       "config:assumptions.yaml#UQ-MC"
     ]
   },
-  "rationale": "Selected based on the OPT-ROBUST-BACKUP criterion, which requires installing robust_backup_mw when it raises probability_demand_met, as shown in TR-023. Option installed-backup was rejected because it does not meet the required probability_demand_met improvement defined in the register rule.",
+  "rationale": "Selected based on the OPT-ROBUST-BACKUP criterion, which requires installing robust_backup_mw when it raises probability_demand_met, as shown in TR-023. Option installed-backup was rejected because it does not meet the robust_backup requirement defined in the assumptions register.",
   "rejected": [
     {
       "option_id": "installed-backup",

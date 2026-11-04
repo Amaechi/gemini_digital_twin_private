@@ -54,11 +54,11 @@
       "TR-013"
     ]
   },
-  "rationale": "lowest lcoh_per_mwh among guard-passed options in economics based on TR-013.",
+  "rationale": "Selected based on ranking-lowest-lcoh_per_mwh among guard-passed options in economics, as identified in TR-013.",
   "rejected": [
     {
       "option_id": "3-doublets",
-      "reason": "higher lcoh_per_mwh than the selected option based on TR-013."
+      "reason": "Higher lcoh_per_mwh compared to the selected option according to TR-013."
     }
   ],
   "decision_source": "llm",

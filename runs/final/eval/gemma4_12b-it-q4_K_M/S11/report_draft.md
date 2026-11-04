@@ -202,9 +202,9 @@ Samples 12 (failed 0); P(demand met) at installed backups 0.4166666666666667; ro
 - DR-03 Heat top-up technology: Plate HEX + HTHP in series + CHP + peak boiler (C2/C3) (llm; criterion ranking-lowest-lcoh_per_mwh)
 - DR-04 Cooling technology mix: Free cooling + electric chillers (C2, C5) (llm; criterion ranking-lowest-lcoh_per_mwh)
 - DR-05 Storage yes/no: No seasonal storage (llm; criterion ranking-lowest-lcoh_per_mwh)
-- DR-07 Gas handling (degas + CHP vs pressurised reinjection): Gas handling: degas_use (policy_fallback; criterion ranking-lowest-lcoh_per_mwh)
+- DR-07 Gas handling (degas + CHP vs pressurised reinjection): Gas handling: degas_use (llm; criterion ranking-lowest-lcoh_per_mwh)
 - DR-08 Return temperature: District-heating return 55 degC (llm; criterion db31-answer)
-- DR-06 Maintenance windows: Outages placed by the optimiser in the lowest-load windows, never overlapping (DB-30) (llm; criterion db30-non-overlapping)
+- DR-06 Maintenance windows: Outages placed by the optimiser in the lowest-load windows, never overlapping (DB-30) (policy_fallback; criterion db30-non-overlapping)
 - DR-11 Backup capacity (robustness): Install the TL-15 P90 robust backups (electric_chiller_mw 8.20, peak_boiler_mw 7.85 MW) as C2-opt-robust (llm; criterion opt-robust-backup)
 - DR-10 Final selection: C2-opt-robust (C2-opt with the TL-15 P90 robust backups (OPT-ROBUST-BACKUP)) (llm; criterion selected-not-rejected)
 

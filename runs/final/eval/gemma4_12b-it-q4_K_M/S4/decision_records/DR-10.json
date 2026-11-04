@@ -10,9 +10,9 @@
       "id": "C2-opt-robust",
       "label": "C2-opt-robust (C2-opt with the TL-15 P90 robust backups (OPT-ROBUST-BACKUP))",
       "evidence_ids": [
-        "TR-021",
-        "TR-022",
-        "TR-023"
+        "TR-025",
+        "TR-026",
+        "TR-027"
       ],
       "recommended": true,
       "eligible": true,
@@ -23,11 +23,14 @@
       "label": "C2-opt (TL-13 optimum of C2 (sized from C2-2d))",
       "evidence_ids": [
         "TR-016",
-        "TR-017",
         "TR-018",
         "TR-019",
         "TR-020",
-        "TR-021"
+        "TR-021",
+        "TR-022",
+        "TR-023",
+        "TR-024",
+        "TR-025"
       ],
       "recommended": false,
       "eligible": false,
@@ -37,7 +40,10 @@
       "id": "C6-opt",
       "label": "C6-opt (TL-13 optimum of C6 (sized from C6-2d))",
       "evidence_ids": [
-        "TR-016"
+        "TR-016",
+        "TR-018",
+        "TR-019",
+        "TR-020"
       ],
       "recommended": false,
       "eligible": false,
@@ -47,7 +53,10 @@
       "id": "C1-opt",
       "label": "C1-opt (TL-13 optimum of C1 (sized from C1-3d))",
       "evidence_ids": [
-        "TR-016"
+        "TR-016",
+        "TR-018",
+        "TR-019",
+        "TR-020"
       ],
       "recommended": false,
       "eligible": false,
@@ -56,13 +65,16 @@
   ],
   "evidence_ids": [
     "TR-016",
-    "TR-017",
     "TR-018",
     "TR-019",
     "TR-020",
     "TR-021",
     "TR-022",
-    "TR-023"
+    "TR-023",
+    "TR-024",
+    "TR-025",
+    "TR-026",
+    "TR-027"
   ],
   "choice": "C2-opt-robust",
   "choice_label": "C2-opt-robust (C2-opt with the TL-15 P90 robust backups (OPT-ROBUST-BACKUP))",
@@ -75,24 +87,24 @@
       "C2-opt-robust"
     ],
     "evidence_ids": [
-      "TR-023"
+      "TR-027"
     ]
   },
-  "rationale": "Decisive criterion: selected design whose latest verifier verdict is not REJECTED; it selects C2-opt-robust (TR-023).",
+  "rationale": "The design is selected based on the verdict criterion because it is the only option with an ACCEPTED status in the verifier results.",
   "rejected": [
     {
       "option_id": "C2-opt",
-      "reason": "Not eligible: not the verified design (only the verified design can be selected)"
+      "reason": "not the verified design"
     },
     {
       "option_id": "C6-opt",
-      "reason": "Not eligible: not the verified design (only the verified design can be selected)"
+      "reason": "not the verified design"
     },
     {
       "option_id": "C1-opt",
-      "reason": "Not eligible: not the verified design (only the verified design can be selected)"
+      "reason": "not the verified design"
     }
   ],
-  "decision_source": "policy_fallback",
+  "decision_source": "llm",
   "stub_evidence": false
 }

@@ -8,7 +8,7 @@
 | [DR-04](DR-04.md) | Cooling technology mix | free-cooling-electric | llm | no |
 | [DR-05](DR-05.md) | Storage yes/no | no-storage | llm | no |
 | [DR-06](DR-06.md) | Maintenance windows | optimiser-lowest-load | llm | no |
-| [DR-07](DR-07.md) | Gas handling (degas + CHP vs pressurised reinjection) | degas-use | policy_fallback | no |
+| [DR-07](DR-07.md) | Gas handling (degas + CHP vs pressurised reinjection) | degas-use | llm | no |
 | [DR-08](DR-08.md) | Return temperature | dh-return-55 | llm | no |
 | [DR-09](DR-09.md) | Materials | titanium-plates-no-cu | llm | no |
 | [DR-10](DR-10.md) | Final selection | C2-opt-robust | llm | no |

@@ -22,9 +22,6 @@
       "id": "C2-opt",
       "label": "C2-opt (TL-13 optimum of C2 (sized from C2-2d))",
       "evidence_ids": [
-        "TR-014",
-        "TR-016",
-        "TR-017",
         "TR-018",
         "TR-019",
         "TR-020",
@@ -40,9 +37,6 @@
       "id": "C6-opt",
       "label": "C6-opt (TL-13 optimum of C6 (sized from C6-2d))",
       "evidence_ids": [
-        "TR-014",
-        "TR-016",
-        "TR-017",
         "TR-018"
       ],
       "recommended": false,
@@ -53,9 +47,6 @@
       "id": "C1-opt",
       "label": "C1-opt (TL-13 optimum of C1 (sized from C1-3d))",
       "evidence_ids": [
-        "TR-014",
-        "TR-016",
-        "TR-017",
         "TR-018"
       ],
       "recommended": false,
@@ -64,9 +55,6 @@
     }
   ],
   "evidence_ids": [
-    "TR-014",
-    "TR-016",
-    "TR-017",
     "TR-018",
     "TR-019",
     "TR-020",
@@ -90,7 +78,7 @@
       "TR-025"
     ]
   },
-  "rationale": "The design is selected based on the verdict criterion because it is the only option with an ACCEPTED status from the verifier. Options C2-opt, C6-opt, and C1-opt were rejected because they were not the verified designs.",
+  "rationale": "The design is recommended based on the verdict criterion because it is the only option with an ACCEPTED status in the verification results. Options C2-opt, C6-opt, and C1-opt were rejected because they were not the verified designs.",
   "rejected": [
     {
       "option_id": "C2-opt",

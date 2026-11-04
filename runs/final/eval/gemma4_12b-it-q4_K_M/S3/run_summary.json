@@ -11,6 +11,7 @@
   "excluded_candidates": [],
   "llm_fallbacks": 0,
   "conflicts": [],
+  "missing_inputs": [],
   "assumptions_and_answers": [],
   "decision_records": [],
   "tool_calls": 0,

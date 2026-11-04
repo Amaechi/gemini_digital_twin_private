@@ -1,14 +1,14 @@
 {
   "total": {
-    "calls": 3,
-    "input_tokens": 6139,
-    "output_tokens": 657,
-    "total_tokens": 6796,
-    "requests": 4,
-    "retries": 1,
+    "calls": 1,
+    "input_tokens": 1062,
+    "output_tokens": 59,
+    "total_tokens": 1121,
+    "requests": 1,
+    "retries": 0,
     "fallbacks": 0,
     "errors": 0,
-    "latency_s": 26.3383
+    "latency_s": 4.5925
   },
   "by_agent": {
     "lead_engineer": {
@@ -20,18 +20,7 @@
       "retries": 0,
       "fallbacks": 0,
       "errors": 0,
-      "latency_s": 4.5324
-    },
-    "requirements": {
-      "calls": 2,
-      "input_tokens": 5077,
-      "output_tokens": 598,
-      "total_tokens": 5675,
-      "requests": 3,
-      "retries": 1,
-      "fallbacks": 0,
-      "errors": 0,
-      "latency_s": 21.8059
+      "latency_s": 4.5925
     }
   },
   "by_phase": {
@@ -44,18 +33,7 @@
       "retries": 0,
       "fallbacks": 0,
       "errors": 0,
-      "latency_s": 4.5324
-    },
-    "P1": {
-      "calls": 2,
-      "input_tokens": 5077,
-      "output_tokens": 598,
-      "total_tokens": 5675,
-      "requests": 3,
-      "retries": 1,
-      "fallbacks": 0,
-      "errors": 0,
-      "latency_s": 21.8059
+      "latency_s": 4.5925
     }
   },
   "by_agent_phase": {
@@ -69,47 +47,34 @@
         "retries": 0,
         "fallbacks": 0,
         "errors": 0,
-        "latency_s": 4.5324
-      }
-    },
-    "requirements": {
-      "P1": {
-        "calls": 2,
-        "input_tokens": 5077,
-        "output_tokens": 598,
-        "total_tokens": 5675,
-        "requests": 3,
-        "retries": 1,
-        "fallbacks": 0,
-        "errors": 0,
-        "latency_s": 21.8059
+        "latency_s": 4.5925
       }
     }
   },
   "by_decision_source": {
     "llm": {
-      "calls": 3,
-      "input_tokens": 6139,
-      "output_tokens": 657,
-      "total_tokens": 6796,
-      "requests": 4,
-      "retries": 1,
+      "calls": 1,
+      "input_tokens": 1062,
+      "output_tokens": 59,
+      "total_tokens": 1121,
+      "requests": 1,
+      "retries": 0,
       "fallbacks": 0,
       "errors": 0,
-      "latency_s": 26.3383
+      "latency_s": 4.5925
     }
   },
   "by_model": {
     "gemma4:12b-it-q4_K_M": {
-      "calls": 3,
-      "input_tokens": 6139,
-      "output_tokens": 657,
-      "total_tokens": 6796,
-      "requests": 4,
-      "retries": 1,
+      "calls": 1,
+      "input_tokens": 1062,
+      "output_tokens": 59,
+      "total_tokens": 1121,
+      "requests": 1,
+      "retries": 0,
       "fallbacks": 0,
       "errors": 0,
-      "latency_s": 26.3383
+      "latency_s": 4.5925
     }
   },
   "corrupt_lines": 0

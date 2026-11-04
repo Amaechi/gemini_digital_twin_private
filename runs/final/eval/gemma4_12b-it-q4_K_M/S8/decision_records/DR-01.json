@@ -13,14 +13,12 @@
         "TR-009",
         "TR-010",
         "TR-011",
-        "TR-012",
         "TR-013",
-        "TR-015",
-        "TR-016"
+        "TR-014"
       ],
       "recommended": true,
       "eligible": true,
-      "notes": "candidates: C2-2d, C3-2d, C6-2d, C7-2d, C2-opt, C6-opt; excluded by DesignGuard/verifier: C4-2d; top-ranked (LCOH ranking); resource: permeability 50 mD (design basis); TR-005 PI 3.06 m\u00b3/h/bar (k 50 mD, h 100 m, S 0, ln(re/rw) 9.13); II = PI; drawdown 98.2 bar and injection overpressure 98.2 bar at 300 m\u00b3/h"
+      "notes": "candidates: C2-2d, C3-2d, C6-2d, C7-2d; excluded by DesignGuard/verifier: C4-2d; top-ranked (LCOH ranking); resource: permeability 50 mD (design basis); TR-005 PI 3.06 m\u00b3/h/bar (k 50 mD, h 100 m, S 0, ln(re/rw) 9.13); II = PI; drawdown 98.2 bar and injection overpressure 98.2 bar at 300 m\u00b3/h"
     },
     {
       "id": "3-doublets",
@@ -29,24 +27,20 @@
         "TR-009",
         "TR-010",
         "TR-011",
-        "TR-012",
         "TR-013",
-        "TR-015",
-        "TR-016"
+        "TR-014"
       ],
       "recommended": false,
       "eligible": true,
-      "notes": "candidates: C1-3d, C5-3d, C8-3d, C8-opt; resource: permeability 50 mD (design basis); TR-005 PI 3.06 m\u00b3/h/bar (k 50 mD, h 100 m, S 0, ln(re/rw) 9.13); II = PI; drawdown 98.2 bar and injection overpressure 98.2 bar at 300 m\u00b3/h"
+      "notes": "candidates: C1-3d, C5-3d, C8-3d; resource: permeability 50 mD (design basis); TR-005 PI 3.06 m\u00b3/h/bar (k 50 mD, h 100 m, S 0, ln(re/rw) 9.13); II = PI; drawdown 98.2 bar and injection overpressure 98.2 bar at 300 m\u00b3/h"
     }
   ],
   "evidence_ids": [
     "TR-009",
     "TR-010",
     "TR-011",
-    "TR-012",
     "TR-013",
-    "TR-015",
-    "TR-016"
+    "TR-014"
   ],
   "choice": "2-doublets",
   "choice_label": "2 doublet(s)",
@@ -59,18 +53,15 @@
       "2-doublets"
     ],
     "evidence_ids": [
-      "TR-011",
-      "TR-012",
       "TR-013",
-      "TR-015",
-      "TR-016"
+      "TR-014"
     ]
   },
   "rationale": "lowest lcoh_per_mwh among guard-passed options in economics",
   "rejected": [
     {
       "option_id": "3-doublets",
-      "reason": "higher lcoh_per_mwh compared to 2-doublets"
+      "reason": "higher lcoh_per_mwh than 2-doublets"
     }
   ],
   "decision_source": "llm",

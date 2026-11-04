@@ -78,21 +78,21 @@
       "TR-021"
     ]
   },
-  "rationale": "C2-opt-robust is the only design with a verdict of ACCEPTED in the verify_design tool, satisfying the selected-not-rejected criterion based on TR-021. C2-opt, C6-opt, and C1-opt were rejected because they are not the verified designs.",
+  "rationale": "Decisive criterion: selected design whose latest verifier verdict is not REJECTED; it selects C2-opt-robust (TR-021).",
   "rejected": [
     {
       "option_id": "C2-opt",
-      "reason": "Not chosen."
+      "reason": "Not eligible: not the verified design (only the verified design can be selected)"
     },
     {
       "option_id": "C6-opt",
-      "reason": "Not chosen."
+      "reason": "Not eligible: not the verified design (only the verified design can be selected)"
     },
     {
       "option_id": "C1-opt",
-      "reason": "Not chosen."
+      "reason": "Not eligible: not the verified design (only the verified design can be selected)"
     }
   ],
-  "decision_source": "llm",
+  "decision_source": "policy_fallback",
   "stub_evidence": false
 }

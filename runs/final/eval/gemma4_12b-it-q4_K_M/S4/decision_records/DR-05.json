@@ -14,12 +14,16 @@
         "TR-010",
         "TR-011",
         "TR-012",
+        "TR-013",
         "TR-014",
-        "TR-015"
+        "TR-015",
+        "TR-016",
+        "TR-018",
+        "TR-019"
       ],
       "recommended": true,
       "eligible": true,
-      "notes": "candidates: C1-3d, C2-2d, C3-2d, C5-3d, C7-2d, C8-3d; excluded by DesignGuard/verifier: C4-2d; top-ranked (LCOH ranking)"
+      "notes": "candidates: C1-3d, C2-2d, C3-2d, C5-3d, C7-2d, C8-3d, C2-opt, C1-opt; excluded by DesignGuard/verifier: C4-2d; top-ranked (LCOH ranking)"
     },
     {
       "id": "seasonal-ht-ates",
@@ -29,12 +33,16 @@
         "TR-010",
         "TR-011",
         "TR-012",
+        "TR-013",
         "TR-014",
-        "TR-015"
+        "TR-015",
+        "TR-016",
+        "TR-018",
+        "TR-019"
       ],
       "recommended": false,
       "eligible": true,
-      "notes": "candidates: C6-2d"
+      "notes": "candidates: C6-2d, C6-opt"
     }
   ],
   "evidence_ids": [
@@ -42,8 +50,12 @@
     "TR-010",
     "TR-011",
     "TR-012",
+    "TR-013",
     "TR-014",
-    "TR-015"
+    "TR-015",
+    "TR-016",
+    "TR-018",
+    "TR-019"
   ],
   "choice": "no-storage",
   "choice_label": "No seasonal storage",
@@ -56,10 +68,12 @@
       "no-storage"
     ],
     "evidence_ids": [
-      "TR-011",
-      "TR-012",
+      "TR-013",
       "TR-014",
-      "TR-015"
+      "TR-015",
+      "TR-016",
+      "TR-018",
+      "TR-019"
     ]
   },
   "rationale": "lowest lcoh_per_mwh among guard-passed options in economics",

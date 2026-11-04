@@ -1620,3 +1620,38 @@ assumptions:
     tag: A
     status: default
     added_by: Pre-L-2
+  - id: CFG-BASIS-CONFIRM
+    title: Requested supply temperature off the design basis (DB-16/DB-17) — confirm before P1
+    value: keep
+    unit: null
+    justification: >-
+      Spec §12 S5: a request such as "supply heating at 120 °C" conflicts with the 100 °C heating supply
+      (DB-16) or the 20 °C cooling supply (DB-17), which are hard limits of this run (CLAUDE.md rule 4).
+      The P0 intake records the conflict (CONFLICT event); P1 then asks the user to confirm the change of
+      basis before any tool runs. Default "keep": the design continues on the design basis (the assumed
+      answer in --input-mode assume, as in the final run). "change": the run stops (escalation) because a
+      change of basis needs new limits in config/limits.yaml and config/design_basis.yaml and a new run; the
+      runner never silently designs for a supply temperature outside the limits.
+    source: GEOAGENT_DESIGN_SPEC §12 S5; §2.4 DB-16, DB-17; CLAUDE.md golden rule 4 [A]
+    sensitivity: "change stops the run (ESCALATED) instead of continuing; no design value depends on the entry."
+    tag: A
+    status: default
+    added_by: WP-13 follow-up
+  - id: CFG-INPUT-DEFAULTS
+    title: Challenge inputs the request does not provide — use the repository defaults
+    value: repository defaults
+    unit: null
+    justification: >-
+      Spec §12 S2: a request written without the challenge files ("Design a geothermal heating system for
+      30 MW") provides none of the demand CSVs, the cooling demand or the reservoir data. The P0 intake lists
+      which of the three the request text lacks (agents/scope.missing_request_inputs; the default brief
+      comes with every file and is never asked); P1 asks ONE question that names them and offers the
+      repository defaults — the design basis in config/ (design_basis.yaml, limits.yaml, climate_nl.yaml)
+      and the demand CSVs in data/demand/ — before anything is loaded or assumed. Default "repository
+      defaults" is the assumed answer in --input-mode assume; other inputs must be placed in those paths
+      before a new run (the runner reads no other location).
+    source: GEOAGENT_DESIGN_SPEC §12 S2; §2.4 (design basis files); README "Where the evidence is" [A]
+    sensitivity: "n/a: the answer selects the input files; the design values come from the files themselves."
+    tag: A
+    status: default
+    added_by: WP-13 follow-up

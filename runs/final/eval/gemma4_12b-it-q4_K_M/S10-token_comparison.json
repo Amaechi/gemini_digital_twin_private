@@ -1,75 +1,75 @@
 {
   "total": {
-    "naive_tokens": 183874.0,
-    "optimised_tokens": 101042.0,
-    "saved_tokens": 82832.0,
-    "saved_frac": 0.4505,
+    "naive_tokens": 173909.0,
+    "optimised_tokens": 108937.0,
+    "saved_tokens": 64972.0,
+    "saved_frac": 0.3736,
     "naive_calls": 34.0,
-    "optimised_calls": 34.0
+    "optimised_calls": 33.0
   },
   "by_agent": {
     "economics": {
-      "naive_tokens": 15669.0,
-      "optimised_tokens": 9439.0,
-      "saved_tokens": 6230.0,
-      "saved_frac": 0.3976,
+      "naive_tokens": 19177.0,
+      "optimised_tokens": 6460.0,
+      "saved_tokens": 12717.0,
+      "saved_frac": 0.6631,
       "naive_calls": 3.0,
       "optimised_calls": 3.0
     },
     "lead_engineer": {
-      "naive_tokens": 21979.0,
-      "optimised_tokens": 9726.0,
-      "saved_tokens": 12253.0,
-      "saved_frac": 0.5575,
-      "naive_calls": 4.0,
+      "naive_tokens": 10107.0,
+      "optimised_tokens": 12333.0,
+      "saved_tokens": -2226.0,
+      "saved_frac": -0.2202,
+      "naive_calls": 3.0,
       "optimised_calls": 4.0
     },
     "model_builder": {
-      "naive_tokens": 13351.0,
-      "optimised_tokens": 2349.0,
-      "saved_tokens": 11002.0,
-      "saved_frac": 0.8241,
-      "naive_calls": 2.0,
+      "naive_tokens": 27537.0,
+      "optimised_tokens": 2352.0,
+      "saved_tokens": 25185.0,
+      "saved_frac": 0.9146,
+      "naive_calls": 4.0,
       "optimised_calls": 1.0
     },
     "reporter": {
-      "naive_tokens": 15655.0,
-      "optimised_tokens": 3499.0,
-      "saved_tokens": 12156.0,
-      "saved_frac": 0.7765,
+      "naive_tokens": 16617.0,
+      "optimised_tokens": 1889.0,
+      "saved_tokens": 14728.0,
+      "saved_frac": 0.8863,
       "naive_calls": 2.0,
-      "optimised_calls": 2.0
+      "optimised_calls": 1.0
     },
     "requirements": {
       "naive_tokens": 9057.0,
-      "optimised_tokens": 7939.0,
-      "saved_tokens": 1118.0,
-      "saved_frac": 0.1234,
+      "optimised_tokens": 7895.0,
+      "saved_tokens": 1162.0,
+      "saved_frac": 0.1283,
       "naive_calls": 3.0,
       "optimised_calls": 3.0
     },
     "reviewer": {
-      "naive_tokens": 23579.0,
-      "optimised_tokens": 7471.0,
-      "saved_tokens": 16108.0,
-      "saved_frac": 0.6832,
+      "naive_tokens": 22961.0,
+      "optimised_tokens": 10160.0,
+      "saved_tokens": 12801.0,
+      "saved_frac": 0.5575,
       "naive_calls": 3.0,
       "optimised_calls": 2.0
     },
     "subsurface": {
-      "naive_tokens": 26640.0,
-      "optimised_tokens": 18041.0,
-      "saved_tokens": 8599.0,
-      "saved_frac": 0.3228,
+      "naive_tokens": 17966.0,
+      "optimised_tokens": 15273.0,
+      "saved_tokens": 2693.0,
+      "saved_frac": 0.1499,
       "naive_calls": 6.0,
       "optimised_calls": 6.0
     },
     "system_architect": {
-      "naive_tokens": 57944.0,
-      "optimised_tokens": 42578.0,
-      "saved_tokens": 15366.0,
-      "saved_frac": 0.2652,
-      "naive_calls": 11.0,
+      "naive_tokens": 50487.0,
+      "optimised_tokens": 52575.0,
+      "saved_tokens": -2088.0,
+      "saved_frac": -0.0414,
+      "naive_calls": 10.0,
       "optimised_calls": 13.0
     }
   },
@@ -84,81 +84,81 @@
     },
     "P1": {
       "naive_tokens": 9057.0,
-      "optimised_tokens": 7939.0,
-      "saved_tokens": 1118.0,
-      "saved_frac": 0.1234,
+      "optimised_tokens": 7895.0,
+      "saved_tokens": 1162.0,
+      "saved_frac": 0.1283,
       "naive_calls": 3.0,
       "optimised_calls": 3.0
     },
     "P10": {
-      "naive_tokens": 15655.0,
-      "optimised_tokens": 3499.0,
-      "saved_tokens": 12156.0,
-      "saved_frac": 0.7765,
+      "naive_tokens": 16617.0,
+      "optimised_tokens": 1889.0,
+      "saved_tokens": 14728.0,
+      "saved_frac": 0.8863,
       "naive_calls": 2.0,
-      "optimised_calls": 2.0
+      "optimised_calls": 1.0
     },
     "P2": {
-      "naive_tokens": 12775.0,
+      "naive_tokens": 12701.0,
       "optimised_tokens": 9762.0,
-      "saved_tokens": 3013.0,
-      "saved_frac": 0.2359,
+      "saved_tokens": 2939.0,
+      "saved_frac": 0.2314,
       "naive_calls": 4.0,
       "optimised_calls": 4.0
     },
     "P3": {
-      "naive_tokens": 21214.0,
-      "optimised_tokens": 16436.0,
-      "saved_tokens": 4778.0,
-      "saved_frac": 0.2252,
+      "naive_tokens": 16788.0,
+      "optimised_tokens": 16345.0,
+      "saved_tokens": 443.0,
+      "saved_frac": 0.0264,
       "naive_calls": 2.0,
       "optimised_calls": 5.0
     },
     "P4": {
-      "naive_tokens": 13351.0,
-      "optimised_tokens": 2349.0,
-      "saved_tokens": 11002.0,
-      "saved_frac": 0.8241,
-      "naive_calls": 2.0,
+      "naive_tokens": 27537.0,
+      "optimised_tokens": 2352.0,
+      "saved_tokens": 25185.0,
+      "saved_frac": 0.9146,
+      "naive_calls": 4.0,
       "optimised_calls": 1.0
     },
     "P5": {
-      "naive_tokens": 37469.0,
-      "optimised_tokens": 26202.0,
-      "saved_tokens": 11267.0,
-      "saved_frac": 0.3007,
+      "naive_tokens": 23218.0,
+      "optimised_tokens": 35831.0,
+      "saved_tokens": -12613.0,
+      "saved_frac": -0.5432,
       "naive_calls": 8.0,
       "optimised_calls": 8.0
     },
     "P6": {
-      "naive_tokens": 13126.0,
-      "optimised_tokens": 8219.0,
-      "saved_tokens": 4907.0,
-      "saved_frac": 0.3738,
-      "naive_calls": 3.0,
-      "optimised_calls": 2.0
-    },
-    "P7": {
-      "naive_tokens": 18049.0,
-      "optimised_tokens": 6150.0,
-      "saved_tokens": 11899.0,
-      "saved_frac": 0.6593,
+      "naive_tokens": 15746.0,
+      "optimised_tokens": 5910.0,
+      "saved_tokens": 9836.0,
+      "saved_frac": 0.6247,
       "naive_calls": 2.0,
       "optimised_calls": 2.0
     },
+    "P7": {
+      "naive_tokens": 6003.0,
+      "optimised_tokens": 8771.0,
+      "saved_tokens": -2768.0,
+      "saved_frac": -0.4611,
+      "naive_calls": 1.0,
+      "optimised_calls": 2.0
+    },
     "P8": {
-      "naive_tokens": 15669.0,
-      "optimised_tokens": 9439.0,
-      "saved_tokens": 6230.0,
-      "saved_frac": 0.3976,
+      "naive_tokens": 19177.0,
+      "optimised_tokens": 6460.0,
+      "saved_tokens": 12717.0,
+      "saved_frac": 0.6631,
       "naive_calls": 3.0,
       "optimised_calls": 3.0
     },
     "P9": {
-      "naive_tokens": 26351.0,
-      "optimised_tokens": 9888.0,
-      "saved_tokens": 16463.0,
-      "saved_frac": 0.6248,
+      "naive_tokens": 25907.0,
+      "optimised_tokens": 12563.0,
+      "saved_tokens": 13344.0,
+      "saved_frac": 0.5151,
       "naive_calls": 4.0,
       "optimised_calls": 3.0
     }

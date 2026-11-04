@@ -1,0 +1,41 @@
+{
+ "data": {
+  "query": "robust_backup logic and peak_boiler_mw impact",
+  "terms": [
+   "robust_backup",
+   "logic",
+   "peak_boiler_mw",
+   "impact"
+  ],
+  "snippets": [
+   {
+    "source": "src/gemini_documentation/source/model_erosion.rst",
+    "section": "Common flow terms",
+    "citation": "model_erosion.rst \u00a7 Common flow terms",
+    "text": "Common flow terms\nAll three rate correlations first derive the particle/fluid mass flow and\nmixture impact velocity from the volumetric flow rate, via the shared\nhelper ``gemini_model.erosion.correlation._common.mass_flow_and_velocity``:\n.. list-table::\n   :header-rows: 1\n   :widths: 25 25 50\n   * - Symbol\n     - Name\n     - Description\n   * - :math:`Q`\n     - ``flowRate``\n     - Fluid flow rate (input, m\u00b3/h)\n   * - :math:`\\rho_f`\n     - ``rho_fluid``\n     - Mixture density of the fluid (input, kg/m\u00b3)\n   * - :math:`D`\n     - ``diameter``\n     - Inner diameter of the pipe (input, m)\n   * - :math:`\\dot{m}_p`\n     - --\n     - Particle/fluid mass flow (kg/s)\n   * - :math:`U_p`\n     - --\n     - Mixture impact velocity (m/s)\n   * - :math:`A`\n     - --\n     - Pipe cross-sectional area (m\u00b2)\n.. math::\n    \\dot{m}_p = \\frac{Q\\,\\rho_f}{3600} \\qquad\n    A = \\frac{\\pi}{4}D^2 \\qquad\n    U_p = \\frac{\\dot{m}_p}{\\rho_f\\,A}",
+    "score": 2.0
+   },
+   {
+    "source": "src/gemini_documentation/source/model_erosion.rst",
+    "section": "Correlations",
+    "citation": "model_erosion.rst \u00a7 Correlations",
+    "text": "Correlations\nMaterial-dependent constants:\n.. list-table::\n   :header-rows: 1\n   :widths: 30 20 20 30\n   * - ``mater``\n     - :math:`K`\n     - :math:`n`\n     - :math:`\\rho_{pipe}` (kg/m\u00b3)\n   * - ``steel``\n     - :math:`2\\times10^{-9}`\n     - 2.6\n     - 7800\n   * - ``titanium``\n     - :math:`2\\times10^{-9}`\n     - 2.6\n     - 4500\n   * - ``GRP/epoxy``\n     - :math:`0.3\\times10^{-9}`\n     - 3.6\n     - 1800\n   * - ``GRP/vinyl ester``\n     - :math:`0.6\\times10^{-9}`\n     - 3.6\n     - 1800\nImpact-angle function (with :math:`\\alpha` in radians):\n.. math::\n    F(\\alpha) = \\alpha\\big(9.37 + \\alpha(-42.295 + \\alpha(110.864 +\n        \\alpha(-175.804 + \\alpha(170.137 + \\alpha(-98.398 + \\alpha(31.211 -\n        4.17\\alpha)))))))\\big)\nThe impacted-area projection and erosion rate are:\n.. math::\n    A_t = \\frac{A}{\\sin\\alpha}\n    \\qquad\n    EL = \\frac{31.5576\\times10^6\\,\\dot{m}_p\\,K\\,U_p^{\\,n}\\,F(\\alpha)}{\\rho_{pipe}\\,A_t}\n    \\quad \\text{[mm/yr]}\nReference: DNV GL, *Recommended Practice RP-O501, Erosive Wear in Piping\nSystems*.",
+    "score": 2.0
+   },
+   {
+    "source": "data/knowledge/reference_cards/RC-02_thermal_breakthrough_spacing.md",
+    "section": "Equations",
+    "citation": "RC-02_thermal_breakthrough_spacing.md \u00a7 Equations",
+    "text": "## Equations\n1. Breakthrough time of a doublet in a confined aquifer (Gringarten & Sauty 1975; papers/ \"Flow and Thermal Modeling of a Geothermal Doublet \u2026 Paris Basin\"):\n   `t_b = \u03c0 h D\u00b2 (\u03c1C)_a / (3 (\u03c1C)_w Q)`\n   h thickness (m), D well spacing at reservoir (m), Q (m\u00b3/s), (\u03c1C)_a aquifer volumetric heat capacity \u2248 2.5e6 J/m\u00b3K [A], (\u03c1C)_w = \u03c1 c_p \u2248 1030 \u00d7 4100 = 4.22e6 J/m\u00b3K.\n   Check: h = 100, D = 1000, Q = 300 m\u00b3/h \u21d2 t_b \u2248 23.6 yr; D = 1200 \u21d2 34 yr.\n2. Production temperature after breakthrough (paper, burden-free limit): `T_prod = (1 \u2212 \u03b8/\u03c0) T_res + (\u03b8/\u03c0) T_inj` along streamline angle \u03b8; with conductive burdens use erfc form `T_w = T_rock + (T_inj \u2212 T_rock) erfc[((t \u2212 t_a)/\u03c4)^0.5]`, \u03c4 = \u03bb t_a. Arrival times: t_a(\u03c0/2) = 3 t_a(0), t_a(3\u03c0/4) = 20.13 t_a(0). Implement the simple form; erfc form MAY.\n3. Heterogeneity uncertainty band: \u00b16 \u00b0C on 30-yr production temperature (Boolean lens case), \u2248 \u00b12 \u00b0C smoother (paper).\n4. Pressure interference between doublets (line source, steady state approx.): `\u0394P(r) = Q \u03bc / (2\u03c0 k h) \u00b7 ln(r_inj / r_prod)` summed over wells (superposition of a source and a sink). Limit \u2264 1 bar at neighbouring wells (regulator rule, papers/ \"Comparison of the Modelled\u2026",
+    "score": 1.0
+   }
+  ]
+ },
+ "summary": "3 snippet(s) for 'robust_backup logic and peak_boiler_mw impact': model_erosion.rst \u00a7 Common flow terms; model_erosion.rst \u00a7 Correlations; RC-02_thermal_breakthrough_spacing.md \u00a7 Equations",
+ "warnings": [],
+ "assumption_ids": [],
+ "sources": [
+  "RC-02_thermal_breakthrough_spacing.md",
+  "model_erosion.rst"
+ ]
+}

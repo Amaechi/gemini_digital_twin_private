@@ -69,15 +69,15 @@
       "TR-013"
     ]
   },
-  "rationale": "lowest lcoh_per_mwh among guard-passed options in economics as identified in TR-013.",
+  "rationale": "Selected based on lowest lcoh_per_mwh among guard-passed options in economics as identified in TR-013. depth-3200m was rejected because it was excluded by DesignGuard as shown in TR-013. depth-1500m was rejected because it did not achieve the best ranking in the specified economic criteria.",
   "rejected": [
     {
       "option_id": "depth-3200m",
-      "reason": "Excluded by DesignGuard/verifier as noted in TR-013 and evidence notes."
+      "reason": "Not chosen."
     },
     {
       "option_id": "depth-1500m",
-      "reason": "Higher LCOH/LCOC compared to the optimal candidates at depth-2500m."
+      "reason": "Not chosen."
     }
   ],
   "decision_source": "llm",

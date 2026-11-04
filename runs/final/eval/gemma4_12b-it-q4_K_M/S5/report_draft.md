@@ -210,6 +210,8 @@ Samples 12 (failed 0); P(demand met) at installed backups 0.4166666666666667; ro
 
 ## Assumptions and answers
 
+- CFG-BASIS-CONFIRM = keep
+- CFG-INPUT-DEFAULTS = repository defaults
 - DB-30 = {'interpretation': 'A', 'doublet_available_days_per_yr': 330, 'planned_outage_days_per_doublet': 35, 'outages_may_overlap': False, 'outage_schedule': 'chosen by the optimiser', 'demand_met_days_per_yr': 365}
 - DB-31 = 55.0
 - DB-32 = 26.0

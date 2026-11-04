@@ -112,19 +112,19 @@
       "TR-019"
     ]
   },
-  "rationale": "Selected based on ranking-lowest-lcoh_per_mwh among guard-passed options in economics, citing TR-019. gas-boiler-chp-topup was rejected for higher lcoh_per_mwh. deeper-direct-hex was rejected due to ineligibility. shallow-large-hp was rejected for higher lcoh_per_mwh.",
+  "rationale": "lowest lcoh_per_mwh among guard-passed options in economics",
   "rejected": [
     {
       "option_id": "gas-boiler-chp-topup",
-      "reason": "Not chosen."
+      "reason": "Higher lcoh_per_mwh than the selected option in economics"
     },
     {
       "option_id": "deeper-direct-hex",
-      "reason": "Not chosen."
+      "reason": "Excluded by DesignGuard/verifier"
     },
     {
       "option_id": "shallow-large-hp",
-      "reason": "Not chosen."
+      "reason": "Higher lcoh_per_mwh than the selected option in economics"
     }
   ],
   "decision_source": "llm",

@@ -10,8 +10,8 @@
       "id": "installed-backup",
       "label": "Keep the base-year backup nameplates of C2-opt (electric_chiller_mw 8.20, peak_boiler_mw 3.50 MW)",
       "evidence_ids": [
-        "TR-025",
-        "TR-023",
+        "TR-019",
+        "TR-017",
         "config:assumptions.yaml#OPT-ROBUST-BACKUP",
         "config:assumptions.yaml#UQ-MC"
       ],
@@ -23,8 +23,8 @@
       "id": "p90-robust-backup",
       "label": "Install the TL-15 P90 robust backups (electric_chiller_mw 8.20, peak_boiler_mw 7.85 MW) as C2-opt-robust",
       "evidence_ids": [
-        "TR-025",
-        "TR-023",
+        "TR-019",
+        "TR-017",
         "config:assumptions.yaml#OPT-ROBUST-BACKUP",
         "config:assumptions.yaml#UQ-MC"
       ],
@@ -34,8 +34,8 @@
     }
   ],
   "evidence_ids": [
-    "TR-023",
-    "TR-025",
+    "TR-017",
+    "TR-019",
     "config:assumptions.yaml#OPT-ROBUST-BACKUP",
     "config:assumptions.yaml#UQ-MC"
   ],
@@ -50,13 +50,13 @@
       "p90-robust-backup"
     ],
     "evidence_ids": [
-      "TR-023",
-      "TR-025",
+      "TR-017",
+      "TR-019",
       "config:assumptions.yaml#OPT-ROBUST-BACKUP",
       "config:assumptions.yaml#UQ-MC"
     ]
   },
-  "rationale": "The selection follows the OPT-ROBUST-BACKUP criterion, which requires installing robust_backup_mw when it raises probability_demand_met as shown in TR-025. Option installed-backup was rejected because it fails to meet the required probability increase defined in the register rule.",
+  "rationale": "The selection follows the OPT-ROBUST-BACKUP criterion, which requires installing robust_backup_mw when it improves the probability_demand_met. Evidence TR-019 confirms this improvement. Option installed-backup was rejected because it does not satisfy the robustness requirement defined in the register rule.",
   "rejected": [
     {
       "option_id": "installed-backup",

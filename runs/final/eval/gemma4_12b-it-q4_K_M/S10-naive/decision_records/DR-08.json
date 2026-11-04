@@ -70,19 +70,19 @@
       "config:assumptions.yaml#DB-31"
     ]
   },
-  "rationale": "lowest lcoh_per_mwh among guard-passed options in economics based on DB-31 and TR-012.",
+  "rationale": "lowest lcoh_per_mwh among guard-passed options in economics based on DB-31",
   "rejected": [
     {
       "option_id": "dh-return-45",
-      "reason": "Does not match the default register value for DB-31."
+      "reason": "Not the registered default in DB-31"
     },
     {
       "option_id": "dh-return-65",
-      "reason": "Does not match the default register value for DB-31."
+      "reason": "Not the registered default in DB-31"
     },
     {
       "option_id": "dh-return-75",
-      "reason": "Does not match the default register value for DB-31."
+      "reason": "Not the registered default in DB-31"
     }
   ],
   "decision_source": "llm",

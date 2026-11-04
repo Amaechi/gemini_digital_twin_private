@@ -11,10 +11,15 @@
   "excluded_candidates": [],
   "llm_fallbacks": 0,
   "conflicts": [],
+  "missing_inputs": [
+    "demand CSVs (daily heating and cooling demand, data/demand/)",
+    "cooling demand (cooling supply 20 degC, DB-17/DB-19)",
+    "reservoir data (depth, temperature, gradient, permeability, thickness; config/design_basis.yaml)"
+  ],
   "assumptions_and_answers": [],
   "decision_records": [],
-  "tool_calls": 3,
+  "tool_calls": 0,
   "stub_tool_calls": 0,
-  "final_summary": "Paused in P1: How should '330 daily steps' be read: A = each doublet available 330 of 365 days (35-day outage, demand met all year) or B = simulate only 330 days?",
+  "final_summary": "Paused in P1: The request does not provide: demand CSVs (daily heating and cooling demand, data/demand/); cooling demand (cooling supply 20 degC, DB-17/DB-19); reservoir data (depth, temperature, gradient, permeability, thickness; config/design_basis.yaml). Use the repository defaults (design basis in config/ and the demand CSVs in data/demand/)? Answer 'defaults' (default) to continue with them; other inputs must be placed there before a new run.",
   "escalation_reason": ""
 }

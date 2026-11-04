@@ -14,10 +14,8 @@
         "TR-010",
         "TR-011",
         "TR-012",
-        "TR-013",
         "TR-014",
-        "TR-016",
-        "TR-017"
+        "TR-015"
       ],
       "recommended": true,
       "eligible": true,
@@ -31,10 +29,8 @@
         "TR-010",
         "TR-011",
         "TR-012",
-        "TR-013",
         "TR-014",
-        "TR-016",
-        "TR-017"
+        "TR-015"
       ],
       "recommended": false,
       "eligible": true,
@@ -46,10 +42,8 @@
     "TR-010",
     "TR-011",
     "TR-012",
-    "TR-013",
     "TR-014",
-    "TR-016",
-    "TR-017"
+    "TR-015"
   ],
   "choice": "no-storage",
   "choice_label": "No seasonal storage",
@@ -64,17 +58,15 @@
     "evidence_ids": [
       "TR-011",
       "TR-012",
-      "TR-013",
       "TR-014",
-      "TR-016",
-      "TR-017"
+      "TR-015"
     ]
   },
-  "rationale": "lowest lcoh_per_mwh among guard-passed options in economics based on TR-017.",
+  "rationale": "lowest lcoh_per_mwh among guard-passed options in economics",
   "rejected": [
     {
       "option_id": "seasonal-ht-ates",
-      "reason": "higher lcoh_per_mwh than the selected option in TR-017."
+      "reason": "higher lcoh_per_mwh compared to no-storage option"
     }
   ],
   "decision_source": "llm",

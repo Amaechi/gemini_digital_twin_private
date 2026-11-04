@@ -67,17 +67,17 @@
       "TR-013"
     ]
   },
-  "rationale": "Decisive criterion: lowest lcoh_per_mwh + lcoc_per_mwh among guard-passed candidates without unmet demand in economics; it selects free-cooling-electric (TR-012, TR-013).",
+  "rationale": "lowest lcoh_per_mwh among guard-passed options in economics",
   "rejected": [
     {
       "option_id": "electric-chillers",
-      "reason": "Not a best option under ranking-lowest-lcoh_per_mwh."
+      "reason": "higher lcoh_per_mwh than the selected option"
     },
     {
       "option_id": "free-cooling-absorption",
-      "reason": "Not a best option under ranking-lowest-lcoh_per_mwh."
+      "reason": "excluded by design guard verification"
     }
   ],
-  "decision_source": "policy_fallback",
+  "decision_source": "llm",
   "stub_evidence": false
 }

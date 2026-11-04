@@ -122,7 +122,7 @@
    "thermal_breakthrough_yr": 74.57337746588789,
    "percentiles": {}
   },
-  "elapsed_s": 0.9414652499835938
+  "elapsed_s": 0.949140458018519
  },
  "inputs": [
   {
@@ -468,7 +468,7 @@
      "thermal_breakthrough_yr": 74.57337746588789,
      "percentiles": {}
     },
-    "elapsed_s": 1.0443478330271319
+    "elapsed_s": 1.0323994579957798
    },
    "delta_objective_per_mwh": -0.02726586504451234,
    "delta_lcoh_per_mwh": -0.027265865044519444,
@@ -601,7 +601,7 @@
      "thermal_breakthrough_yr": 84.4469021557327,
      "percentiles": {}
     },
-    "elapsed_s": 1.2342252919916064
+    "elapsed_s": 1.223958499962464
    },
    "delta_objective_per_mwh": -5.481931199647221,
    "delta_lcoh_per_mwh": -5.224873273980947,
@@ -737,7 +737,7 @@
      "thermal_breakthrough_yr": 63.14120108951218,
      "percentiles": {}
     },
-    "elapsed_s": 0.876109333941713
+    "elapsed_s": 0.8738749589538202
    },
    "delta_objective_per_mwh": 3616.889303962623,
    "delta_lcoh_per_mwh": 10.329561561551245,
@@ -873,7 +873,7 @@
      "thermal_breakthrough_yr": 55.59030823363206,
      "percentiles": {}
     },
-    "elapsed_s": 0.8423497499898076
+    "elapsed_s": 0.8443479159614071
    },
    "delta_objective_per_mwh": 18904.43077001424,
    "delta_lcoh_per_mwh": 27.636736783615916,
@@ -1009,7 +1009,7 @@
      "thermal_breakthrough_yr": 72.28297203381453,
      "percentiles": {}
     },
-    "elapsed_s": 1.0208235839381814
+    "elapsed_s": 1.0208981250179932
    },
    "delta_objective_per_mwh": 1020.6417802701811,
    "delta_lcoh_per_mwh": -1.389524824551934,
@@ -1143,7 +1143,7 @@
      "thermal_breakthrough_yr": 74.57337746588789,
      "percentiles": {}
     },
-    "elapsed_s": 1.049059332930483
+    "elapsed_s": 1.043234208947979
    },
    "delta_objective_per_mwh": 0.0,
    "delta_lcoh_per_mwh": 0.0,
@@ -1277,7 +1277,7 @@
      "thermal_breakthrough_yr": 74.57337746588789,
      "percentiles": {}
     },
-    "elapsed_s": 0.9953097499674186
+    "elapsed_s": 0.9933558749035001
    },
    "delta_objective_per_mwh": 6.75309663505459,
    "delta_lcoh_per_mwh": 0.11320416599900085,
@@ -1405,7 +1405,7 @@
      "thermal_breakthrough_yr": 67.22166043407759,
      "percentiles": {}
     },
-    "elapsed_s": 0.9701347089139745
+    "elapsed_s": 0.9536116659874097
    },
    "delta_objective_per_mwh": 4.962140472073145,
    "delta_lcoh_per_mwh": 0.8330148329510791,
@@ -2419,7 +2419,7 @@
    "thermal_breakthrough_yr": 74.57337746588789,
    "percentiles": {}
   },
-  "elapsed_s": 0.9466567499330267
+  "elapsed_s": 0.9353213750291616
  },
  "percentiles": {
   "lcoh_per_mwh": {
@@ -2861,7 +2861,7 @@
    }
   }
  },
- "elapsed_s": 5.57326104096137,
+ "elapsed_s": 5.588844874990173,
  "outputs": {},
  "warnings": [
   "7/12 samples breach a hard limit in operation (counted as demand not met; first: heating_supply_margin_k = -4.431 (DB-16))"

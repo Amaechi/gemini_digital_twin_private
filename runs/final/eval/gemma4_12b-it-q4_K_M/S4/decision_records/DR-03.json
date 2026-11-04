@@ -14,12 +14,16 @@
         "TR-010",
         "TR-011",
         "TR-012",
+        "TR-013",
         "TR-014",
-        "TR-015"
+        "TR-015",
+        "TR-016",
+        "TR-018",
+        "TR-019"
       ],
       "recommended": false,
       "eligible": true,
-      "notes": "candidates: C1-3d"
+      "notes": "candidates: C1-3d, C1-opt"
     },
     {
       "id": "hthp-series",
@@ -29,12 +33,16 @@
         "TR-010",
         "TR-011",
         "TR-012",
+        "TR-013",
         "TR-014",
-        "TR-015"
+        "TR-015",
+        "TR-016",
+        "TR-018",
+        "TR-019"
       ],
       "recommended": true,
       "eligible": true,
-      "notes": "candidates: C2-2d, C3-2d, C6-2d, C7-2d, C8-3d; top-ranked (LCOH ranking)"
+      "notes": "candidates: C2-2d, C3-2d, C6-2d, C7-2d, C8-3d, C2-opt, C6-opt; top-ranked (LCOH ranking)"
     },
     {
       "id": "deeper-direct-hex",
@@ -44,8 +52,11 @@
         "TR-010",
         "TR-011",
         "TR-012",
+        "TR-013",
         "TR-014",
-        "TR-015"
+        "TR-015",
+        "TR-018",
+        "TR-019"
       ],
       "recommended": false,
       "eligible": false,
@@ -59,8 +70,11 @@
         "TR-010",
         "TR-011",
         "TR-012",
+        "TR-013",
         "TR-014",
-        "TR-015"
+        "TR-015",
+        "TR-018",
+        "TR-019"
       ],
       "recommended": false,
       "eligible": true,
@@ -72,8 +86,12 @@
     "TR-010",
     "TR-011",
     "TR-012",
+    "TR-013",
     "TR-014",
-    "TR-015"
+    "TR-015",
+    "TR-016",
+    "TR-018",
+    "TR-019"
   ],
   "choice": "hthp-series",
   "choice_label": "Plate HEX + HTHP in series + CHP + peak boiler (C2/C3)",
@@ -86,13 +104,15 @@
       "hthp-series"
     ],
     "evidence_ids": [
-      "TR-011",
-      "TR-012",
+      "TR-013",
       "TR-014",
-      "TR-015"
+      "TR-015",
+      "TR-016",
+      "TR-018",
+      "TR-019"
     ]
   },
-  "rationale": "Selected based on ranking-lowest-lcoh_per_mwh among guard-passed options in economics as identified in TR-015. gas-boiler-chp-topup was rejected for higher lcoh_per_mwh. deeper-direct-hex was rejected due to eligibility status. shallow-large-hp was rejected for higher lcoh_per_mwh.",
+  "rationale": "Selected based on ranking-lowest-lcoh_per_mwh among guard-passed options in economics as shown in TR-019. gas-boiler-chp-topup was rejected for higher lcoh_per_mwh. deeper-direct-hex was rejected as it was not eligible. shallow-large-hp was rejected for higher lcoh_per_mwh.",
   "rejected": [
     {
       "option_id": "gas-boiler-chp-topup",
