@@ -1,0 +1,90 @@
+{
+  "dr_id": "DR-08",
+  "title": "Return temperature",
+  "run_id": "S11",
+  "phase": "P5",
+  "role": "system_architect",
+  "question": "Which district-heating return temperature is designed for?",
+  "options": [
+    {
+      "id": "dh-return-55",
+      "label": "District-heating return 55 degC",
+      "evidence_ids": [
+        "config:assumptions.yaml#DB-31",
+        "TR-012"
+      ],
+      "recommended": true,
+      "eligible": true,
+      "notes": ""
+    },
+    {
+      "id": "dh-return-45",
+      "label": "District-heating return 45 degC",
+      "evidence_ids": [
+        "config:assumptions.yaml#DB-31",
+        "TR-012"
+      ],
+      "recommended": false,
+      "eligible": true,
+      "notes": ""
+    },
+    {
+      "id": "dh-return-65",
+      "label": "District-heating return 65 degC",
+      "evidence_ids": [
+        "config:assumptions.yaml#DB-31",
+        "TR-012"
+      ],
+      "recommended": false,
+      "eligible": true,
+      "notes": ""
+    },
+    {
+      "id": "dh-return-75",
+      "label": "District-heating return 75 degC",
+      "evidence_ids": [
+        "config:assumptions.yaml#DB-31",
+        "TR-012"
+      ],
+      "recommended": false,
+      "eligible": true,
+      "notes": ""
+    }
+  ],
+  "evidence_ids": [
+    "TR-012",
+    "config:assumptions.yaml#DB-31"
+  ],
+  "choice": "dh-return-55",
+  "choice_label": "District-heating return 55 degC",
+  "criterion": {
+    "id": "db31-answer",
+    "key": "DB-31",
+    "source": "assumptions register",
+    "text": "register default kept for the district-heating return temperature (DB-31)",
+    "best_option_ids": [
+      "dh-return-55"
+    ],
+    "evidence_ids": [
+      "TR-012",
+      "config:assumptions.yaml#DB-31"
+    ]
+  },
+  "rationale": "The selected option matches the register default for the district-heating return temperature (DB-31) as specified in the assumptions register.",
+  "rejected": [
+    {
+      "option_id": "dh-return-45",
+      "reason": "Does not match the register default for the district-heating return temperature (DB-31)."
+    },
+    {
+      "option_id": "dh-return-65",
+      "reason": "Does not match the register default for the district-heating return temperature (DB-31)."
+    },
+    {
+      "option_id": "dh-return-75",
+      "reason": "Does not match the register default for the district-heating return temperature (DB-31)."
+    }
+  ],
+  "decision_source": "llm",
+  "stub_evidence": false
+}
