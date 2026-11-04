@@ -1,0 +1,95 @@
+{
+  "run_id": "final_llm",
+  "status": "completed",
+  "phase": "P10",
+  "engine": "llm+policy_fallback",
+  "input_mode": "ask",
+  "selected_candidate": "C2-opt-robust",
+  "verdict": "ACCEPTED",
+  "approval": "pending",
+  "loop_count": 0,
+  "excluded_candidates": [
+    "C4-2d"
+  ],
+  "llm_fallbacks": 7,
+  "conflicts": [],
+  "missing_inputs": [],
+  "assumptions_and_answers": [
+    "DB-30 = {\"interpretation\":\"A\",\"doublet_available_days_per_yr\":330,\"planned_outage_days_per_doublet\":35,\"outages_may_overlap\":false,\"outage_schedule\":\"chosen by the optimiser\",\"demand_met_days_per_yr\":365} (assumed: register default)",
+    "DB-31 = 55.0 degC (assumed: register default)",
+    "DB-32 = 26.0 degC (assumed: register default)",
+    "Human approval pending (non-interactive run)"
+  ],
+  "decision_records": [
+    {
+      "dr_id": "DR-09",
+      "choice": "titanium-plates-no-cu",
+      "decision_source": "policy_fallback",
+      "stub_evidence": false
+    },
+    {
+      "dr_id": "DR-01",
+      "choice": "2-doublets",
+      "decision_source": "policy_fallback",
+      "stub_evidence": false
+    },
+    {
+      "dr_id": "DR-02",
+      "choice": "depth-2500m",
+      "decision_source": "policy_fallback",
+      "stub_evidence": false
+    },
+    {
+      "dr_id": "DR-03",
+      "choice": "hthp-series",
+      "decision_source": "policy_fallback",
+      "stub_evidence": false
+    },
+    {
+      "dr_id": "DR-04",
+      "choice": "free-cooling-electric",
+      "decision_source": "llm",
+      "stub_evidence": false
+    },
+    {
+      "dr_id": "DR-05",
+      "choice": "no-storage",
+      "decision_source": "policy_fallback",
+      "stub_evidence": false
+    },
+    {
+      "dr_id": "DR-07",
+      "choice": "degas-use",
+      "decision_source": "llm",
+      "stub_evidence": false
+    },
+    {
+      "dr_id": "DR-08",
+      "choice": "dh-return-55",
+      "decision_source": "policy_fallback",
+      "stub_evidence": false
+    },
+    {
+      "dr_id": "DR-06",
+      "choice": "optimiser-lowest-load",
+      "decision_source": "llm",
+      "stub_evidence": false
+    },
+    {
+      "dr_id": "DR-11",
+      "choice": "p90-robust-backup",
+      "decision_source": "llm",
+      "stub_evidence": false
+    },
+    {
+      "dr_id": "DR-10",
+      "choice": "C2-opt-robust",
+      "decision_source": "policy_fallback",
+      "stub_evidence": false
+    }
+  ],
+  "tool_calls": 26,
+  "stub_tool_calls": 0,
+  "final_summary": "Completed P0\u2013P10: selected C2-opt-robust (verifier verdict ACCEPTED); 11 Decision Records; approval pending; 0/26 tool calls were stubs. LLM fallbacks to policy: 7.",
+  "escalation_reason": ""
+}
