@@ -114,27 +114,37 @@ Hardware (operator's note, not recorded by the run): MacBook Pro M3, 36 GB, Olla
 `OLLAMA_CONTEXT_LENGTH=65536`.
 
 **S1–S11 evaluation** (`runs/final/eval/gemma4_12b-it-q4_K_M/EVAL_REPORT.md`, quick tool
-profile): 5 pass (S1, S3, S4, S6, S9), 5 pending (S2, S5, S8, S10, S11: the scenario check that
-is not implemented yet is named in the report), 1 fail (S7). The S7 "fail" predates the Model
-Builder fix [#23](https://github.com/Amaechi/gemini_digital_twin_private/pull/23): every coder
-draft timed out at the SDK default deadline. Re-run locally after #23, the Model Builder detected
-the gap and closed it in 2 drafts with 2 passing tests: evidence and review notes in
-[`docs/results/s7_demo/`](docs/results/s7_demo/README.md). `runs/final/eval` is left unchanged
-because the transcripts check (SUB-17) reads it. S2/S5/S8 closed on 2026-11-03 (P1 intake
-questions `CFG-INPUT-DEFAULTS` / `CFG-BASIS-CONFIRM`, `cross_run_sizing` check against S1):
-eval rerun pending — the table above is the eval before the change; the new S8 check passes on
-its stored evidence (ESP 49 stages at 1560 m, 1.43 MW peak at 50 mD vs 16 stages at 840 m,
-0.46 MW in S1).
+profile, rerun on 2026-11-04 after [#29](https://github.com/Amaechi/gemini_digital_twin_private/pull/29)
+and [#32](https://github.com/Amaechi/gemini_digital_twin_private/pull/32), merged as
+[#39](https://github.com/Amaechi/gemini_digital_twin_private/pull/39)): **8 pass** (S1, S2, S3,
+S4, S5, S6, S8, S9), **3 pending** (S7, S10, S11), **0 fail**; 46 of 46 checks pass, 0 token-budget
+overruns (`eval_results.json`, `model_comparison.json`). S2 pauses in P1 with one
+`CFG-INPUT-DEFAULTS` question that lists the missing inputs and runs no tool; S5 records
+`CFG-BASIS-CONFIRM = keep` and completes on the 100 °C basis; S8 re-sizes against S1 of the same
+eval (PI 3.06 vs 12.22 m³/h/bar: ESP 49 stages at 1560 m, 1.43 MW peak vs 16 stages at 840 m,
+0.46 MW). The three pending scenarios complete (S7 and S11 ACCEPTED in P10) and each names the
+check that is not automated: S7 — the policy engine's P4 runs the gap analysis only (WP-12
+decision); the LLM Model Builder writes and tests the model in the local Ollama run, evidence in
+[`docs/results/s7_demo/`](docs/results/s7_demo/README.md) (2 drafts, 2 passing tests); S10 — the
+token comparison figure (the report tables the comparison); S11 — the 16 GB vs 36 GB comparison
+needs two local runs and `run_eval.py --compare` (the table below).
+
+**§4.3 settings study** ([`docs/results/SETTINGS_STUDY.md`](docs/results/SETTINGS_STUDY.md),
+`eval_results.json` of each run in `docs/results/settings_study/`): S11 on gemma4:12b-it-q4_K_M
+with thinking on and with `OLLAMA_CONTEXT_LENGTH=32768`, against the submitted settings (thinking
+off, 64K). All three complete with the same ACCEPTED design; thinking on spends the 2 048-token
+output cap on reasoning in 11 of 34 calls (policy fallbacks 11, validity 68 %, wall time × 2.7);
+32K is indistinguishable from 64K (32/32 valid, 0 fallbacks; largest prompt 4 608 tokens).
 
 **S10 naive vs optimised context** (`runs/final/eval/gemma4_12b-it-q4_K_M/S10-token_comparison.json`):
-183 874 → 101 042 tokens for the same 34 calls, a **45 % saving** from the compacted history and
-tool-result summaries.
+173 909 → 108 937 tokens for the same task (34 naive / 33 optimised calls), a **37 % saving**
+from the compacted history and tool-result summaries.
 
 **S11 model comparison** (one S11 run per model, `runs/final/eval/<model>/eval_results.json`):
 
 | Model (Ollama tag) | Class | Outcome | LLM calls | Tool-call validity | Fallbacks | Tokens | Runtime |
 |---|---|---|---|---|---|---|---|
-| gemma4:12b-it-q4_K_M (chosen) | 16 GB | completed, ACCEPTED | 35 | 89 % | 4 | 115 928 | 400 s |
+| gemma4:12b-it-q4_K_M (chosen) | 16 GB | completed, ACCEPTED | 33 | 97 % | 1 | 88 524 | 373 s |
 | qwen3.6:27b | 36 GB | completed, ACCEPTED | 38 | 82 % | 7 | 126 855 | 673 s |
 | qwen3.6:35b-a3b | 36 GB | escalated in P6 (tool-call budget) | 29 | 97 % | 1 | 79 061 | 167 s |
 | gemma4:26b-a4b | 24–36 GB | escalated in P5 (DR-08 token limit) | 27 | 70 % | 7 | 101 871 | 176 s |
@@ -445,7 +455,7 @@ fake STT/TTS/LLM, real what-if tool): two `whatif/<n>/` records, the run's files
 | `runs/final/eval/` | S1–S11 transcripts of the chosen model, S11 of four other models, `model_comparison.{json,md}`, `S10-token_comparison.json` |
 | `runs/final_qwen27b/final_llm/` | second full LLM run (qwen3.6:27b, L-3): same file set as the submitted run (`llm_calls.jsonl`, `token_summary.json`, `events.jsonl`, `tool_results/TR-001…026.json`, `decision_records/`, `report_draft.md`, figures, annual CSVs); approval pending; not read by `validate_submission.py` |
 | `runs/final_policy/` | the same workflow on the deterministic policy engine (reference run, built by `scripts/build_results.py`) |
-| `docs/results/` | `REPORT.md` (report pack, generated), `DECK_OUTLINE.md` (slides + video script), figures (`final_llm/`), `s7_demo/` (Model Builder evidence), `submission_check.md`, `eval_policy_quick/`, WP-14 policy-run tables |
+| `docs/results/` | `REPORT.md` (report pack, generated), `DECK_OUTLINE.md` (slides + video script), figures (`final_llm/`), `s7_demo/` (Model Builder evidence), `SETTINGS_STUDY.md` + `settings_study/` (§4.3 thinking / context-length study, three `eval_results.json`), `submission_check.md`, `eval_policy_quick/`, WP-14 policy-run tables |
 | `docs/hackathon/` | `GEOAGENT_DESIGN_SPEC.md` (requirements), `WORK_PACKAGES.md`, `PROGRESS.md` (decisions, follow-ups, submission checklist), `CLOUD_SETUP.md` (laptop steps, submission) |
 | `config/` | `design_basis.yaml`, `climate_nl.yaml`, `limits.yaml`, `cost_assumptions.yaml`, `assumptions.yaml` (register of every assumed value), `llm.yaml` |
 | `data/knowledge/reference_cards/` | RC-01…RC-10: the only engineering source for equations and values (books are not redistributed) |
@@ -495,19 +505,24 @@ credential exists anywhere in the repository (`.env.template` is GEMINI's and un
   by CEPCI 1986→2023 (× 2.51), inside the RC-10 benchmark bands but not confirmed from a second
   source (`config/cost_assumptions.yaml`, `*_chiller_plant_cost_function_usd`). LCOC carries
   that uncertainty; the Monte Carlo range covers ± 30 %.
-- **S2, S5 and S8 read "pending" in `runs/final/eval`**: that eval predates the P1 intake
-  questions (S2 lists the inputs a request lacks and offers the repository defaults; S5 asks to
-  confirm a DB-16/DB-17 change of basis, default keep) and the S8 cross-run sizing check against
-  S1; closed on 2026-11-03, eval rerun pending. The missing-input detection is keyword-based on
-  the request text (`agents/scope.missing_request_inputs`); a change of basis stops the run
-  (the limits are changed in `config/` and a new run started), it is never designed for; every
-  prompt other than the brief records one assumed `CFG-INPUT-DEFAULTS` answer in assume mode.
-- **S7 in `runs/final/eval` reads "fail"**: every coder draft timed out before the Model Builder
-  fix [#23](https://github.com/Amaechi/gemini_digital_twin_private/pull/23); the post-#23 local
-  run closed the gap in 2 drafts, evidence in [`docs/results/s7_demo/`](docs/results/s7_demo/README.md).
+- **S7, S10 and S11 read "pending" in `runs/final/eval`** (8 pass / 3 pending / 0 fail after the
+  2026-11-04 rerun, [#39](https://github.com/Amaechi/gemini_digital_twin_private/pull/39)): each
+  run completes and every implemented check passes; the pending item is the check the harness
+  does not automate, named in `eval_results.json`: S7 — "the policy engine's P4 runs the gap
+  analysis only (WP-12 decision); the LLM Model Builder writes and tests the model in the local
+  Ollama run (python -m gemini_agent.agents.model_builder --sandbox runs/s7_demo)" (evidence
+  [`docs/results/s7_demo/`](docs/results/s7_demo/README.md)); S10 — "the
+  report tables the comparison (S10-token_comparison.json); WP-14 draws the figures"; S11 — "needs
+  two local Ollama runs (run_eval.py --engine llm --model <tag> for each), then run_eval.py
+  --compare" (done by hand, the S11 table above; the outcome field is not updated by `--compare`).
+- **P1 intake questions (S2, S5)**: the missing-input detection is keyword-based on the request
+  text (`agents/scope.missing_request_inputs`); a change of basis stops the run (the limits are
+  changed in `config/` and a new run started), it is never designed for; every prompt other than
+  the brief records one assumed `CFG-INPUT-DEFAULTS` answer in assume mode.
 - **P5 DR-08 token-limit escalation on gemma4:26b-a4b** (fixed on 2026-11-03; the submitted
-  runs in `runs/final*` and `runs/final/eval` predate the fix): the chosen model never hit a
-  budget. On gemma4:26b-a4b (and on qwen3.6:27b in a later full run) the per-call usage limit of
+  runs `runs/final/final_llm`, `runs/final_qwen27b` and the four other-model S11 runs predate the
+  fix; the chosen model's S1–S11 eval was rerun after it, 0 overruns): the chosen model never
+  hit a budget. On gemma4:26b-a4b (and on qwen3.6:27b in a later full run) the per-call usage limit of
   the Decision Record choice was the phase's remaining token budget (`total_tokens_limit` 765
   vs 1 900 used) and the run escalated inside a DR the workflow requires. Now a DR choice call's
   usage limit is floored at the call's own token ceiling (every allowed request at the prompt

@@ -1,0 +1,910 @@
+{
+  "generated_at": "2026-11-04T03:44:53.381175+00:00",
+  "engine": "llm",
+  "model": "gemma4:12b-it-q4_K_M",
+  "eval_dir": "runs/final/eval/gemma4_12b-it-q4_K_M",
+  "scenarios_source": "evals/scenarios.yaml",
+  "runs": [
+    {
+      "scenario": "S1",
+      "situation": "Full brief + all files",
+      "expected": "Complete design, ACCEPTED",
+      "engine": "llm",
+      "model": "gemma4:12b-it-q4_K_M",
+      "outcome": "pass",
+      "status": "completed",
+      "phase": "P10",
+      "verdict": "ACCEPTED",
+      "selected_candidate": "C2-opt-robust",
+      "conflicts": [],
+      "metrics": {
+        "runtime_s": 387.622,
+        "tool_calls": 28,
+        "stub_tool_calls": 0,
+        "llm_calls": 33,
+        "llm_valid_calls": 31,
+        "retries": 8,
+        "fallbacks": 2,
+        "step_rejections": 3,
+        "kind_coercions": 9,
+        "token_budget_overruns": 0,
+        "input_tokens": 88558,
+        "output_tokens": 5237
+      },
+      "checks": [
+        {
+          "type": "status",
+          "expect": "runs P0–P10 to completion",
+          "passed": true,
+          "detail": "status completed"
+        },
+        {
+          "type": "phase",
+          "expect": "ends in P10 (report and approval)",
+          "passed": true,
+          "detail": "phase P10"
+        },
+        {
+          "type": "phases_in_order",
+          "expect": "every phase P0–P10 runs, in order (verifier loop-backs allowed)",
+          "passed": true,
+          "detail": "first starts ['P0', 'P1', 'P2', 'P3', 'P4', 'P5', 'P6', 'P7', 'P8', 'P9', 'P10']; 11 starts"
+        },
+        {
+          "type": "loops_within_limit",
+          "expect": "verifier loop-backs stay within the limit (spec §5.2: ≤ 3)",
+          "passed": true,
+          "detail": "0 loop-back(s) (limit 3)"
+        },
+        {
+          "type": "selected_candidate",
+          "expect": "a candidate is selected that was neither guard-failed nor REJECTED",
+          "passed": true,
+          "detail": "selected C2-opt-robust"
+        },
+        {
+          "type": "decision_records",
+          "expect": "DR-01…DR-11 are written",
+          "passed": true,
+          "detail": "11 DRs; missing none"
+        },
+        {
+          "type": "files",
+          "expect": "run artefacts are written",
+          "passed": true,
+          "detail": "missing none"
+        },
+        {
+          "type": "verdict",
+          "expect": "the verifier ACCEPTs the selected design (promoted WP-14)",
+          "passed": true,
+          "detail": "verdict ACCEPTED"
+        },
+        {
+          "type": "stub_tool_calls_max",
+          "expect": "0 stub tool calls (promoted WP-14: real tools bound)",
+          "passed": true,
+          "detail": "0/28 stub calls"
+        }
+      ],
+      "pending": [],
+      "run_dirs": [
+        "S1"
+      ],
+      "verify_cost_items": [
+        "absorption_chiller_plant_cost_function_usd",
+        "electric_chiller_plant_cost_function_usd"
+      ],
+      "token_comparison": null,
+      "note": ""
+    },
+    {
+      "scenario": "S2",
+      "situation": "\"Design a geothermal heating system for 30 MW\" (no CSVs/cooling/reservoir)",
+      "expected": "Lists missing inputs, asks, does not invent",
+      "engine": "llm",
+      "model": "gemma4:12b-it-q4_K_M",
+      "outcome": "pass",
+      "status": "paused",
+      "phase": "P1",
+      "verdict": null,
+      "selected_candidate": null,
+      "conflicts": [],
+      "metrics": {
+        "runtime_s": 4.643,
+        "tool_calls": 0,
+        "stub_tool_calls": 0,
+        "llm_calls": 1,
+        "llm_valid_calls": 1,
+        "retries": 0,
+        "fallbacks": 0,
+        "step_rejections": 0,
+        "kind_coercions": 0,
+        "token_budget_overruns": 0,
+        "input_tokens": 1062,
+        "output_tokens": 59
+      },
+      "checks": [
+        {
+          "type": "status",
+          "expect": "stops and asks instead of designing",
+          "passed": true,
+          "detail": "status paused"
+        },
+        {
+          "type": "phase",
+          "expect": "asks during P1 (design basis and missing inputs)",
+          "passed": true,
+          "detail": "phase P1"
+        },
+        {
+          "type": "pending_question",
+          "expect": "ONE missing-input question is pending (CFG-INPUT-DEFAULTS; default = the repository defaults; promoted WP-13 follow-up)",
+          "passed": true,
+          "detail": "asks [CFG-INPUT-DEFAULTS]: The request does not provide: demand CSVs (daily heating and cooling demand, data/demand/); cooling "
+        },
+        {
+          "type": "question_mentions",
+          "expect": "the question lists the inputs the request lacks: demand CSVs, cooling demand, reservoir data (promoted WP-13 follow-up)",
+          "passed": true,
+          "detail": "question misses nothing"
+        },
+        {
+          "type": "no_assumptions",
+          "expect": "nothing is assumed before the answer (does not invent)",
+          "passed": true,
+          "detail": "0 assumption(s)/answer(s) recorded"
+        },
+        {
+          "type": "tool_calls_max",
+          "expect": "no tool runs before the answer (nothing is loaded from config/ or data/demand/ yet)",
+          "passed": true,
+          "detail": "0 tool call(s)"
+        }
+      ],
+      "pending": [],
+      "run_dirs": [
+        "S2"
+      ],
+      "verify_cost_items": [],
+      "token_comparison": null,
+      "note": ""
+    },
+    {
+      "scenario": "S3",
+      "situation": "\"What's the best pizza in Delft?\"",
+      "expected": "Polite refusal/redirect",
+      "engine": "llm",
+      "model": "gemma4:12b-it-q4_K_M",
+      "outcome": "pass",
+      "status": "refused",
+      "phase": "P0",
+      "verdict": null,
+      "selected_candidate": null,
+      "conflicts": [],
+      "metrics": {
+        "runtime_s": 2.718,
+        "tool_calls": 0,
+        "stub_tool_calls": 0,
+        "llm_calls": 1,
+        "llm_valid_calls": 1,
+        "retries": 0,
+        "fallbacks": 0,
+        "step_rejections": 0,
+        "kind_coercions": 0,
+        "token_budget_overruns": 0,
+        "input_tokens": 1067,
+        "output_tokens": 61
+      },
+      "checks": [
+        {
+          "type": "status",
+          "expect": "the request is refused",
+          "passed": true,
+          "detail": "status refused"
+        },
+        {
+          "type": "phases_started",
+          "expect": "stops in P0 intake",
+          "passed": true,
+          "detail": "phases ['P0']"
+        },
+        {
+          "type": "summary_contains",
+          "expect": "the refusal redirects to the design task",
+          "passed": true,
+          "detail": "summary: GeoAgent only designs deep-geothermal district heating (100 degC) and cooling (20 degC) systems with the GEMINI digital "
+        },
+        {
+          "type": "tool_calls_max",
+          "expect": "no tool is called",
+          "passed": true,
+          "detail": "0 tool call(s)"
+        }
+      ],
+      "pending": [],
+      "run_dirs": [
+        "S3"
+      ],
+      "verify_cost_items": [],
+      "token_comparison": null,
+      "note": ""
+    },
+    {
+      "scenario": "S4",
+      "situation": "\"Use 5 doublets at 500 m³/h\"",
+      "expected": "Flags DB-10/11 violation, proposes compliant option",
+      "engine": "llm",
+      "model": "gemma4:12b-it-q4_K_M",
+      "outcome": "pass",
+      "status": "completed",
+      "phase": "P10",
+      "verdict": "ACCEPTED",
+      "selected_candidate": "C2-opt-robust",
+      "conflicts": [
+        "Requested 5 doublets conflicts with the hard limit 1–3 doublets (DB-10); candidates stay within the limit.",
+        "Requested 500 m3/h conflicts with the per-doublet flow limit 50–300 m3/h (DB-11); flows stay within the limit."
+      ],
+      "metrics": {
+        "runtime_s": 434.377,
+        "tool_calls": 29,
+        "stub_tool_calls": 0,
+        "llm_calls": 36,
+        "llm_valid_calls": 35,
+        "retries": 11,
+        "fallbacks": 1,
+        "step_rejections": 0,
+        "kind_coercions": 7,
+        "token_budget_overruns": 0,
+        "input_tokens": 100280,
+        "output_tokens": 5787
+      },
+      "checks": [
+        {
+          "type": "conflict_contains",
+          "expect": "flags the doublet-count limit DB-10",
+          "passed": true,
+          "detail": "2 conflict(s); matching: ['Requested 5 doublets conflicts with the hard limit 1–3 doublets (DB-10); candidates stay within the limit.']"
+        },
+        {
+          "type": "conflict_contains",
+          "expect": "flags the per-doublet flow limit DB-11",
+          "passed": true,
+          "detail": "2 conflict(s); matching: ['Requested 500 m3/h conflicts with the per-doublet flow limit 50–300 m3/h (DB-11); flows stay within the limit.']"
+        },
+        {
+          "type": "status",
+          "expect": "continues within the limits",
+          "passed": true,
+          "detail": "status completed"
+        },
+        {
+          "type": "within_limits",
+          "expect": "every candidate respects DB-10 doublets and DB-11 flow (limits.yaml)",
+          "passed": true,
+          "detail": "12 candidates; doublets ≤ 3, flows ≤ 300 m3/h; outside limits: none"
+        },
+        {
+          "type": "selected_candidate",
+          "expect": "proposes a compliant candidate",
+          "passed": true,
+          "detail": "selected C2-opt-robust"
+        }
+      ],
+      "pending": [],
+      "run_dirs": [
+        "S4"
+      ],
+      "verify_cost_items": [
+        "absorption_chiller_plant_cost_function_usd",
+        "electric_chiller_plant_cost_function_usd"
+      ],
+      "token_comparison": null,
+      "note": ""
+    },
+    {
+      "scenario": "S5",
+      "situation": "\"Supply heating at 120 °C\"",
+      "expected": "Notes conflict with DB-16, asks to confirm change of basis",
+      "engine": "llm",
+      "model": "gemma4:12b-it-q4_K_M",
+      "outcome": "pass",
+      "status": "completed",
+      "phase": "P10",
+      "verdict": "ACCEPTED",
+      "selected_candidate": "C2-opt-robust",
+      "conflicts": [
+        "Requested heating supply 120 degC conflicts with the design basis 100 degC (DB-16); the design keeps 100 degC until a change of basis is confirmed."
+      ],
+      "metrics": {
+        "runtime_s": 419.144,
+        "tool_calls": 30,
+        "stub_tool_calls": 0,
+        "llm_calls": 33,
+        "llm_valid_calls": 30,
+        "retries": 11,
+        "fallbacks": 3,
+        "step_rejections": 0,
+        "kind_coercions": 7,
+        "token_budget_overruns": 0,
+        "input_tokens": 98689,
+        "output_tokens": 5490
+      },
+      "checks": [
+        {
+          "type": "conflict_contains",
+          "expect": "notes the conflict with the 100 °C heating supply DB-16",
+          "passed": true,
+          "detail": "1 conflict(s); matching: ['Requested heating supply 120 degC conflicts with the design basis 100 degC (DB-16); the design keeps 100 degC until a change of basis is confirmed.']"
+        },
+        {
+          "type": "conflict_contains",
+          "expect": "keeps the basis until the change is confirmed",
+          "passed": true,
+          "detail": "1 conflict(s); matching: ['Requested heating supply 120 degC conflicts with the design basis 100 degC (DB-16); the design keeps 100 degC until a change of basis is confirmed.']"
+        },
+        {
+          "type": "assumption_or_question",
+          "expect": "asks the user to confirm the change of basis in P1 (CFG-BASIS-CONFIRM: keep | change; in --input-mode assume the register default 'keep' is recorded; promoted WP-13 follow-up)",
+          "passed": true,
+          "detail": "recorded: CFG-BASIS-CONFIRM = keep (assumed: register default)"
+        },
+        {
+          "type": "status",
+          "expect": "continues on the design basis (the assumed answer keeps DB-16)",
+          "passed": true,
+          "detail": "status completed"
+        }
+      ],
+      "pending": [],
+      "run_dirs": [
+        "S5"
+      ],
+      "verify_cost_items": [
+        "absorption_chiller_plant_cost_function_usd",
+        "electric_chiller_plant_cost_function_usd"
+      ],
+      "token_comparison": null,
+      "note": ""
+    },
+    {
+      "scenario": "S6",
+      "situation": "Return temperature not given",
+      "expected": "Asks or records DB-31 assumption + sensitivity",
+      "engine": "llm",
+      "model": "gemma4:12b-it-q4_K_M",
+      "outcome": "pass",
+      "status": "completed",
+      "phase": "P10",
+      "verdict": "ACCEPTED",
+      "selected_candidate": "C2-opt-robust",
+      "conflicts": [],
+      "metrics": {
+        "runtime_s": 380.558,
+        "tool_calls": 25,
+        "stub_tool_calls": 0,
+        "llm_calls": 33,
+        "llm_valid_calls": 32,
+        "retries": 10,
+        "fallbacks": 1,
+        "step_rejections": 0,
+        "kind_coercions": 4,
+        "token_budget_overruns": 0,
+        "input_tokens": 90279,
+        "output_tokens": 5339
+      },
+      "checks": [
+        {
+          "type": "assumption_or_question",
+          "expect": "asks for, or records, the DB-31 heating return temperature",
+          "passed": true,
+          "detail": "recorded: DB-31 = 55.0 degC (assumed: register default)"
+        },
+        {
+          "type": "status",
+          "expect": "continues on the labelled assumption",
+          "passed": true,
+          "detail": "status completed"
+        },
+        {
+          "type": "tool_output_mentions",
+          "expect": "runs a sensitivity on DB-31 (TL-15 cases, promoted WP-14)",
+          "passed": true,
+          "detail": "uncertainty.data.cases misses nothing"
+        }
+      ],
+      "pending": [],
+      "run_dirs": [
+        "S6"
+      ],
+      "verify_cost_items": [
+        "absorption_chiller_plant_cost_function_usd",
+        "electric_chiller_plant_cost_function_usd"
+      ],
+      "token_comparison": null,
+      "note": ""
+    },
+    {
+      "scenario": "S7",
+      "situation": "Cooling model removed from registry",
+      "expected": "Gap detected; Model Builder writes model + passes reference-example test",
+      "engine": "llm",
+      "model": "gemma4:12b-it-q4_K_M",
+      "outcome": "pending",
+      "status": "completed",
+      "phase": "P10",
+      "verdict": "ACCEPTED",
+      "selected_candidate": "C2-opt-robust",
+      "conflicts": [],
+      "metrics": {
+        "runtime_s": 448.024,
+        "tool_calls": 27,
+        "stub_tool_calls": 0,
+        "llm_calls": 36,
+        "llm_valid_calls": 31,
+        "retries": 17,
+        "fallbacks": 5,
+        "step_rejections": 1,
+        "kind_coercions": 4,
+        "token_budget_overruns": 0,
+        "input_tokens": 114475,
+        "output_tokens": 6510
+      },
+      "checks": [
+        {
+          "type": "tool_called",
+          "expect": "runs the model-gap analysis in P4",
+          "passed": true,
+          "detail": "model_gap_analysis called 1x in P4"
+        },
+        {
+          "type": "status",
+          "expect": "the run completes",
+          "passed": true,
+          "detail": "status completed"
+        },
+        {
+          "type": "gap_reported",
+          "expect": "the missing absorption chiller is reported as a gap (promoted WP-14)",
+          "passed": true,
+          "detail": "gaps reported: ['absorption_chiller']"
+        }
+      ],
+      "pending": [
+        {
+          "expect": "the Model Builder writes the model from its reference card and it passes the reference-example test",
+          "needs": [
+            "L-2"
+          ],
+          "reason": "the policy engine's P4 runs the gap analysis only (WP-12 decision); the LLM Model Builder writes and tests the model in the local Ollama run (python -m gemini_agent.agents.model_builder --sandbox runs/s7_demo)",
+          "currently": null,
+          "now_passes": null
+        }
+      ],
+      "run_dirs": [
+        "S7"
+      ],
+      "verify_cost_items": [
+        "electric_chiller_plant_cost_function_usd"
+      ],
+      "token_comparison": null,
+      "note": ""
+    },
+    {
+      "scenario": "S8",
+      "situation": "Permeability 50 mD",
+      "expected": "Re-sizes and explains",
+      "engine": "llm",
+      "model": "gemma4:12b-it-q4_K_M",
+      "outcome": "pass",
+      "status": "completed",
+      "phase": "P10",
+      "verdict": "ACCEPTED",
+      "selected_candidate": "C2-opt-robust",
+      "conflicts": [],
+      "metrics": {
+        "runtime_s": 379.328,
+        "tool_calls": 24,
+        "stub_tool_calls": 0,
+        "llm_calls": 33,
+        "llm_valid_calls": 32,
+        "retries": 12,
+        "fallbacks": 1,
+        "step_rejections": 0,
+        "kind_coercions": 6,
+        "token_budget_overruns": 0,
+        "input_tokens": 93061,
+        "output_tokens": 5436
+      },
+      "checks": [
+        {
+          "type": "design_basis_value",
+          "expect": "the design basis carries 50 mD",
+          "passed": true,
+          "detail": "reservoir.permeability_md = 50.0"
+        },
+        {
+          "type": "status",
+          "expect": "the run completes on the changed basis",
+          "passed": true,
+          "detail": "status completed"
+        },
+        {
+          "type": "dr_mentions",
+          "expect": "explains the change in the Decision Records: DR-01 quotes the permeability and TL-04 (promoted WP-14)",
+          "passed": true,
+          "detail": "DR-01 misses nothing"
+        },
+        {
+          "type": "cross_run_sizing",
+          "expect": "re-sizes the doublets for the lower productivity: against S1 of the same eval, the wells (doublets, depth, flow) or the ESP (stages, setting depth, peak electric power) are larger at the lower PI (promoted WP-13 follow-up; needs S1 in the same eval run)",
+          "passed": true,
+          "detail": "ESP re-sized: PI 3.06 vs S1 12.22 m3/h/bar; design 2 x 300.0 m3/h @ 2500.0 m, ESP 49 stages @ 1560 m, peak 1.43 MW (full year) vs 2 x 300.0 m3/h @ 2500.0 m, ESP 16 stages @ 840 m, peak 0.46 MW (full year)"
+        }
+      ],
+      "pending": [],
+      "run_dirs": [
+        "S8"
+      ],
+      "verify_cost_items": [
+        "absorption_chiller_plant_cost_function_usd",
+        "electric_chiller_plant_cost_function_usd"
+      ],
+      "token_comparison": null,
+      "note": ""
+    },
+    {
+      "scenario": "S9",
+      "situation": "Gradient 30 °C/km but \"reservoir 150 °C at 2.5 km\"",
+      "expected": "Detects inconsistency",
+      "engine": "llm",
+      "model": "gemma4:12b-it-q4_K_M",
+      "outcome": "pass",
+      "status": "completed",
+      "phase": "P10",
+      "verdict": "ACCEPTED",
+      "selected_candidate": "C2-opt-robust",
+      "conflicts": [
+        "Stated 150 degC at 2500 m is inconsistent with the design basis: 12 degC surface temperature (DB-04) and 30 K/km gradient (DB-03) give 87.0 degC there (RC-01); the design uses the design basis until the data are confirmed."
+      ],
+      "metrics": {
+        "runtime_s": 364.037,
+        "tool_calls": 23,
+        "stub_tool_calls": 0,
+        "llm_calls": 32,
+        "llm_valid_calls": 30,
+        "retries": 11,
+        "fallbacks": 2,
+        "step_rejections": 0,
+        "kind_coercions": 4,
+        "token_budget_overruns": 0,
+        "input_tokens": 91575,
+        "output_tokens": 5215
+      },
+      "checks": [
+        {
+          "type": "conflict_contains",
+          "expect": "detects that 150 °C at 2.5 km contradicts the 30 °C/km gradient",
+          "passed": true,
+          "detail": "1 conflict(s); matching: ['Stated 150 degC at 2500 m is inconsistent with the design basis: 12 degC surface temperature (DB-04) and 30 K/km gradient (DB-03) give 87.0 degC there (RC-01); the design uses the design basis until the data are confirmed.']"
+        },
+        {
+          "type": "conflict_contains",
+          "expect": "names the gradient it checked against (DB-03)",
+          "passed": true,
+          "detail": "1 conflict(s); matching: ['Stated 150 degC at 2500 m is inconsistent with the design basis: 12 degC surface temperature (DB-04) and 30 K/km gradient (DB-03) give 87.0 degC there (RC-01); the design uses the design basis until the data are confirmed.']"
+        },
+        {
+          "type": "status",
+          "expect": "continues on the design basis",
+          "passed": true,
+          "detail": "status completed"
+        }
+      ],
+      "pending": [],
+      "run_dirs": [
+        "S9"
+      ],
+      "verify_cost_items": [
+        "absorption_chiller_plant_cost_function_usd",
+        "electric_chiller_plant_cost_function_usd"
+      ],
+      "token_comparison": null,
+      "note": ""
+    },
+    {
+      "scenario": "S10",
+      "situation": "Same task, naive vs optimised token settings",
+      "expected": "Token comparison chart",
+      "engine": "llm",
+      "model": "gemma4:12b-it-q4_K_M",
+      "outcome": "pending",
+      "status": "completed",
+      "phase": "P10",
+      "verdict": "ACCEPTED",
+      "selected_candidate": "C2-opt-robust",
+      "conflicts": [],
+      "metrics": {
+        "runtime_s": 973.707,
+        "tool_calls": 56,
+        "stub_tool_calls": 0,
+        "llm_calls": 67,
+        "llm_valid_calls": 63,
+        "retries": 24,
+        "fallbacks": 4,
+        "step_rejections": 3,
+        "kind_coercions": 13,
+        "token_budget_overruns": 0,
+        "input_tokens": 271013,
+        "output_tokens": 11833
+      },
+      "checks": [
+        {
+          "type": "status",
+          "expect": "the optimised run completes",
+          "passed": true,
+          "detail": "status completed"
+        },
+        {
+          "type": "token_saving",
+          "expect": "the optimised settings use no more tokens than the naive ones",
+          "passed": true,
+          "detail": "naive 173909 vs optimised 108937 tokens"
+        },
+        {
+          "type": "llm_metrics",
+          "expect": "LLM calls and tokens are logged",
+          "passed": true,
+          "detail": "30/33 LLM calls used without fallback"
+        }
+      ],
+      "pending": [
+        {
+          "expect": "token comparison chart (figure)",
+          "needs": [
+            "WP-14"
+          ],
+          "reason": "the report tables the comparison (S10-token_comparison.json); WP-14 draws the figures",
+          "currently": null,
+          "now_passes": null
+        }
+      ],
+      "run_dirs": [
+        "S10-naive",
+        "S10-optimised"
+      ],
+      "verify_cost_items": [
+        "absorption_chiller_plant_cost_function_usd",
+        "electric_chiller_plant_cost_function_usd"
+      ],
+      "token_comparison": {
+        "total": {
+          "naive_tokens": 173909.0,
+          "optimised_tokens": 108937.0,
+          "saved_tokens": 64972.0,
+          "saved_frac": 0.3736,
+          "naive_calls": 34.0,
+          "optimised_calls": 33.0
+        },
+        "by_agent": {
+          "economics": {
+            "naive_tokens": 19177.0,
+            "optimised_tokens": 6460.0,
+            "saved_tokens": 12717.0,
+            "saved_frac": 0.6631,
+            "naive_calls": 3.0,
+            "optimised_calls": 3.0
+          },
+          "lead_engineer": {
+            "naive_tokens": 10107.0,
+            "optimised_tokens": 12333.0,
+            "saved_tokens": -2226.0,
+            "saved_frac": -0.2202,
+            "naive_calls": 3.0,
+            "optimised_calls": 4.0
+          },
+          "model_builder": {
+            "naive_tokens": 27537.0,
+            "optimised_tokens": 2352.0,
+            "saved_tokens": 25185.0,
+            "saved_frac": 0.9146,
+            "naive_calls": 4.0,
+            "optimised_calls": 1.0
+          },
+          "reporter": {
+            "naive_tokens": 16617.0,
+            "optimised_tokens": 1889.0,
+            "saved_tokens": 14728.0,
+            "saved_frac": 0.8863,
+            "naive_calls": 2.0,
+            "optimised_calls": 1.0
+          },
+          "requirements": {
+            "naive_tokens": 9057.0,
+            "optimised_tokens": 7895.0,
+            "saved_tokens": 1162.0,
+            "saved_frac": 0.1283,
+            "naive_calls": 3.0,
+            "optimised_calls": 3.0
+          },
+          "reviewer": {
+            "naive_tokens": 22961.0,
+            "optimised_tokens": 10160.0,
+            "saved_tokens": 12801.0,
+            "saved_frac": 0.5575,
+            "naive_calls": 3.0,
+            "optimised_calls": 2.0
+          },
+          "subsurface": {
+            "naive_tokens": 17966.0,
+            "optimised_tokens": 15273.0,
+            "saved_tokens": 2693.0,
+            "saved_frac": 0.1499,
+            "naive_calls": 6.0,
+            "optimised_calls": 6.0
+          },
+          "system_architect": {
+            "naive_tokens": 50487.0,
+            "optimised_tokens": 52575.0,
+            "saved_tokens": -2088.0,
+            "saved_frac": -0.0414,
+            "naive_calls": 10.0,
+            "optimised_calls": 13.0
+          }
+        },
+        "by_phase": {
+          "P0": {
+            "naive_tokens": 1158.0,
+            "optimised_tokens": 1159.0,
+            "saved_tokens": -1.0,
+            "saved_frac": -0.0009,
+            "naive_calls": 1.0,
+            "optimised_calls": 1.0
+          },
+          "P1": {
+            "naive_tokens": 9057.0,
+            "optimised_tokens": 7895.0,
+            "saved_tokens": 1162.0,
+            "saved_frac": 0.1283,
+            "naive_calls": 3.0,
+            "optimised_calls": 3.0
+          },
+          "P10": {
+            "naive_tokens": 16617.0,
+            "optimised_tokens": 1889.0,
+            "saved_tokens": 14728.0,
+            "saved_frac": 0.8863,
+            "naive_calls": 2.0,
+            "optimised_calls": 1.0
+          },
+          "P2": {
+            "naive_tokens": 12701.0,
+            "optimised_tokens": 9762.0,
+            "saved_tokens": 2939.0,
+            "saved_frac": 0.2314,
+            "naive_calls": 4.0,
+            "optimised_calls": 4.0
+          },
+          "P3": {
+            "naive_tokens": 16788.0,
+            "optimised_tokens": 16345.0,
+            "saved_tokens": 443.0,
+            "saved_frac": 0.0264,
+            "naive_calls": 2.0,
+            "optimised_calls": 5.0
+          },
+          "P4": {
+            "naive_tokens": 27537.0,
+            "optimised_tokens": 2352.0,
+            "saved_tokens": 25185.0,
+            "saved_frac": 0.9146,
+            "naive_calls": 4.0,
+            "optimised_calls": 1.0
+          },
+          "P5": {
+            "naive_tokens": 23218.0,
+            "optimised_tokens": 35831.0,
+            "saved_tokens": -12613.0,
+            "saved_frac": -0.5432,
+            "naive_calls": 8.0,
+            "optimised_calls": 8.0
+          },
+          "P6": {
+            "naive_tokens": 15746.0,
+            "optimised_tokens": 5910.0,
+            "saved_tokens": 9836.0,
+            "saved_frac": 0.6247,
+            "naive_calls": 2.0,
+            "optimised_calls": 2.0
+          },
+          "P7": {
+            "naive_tokens": 6003.0,
+            "optimised_tokens": 8771.0,
+            "saved_tokens": -2768.0,
+            "saved_frac": -0.4611,
+            "naive_calls": 1.0,
+            "optimised_calls": 2.0
+          },
+          "P8": {
+            "naive_tokens": 19177.0,
+            "optimised_tokens": 6460.0,
+            "saved_tokens": 12717.0,
+            "saved_frac": 0.6631,
+            "naive_calls": 3.0,
+            "optimised_calls": 3.0
+          },
+          "P9": {
+            "naive_tokens": 25907.0,
+            "optimised_tokens": 12563.0,
+            "saved_tokens": 13344.0,
+            "saved_frac": 0.5151,
+            "naive_calls": 4.0,
+            "optimised_calls": 3.0
+          }
+        }
+      },
+      "note": ""
+    },
+    {
+      "scenario": "S11",
+      "situation": "Same task on 16 GB-class vs 36 GB-class model",
+      "expected": "Tool-call validity, retries, fallbacks, tokens, quality",
+      "engine": "llm",
+      "model": "gemma4:12b-it-q4_K_M",
+      "outcome": "pending",
+      "status": "completed",
+      "phase": "P10",
+      "verdict": "ACCEPTED",
+      "selected_candidate": "C2-opt-robust",
+      "conflicts": [],
+      "metrics": {
+        "runtime_s": 372.586,
+        "tool_calls": 25,
+        "stub_tool_calls": 0,
+        "llm_calls": 33,
+        "llm_valid_calls": 32,
+        "retries": 7,
+        "fallbacks": 1,
+        "step_rejections": 1,
+        "kind_coercions": 6,
+        "token_budget_overruns": 0,
+        "input_tokens": 83558,
+        "output_tokens": 4966
+      },
+      "checks": [
+        {
+          "type": "status",
+          "expect": "the run completes",
+          "passed": true,
+          "detail": "status completed"
+        },
+        {
+          "type": "llm_metrics",
+          "expect": "tool-call validity, retries, fallbacks and tokens are recorded",
+          "passed": true,
+          "detail": "32/33 LLM calls used without fallback"
+        }
+      ],
+      "pending": [
+        {
+          "expect": "the 16 GB-class and 36 GB-class models are compared",
+          "needs": [
+            "L-1"
+          ],
+          "reason": "needs two local Ollama runs (run_eval.py --engine llm --model <tag> for each), then run_eval.py --compare",
+          "currently": null,
+          "now_passes": null
+        }
+      ],
+      "run_dirs": [
+        "S11"
+      ],
+      "verify_cost_items": [
+        "absorption_chiller_plant_cost_function_usd",
+        "electric_chiller_plant_cost_function_usd"
+      ],
+      "token_comparison": null,
+      "note": ""
+    }
+  ]
+}
