@@ -84,9 +84,9 @@ report pack `docs/results/REPORT.md` cites the source of each table. Figures: `d
 
 ### 10. Economics, CO₂, exergy, tokens, novelty — *agent/LLM, reproducibility*
 - **Show:** `fig_tokens_by_phase.png` + the S11 table of `REPORT.md` §10 + the S10 line
-  (183 874 → 101 042 tokens, −45 %).
+  (173 909 → 108 937 tokens, −37 %).
 - "The final run used 34 calls and 99 k tokens on a 12-billion-parameter model on a laptop, with
-  two policy fallbacks and zero stub tools. Compact history and tool-result summaries save 45 %."
+  two policy fallbacks and zero stub tools. Compact history and tool-result summaries save 37 %."
 - "Reproduce it with one command on the policy engine, no GPU: same design, same records."
 - "Novelty: a deterministic workflow where the model only chooses, a verifier with sole authority
   to accept, and a Model Builder that extends the digital twin from reference cards."

@@ -466,15 +466,15 @@ Source: `runs/final/eval/gemma4_12b-it-q4_K_M/S10-token_comparison.json` (runs `
 
 | Agent | naive_tokens | optimised_tokens | saved_tokens | saved_frac | naive_calls | optimised_calls |
 | --- | --- | --- | --- | --- | --- | --- |
-| total | 183,874 | 101,042 | 82,832 | 0.4505 | 34 | 34 |
-| economics | 15,669 | 9,439 | 6,230 | 0.3976 | 3 | 3 |
-| lead_engineer | 21,979 | 9,726 | 12,253 | 0.5575 | 4 | 4 |
-| model_builder | 13,351 | 2,349 | 11,002 | 0.8241 | 2 | 1 |
-| reporter | 15,655 | 3,499 | 12,156 | 0.7765 | 2 | 2 |
-| requirements | 9,057 | 7,939 | 1,118 | 0.1234 | 3 | 3 |
-| reviewer | 23,579 | 7,471 | 16,108 | 0.6832 | 3 | 2 |
-| subsurface | 26,640 | 18,041 | 8,599 | 0.3228 | 6 | 6 |
-| system_architect | 57,944 | 42,578 | 15,366 | 0.2652 | 11 | 13 |
+| total | 173,909 | 108,937 | 64,972 | 0.3736 | 34 | 33 |
+| economics | 19,177 | 6,460 | 12,717 | 0.6631 | 3 | 3 |
+| lead_engineer | 10,107 | 12,333 | -2,226 | -0.2202 | 3 | 4 |
+| model_builder | 27,537 | 2,352 | 25,185 | 0.9146 | 4 | 1 |
+| reporter | 16,617 | 1,889 | 14,728 | 0.8863 | 2 | 1 |
+| requirements | 9,057 | 7,895 | 1,162 | 0.1283 | 3 | 3 |
+| reviewer | 22,961 | 10,160 | 12,801 | 0.5575 | 3 | 2 |
+| subsurface | 17,966 | 15,273 | 2,693 | 0.1499 | 6 | 6 |
+| system_architect | 50,487 | 52,575 | -2,088 | -0.0414 | 10 | 13 |
 
 ## 10. S11 — model comparison (same task, one S11 run per model)
 
@@ -482,13 +482,13 @@ Sources: `runs/final/eval/gemma4_12b-it-q4_K_M/eval_results.json`, `runs/final/e
 
 | Model | Outcome | Status | Phase | Verdict | LLM calls | Valid | Validity | Retries | Fallbacks | Tokens | Runtime s |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| gemma4:12b-it-q4_K_M | pending | completed | P10 | ACCEPTED | 35 | 31 | 89% | 15 | 4 | 115,928 | 400.3 |
+| gemma4:12b-it-q4_K_M | pending | completed | P10 | ACCEPTED | 33 | 32 | 97% | 7 | 1 | 88,524 | 372.6 |
 | gemma4:26b-a4b | fail | escalated | P5 | - | 27 | 19 | 70% | 14 | 7 | 101,871 | 175.7 |
 | qwen3.5:9b-q4_K_M | fail | escalated | P5 | - | 22 | 15 | 68% | 17 | 7 | 83,724 | 203.2 |
 | qwen3.6:27b | pending | completed | P10 | ACCEPTED | 38 | 31 | 82% | 17 | 7 | 126,855 | 672.5 |
 | qwen3.6:35b-a3b | fail | escalated | P6 | - | 29 | 28 | 97% | 7 | 1 | 79,061 | 167.3 |
 
-`runs/final/eval/model_comparison.json` (generated 2026-11-03T10:23:31.989786+00:00) sums every scenario in each eval folder; for the chosen model that is S1–S11, so its like-for-like S11 line is the one above, taken from its `eval_results.json`.
+`runs/final/eval/model_comparison.json` (generated 2026-11-04T07:59:01.288960+00:00) sums every scenario in each eval folder; for the chosen model that is S1–S11, so its like-for-like S11 line is the one above, taken from its `eval_results.json`.
 
 ## 11. S1–S11 evaluation of the chosen model
 
@@ -496,17 +496,17 @@ Source: `runs/final/eval/gemma4_12b-it-q4_K_M/eval_results.json` (`EVAL_REPORT.m
 
 | Scenario | Expected | Outcome | Status | Phase | Verdict | Tool calls (stub) | LLM calls | Validity | Fallbacks | Tokens | Runtime s | Pending / failed |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| S1 | Complete design, ACCEPTED | pass | completed | P10 | ACCEPTED | 27 (0) | 34 | 94% | 2 | 103,302 | 379.4 | – |
-| S2 | Lists missing inputs, asks, does not invent | pending | paused | P1 | - | 3 (0) | 3 | 100% | 0 | 6,796 | 26.5 | the question lists the inputs the request lacks (demand CSVs, cooling, reservoir) |
-| S3 | Polite refusal/redirect | pass | refused | P0 | - | 0 (0) | 1 | 100% | 0 | 1,128 | 4.3 | – |
-| S4 | Flags DB-10/11 violation, proposes compliant option | pass | completed | P10 | ACCEPTED | 25 (0) | 32 | 91% | 3 | 99,202 | 352.7 | – |
-| S5 | Notes conflict with DB-16, asks to confirm change of basis | pending | completed | P10 | ACCEPTED | 28 (0) | 34 | 97% | 1 | 92,830 | 372.1 | asks the user to confirm the change of basis |
-| S6 | Asks or records DB-31 assumption + sensitivity | pass | completed | P10 | ACCEPTED | 27 (0) | 33 | 91% | 3 | 105,299 | 350.9 | – |
-| S7 | Gap detected; Model Builder writes model + passes reference-example test | fail | escalated | P4 | - | 16 (0) | 15 | 93% | 1 | 46,743 | 143.1 | the Model Builder writes the model from its reference card and it passes the reference-example test; status escalated |
-| S8 | Re-sizes and explains | pending | completed | P10 | ACCEPTED | 26 (0) | 38 | 92% | 3 | 106,820 | 395.9 | re-sizes the doublets for the lower productivity |
-| S9 | Detects inconsistency | pass | completed | P10 | ACCEPTED | 23 (0) | 32 | 84% | 5 | 110,382 | 354.2 | – |
-| S10 | Token comparison chart | pending | completed | P10 | ACCEPTED | 54 (0) | 68 | 94% | 4 | 284,916 | 948.3 | token comparison chart (figure) |
-| S11 | Tool-call validity, retries, fallbacks, tokens, quality | pending | completed | P10 | ACCEPTED | 29 (0) | 35 | 89% | 4 | 115,928 | 400.3 | the 16 GB-class and 36 GB-class models are compared |
+| S1 | Complete design, ACCEPTED | pass | completed | P10 | ACCEPTED | 28 (0) | 33 | 94% | 2 | 93,795 | 387.6 | – |
+| S2 | Lists missing inputs, asks, does not invent | pass | paused | P1 | - | 0 (0) | 1 | 100% | 0 | 1,121 | 4.6 | – |
+| S3 | Polite refusal/redirect | pass | refused | P0 | - | 0 (0) | 1 | 100% | 0 | 1,128 | 2.7 | – |
+| S4 | Flags DB-10/11 violation, proposes compliant option | pass | completed | P10 | ACCEPTED | 29 (0) | 36 | 97% | 1 | 106,067 | 434.4 | – |
+| S5 | Notes conflict with DB-16, asks to confirm change of basis | pass | completed | P10 | ACCEPTED | 30 (0) | 33 | 91% | 3 | 104,179 | 419.1 | – |
+| S6 | Asks or records DB-31 assumption + sensitivity | pass | completed | P10 | ACCEPTED | 25 (0) | 33 | 97% | 1 | 95,618 | 380.6 | – |
+| S7 | Gap detected; Model Builder writes model + passes reference-example test | pending | completed | P10 | ACCEPTED | 27 (0) | 36 | 86% | 5 | 120,985 | 448.0 | the Model Builder writes the model from its reference card and it passes the reference-example test |
+| S8 | Re-sizes and explains | pass | completed | P10 | ACCEPTED | 24 (0) | 33 | 97% | 1 | 98,497 | 379.3 | – |
+| S9 | Detects inconsistency | pass | completed | P10 | ACCEPTED | 23 (0) | 32 | 94% | 2 | 96,790 | 364.0 | – |
+| S10 | Token comparison chart | pending | completed | P10 | ACCEPTED | 56 (0) | 67 | 94% | 4 | 282,846 | 973.7 | token comparison chart (figure) |
+| S11 | Tool-call validity, retries, fallbacks, tokens, quality | pending | completed | P10 | ACCEPTED | 25 (0) | 33 | 97% | 1 | 88,524 | 372.6 | the 16 GB-class and 36 GB-class models are compared |
 
 ## 12. S7 — model gap closed by the Model Builder (local run after #23)
 
