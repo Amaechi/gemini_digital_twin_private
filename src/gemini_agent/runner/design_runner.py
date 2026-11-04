@@ -15,7 +15,8 @@
 # instead of escalating mid-DR (the engine floors its usage limit; past the call's own ceiling
 # the policy chooses, a counted fallback); decisions keep AG-04. 2026-11-03 (review loop): P9b
 # user review — objection → one bounded what-if lever (engine) → what-if (tools) → adopt (P6–P9
-# rerun on the loop-back path, TL-13 sized from the adopted design) or keep; DR-12.
+# rerun on the loop-back path, TL-13 sized from the adopted design) or keep; DR-12. 2026-11-04
+# (voice dialogue): ``adopt_whatif`` applies that adoption path to a completed run.
 """Workflow runner: deterministic phases P0–P10 (spec §4.1, §5.2).
 
 The runner decides WHICH phase runs, enforces budgets (AG-04), executes every tool call,
@@ -346,6 +347,9 @@ class DesignRunner:
             self._save(state)
         self._save(state)
         self._write_outputs(state)
+        return self._result(state)
+
+    def _result(self, state: RunState) -> RunResult:
         return RunResult(
             run_id=state.run_id,
             status=state.status,
@@ -358,6 +362,10 @@ class DesignRunner:
             decision_records=[record.dr_id for record in state.decision_records],
             approval=state.approval,
         )
+
+    def result(self, run_id: str) -> RunResult:
+        """The ``RunResult`` of a stored run as ``start``/``resume`` reported it (read-only)."""
+        return self._result(self.load_state(run_id))
 
     def _budget(self, spec: PhaseSpec) -> PhaseBudget:
         return self.budgets.get(spec.phase, spec.budget)
@@ -1562,6 +1570,130 @@ class DesignRunner:
             note=f"P6–P9 rerun on {candidate.id} (TL-13 sizes from it)",
             recommended_id=previous,
         )
+
+    def adopt_whatif(
+        self,
+        run_id: str,
+        result: whatif_tool.WhatIfResult,
+        *,
+        objection: str,
+        mapping_source: str = "user",
+    ) -> RunResult:
+        """Adopt a what-if of a finished run: P6–P9 rerun on its design, DR-12 (FINAL_SPRINT §I).
+
+        The voice dialogue (``ui.dialogue``) computes what-ifs on a completed run with
+        ``tools.whatif`` and, when the user says "adopt", hands the result here. This is the
+        review loop's own adoption path (:meth:`_adopt` → :meth:`_restart_from_p6` →
+        :meth:`_loop`) applied after P10: the what-if joins the run as ``whatif`` evidence
+        (``TR-…``), the ``REVIEW_*`` events record the objection, the lever and the what-if, DR-12
+        "User review" is written adopted, and the run continues from P6 on the adopted design
+        (TL-13 pinned to it) up to a new P10 approval asked through ``ask_fn``. Counted against
+        the ≤ 3 verification loops like any loop-back; the run's artefacts are rewritten as after
+        one. ``ValueError`` when the run is not completed, the what-if is not this run's, the
+        lever is not adoptable, the what-if design is unusable or no loop is left — nothing is
+        written then.
+        """
+        state = self.load_state(run_id)
+        if state.status != RunStatus.COMPLETED:
+            raise ValueError(f"run '{run_id}' is {state.status.value}, not completed")
+        if result.run_id != run_id:
+            raise ValueError(f"what-if {result.index} belongs to run '{result.run_id}'")
+        lever = next(iter(result.levers))
+        value = result.levers[lever]
+        if lever not in review_mod.ADOPTABLE:
+            reason = review_mod.NOT_ADOPTABLE_REASON.get(lever, "not a design lever")
+            raise ValueError(f"lever {lever} cannot be adopted: {reason}")
+        after = result.after
+        if after.status != "ok" or not after.guard_approved:
+            raise ValueError(f"what-if design not usable: {after.reason or after.status}")
+        if state.loop_count >= self.max_verification_loops:
+            raise ValueError(
+                f"the {self.max_verification_loops} verification loops are used; the design "
+                "cannot be changed again in this run"
+            )
+        # Reopen the run at the P9 review with the what-if as evidence (as _review records it).
+        previous_approval = state.approval
+        state.status = RunStatus.RUNNING
+        state.phase = Phase.P9
+        state.pending = None
+        state.approval = None
+        if self.ask_fn is not None:  # the dialogue is interactive: the new P10 approval is asked
+            state.input_mode = "ask"
+        review = state.review = ReviewState(
+            stage="adopt",
+            round=1,
+            objection=objection[:600],
+            lever=lever,
+            value=value,
+            mapping_source=mapping_source,
+            whatif_index=result.index,
+            whatif_candidate_id=after.candidate.id,
+        )
+        self._event(
+            state,
+            "REVIEW_START",
+            {
+                "candidate_id": state.selected_id,
+                "verdict": state.verdict_value(),
+                "budget": result.budget,
+                "message": f"voice dialogue: review of {state.selected_id} after the P10 "
+                f"approval ({previous_approval})",
+            },
+        )
+        self._event(state, "REVIEW_OBJECTION", {"round": 1, "message": review.objection})
+        self._event(
+            state,
+            "REVIEW_MAPPED",
+            {
+                "round": 1,
+                "lever": lever,
+                "value": str(result.record.levers.get(lever, value)),
+                "source": mapping_source,
+                "retries": 0,
+                "error": None,
+                "message": f"voice dialogue: {whatif_tool.format_levers(result.levers)}",
+            },
+        )
+        tr_id = f"TR-{len(state.tool_results) + 1:03d}"
+        stub = self.toolbox.spec("verify_design").stub
+        state.tool_results.append(review_mod.whatif_record(state, result, tr_id, stub=stub))
+        review.whatif_tool_result_id = tr_id
+        self._event(
+            state,
+            "REVIEW_WHATIF",
+            {
+                "id": tr_id,
+                "index": result.index,
+                "lever": lever,
+                "value": value,
+                "candidate_id": after.candidate.id,
+                "guard_approved": after.guard_approved,
+                "verdict": after.verdict.value if after.verdict is not None else None,
+                "record": result.record.dr_id,
+                "path": result.outputs.get("json"),
+                "message": result.summary,
+            },
+        )
+        if self._adopt(state, review, result) != "adopted":  # defensive: checked above
+            state.status = RunStatus.COMPLETED
+            state.phase = Phase.P10
+            state.approval = previous_approval
+            self._save(state)
+            self._write_outputs(state)
+            return self._result(state)
+        following = self._restart_from_p6(
+            state,
+            violations=list(state.violations),
+            message=f"user review adopted ({state.loop_count + 1}): back to P6",
+            reason="review",
+        )
+        if following is None:  # escalated at the loop limit
+            self._save(state)
+            self._write_outputs(state)
+            return self._result(state)
+        state.phase = following
+        self._save(state)
+        return self._loop(state)
 
     def _register_adopted_design(self, state: RunState, result: whatif_tool.WhatIfResult) -> None:
         """Hand the adopted design (and its outage schedule) to the real tool session."""

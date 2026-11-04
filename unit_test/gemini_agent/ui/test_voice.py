@@ -26,7 +26,7 @@ from gemini_agent.logging.llm_logger import LLMLogger
 from gemini_agent.runner.design_runner import APPROVAL_ID
 from gemini_agent.schemas.config import load_config
 from gemini_agent.schemas.decision import InputRequest, Phase
-from gemini_agent.ui import voice
+from gemini_agent.ui import dialogue, voice
 from unit_test.gemini_agent.llm_fakes import (
     Counting,
     always_invalid,
@@ -487,7 +487,7 @@ def test_approval_text_reads_the_stored_verifier_summary(tmp_path):
 
 
 def test_dialogue_hook_is_the_only_post_run_step():
-    """The §I hook receives the RunResult once; without a hook nothing happens."""
+    """The §I hook (``ui.dialogue``) receives the RunResult once; without a hook nothing happens."""
     seen = []
     session = _session(lambda: "", dialogue_hook=seen.append)
     session.after_run("result")  # type: ignore[arg-type]
@@ -526,8 +526,9 @@ def test_talk_drives_a_smoke_budget_policy_run_end_to_end(tmp_path, monkeypatch,
             "65 degrees",  # DB-31
             "26",  # DB-32
             "yes, approve",  # P10 approval
+            "stop",  # the post-run dialogue (§I): nothing to change
         ],
-        confirmations=["", "", "", "", "", ""],
+        confirmations=["", "", "", "", "", "", ""],
     )
     monkeypatch.setattr("builtins.input", keyboard)
     code = main(
@@ -574,6 +575,10 @@ def test_talk_drives_a_smoke_budget_policy_run_end_to_end(tmp_path, monkeypatch,
     assert approval.startswith("Verifier summary:") and approval.endswith(voice.APPROVAL_SUFFIX)
     assert any(s.startswith("Run talk1 completed.") for s in spoken)
     assert not (tmp_path / "talk1" / "llm_calls.jsonl").exists()  # policy: no LLM call at all
+    # The dialogue loop (§I) followed the approval and was stopped by the user at once.
+    assert dialogue.CHANGE_PROMPT in spoken and "Stop the dialogue? [Y/n] " in keyboard.prompts
+    assert spoken[-1] == "Dialogue over: 0 what-ifs computed, 0 adopted."
+    assert not (tmp_path / "talk1" / "whatif").exists()
 
 
 @pytest.mark.usefixtures("stub_tools")

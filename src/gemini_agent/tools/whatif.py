@@ -545,12 +545,18 @@ def apply_levers(
     update: dict[str, Any] = {}
     if "doublets" in levers:
         update["doublets"] = int(levers["doublets"])
+        mechanism = "candidate field; DesignGuard DB-10"
+        if update["doublets"] != candidate.doublets and outages is not None:
+            # 2026-11-04 (voice dialogue): the run's schedule has one outage per doublet of the
+            # selected design; TL-12 places lowest-load windows for the new count (SIM-OUTAGE).
+            outages = None
+            mechanism += "; outage schedule re-placed by TL-12 for the new count (SIM-OUTAGE)"
         applied.append(
             AppliedLever(
                 lever="doublets",
                 value=update["doublets"],
                 base_value=candidate.doublets,
-                mechanism="candidate field; DesignGuard DB-10",
+                mechanism=mechanism,
             )
         )
     if "design_flow_m3h" in levers:

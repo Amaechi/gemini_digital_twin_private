@@ -1,7 +1,8 @@
 """Tests of the interactive design review loop (``cli run --review``; FINAL_SPRINT §E) — offline.
 
-The what-if tool is replaced by a fake that keeps the real lever parsing, bounds and DesignGuard
-(``apply_levers``) but fabricates the KPIs, so the runner tests stay on the stub toolbox. One
+The what-if tool is replaced by a fake (``unit_test.gemini_agent.whatif_fakes``) that keeps the
+real lever parsing, bounds and DesignGuard (``apply_levers``) but fabricates the KPIs, so the
+runner tests stay on the stub toolbox. One
 test at the end runs the real tools (smoke budget) end to end: objection → what-if → adopt →
 TL-13 re-sized from the adopted design → ACCEPTED.
 """
@@ -9,7 +10,6 @@ TL-13 re-sized from the adopted design → ACCEPTED.
 from __future__ import annotations
 
 import json
-from pathlib import Path
 
 import pytest
 from pydantic_ai.messages import ModelResponse, TextPart
@@ -34,25 +34,14 @@ from gemini_agent.schemas.decision import (
     RunStatus,
     check_lever_choice,
 )
-from gemini_agent.schemas.results import KPISet
 from gemini_agent.tools import whatif as whatif_tool
-from gemini_agent.tools.whatif import (
-    ToolEvidence,
-    WhatIfOutcome,
-    WhatIfResult,
-    apply_levers,
-    build_record,
-    build_table,
-    load_run,
-    next_index,
-    parse_levers,
-)
 from unit_test.gemini_agent.llm_fakes import (
     fake_model,
     output_name,
     policy_like,
     user_prompt,
 )
+from unit_test.gemini_agent.whatif_fakes import fake_whatif
 
 pytestmark = pytest.mark.usefixtures("stub_tools")
 
@@ -83,72 +72,6 @@ class Script:
 
     def ids(self, prefix: str = "") -> list[str]:
         return [rid for rid, _ in self.asked if rid.startswith(prefix)]
-
-
-def fake_whatif(calls: list, *, lcoh_after: float = 40.0, verdict=DesignVerdict.UNVERIFIED):
-    """A what-if that parses, bounds and guards the lever for real and fabricates the KPIs."""
-
-    def run(run_dir, levers, budget="quick", *, config_dir=None):
-        parsed = parse_levers(levers)
-        calls.append(dict(parsed))
-        snapshot = load_run(run_dir)
-        index = next_index(run_dir)
-        design = apply_levers(snapshot, parsed, index=index, config_dir=config_dir)
-        out_dir = Path(run_dir) / whatif_tool.WHATIF_DIR / str(index)
-        out_dir.mkdir(parents=True, exist_ok=False)
-        base = snapshot.selected
-
-        def outcome(label, candidate, lcoh, prefix):
-            return WhatIfOutcome(
-                label=label,
-                candidate=candidate,
-                status="ok",
-                guard_approved=True,
-                guard_reason="ok",
-                kpis=KPISet(
-                    candidate_id=candidate.id,
-                    lcoh_per_mwh=lcoh,
-                    lcoc_per_mwh=26.0,
-                    unmet_heating_mwh=0.0,
-                    unmet_cooling_mwh=0.0,
-                    unmet_heating_days=0,
-                    unmet_cooling_days=0,
-                ),
-                year_mode="fake",
-                verdict=verdict,
-                verifier_summary=f"fake verifier: {verdict.value}",
-                evidence=[
-                    ToolEvidence(
-                        id=f"{prefix}-01",
-                        tool="simulate_annual",
-                        candidate_id=candidate.id,
-                        ok=True,
-                        data_keys=["lcoh_per_mwh", "lcoc_per_mwh"],
-                    )
-                ],
-            )
-
-        before = outcome("before", base, 45.0, f"TR-W{index}B")
-        after = outcome("after", design.candidate, lcoh_after, f"TR-W{index}A")
-        record = build_record(index, snapshot.run_id, parsed, before, after)
-        result = WhatIfResult(
-            run_id=snapshot.run_id,
-            index=index,
-            budget=budget,
-            levers=parsed,
-            applied=design.applied,
-            scenario=design.scenario,
-            before=before,
-            after=after,
-            table=build_table(before, after),
-            record=record,
-            outputs={"json": f"{whatif_tool.WHATIF_DIR}/{index}/whatif.json"},
-            summary=f"FAKE what-if {index} {whatif_tool.format_levers(parsed)}",
-        )
-        (out_dir / "whatif.json").write_text(result.model_dump_json(indent=1), "utf-8")
-        return result
-
-    return run
 
 
 def _events(runner: DesignRunner, run_id: str):

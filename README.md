@@ -369,9 +369,53 @@ PYTHONPATH=src python -m gemini_agent.cli talk --engine llm --model <tag> --budg
 
 `--typed` replaces the microphone by the keyboard (no optional package needed; also how the tests
 drive the loop), `--stt-model` picks another faster-whisper size, `--engine policy` runs without
-Ollama. Limits: English transcription, no barge-in while the assistant speaks, no voice "stop" —
-Ctrl-C ends the run like `run`. The post-run voice dialogue (what-if by voice) is a reserved hook
-(`VoiceSession.dialogue_hook`), not yet implemented.
+Ollama. Limits: English transcription, no barge-in while the assistant speaks; Ctrl-C ends the run
+like `run`.
+
+**Dialogue: what-if by voice.** After the approval — or at once with `talk --run-id <id>` on a
+completed run — the assistant asks "What would you like to change?" and loops (max 5 rounds,
+`src/gemini_agent/ui/dialogue.py`): your request is echoed and confirmed, mapped by the Lead
+Engineer role with the review loop's schema (`ReviewQuestion` → one bounded `LeverChoice`; keywords
+with `--engine policy`), echoed again ("I understood: change the heating return temperature to 65
+degrees Celsius — compute the what-if?"), computed with the same `whatif(...)` as `cli whatif`,
+and read back as three sentences whose numbers come from the `WhatIfResult` table, rounded, with
+units. "Adopt it, try another, or stop?" — *adopt* is the review loop's adoption
+(`DesignRunner.adopt_whatif`: P6–P9 rerun on the what-if design, TL-13 pinned to it, DR-12 "User
+review", the new P10 approval asked by voice), *another* starts the next round, *stop* ends.
+Without an adoption nothing outside `runs/<id>/whatif/` is written (the what-if folders,
+`dialogue.jsonl`, and on a completed run the dialogue's `llm_calls.jsonl`); adopting rewrites the
+run's P6–P10 records like a review-loop adoption, so on the repository's submitted `runs/final*`
+directories *adopt* is never offered (copy the run elsewhere first). `--no-dialogue` ends `talk`
+at the approval. Example on a copy of the submitted run (`--budget quick`; the numbers are the
+what-if tool's; `>` marks what you say, `[Y/n]` the keyboard confirmations):
+
+```text
+We can now explore changes to the recommended design C2-opt-robust as what-ifs; nothing is adopted without your confirmation.
+What would you like to change? Name one design lever, for example the heating return temperature, the number of doublets or the backup boiler. Say stop to end.
+> change the return temperature to 65
+I heard: "change the return temperature to 65"          Use it? [Y/n]
+I understood: change the heating return temperature (DB-31) to 65 degrees Celsius.   Compute the what-if? [Y/n]
+What-if 1: changing the heating return temperature from 55 degrees Celsius to 65 degrees Celsius turns the recommended design C2-opt-robust into C2-opt-robust-w1. Before to after: LCOH from 44.6 to 58.4 dollars per megawatt-hour, LCOC from 26.3 to 26.5 dollars per megawatt-hour, CAPEX from 30.1 to 30.0 million dollars, CO2 from 7360 to 10609 tonnes per year. Unmet heating days from 0 to 0, unmet cooling days from 0 to 0, P(demand met) 0.90 before, not recomputed with the quick budget; the DesignGuard approved and the verifier says ACCEPTED for the what-if design.
+Adopt it, try another, or stop?
+> try another
+I heard: "try another"                                   I understood another - apply? [Y/n]
+What else would you like to change? Say stop to end.
+> try 3 doublets
+I heard: "try 3 doublets"                                Use it? [Y/n]
+I understood: change the number of doublets (doublets) to 3.   Compute the what-if? [Y/n]
+What-if 2: changing the number of doublets from 2 to 3 turns the recommended design C2-opt-robust into C2-opt-robust-w2. Before to after: LCOH from 44.6 to 48.5 dollars per megawatt-hour, LCOC from 26.3 to 26.3 dollars per megawatt-hour, CAPEX from 30.1 to 37.9 million dollars, CO2 from 7360 to 7581 tonnes per year. Unmet heating days from 0 to 0, unmet cooling days from 0 to 0, P(demand met) 0.90 before, not recomputed with the quick budget; the DesignGuard approved and the verifier says ACCEPTED for the what-if design.
+Adopt it, try another, or stop?
+> stop
+I heard: "stop"                                          I understood stop - apply? [Y/n]
+Dialogue over: 2 what-ifs computed, 0 adopted.
+```
+
+The printed output also holds the full before → after table of each what-if. A request no lever
+expresses ("make it cheaper") is answered with the reason and asked again; a lever outside its
+bound ("5 doublets") is refused with the DesignGuard's reason; `design_flow_m3h`, `ECO-CO2-GAS`
+and `CHP-EL-FRAC` are computed but cannot be adopted (the prompt then offers *another* or *stop*
+only). The three-turn dialogue above is the offline test (`unit_test/gemini_agent/ui/test_dialogue.py`,
+fake STT/TTS/LLM, real what-if tool): two `whatif/<n>/` records, the run's files byte-identical.
 
 ## Where the evidence is
 
@@ -393,7 +437,8 @@ Ctrl-C ends the run like `run`. The post-run voice dialogue (what-if by voice) i
   `verify/` (DesignGuard, DesignVerifier), `memory/` (event store, project knowledge, design
   cache), `logging/` (LLM call log), `eval/` (S1–S11 harness, submission checks), `schemas/`,
   `prompts/`, `ui/` (web Design Commander: `run_view.py`, `server.py`, `static/`; voice
-  front-end `voice.py`), `cli.py`. `requirements-voice.txt` pins the optional voice packages.
+  front-end `voice.py`, voice dialogue `dialogue.py`), `cli.py`. `requirements-voice.txt` pins the
+  optional voice packages.
 - `src/gemini_model/` — new GEMINI models with reference cards, tests and `.rst` pages:
   `absorption_chiller`, `electric_chiller`, `heat_rejection`, `free_cooling`, `electric_boiler`,
   `thermal_storage`, `fluid` (configurable brine PVT), plus extensions of `heatpump`
