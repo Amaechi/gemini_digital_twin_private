@@ -237,6 +237,37 @@ on the changed design for its P(demand met) (the before value is the run's own T
 `probability_source` records); `--budget smoke` is the CI day subset (no `DB-30=B`).
 The same function is `gemini_agent.tools.whatif.whatif(run_dir, levers, budget) -> WhatIfResult`.
 
+### Review loop (`run --review`)
+
+`cli run --review` (post-submission feature; default off, so every run and eval without the flag
+is unchanged) adds a user review after the P9 verifier verdict. The runner asks
+"Any objection to the recommended design? (Enter = none)"; free text such as *the boiler is too
+big* or *I'd prefer 3 doublets* goes to the Lead Engineer role, whose structured output
+(`LeverChoice`) maps it to **exactly one** bounded what-if lever and value (the list above) or
+"no lever matches", in which case the reason is shown and the question repeated (max 3 rounds).
+The runner then runs the same `whatif(...)` as `cli whatif` on the live run (`runs/<id>/whatif/<n>/`),
+prints the before → after KPI table with the DesignGuard / verifier verdicts and asks "adopt the
+change? yes/no". *Yes* reruns P6–P9 on the changed design through the verifier loop-back path
+(counted against the ≤ 3 loops): TL-13 sizes from the adopted design (its doublets, depth and
+return temperatures fixed; the runner-only `optimise_design` argument `candidate_id`), P7–P9
+verify it, and the review is
+asked again. DR-12 "User review: \<objection\> → \<lever\>" records adopted or kept with the
+what-if evidence (`TR-…` id, the `DR-W<n>` record). Golden rule 1 holds: the LLM only picks a
+lever, every number is a tool result; the policy engine maps a few keyword patterns
+(boiler/backup, return temperature, doublets, depth, flow, concept, DB-30), so this also works
+offline:
+
+```bash
+PYTHONPATH=src python -m gemini_agent.cli run --engine policy --input-mode ask --review --budget quick
+```
+
+Pause mode works too (`resume --answer "the boiler is too big"`, then `--answer yes`). Adoptable
+levers: `DB-31`, `DB-32`, `DB-30` (recorded as user answers), `doublets`, `concept`,
+`OPT-ROBUST-BACKUP` (`off` removes the DR-11 robust option in the rerun). `design_flow_m3h` is a
+TL-13 size variable and `ECO-CO2-GAS` / `CHP-EL-FRAC` are register values: their what-if is shown
+but cannot be adopted in a run. DR-12 holds the last review of the run; earlier adoptions are
+listed in its rationale and in the `REVIEW_*` / `LOOP_BACK` events.
+
 **Laptop LLM run** (needs [Ollama](https://ollama.com); full detail and timings in
 `docs/hackathon/CLOUD_SETUP.md` §7). Models per hardware are in `config/llm.yaml`: profile
 `16gb` (qwen3.5:9b orchestrator, gemma4:12b coder) and `36gb` (qwen3.6:35b-a3b, qwen3.6:27b);
@@ -357,7 +388,8 @@ Ctrl-C ends the run like `run`. The post-run voice dialogue (what-if by voice) i
 ## Repository map (what we added to GEMINI)
 
 - `src/gemini_agent/` — the application: `agents/` (engine, roles, scope, model builder),
-  `runner/` (phases, design runner, toolbox, real tools, Decision Records), `tools/` (TL-01…23),
+  `runner/` (phases, design runner, toolbox, real tools, Decision Records, review loop),
+  `tools/` (TL-01…23),
   `verify/` (DesignGuard, DesignVerifier), `memory/` (event store, project knowledge, design
   cache), `logging/` (LLM call log), `eval/` (S1–S11 harness, submission checks), `schemas/`,
   `prompts/`, `ui/` (web Design Commander: `run_view.py`, `server.py`, `static/`; voice

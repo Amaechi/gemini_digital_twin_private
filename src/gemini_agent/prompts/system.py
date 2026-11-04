@@ -2,7 +2,8 @@
 # file services/plant-debugger/plant_debugger/agent/prompt.py @ d69507a (structure and rule style
 # only). Modified by GeoAgent team, 2026-11-01: GeoAgent roles, phases, tools and rules;
 # 2026-11-02 (L-1 follow-up): step-kind map per role, second few-shot, DR criteria; L-1 P0
-# follow-up: meaning of each no-tool kind, finalise first.
+# follow-up: meaning of each no-tool kind, finalise first; 2026-11-03 (review loop): the
+# objection → lever prompt of the Lead Engineer.
 """System prompts and per-call prompts for the role agents (spec §5.1, §5.4).
 
 Prompts are short on purpose (spec §5.4.4, MEM-06): role, numbered rules, the step kind of each
@@ -19,6 +20,7 @@ from gemini_agent.schemas.decision import (
     KIND_TOOLS,
     DecisionContext,
     DecisionQuestion,
+    ReviewQuestion,
     Role,
 )
 
@@ -151,4 +153,34 @@ def choice_prompt(question: DecisionQuestion, context: DecisionContext) -> str:
         f"{question.dr_id} {question.title}: {question.question}\n"
         "Choose exactly one eligible option id; explain briefly why and why each other option "
         f"was rejected. {rules} DATA:\n{_compact_json(payload)}"
+    )
+
+
+REVIEW_RULES = (
+    "Map the user's objection to exactly one lever of DATA.levers and a value, or set lever to "
+    "null when no offered lever expresses it (the user is then asked again). The value is text "
+    "the tools parse: copy the user's own number or choice (degC, count, on/off, A/B), or the id "
+    "of one of DATA.candidates for the concept lever; never work out a number yourself: for "
+    "'more' or 'fewer' doublets return the value more or fewer (the runner steps the count). A "
+    "too-large boiler or "
+    "backup means OPT-ROBUST-BACKUP off; a depth means the candidate nearest it. The rationale "
+    "names the lever id and states no number."
+)
+"""Rules of the objection → lever call (review loop); the output schema is ``LeverChoice``."""
+
+REVIEW_FEW_SHOT = (
+    'Example: objection "the boiler is far too big" -> {"lever": "OPT-ROBUST-BACKUP", "value": '
+    '"off", "rationale": "The objection is about the backup boiler size; OPT-ROBUST-BACKUP off '
+    'removes the TL-15 robust nameplates."}. Example: objection "make it prettier" -> {"lever": '
+    'null, "value": null, "rationale": "No design lever expresses the objection."}'
+)
+
+
+def review_prompt(question: ReviewQuestion) -> str:
+    """User prompt of the review mapping: the objection, the design and the bounded levers."""
+    payload = question.model_dump(mode="json")
+    return (
+        f"REVIEW round {question.round}: the user objects to the recommended design "
+        f'{question.selected.id}: "{question.objection}"\n{REVIEW_RULES} {REVIEW_FEW_SHOT} '
+        f"DATA:\n{_compact_json(payload)}"
     )

@@ -17,6 +17,9 @@ results — the recommendation rule first, then KPI criteria that discriminate b
 eligible options — and the evidence keys a rationale may cite (field names of the evidence tool
 results, the tools, assumption ids). A choice names one criterion and must be one of its best
 options, so its rationale is grounded and cannot contradict itself.
+
+Review loop (2026-11-03): DR-12 "User review" is written by ``runner/review.py``; an adopted
+``OPT-ROBUST-BACKUP=off`` makes the DR-11 robust option ineligible in the rerun pass.
 """
 
 from __future__ import annotations
@@ -66,7 +69,10 @@ DR_QUESTIONS: dict[str, tuple[str, Role]] = {
         ),
         Role.ECONOMICS,
     ),
+    "DR-12": ("Any objection to the recommended design?", Role.LEAD_ENGINEER),
 }
+"""DR-12 (review loop, 2026-11-03) is built by ``runner/review.py`` from the user's objection and
+the what-if result, not by :func:`build_question`."""
 
 ROBUST_BACKUP_ID = "OPT-ROBUST-BACKUP"
 """Register entry of the DR-11 recommendation rule (pre-L-2)."""
@@ -426,6 +432,10 @@ def _backup_options(
     robust_id = backup.robust_candidate_id
     installed_ok = backup.candidate_id not in excluded
     robust_ok = robust_id is not None and backup.robust_meets_demand and robust_id not in excluded
+    # Review loop (DR-12): a user who adopted OPT-ROBUST-BACKUP=off removed the robust backups;
+    # the option stays visible but is not eligible in this pass (the user's decision stands).
+    user_off = state.review_levers.get(ROBUST_BACKUP_ID) is False
+    robust_ok = robust_ok and not user_off
     p0, p1 = backup.probability_demand_met, backup.probability_demand_met_robust
     raises = robust_ok and p0 is not None and p1 is not None and p1 > p0
     install = raises and (rule.recommend == "robust" or not installed_ok)
@@ -449,6 +459,8 @@ def _backup_options(
             f" USD/MWh, ΔCAPEX {signed(backup.delta_capex_million)} MUSD ({backup.year_mode} "
             "year)" + ("; recommended (OPT-ROBUST-BACKUP)" if install else "")
         )
+    elif user_off:
+        robust_notes = "removed by the user review (DR-12: OPT-ROBUST-BACKUP off)"
     elif robust_id is not None and robust_id in excluded:
         robust_notes = f"{robust_id} excluded by DesignGuard/verifier"
     elif robust_id is not None:
@@ -788,11 +800,12 @@ def render_markdown(record: DecisionRecord) -> str:
     lines += [f"- Why: {record.rationale}"]
     recommended = [o.id for o in record.options if o.recommended]
     if recommended and record.choice not in recommended:
-        follows = (
-            "the chosen option is installed and verified in P9"
-            if record.dr_id == "DR-11"
-            else "the selected design follows the workflow ranking"
-        )
+        if record.dr_id == "DR-11":
+            follows = "the chosen option is installed and verified in P9"
+        elif record.dr_id == "DR-12":
+            follows = "the user's review decision stands; the P9 DesignVerifier verifies the design"
+        else:
+            follows = "the selected design follows the workflow ranking"
         lines.append(
             f"- Note: differs from the workflow-recommended option {', '.join(recommended)}; "
             f"{follows}."

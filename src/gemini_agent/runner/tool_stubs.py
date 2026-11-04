@@ -315,6 +315,10 @@ def optimise_design(args: OptimiseArgs, context: ToolContext) -> ToolResult[Shor
     excluded = context.excluded_ids
     ranked = ranking.rank_candidates(context.candidates, context.kpis, exclude_ids=excluded)
     shortlist = ranked[: args.top_n]
+    if args.candidate_id is not None and args.candidate_id not in excluded:
+        # Review loop (DR-12): the adopted design is the shortlist (the real TL-13 sizes from it).
+        shortlist = [args.candidate_id] + [c for c in shortlist if c != args.candidate_id]
+        shortlist = shortlist[: args.top_n]
     evidence = ranking.has_kpi_evidence(context.kpis)
     skipped = f"; excluded {', '.join(sorted(excluded))}" if excluded else ""
     return ToolResult[ShortlistOutput](

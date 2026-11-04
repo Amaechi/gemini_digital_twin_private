@@ -4,6 +4,7 @@
 # Decision Records (AG-07), option choices, missing-input requests (AG-05) and run status enums.
 # 2026-11-02 (L-1 follow-up): pre-validation hook for step kinds; DR criteria and evidence keys.
 # 2026-11-02 (pre-L-2): DR-11 backup capacity (OPT-ROBUST-BACKUP).
+# 2026-11-03 (review loop): DR-12 user review; ReviewQuestion / LeverChoice (objection → lever).
 """Typed decisions exchanged between the workflow runner and the decision engines (spec §5.3).
 
 The runner owns the phase order (P0–P10); an engine (deterministic policy or an LLM agent) only
@@ -315,6 +316,134 @@ class DecisionContext(StrictModel):
     budget_left: dict[str, int] = Field(default_factory=dict)
 
 
+class LeverBrief(StrictModel):
+    """One bounded what-if lever as the review agent sees it (``tools.whatif.LEVERS``)."""
+
+    id: str
+    kind: Literal["float", "int", "choice", "flag", "candidate"]
+    description: str
+    unit: str = ""
+    choices: list[str] = Field(default_factory=list)
+    bound: str = ""
+    adoptable: bool = Field(
+        default=True,
+        description="False: shown in the what-if only (a scenario lever or a TL-13 size "
+        "variable); the run cannot adopt it.",
+    )
+
+
+class CandidateBrief(StrictModel):
+    """A screened candidate the ``concept`` lever may re-pick (no KPIs: ids and geometry only)."""
+
+    id: str
+    concept: str
+    doublets: int
+    depth_m: float | None = None
+    description: str = ""
+
+
+class ReviewQuestion(StrictModel):
+    """The user's objection to the recommended design, to be mapped to one lever (review loop).
+
+    The workflow builds it from the run state; the engine answers with a :class:`LeverChoice`.
+    Numbers in ``objection`` are the user's own words; the engine copies, never computes.
+    """
+
+    run_id: str
+    phase: Phase = Phase.P9
+    role: Role = Role.LEAD_ENGINEER
+    round: int = Field(ge=1, description="Objection round in this review (max 3).")
+    objection: str = Field(min_length=1, max_length=600)
+    selected: CandidateBrief
+    selected_returns_degc: dict[str, float] = Field(
+        default_factory=dict, description="heating_return_degc / cooling_return_degc."
+    )
+    robust_backup_installed: bool | None = Field(
+        default=None, description="Whether the design carries the TL-15 robust backups (DR-11)."
+    )
+    levers: list[LeverBrief] = Field(min_length=1)
+    candidates: list[CandidateBrief] = Field(
+        default_factory=list, description="Screened candidates the concept lever may pick."
+    )
+    feedback: str = Field(default="", description="Why the previous round did not match.")
+
+    def lever(self, lever_id: str | None) -> LeverBrief | None:
+        """Return the offered lever with this id (None if not offered)."""
+        return next((lever for lever in self.levers if lever.id == lever_id), None)
+
+
+class LeverChoice(StrictModel):
+    """Structured output of the review mapping: exactly one lever + value, or no match.
+
+    ``lever`` None means no offered lever expresses the objection (the user is asked again).
+    ``value`` is text the what-if parses (``tools.whatif.parse_levers``): the user's own number
+    or choice, a candidate id, ``on``/``off`` — never a quantity the engine worked out.
+    """
+
+    lever: str | None = Field(default=None, max_length=64)
+    value: str | None = Field(default=None, max_length=64)
+    rationale: str = Field(min_length=1, max_length=600, description="≤ 60 words, no numbers.")
+
+    @field_validator("rationale")
+    @classmethod
+    def _short_rationale(cls, text: str) -> str:
+        if _word_count(text) > RATIONALE_MAX_WORDS:
+            raise ValueError(f"rationale must be <= {RATIONALE_MAX_WORDS} words")
+        return reject_llm_quantities(text)
+
+    @model_validator(mode="after")
+    def _value_with_lever(self) -> LeverChoice:
+        if self.lever is not None and (self.value is None or not self.value.strip()):
+            raise ValueError(f"lever {self.lever} needs a value")
+        if self.lever is None and self.value is not None:
+            raise ValueError("value without a lever; set lever null for 'no lever matches'")
+        return self
+
+
+_FLAG_WORDS = {"on", "off", "true", "false", "yes", "no", "1", "0"}
+INT_STEPS: dict[str, int] = {"more": 1, "fewer": -1, "less": -1}
+"""Integer-lever values an engine may return instead of a count (golden rule 1: the runner steps
+the selected design's count deterministically, ``runner.review.resolve_value``)."""
+
+
+def check_lever_choice(question: ReviewQuestion, choice: LeverChoice) -> str | None:
+    """Return an error message for the engine, or None if the lever choice is acceptable.
+
+    The lever must be one the question offers and the value must parse for its kind (number,
+    integer, one of the choices, on/off, or a candidate id / concept of ``question.candidates``).
+    Bounds (register range, DesignGuard) are checked by the what-if itself.
+    """
+    if choice.lever is None:
+        return None
+    lever = question.lever(choice.lever)
+    if lever is None:
+        return f"lever must be one of the offered ids {[item.id for item in question.levers]}"
+    value = (choice.value or "").strip()
+    if lever.kind == "float":
+        try:
+            float(value)
+        except ValueError:
+            return f"{lever.id} needs a number ({lever.unit or 'unitless'}), got '{value}'"
+    elif lever.kind == "int":
+        if value.lower() not in INT_STEPS and not re.fullmatch(r"[+-]?\d+", value):
+            return f"{lever.id} needs an integer (or more / fewer), got '{value}'"
+    elif lever.kind == "choice":
+        if value.lower() not in {c.lower() for c in lever.choices}:
+            return f"{lever.id} must be one of {lever.choices}, got '{value}'"
+    elif lever.kind == "flag":
+        if value.lower() not in _FLAG_WORDS:
+            return f"{lever.id} must be on or off, got '{value}'"
+    elif lever.kind == "candidate":
+        ids = {c.id.lower() for c in question.candidates}
+        concepts = {c.concept.lower() for c in question.candidates}
+        if value.lower() not in ids | concepts:
+            return (
+                f"{lever.id} must name a screened candidate id or concept of the run "
+                f"{sorted(c.id for c in question.candidates)}, got '{value}'"
+            )
+    return None
+
+
 DR_IDS = Literal[
     "DR-01",
     "DR-02",
@@ -327,6 +456,7 @@ DR_IDS = Literal[
     "DR-09",
     "DR-10",
     "DR-11",
+    "DR-12",
 ]
 
 DR_TITLES: dict[str, str] = {
@@ -343,7 +473,15 @@ DR_TITLES: dict[str, str] = {
     "DR-11": "Backup capacity (robustness)",
 }
 """AG-07 Decision Records DR-01…DR-10, plus DR-11 (pre-L-2): install the TL-15 robust backup
-nameplates or keep the base-year ones (OPT-ROBUST-BACKUP), decided after P8."""
+nameplates or keep the base-year ones (OPT-ROBUST-BACKUP), decided after P8. These are the
+records every run writes; DR-12 (:data:`REVIEW_DR_ID`) exists only in runs with the review loop."""
+
+REVIEW_DR_ID = "DR-12"
+REVIEW_DR_TITLE = "User review"
+"""Review loop (``cli run --review``, 2026-11-03): after the P9 verdict the user may object to the
+recommended design; the objection is mapped to one bounded what-if lever, the what-if is computed
+by the tools and the user adopts the change (P6–P9 rerun) or keeps the design. Not in
+:data:`DR_TITLES` because it is written only when the review loop is on."""
 
 
 class DecisionOption(StrictModel):

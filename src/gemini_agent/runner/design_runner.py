@@ -13,7 +13,9 @@
 # (CFG-INPUT-DEFAULTS) — asked once, before any tool runs or default is assumed. 2026-11-03
 # (runner J): a Decision Record call past the phase token budget records TOKEN_BUDGET_OVERRUN
 # instead of escalating mid-DR (the engine floors its usage limit; past the call's own ceiling
-# the policy chooses, a counted fallback); decisions keep AG-04.
+# the policy chooses, a counted fallback); decisions keep AG-04. 2026-11-03 (review loop): P9b
+# user review — objection → one bounded what-if lever (engine) → what-if (tools) → adopt (P6–P9
+# rerun on the loop-back path, TL-13 sized from the adopted design) or keep; DR-12.
 """Workflow runner: deterministic phases P0–P10 (spec §4.1, §5.2).
 
 The runner decides WHICH phase runs, enforces budgets (AG-04), executes every tool call,
@@ -51,6 +53,7 @@ from gemini_agent.agents.scope import (
 )
 from gemini_agent.logging.llm_logger import LLMLogger
 from gemini_agent.memory.event_store import SQLiteEventStore
+from gemini_agent.runner import review as review_mod
 from gemini_agent.runner.decision_records import (
     build_question,
     installed_design,
@@ -67,6 +70,7 @@ from gemini_agent.runner.phases import (
 )
 from gemini_agent.runner.state import (
     InputMode,
+    ReviewState,
     RobustBackup,
     RunState,
     ToolRecord,
@@ -82,13 +86,16 @@ from gemini_agent.schemas.decision import (
     DesignVerdict,
     InputAnswer,
     InputRequest,
+    LeverChoice,
     NextStep,
     Phase,
     Role,
     RunStatus,
+    check_lever_choice,
     states_numbers,
 )
 from gemini_agent.schemas.results import KPISet
+from gemini_agent.tools import whatif as whatif_tool
 
 RUNS_ROOT = REPO_ROOT / "runs"
 STORE_FILE = "events.sqlite"
@@ -148,6 +155,8 @@ _NO = frozenset({"n", "no", "reject", "rejected"})
 
 Outcome = Literal["continue", "finalise", "paused", "stopped", "done"]
 AskFn = Callable[[InputRequest], str | None]
+ReviewOutcome = Literal["continue", "paused", "adopted"]
+"""Review loop (P9b): keep the design and go on, wait for the user, or rerun P6–P9."""
 
 
 def _db30_interpretation_b(default: dict[str, Any]) -> dict[str, Any]:
@@ -219,12 +228,20 @@ class DesignRunner:
         max_verification_loops: int = MAX_VERIFICATION_LOOPS,
         history_events: int | None = HISTORY_EVENTS,
         compact_history: bool = True,
+        review: bool = False,
+        review_budget: str = whatif_tool.DEFAULT_BUDGET,
     ) -> None:
         """Configure the runner; ``budgets`` override the phase table per phase.
 
         ``history_events`` (None = all) and ``compact_history`` are the MEM-06 context switches;
         the defaults are the optimised settings (WP-13 S10 runs the naive ones for comparison).
+        ``review`` (``cli run --review``) adds the P9b user review; ``review_budget`` is the
+        what-if budget of that review (``tools.whatif.BUDGETS``; default quick = full year).
         """
+        if review_budget not in whatif_tool.BUDGETS:
+            raise ValueError(f"review_budget must be one of {whatif_tool.BUDGETS}")
+        self.review = review
+        self.review_budget = review_budget
         self.engine = engine
         self.runs_root = Path(runs_root)
         self.toolbox = toolbox or default_toolbox()
@@ -278,9 +295,14 @@ class DesignRunner:
             engine=self.engine.name,
             input_mode=input_mode,
             model_tag=model_tag,
+            review_enabled=self.review,
+            review_budget=self.review_budget if self.review else "",
         )
         store.create_run(run_id, state.status.value, state.model_dump(mode="json"))
-        self._event(state, "RUN_START", {"engine": self.engine.name, "input_mode": input_mode})
+        payload: dict[str, Any] = {"engine": self.engine.name, "input_mode": input_mode}
+        if self.review:  # events of a run without --review are unchanged
+            payload["review"] = True
+        self._event(state, "RUN_START", payload)
         return self._loop(state)
 
     def load_state(self, run_id: str) -> RunState:
@@ -295,10 +317,14 @@ class DesignRunner:
         state = self.load_state(run_id)
         if state.status != RunStatus.PAUSED or state.pending is None:
             raise ValueError(f"run '{run_id}' is {state.status.value}, not paused")
-        if answer is None or not str(answer).strip():
-            raise InvalidAnswer(f"an answer is required: {state.pending.question}")
         request = state.pending
-        self._apply_answer(state, request, str(answer))
+        if request.request_id.startswith(review_mod.REVIEW_PREFIX):
+            # Review loop: the objection text (Enter = none) or the adopt yes/no.
+            self._apply_review_answer(state, request, "" if answer is None else str(answer))
+        else:
+            if answer is None or not str(answer).strip():
+                raise InvalidAnswer(f"an answer is required: {state.pending.question}")
+            self._apply_answer(state, request, str(answer))
         state.pending = None
         state.status = RunStatus.RUNNING
         self._event(state, "RESUME", {"request_id": request.request_id, "engine": self.engine.name})
@@ -610,7 +636,21 @@ class DesignRunner:
         }
 
     def _default_args(self, state: RunState, spec: PhaseSpec, tool: str) -> dict[str, ArgValue]:
-        return self._resolve_args(state, dict(spec.default_args.get(tool, {})))
+        return self._pin_args(
+            state, tool, self._resolve_args(state, dict(spec.default_args.get(tool, {})))
+        )
+
+    @staticmethod
+    def _pin_args(state: RunState, tool: str, args: dict[str, ArgValue]) -> dict[str, ArgValue]:
+        """Runner-only arguments: TL-13's ``candidate_id`` is the adopted what-if design or None.
+
+        Review loop: after an adoption TL-13 sizes from the adopted design; without one the
+        argument is forced to None, so an agent can never choose what TL-13 sizes (the brief
+        does not show the argument; ``toolbox.RUNNER_ONLY``).
+        """
+        if tool == "optimise_design":
+            return {**args, "candidate_id": state.review_pin}
+        return args
 
     def _tool_context(self, state: RunState) -> ToolContext:
         return ToolContext(
@@ -651,6 +691,7 @@ class DesignRunner:
                 f"tool-call budget exceeded in {spec.phase.value} ({budget.max_tool_calls} calls)",
             )
         prog.tool_calls_used += int(budgeted)
+        args = self._pin_args(state, tool, args)
         signature = self._signature(state, tool, args)
         args = self._resolve_args(state, args)
         tool_spec = self.toolbox.spec(tool)
@@ -1123,16 +1164,17 @@ class DesignRunner:
             if verification is None or verification.phase != phase:
                 self._escalate(state, f"no verification of the selected design in {phase.value}")
                 return None
-            self._event(
-                state,
-                "VERIFY_GATE",
-                {
-                    "candidate_id": verification.candidate_id,
-                    "verdict": verification.verdict.value,
-                    "verifier": verification.verifier,
-                    "message": f"{verification.candidate_id}: {verification.verdict.value}",
-                },
-            )
+            if state.review is None:  # a resumed review passed this gate before the pause
+                self._event(
+                    state,
+                    "VERIFY_GATE",
+                    {
+                        "candidate_id": verification.candidate_id,
+                        "verdict": verification.verdict.value,
+                        "verifier": verification.verifier,
+                        "message": f"{verification.candidate_id}: {verification.verdict.value}",
+                    },
+                )
             if verification.verdict == DesignVerdict.REJECTED:
                 return self._loop_back(state, verification)
             if phase == Phase.P9 and self._unverified_without_stubs(state, verification):
@@ -1143,6 +1185,17 @@ class DesignRunner:
                     f"{verification.tool_result_id})",
                 )
                 return None
+            if phase == Phase.P9 and state.review_enabled:
+                outcome = self._review(state)
+                if outcome == "paused":
+                    return None
+                if outcome == "adopted":
+                    return self._restart_from_p6(
+                        state,
+                        violations=list(state.violations),
+                        message=f"user review adopted ({state.loop_count + 1}): back to P6",
+                        reason="review",
+                    )
         if phase == Phase.P10 and state.approval is None:
             verdict = state.verdict_value() or "not verified"
             request = InputRequest(
@@ -1170,24 +1223,50 @@ class DesignRunner:
         )
 
     def _loop_back(self, state: RunState, verification: Verification) -> Phase | None:
+        """REJECTED verification: back to P6 (≤ 3 loops), else escalate (spec §5.2 P7)."""
+        if state.review_pin is not None:
+            # The adopted what-if design (review loop) failed verification: TL-13 is free again.
+            state.review_pin = None
+        return self._restart_from_p6(
+            state,
+            violations=list(verification.violations),
+            message=f"verification REJECTED ({state.loop_count + 1}): back to P6",
+            reason="verifier",
+        )
+
+    def _restart_from_p6(
+        self,
+        state: RunState,
+        *,
+        violations: list[str],
+        message: str,
+        reason: Literal["verifier", "review"],
+    ) -> Phase | None:
+        """Rerun P6–P10 (verifier loop-back and adopted user review share this path)."""
         state.loop_count += 1
         self._event(
             state,
             "LOOP_BACK",
-            {
-                "loop": state.loop_count,
-                "violations": verification.violations,
-                "message": f"verification REJECTED ({state.loop_count}): back to P6",
-            },
+            (
+                {
+                    "loop": state.loop_count,
+                    "violations": violations,
+                    "reason": reason,
+                    "message": message,
+                }
+                if reason == "review"
+                else {"loop": state.loop_count, "violations": violations, "message": message}
+            ),
         )
         if state.loop_count > self.max_verification_loops:
             self._escalate(
                 state,
                 f"verification still REJECTED after {self.max_verification_loops} loops: "
-                + "; ".join(verification.violations)[:200],
+                + "; ".join(violations)[:200],
             )
             return None
-        state.violations = list(verification.violations)
+        state.violations = list(violations)
+        state.review = None  # a new pass gets a new review
         state.robust_backup = None  # P8 re-prices the robust backups of the new selection
         redo = {"DR-06", "DR-10", "DR-11"}
         dropped = [state.progress.pop(phase.value, None) for phase in LOOP_BACK_PHASES]
@@ -1198,6 +1277,385 @@ class DesignRunner:
         )
         state.decision_records = [r for r in state.decision_records if r.dr_id not in redo]
         return Phase.P6
+
+    # ------------------------------------------------------------------ review loop (P9b)
+    def _review(self, state: RunState) -> ReviewOutcome:
+        """P9b user review (``--review``): objection → lever → what-if → adopt or keep.
+
+        A small state machine persisted in ``state.review`` so the pause mode can resume it:
+        ``objection`` (ask, map with the engine, compute the what-if), ``adopt`` (show the
+        before → after table, ask yes/no), ``done``. At most :data:`review_mod.MAX_REVIEW_ROUNDS`
+        objections are mapped per pass; "no lever matches" and refused levers ask again with the
+        reason. The engine only chooses the lever; every number is the what-if tool's.
+        """
+        review = state.review
+        if review is None:
+            review = state.review = ReviewState()
+            self._event(
+                state,
+                "REVIEW_START",
+                {
+                    "candidate_id": state.selected_id,
+                    "verdict": state.verdict_value(),
+                    "budget": state.review_budget or self.review_budget,
+                    "message": f"user review of {state.selected_id} "
+                    f"(verdict {state.verdict_value() or 'none'})",
+                },
+            )
+        invalid = 0
+        while True:
+            if review.stage == "objection":
+                if review.round >= review_mod.MAX_REVIEW_ROUNDS:
+                    return self._finish_review(
+                        state,
+                        None,
+                        adopted=False,
+                        note=f"no lever matched in {review_mod.MAX_REVIEW_ROUNDS} rounds",
+                    )
+                answer = self._ask_review(state, review_mod.objection_request(state, review))
+                if answer is None:
+                    return "paused"
+                text = " ".join(answer.split())
+                if text.lower() in review_mod.NO_OBJECTION:
+                    self._event(state, "REVIEW_NONE", {"message": "no objection"})
+                    return self._finish_review(state, None, adopted=False, note="no objection")
+                review.round += 1
+                review.objection, review.feedback = text[:600], ""
+                self._event(
+                    state,
+                    "REVIEW_OBJECTION",
+                    {"round": review.round, "message": review.objection},
+                )
+                choice = self._map_objection(state, review)
+                if choice.lever is None:
+                    review.feedback = f"No lever matches '{review.objection}': {choice.rationale}"
+                    self._event(state, "REVIEW_UNMATCHED", {"message": review.feedback})
+                    self._save(state)
+                    continue
+                self._save(state)  # the what-if reads the persisted run state
+                try:
+                    result = review_mod.run_whatif(
+                        self.run_dir(state.run_id),
+                        choice.lever,
+                        review_mod.resolve_value(state, choice.lever, choice.value),
+                        state.review_budget or self.review_budget,
+                        self.config_dir,
+                    )
+                except whatif_tool.WhatIfRefused as exc:
+                    review.feedback = f"{choice.lever}={choice.value} refused: {exc}"[:500]
+                    self._event(state, "REVIEW_REFUSED", {"message": review.feedback})
+                    continue
+                except (whatif_tool.UnknownLever, ValueError, OSError) as exc:
+                    review.feedback = (
+                        f"what-if {choice.lever}={choice.value} failed: "
+                        f"{type(exc).__name__}: {exc}"
+                    )[:500]
+                    self._event(state, "REVIEW_REFUSED", {"message": review.feedback})
+                    continue
+                tr_id = f"TR-{len(state.tool_results) + 1:03d}"
+                stub = self.toolbox.spec("verify_design").stub
+                state.tool_results.append(review_mod.whatif_record(state, result, tr_id, stub=stub))
+                review.lever = next(iter(result.levers))
+                review.value = result.levers[review.lever]
+                review.whatif_index = result.index
+                review.whatif_candidate_id = result.after.candidate.id
+                review.whatif_tool_result_id = tr_id
+                after = result.after
+                self._event(
+                    state,
+                    "REVIEW_WHATIF",
+                    {
+                        "id": tr_id,
+                        "index": result.index,
+                        "lever": review.lever,
+                        "value": review.value,
+                        "candidate_id": after.candidate.id,
+                        "guard_approved": after.guard_approved,
+                        "verdict": after.verdict.value if after.verdict is not None else None,
+                        "record": result.record.dr_id,
+                        "path": result.outputs.get("json"),
+                        "message": result.summary,
+                    },
+                )
+                review.stage = "adopt"
+                self._save(state)
+            elif review.stage == "adopt":
+                assert review.whatif_index is not None
+                result = review_mod.load_whatif(self.run_dir(state.run_id), review.whatif_index)
+                answer = self._ask_review(state, review_mod.adopt_request(state, review, result))
+                if answer is None:
+                    return "paused"
+                norm = answer.strip().lower()
+                if norm in _YES:
+                    return self._adopt(state, review, result)
+                if norm in _NO or not norm:
+                    return self._finish_review(
+                        state, result, adopted=False, note="declined by the user"
+                    )
+                invalid += 1
+                self._event(
+                    state, "INVALID_ANSWER", {"message": f"adopt answer must be yes or no: {norm}"}
+                )
+                if invalid >= 3:
+                    return self._finish_review(
+                        state, result, adopted=False, note="no yes/no answer; kept by default"
+                    )
+            else:
+                return "continue"
+
+    def _ask_review(self, state: RunState, request: InputRequest) -> str | None:
+        """Ask a review question through the input mode; None = paused (``resume`` answers)."""
+        review = state.review
+        assert review is not None
+        if review.answer is not None:  # brought by resume
+            text, review.answer = review.answer, None
+            return text
+        if state.input_mode == "assume":
+            return str(request.default)
+        if state.input_mode == "ask" and self.ask_fn is not None:
+            raw = self.ask_fn(request)
+            return "" if raw is None else str(raw)
+        state.pending = request
+        state.status = RunStatus.PAUSED
+        state.final_summary = f"Paused in {request.phase.value} (user review): {request.question}"
+        self._event(state, "PAUSE", {"request": request.model_dump(mode="json")})
+        self._save(state)
+        return None
+
+    def _apply_review_answer(self, state: RunState, request: InputRequest, raw: str) -> None:
+        """Validate and store the answer ``resume`` brought for a pending review question."""
+        if state.review is None:
+            raise ValueError("no user review in progress")
+        text = raw.strip()
+        adopt = request.request_id.startswith(f"{review_mod.REVIEW_PREFIX}-ADOPT")
+        if adopt and text and text.lower() not in _YES | _NO:
+            raise InvalidAnswer("adopt answer must be yes or no")
+        state.review.answer = text
+
+    def _map_objection(self, state: RunState, review: ReviewState) -> LeverChoice:
+        """Engine call: the objection → one offered lever (``LeverChoice``), checked and logged.
+
+        Like a Decision Record call the engine floors its usage limit; past the phase budget
+        the overrun is recorded (``TOKEN_BUDGET_OVERRUN``); an invalid or failed mapping falls
+        back to the keyword policy (counted fallback).
+        """
+        spec = PHASE_SPECS[Phase.P9]
+        prog, budget = state.phase_progress(spec.phase), self._budget(spec)
+        question = review_mod.build_review_question(state, review)
+        context = self._context(state, spec, role=question.role)
+        limit_error: str | None = None
+        try:
+            result = self.engine.map_objection(question, context)
+        except EngineBudgetExceeded as exc:
+            limit_error = f"LLM usage limit exceeded for the review mapping: {exc}"[:500]
+            result = EngineResult(
+                self._policy.map_objection(question, context).value,
+                source="policy_fallback",
+                input_tokens=exc.input_tokens,
+                output_tokens=exc.output_tokens,
+                error=limit_error,
+            )
+        prog.tokens_used += result.input_tokens + result.output_tokens
+        choice, source = result.value, result.source
+        error = check_lever_choice(question, choice)
+        if error:
+            self._event(state, "STEP_REJECTED", {"message": f"review mapping rejected: {error}"})
+            choice, source = self._policy.map_objection(question, context).value, "policy_fallback"
+        prog.fallbacks += int(source == "policy_fallback")
+        review.mapping_source = source
+        self._event(
+            state,
+            "REVIEW_MAPPED",
+            {
+                "round": review.round,
+                "lever": choice.lever,
+                "value": choice.value,
+                "source": source,
+                "retries": result.retries,
+                "error": result.error,
+                "message": choice.rationale,
+            },
+        )
+        if limit_error is not None or prog.tokens_used > budget.max_tokens:
+            overrun = max(prog.tokens_used - budget.max_tokens, 0)
+            self._event(
+                state,
+                "TOKEN_BUDGET_OVERRUN",
+                {
+                    "dr_id": review_mod.REVIEW_DR_ID,
+                    "tokens_used": prog.tokens_used,
+                    "max_tokens": budget.max_tokens,
+                    "overrun": overrun,
+                    "error": limit_error,
+                    "message": f"review mapping {overrun} tokens past the P9 token budget "
+                    f"({prog.tokens_used} > {budget.max_tokens})"
+                    + (f"; {limit_error}" if limit_error else ""),
+                },
+            )
+        return choice
+
+    def _adopt(
+        self, state: RunState, review: ReviewState, result: whatif_tool.WhatIfResult
+    ) -> ReviewOutcome:
+        """Adopt the what-if design: it becomes the selection TL-13 sizes from in P6–P9."""
+        lever = review.lever or ""
+        value = result.levers.get(lever)
+        after = result.after
+        if lever not in review_mod.ADOPTABLE:
+            reason = review_mod.NOT_ADOPTABLE_REASON.get(lever, "not a design lever")
+            return self._finish_review(
+                state, result, adopted=False, note=f"lever {lever} cannot be adopted: {reason}"
+            )
+        if after.status != "ok" or not after.guard_approved:
+            return self._finish_review(
+                state,
+                result,
+                adopted=False,
+                note=f"what-if design not usable: {after.reason or after.status}",
+            )
+        if state.loop_count >= self.max_verification_loops:
+            return self._finish_review(
+                state,
+                result,
+                adopted=False,
+                note=f"the {self.max_verification_loops} verification loops are used; the "
+                "design cannot be changed again in this run",
+            )
+        candidate = after.candidate
+        state.candidates = [c for c in state.candidates if c.id != candidate.id] + [candidate]
+        if after.kpis is not None:
+            state.kpis.pop(candidate.id, None)
+            self._merge_kpi(state, after.kpis)
+        self._register_adopted_design(state, result)
+        if lever in review_mod.ANSWER_LEVERS:
+            request = self._register_request(
+                state, Phase.P9, lever, f"user review: {lever} = {value}"
+            )
+            self._record_answer(state, request, self._coerce_answer(request, str(value)), "user")
+        state.review_levers[lever] = value
+        state.review_pin = candidate.id
+        previous = state.selected_id
+        state.selected_id = candidate.id
+        state.shortlist = [candidate.id] + [c for c in state.shortlist if c != candidate.id]
+        state.violations = [
+            (
+                f"user review (DR-12): '{review.objection}' → "
+                f"{whatif_tool.format_levers({lever: value})}; TL-13 sizes from the adopted "
+                f"what-if design {candidate.id}"
+            )
+        ]
+        self._event(
+            state,
+            "DESIGN_SELECTED",
+            {
+                "candidate_id": candidate.id,
+                "replaces": previous,
+                "dr_id": review_mod.REVIEW_DR_ID,
+                "message": f"DR-12 adopted what-if {result.index}: selected {candidate.id} "
+                f"instead of {previous}; P6–P9 rerun on it",
+            },
+        )
+        return self._finish_review(
+            state,
+            result,
+            adopted=True,
+            note=f"P6–P9 rerun on {candidate.id} (TL-13 sizes from it)",
+            recommended_id=previous,
+        )
+
+    def _register_adopted_design(self, state: RunState, result: whatif_tool.WhatIfResult) -> None:
+        """Hand the adopted design (and its outage schedule) to the real tool session."""
+        session = getattr(self.toolbox, "session", None)
+        if session is None or not hasattr(session, "register_design"):
+            return  # stub toolbox: the shortlist stub needs no sized design
+        from gemini_agent.runner.real_tools import SESSION_DIR, SizedDesign
+
+        after = result.after
+        path = (
+            self.run_dir(state.run_id)
+            / whatif_tool.WHATIF_DIR
+            / str(result.index)
+            / SESSION_DIR
+            / "sized_designs.json"
+        )
+        entry = None
+        if path.is_file():
+            entry = json.loads(path.read_text(encoding="utf-8")).get(after.candidate.id)
+        sized = (
+            SizedDesign.model_validate(entry)
+            if entry
+            else SizedDesign(
+                candidate=after.candidate,
+                concept_candidate_id=after.candidate.id,
+                outage_start_indices=after.outage_start_indices,
+            )
+        )
+        session.register_design(self._tool_context(state), sized)
+
+    def _finish_review(
+        self,
+        state: RunState,
+        result: whatif_tool.WhatIfResult | None,
+        *,
+        adopted: bool,
+        note: str,
+        recommended_id: str | None = None,
+    ) -> ReviewOutcome:
+        """Write DR-12 (adopted or kept) and close the review of this pass.
+
+        ``recommended_id`` is the design the review was about (after an adoption the selection
+        already points at the what-if design).
+        """
+        review = state.review
+        assert review is not None
+        recommended = recommended_id or state.selected_id
+        evidence_ids: list[str] = []
+        if review.whatif_tool_result_id:
+            evidence_ids.append(review.whatif_tool_result_id)
+        verification = state.latest_verification(recommended)
+        if verification is not None:
+            evidence_ids.append(verification.tool_result_id)
+        levers = {review.lever: review.value} if review.lever else {}
+        keys = review_mod.evidence_keys_for(state, evidence_ids, levers)
+        record = review_mod.review_record(
+            state,
+            review,
+            result,
+            adopted=adopted,
+            note=note,
+            evidence_ids=evidence_ids,
+            evidence_keys=keys,
+            recommended_id=recommended,
+        )
+        state.decision_records = [
+            r for r in state.decision_records if r.dr_id != review_mod.REVIEW_DR_ID
+        ] + [record]
+        self._event(
+            state,
+            "DECISION_RECORD",
+            {
+                "dr_id": record.dr_id,
+                "choice": record.choice,
+                "source": record.decision_source,
+                "stub_evidence": record.stub_evidence,
+            },
+        )
+        self._event(
+            state,
+            "REVIEW_ADOPTED" if adopted else "REVIEW_KEPT",
+            {
+                "lever": review.lever,
+                "value": review.value,
+                "whatif_index": review.whatif_index,
+                "candidate_id": review.whatif_candidate_id,
+                "message": f"{record.title}: {'adopted' if adopted else 'kept'} — {note}",
+            },
+        )
+        review.stage = "done"
+        if not adopted:
+            state.review = None
+        self._save(state)
+        return "adopted" if adopted else "continue"
 
     # ------------------------------------------------------------------ terminal states
     def _intake(self, state: RunState) -> None:

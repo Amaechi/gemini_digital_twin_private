@@ -1,60 +1,62 @@
 # PROGRESS — read first, update last
 
-Keep it ≤ 20 KB; it is the hand-off between sessions. Old detail: merged PRs, `git log -p`.
+Keep it ≤ 20 KB (the hand-off between sessions; old detail: merged PRs, `git log -p`).
 
-## Status board (final, 2026-11-03)
+## Status board
 | WP | Title | Status | PR | Notes |
 |---|---|---|---|---|
-| WP-00 | Bootstrap, env, CI, skeleton | merged (529bc4b) | [#1](https://github.com/Amaechi/gemini_digital_twin_private/pull/1) | doublet example 129.02 m³/h |
-| WP-01 | GEMINI core fixes, registry | merged (ac57442; review cac5889) | [#3](https://github.com/Amaechi/gemini_digital_twin_private/pull/3), [#5](https://github.com/Amaechi/gemini_digital_twin_private/pull/5) | pvt blocks, separator gas, registry |
-| WP-02 | Cooling models | merged (6eedd33) | [#7](https://github.com/Amaechi/gemini_digital_twin_private/pull/7) | 4 cooling models; HEX per-side ρ/c_p |
-| WP-03 | Heat pump, e-boiler, storage | merged (6fa9667) | [#11](https://github.com/Amaechi/gemini_digital_twin_private/pull/11) | closed-form HP (capped 3.71 @ design); e-boiler; storage |
-| WP-04 | Design basis, demand, climate | merged (f7acb2a) | [#2](https://github.com/Amaechi/gemini_digital_twin_private/pull/2) | TL-01/02/02b |
-| WP-05 | Subsurface & doublet tools | merged (bc8baab) | [#8](https://github.com/Amaechi/gemini_digital_twin_private/pull/8) | TL-03…08; 7 SUB-* |
-| WP-06 | Config generator, guard, day sim | merged (9eb7beb) | [#13](https://github.com/Amaechi/gemini_digital_twin_private/pull/13) | TL-09/10/11; 9 CFG-*; `DayResult.flags` |
-| WP-07 | Annual simulation & dispatch | merged (a68c2c9) | [#17](https://github.com/Amaechi/gemini_digital_twin_private/pull/17) | TL-12 |
-| WP-08 | Economics, CO₂, exergy, scaling | merged (66acde7) | [#12](https://github.com/Amaechi/gemini_digital_twin_private/pull/12) | TL-14/22/23; C0 LCOH 137 $/MWh ≈ ACM cap |
-| WP-09 | Verifier, memory, logging | merged (901e110) | [#9](https://github.com/Amaechi/gemini_digital_twin_private/pull/9) | 41-check DesignVerifier (46 with WP-14) |
-| WP-10 | Agents, runner, CLI | merged (2285460; review a9083b7) | [#4](https://github.com/Amaechi/gemini_digital_twin_private/pull/4), [#6](https://github.com/Amaechi/gemini_digital_twin_private/pull/6) | policy P0–P10 on stubs |
-| WP-10 L-1 | LLM-path hardening from L-1 | merged (3304f48) | [#19](https://github.com/Amaechi/gemini_digital_twin_private/pull/19) | kinds, call limits, dup guard, DR criteria |
-| WP-10 P0 | P0 intake cannot escalate an in-scope request | merged (81787f1) | [#22](https://github.com/Amaechi/gemini_digital_twin_private/pull/22) | finalise/refuse only; `INTAKE_CLOSED` |
-| WP-11 | Optimisation & uncertainty | merged (78491fe) | [#18](https://github.com/Amaechi/gemini_digital_twin_private/pull/18) | TL-13/15 |
-| WP-12 | Model gap & Model Builder | merged (b81cfa9) | [#15](https://github.com/Amaechi/gemini_digital_twin_private/pull/15) | TL-17/18; S7 demo |
-| WP-12 follow-up | Builder uses llm.yaml call settings, retries on timeout | merged (5ba4ad5) | [#23](https://github.com/Amaechi/gemini_digital_twin_private/pull/23) | `calls.model_builder` 1200 s / 8192 tok; local S7 closed |
-| WP-13 | Eval suite & submission checks | merged (a622551) | [#16](https://github.com/Amaechi/gemini_digital_twin_private/pull/16) | S1–S11; SUB-01…24 |
-| WP-14 | Integration run & figures | merged (c694720) | [#20](https://github.com/Amaechi/gemini_digital_twin_private/pull/20) | real tools; `runs/final_policy/` |
-| Pre-L-2 | Robust backup (DR-11), final-run instructions | merged (a1d7f40) | [#21](https://github.com/Amaechi/gemini_digital_twin_private/pull/21) | OPT-ROBUST-BACKUP; CLOUD_SETUP §7 |
-| L-1 | Local: pick LLM via S11 eval | done | [#24](https://github.com/Amaechi/gemini_digital_twin_private/pull/24) | gemma4:12b-it-q4_K_M chosen |
-| L-2 | Local: final LLM run + eval transcripts | done (1c5fb18) | [#24](https://github.com/Amaechi/gemini_digital_twin_private/pull/24) | `runs/final/final_llm`, `runs/final/eval` |
+| WP-00 | Bootstrap, env, CI, skeleton | merged (529bc4b) | [#1](/Amaechi/gemini_digital_twin_private/pull/1) | doublet example 129.02 m³/h |
+| WP-01 | GEMINI core fixes, registry | merged (ac57442; review cac5889) | [#3](/Amaechi/gemini_digital_twin_private/pull/3), [#5](/Amaechi/gemini_digital_twin_private/pull/5) | pvt blocks, separator gas, registry |
+| WP-02 | Cooling models | merged (6eedd33) | [#7](/Amaechi/gemini_digital_twin_private/pull/7) | 4 cooling models; HEX per-side ρ/c_p |
+| WP-03 | Heat pump, e-boiler, storage | merged (6fa9667) | [#11](/Amaechi/gemini_digital_twin_private/pull/11) | closed-form HP (capped 3.71 @ design); e-boiler; storage |
+| WP-04 | Design basis, demand, climate | merged (f7acb2a) | [#2](/Amaechi/gemini_digital_twin_private/pull/2) | TL-01/02/02b |
+| WP-05 | Subsurface & doublet tools | merged (bc8baab) | [#8](/Amaechi/gemini_digital_twin_private/pull/8) | TL-03…08; 7 SUB-* |
+| WP-06 | Config generator, guard, day sim | merged (9eb7beb) | [#13](/Amaechi/gemini_digital_twin_private/pull/13) | TL-09/10/11; 9 CFG-*; `DayResult.flags` |
+| WP-07 | Annual simulation & dispatch | merged (a68c2c9) | [#17](/Amaechi/gemini_digital_twin_private/pull/17) | TL-12 |
+| WP-08 | Economics, CO₂, exergy, scaling | merged (66acde7) | [#12](/Amaechi/gemini_digital_twin_private/pull/12) | TL-14/22/23; C0 LCOH 137 $/MWh ≈ ACM cap |
+| WP-09 | Verifier, memory, logging | merged (901e110) | [#9](/Amaechi/gemini_digital_twin_private/pull/9) | 41-check DesignVerifier (46 with WP-14) |
+| WP-10 | Agents, runner, CLI | merged (2285460; review a9083b7) | [#4](/Amaechi/gemini_digital_twin_private/pull/4), [#6](/Amaechi/gemini_digital_twin_private/pull/6) | policy P0–P10 on stubs |
+| WP-10 L-1 | LLM-path hardening from L-1 | merged (3304f48) | [#19](/Amaechi/gemini_digital_twin_private/pull/19) | kinds, call limits, dup guard, DR criteria |
+| WP-10 P0 | P0 intake cannot escalate an in-scope request | merged (81787f1) | [#22](/Amaechi/gemini_digital_twin_private/pull/22) | finalise/refuse only; `INTAKE_CLOSED` |
+| WP-11 | Optimisation & uncertainty | merged (78491fe) | [#18](/Amaechi/gemini_digital_twin_private/pull/18) | TL-13/15 |
+| WP-12 | Model gap & Model Builder | merged (b81cfa9) | [#15](/Amaechi/gemini_digital_twin_private/pull/15) | TL-17/18; S7 demo |
+| WP-12 follow-up | Builder uses llm.yaml call settings, retries on timeout | merged (5ba4ad5) | [#23](/Amaechi/gemini_digital_twin_private/pull/23) | `calls.model_builder` 1200 s / 8192 tok; local S7 closed |
+| WP-13 | Eval suite & submission checks | merged (a622551) | [#16](/Amaechi/gemini_digital_twin_private/pull/16) | S1–S11; SUB-01…24 |
+| WP-14 | Integration run & figures | merged (c694720) | [#20](/Amaechi/gemini_digital_twin_private/pull/20) | real tools; `runs/final_policy/` |
+| Pre-L-2 | Robust backup (DR-11), final-run instructions | merged (a1d7f40) | [#21](/Amaechi/gemini_digital_twin_private/pull/21) | OPT-ROBUST-BACKUP; CLOUD_SETUP §7 |
+| L-1 | Local: pick LLM via S11 eval | done | [#24](/Amaechi/gemini_digital_twin_private/pull/24) | gemma4:12b-it-q4_K_M chosen |
+| L-2 | Local: final LLM run + eval transcripts | done (1c5fb18) | [#24](/Amaechi/gemini_digital_twin_private/pull/24) | `runs/final/final_llm`, `runs/final/eval` |
 | S7 local | Model Builder demo after #23 | done (evidence `origin/s7-evidence`, copied to `docs/results/s7_demo/`) | | gap detected and closed, 2 drafts, 2 tests passed |
-| WP-15 | Final review, documentation, licensing, packaging | merged (7b75c62) | [#25](https://github.com/Amaechi/gemini_digital_twin_private/pull/25) | README, NOTICE, REPORT.md, DECK_OUTLINE.md, clean LLM shutdown |
-| Feature B | What-if on a finished run (`cli whatif`) | merged (a8d9aa5) | [#28](https://github.com/Amaechi/gemini_digital_twin_private/pull/28) | `tools/whatif.py`; 9 levers; `runs/<id>/whatif/<n>/` + DR-W<n> |
-| Eval F | Close S2 (request inputs), S5 (confirm basis), S8 (cross-run sizing) | merged (da5c64d) | [#29](https://github.com/Amaechi/gemini_digital_twin_private/pull/29) | P1 intake questions CFG-INPUT-DEFAULTS / CFG-BASIS-CONFIRM; `cross_run_sizing`; eval rerun pending (L2) |
-| Post-sub C | `--speak`, CHP 0.50 case, fig_tokens | merged (cf6ec2a) | [#31](https://github.com/Amaechi/gemini_digital_twin_private/pull/31) | `speech.py`; CHP case already in UQ-CASES (tests + README); token chart real in LLM runs; 11 `fig_tokens.png` redrawn |
-| Runner J | Decision Record calls are not starved by the phase token budget | merged (f0e0823) | [#32](https://github.com/Amaechi/gemini_digital_twin_private/pull/32) | DR choice usage-limit floor; `TOKEN_BUDGET_OVERRUN`; P5 90 k tokens; L3 rerun after merge |
-| Feature G | Web Design Commander view (`cli serve`) | merged (c1e9783) | [#33](https://github.com/Amaechi/gemini_digital_twin_private/pull/33) | `ui/run_view.py`, `ui/server.py`, `ui/static/` (Plant Debugger shell, Apache header); read-only JSON API; answer/approve via `resume` |
-| Feature D | Push-to-talk voice front-end (`cli talk`) | in review | | `ui/voice.py`; faster-whisper STT, `say` TTS, one logged NativeOutput normaliser call per answer, keyboard confirmation; `requirements-voice.txt` (optional, not in CI); §I hook |
+| WP-15 | Final review, documentation, licensing, packaging | merged (7b75c62) | [#25](/Amaechi/gemini_digital_twin_private/pull/25) | README, NOTICE, REPORT.md, DECK_OUTLINE.md, clean LLM shutdown |
+| Feature B | What-if on a finished run (`cli whatif`) | merged (a8d9aa5) | [#28](/Amaechi/gemini_digital_twin_private/pull/28) | `tools/whatif.py`; 9 levers; `runs/<id>/whatif/<n>/` + DR-W<n> |
+| Eval F | Close S2 (request inputs), S5 (confirm basis), S8 (cross-run sizing) | merged (da5c64d) | [#29](/Amaechi/gemini_digital_twin_private/pull/29) | P1 intake questions CFG-INPUT-DEFAULTS / CFG-BASIS-CONFIRM; `cross_run_sizing`; eval rerun pending (L2) |
+| Post-sub C | `--speak`, CHP 0.50 case, fig_tokens | merged (cf6ec2a) | [#31](/Amaechi/gemini_digital_twin_private/pull/31) | `speech.py`; CHP case already in UQ-CASES (tests + README); token chart real in LLM runs; 11 `fig_tokens.png` redrawn |
+| Runner J | Decision Record calls are not starved by the phase token budget | merged (f0e0823) | [#32](/Amaechi/gemini_digital_twin_private/pull/32) | DR choice usage-limit floor; `TOKEN_BUDGET_OVERRUN`; P5 90 k tokens; L3 rerun after merge |
+| Feature G | Web Design Commander view (`cli serve`) | merged (c1e9783) | [#33](/Amaechi/gemini_digital_twin_private/pull/33) | `ui/run_view.py`, `ui/server.py`, `ui/static/` (Plant Debugger shell, Apache header); read-only JSON API; answer/approve via `resume` |
+| Feature D | Push-to-talk voice front-end (`cli talk`) | merged (7a5dcac) | [#35](/Amaechi/gemini_digital_twin_private/pull/35) | `ui/voice.py`; faster-whisper STT, `say` TTS, one logged normaliser call per answer, keyboard confirmation; `requirements-voice.txt`; §I hook |
+| Feature E | Interactive design review loop (DR-12) | in review | [#36](/Amaechi/gemini_digital_twin_private/pull/36) | `cli run --review`; P9b objection → one what-if lever → `whatif` → adopt (P6–P9 rerun, TL-13 pinned) or keep; DR-12 |
 
-Status: todo · in progress · in review · merged · blocked.
-Latest full suite (Feature D, 11-03, after the wp-reviewer fixes): `PYTHONPATH=src python -m pytest -q unit_test/gemini_model unit_test/gemini_simulator unit_test/gemini_agent -x` → **1424 passed, 8 warnings in 416 s** (38 voice tests included). Previous (Feature G, merge eb5a473): 1386 passed. `validate_submission --pytest` → READY, 22 pass / 0 fail / WARN SUB-14 / MANUAL SUB-23; SUB-24 PASS (`docs/results/submission_check.md`).
+Latest full suite (Feature E after merging main with #34/#35, 11-04): `PYTHONPATH=src python -m pytest -q unit_test/gemini_model unit_test/gemini_simulator unit_test/gemini_agent -x` → **1467 passed, 8 warnings in 498 s** (incl. 42 review + 38 voice tests). `validate_submission --pytest` READY (22 pass, 0 fail, WARN SUB-14, MANUAL SUB-23, SUB-24 PASS).
 
 ## Decisions log (newest first)
-One line per decision, grouped by WP; dated 11-01 (WP-00: 10-31). Why: the `config/assumptions.yaml` entry or the module docstring.
+One line per decision; the why is in `config/assumptions.yaml` or the module docstring.
 
-**Feature D — push-to-talk voice front-end** (11-03, FINAL_SPRINT §D)
-- `cli talk [--engine] [--model] [--budget] [--run-id] [--stt-model small] [--typed] [--mute]` = `ui/voice.py` around the ordinary `DesignRunner.start(input_mode="ask")` with `VoiceSession.ask` as `ask_fn` (`cli._runner` gained `ask_fn=`/`model=`; `run`/`resume`/`serve` unchanged). Listen: `Microphone` (sounddevice, Enter starts/stops, 16 kHz) → `WhisperTranscriber` (faster-whisper `small`, CPU int8, English, VAD; no Metal backend in CTranslate2). Speak: `speech.Speaker` (`say`; printed only elsewhere / `--mute`); everything spoken is printed.
-- Understanding = deterministic `answer_spec(request)` (mirrors `_coerce_answer`: yes/no for APPROVAL, keep/change, defaults, number + unit, A/B, text) + normaliser: `LLMNormaliser` = ONE `NativeOutput(NormalisedAnswer{heard, interpretation value|default|unclear, value})` call per transcript, output-validated against the spec, bounded retries, logged with `agent=voice_normaliser` (`llm` / `policy_fallback`), fallback = keyword `PolicyNormaliser` (the whole normaliser for `--engine policy`; digits only). The Ollama model is built once in `cli._talk` and shared with the engine (one `close_model_clients`).
-- Nothing bypassed: the value is echoed (`I understood 65 degC - apply? [Y/n]`, keyboard) and only then handed to the runner as a typed string (`_apply_answer` validates; invalid → re-asked); unclear/unconfirmed → re-ask, 3 attempts → None (register default recorded as an assumption, as Enter in ask mode). P10 speaks the verifier's stored summary (`run_view.run_verifier`) + the approval question; `_report` then speaks summary/DR-11 as `--speak`. No confirmed request → offer the brief, else exit 2, nothing written.
-- Dependencies only in `requirements-voice.txt` (faster-whisper 1.2.1, sounddevice 0.5.6), lazy `import_voice_module` → `VoiceDependencyError` with the install hint (+ 0.5 GB model note), checked before the first question; `--typed` needs none; a test asserts no workflow installs the file. §I hook: `VoiceSession.dialogue_hook(result)`, called once after the report.
-- wp-reviewer: 1 must-fix (negated approvals "do not approve" read as yes → `_NEGATION_WORDS`, unclear + re-ask) and 4 should-fix applied: LLM value canonicalised before echo/runner ("65 degrees" → 65); §I hook runs before `runner.close()` (shared model alive); `--engine llm` creates `runs/<id>/` only after the request is confirmed; default shortcut ignores negations, `_NUMBER` ignores a sign glued to a word; CFG-INPUT-DEFAULTS also accepts `yes`.
-- Tests `ui/test_voice.py` (38): spec/validator, 16 policy cases, FunctionModel normaliser (records, retry, fallback), fake sounddevice/faster_whisper modules, session ask/request/approval/hook, `talk --typed --engine policy --budget smoke` end to end on real tools (≈ 25 s; DB-31 re-asked after "sixty-five"), `talk --engine llm` with a FunctionModel ear (5 records, one shared model), missing-package exit, help. The `say` test stub passes other subprocesses through (matplotlib's font lookup in P10).
+**Feature E — interactive design review loop, DR-12** (11-03, §E, PR #36)
+- `cli run --review` (default off; `RunState.review_enabled`, kept by `resume`): after the P9 gate verdict the runner asks "Any objection to the recommended design? (Enter = none)" (ask / pause; assume = none); state machine `DesignRunner._review` + `ReviewState`, pause/resume via `REVIEW-*` request ids.
+- Mapping = third engine call `DecisionEngine.map_objection(ReviewQuestion, context) -> LeverChoice` (NativeOutput: one `tools.whatif` lever + value or null; `check_lever_choice` shared by agent and runner; rationale without numbers). LLM = Lead Engineer kind `review` (DR-like floored limit, logged, retries → policy fallback); policy = `agents/objections.map_objection_by_keywords` (boiler/backup, return temperature, doublets, depth → nearest screened concept, flow, concept, DB-30). Unmatched / refused → reason prepended, 3 rounds → kept.
+- What-if = `tools.whatif.whatif(run_dir, {lever: value}, review_budget)` on the live run (`runs/<id>/whatif/<n>/`), recorded as a `ToolRecord` (`tool=whatif`, source user) so DR-12 cites real evidence keys; `review_budget` = the run's `--budget` else `quick`.
+- Adopt (`_adopt`): the what-if candidate joins `state.candidates`, `register_design` persists it, DB-30/31/32 become user answers, `state.review_pin` = its id, then `_restart_from_p6` (shared verifier loop-back path; counts against `MAX_VERIFICATION_LOOPS`, at the limit the change is kept). TL-13 pinned via runner-only `OptimiseArgs.candidate_id` (`_pin_args` overwrites it) → unpinned runs byte-identical. Adopted `OPT-ROBUST-BACKUP=off` makes the DR-11 robust option ineligible. Not adoptable: `design_flow_m3h`, `ECO-CO2-GAS`, `CHP-EL-FRAC`.
+- DR-12 (`review.review_record`): "User review: <objection> → <lever>=<value>", options `kept` / `<what-if id>`, criterion `user-review`, evidence = what-if TR + P9 verification TR; `DR_TITLES` unchanged, `DR_IDS` + DR-12. Off by default: no new event/record/summary key without `--review`; on: `REVIEW_*` events, `TOKEN_BUDGET_OVERRUN` (DR-12) past the P9 budget.
+- Tests `runner/test_review.py` (42): keyword table, validator, off → no review path, policy "boiler too big" → adopt → P6–P9 rerun + DR-12, unmatched ×3, refused `doublets=5`, decline, loop limit, FunctionModel map / invalid lever → fallback, pause/resume, runner-only pin, CLI flag, real-tools smoke (adopted 50 °C → ACCEPTED). wp-reviewer: APPROVE after fixes.
+
 
 **Merged WPs** (one line each; the full decisions are in the PR descriptions and `git log -p` of this file)
-- Feature G (#33): `cli serve` = `ui.server` on `http.server` (no dependency) + Plant Debugger Commander shell (`ui/static/`, README header); `ui/run_view.py` read-only (sqlite `mode=ro` → jsonl fallback; verifier result; figures; tokens; display only); `POST answer|approve` → `cli.resume_runner` + `DesignRunner.resume` under a lock (400/409/404/501); warning for a non-loopback bind.
-- Runner J (#32): `LLMEngine.choose` floors the usage limit at `call_token_ceiling` = n·(p + overhead) + o·n(n+1)/2 (`CHARS_PER_TOKEN` 3, `REQUEST_OVERHEAD_TOKENS` 1024); a DR past the phase budget records `TOKEN_BUDGET_OVERRUN` (past its own ceiling the policy chooses, counted) instead of escalating; P5 `max_tokens` 90 k; harness `token_budget_overruns` metric + column. Cause: verbose models used ≈ 60 k of P5's 60 k before DR-08 (`UsageLimitExceeded`).
-- Post-sub C (#31): `--speak` (`speech.Speaker`, macOS `say`, no-op elsewhere; questions, P10 summary, DR-11, what-if verdicts; printed output unchanged); CHP-EL-FRAC 0.50 already in UQ-CASES (physics check + README row); interim `token_summary.json` before `plot_figures` and a run-end `fig_tokens.png` redraw; 11 committed `fig_tokens.png` regenerated (figures only).
-- Eval F (#29): P0 lists missing challenge inputs (`missing_request_inputs` → `MISSING_INPUTS`); P1 opens with CFG-BASIS-CONFIRM (`keep`/`change`, change ⇒ escalate) then one CFG-INPUT-DEFAULTS question; `cross_run_sizing` check (S8, baseline S1 in the same eval dir); S2/S5/S8 pass on real tools; keyword-based missing-input detection.
-- Feature B (#28): `cli whatif --run-id --set LEVER=v` = `tools.whatif`; 9 levers (DB-31/32, DB-30, ECO-CO2-GAS, CHP-EL-FRAC, OPT-ROBUST-BACKUP, flow, doublets, concept) applied as TL-15 does; guard → TL-12 → verifier per side in `runs/<id>/whatif/<n>/`, the run's files never written; DR-W<n>; DB-31=65 on the final run stays ACCEPTED (LCOH 44.6 → 58.4).
+- Feature D (#35): `cli talk` = `ui/voice.py` around the ask-mode run: push-to-talk `Microphone` (sounddevice) → faster-whisper `small` → `answer_spec` (mirrors `_coerce_answer`) + ONE logged NativeOutput `LLMNormaliser` call per transcript (`agent=voice_normaliser`; keyword `PolicyNormaliser` fallback / `--engine policy`) → canonical value echoed, keyboard-confirmed, validated by the runner as typed; P10 speaks the stored verifier summary; `requirements-voice.txt`; `--typed`, `--mute`; §I hook.
+- Feature G (#33): `cli serve` = `ui.server` on `http.server` + Plant Debugger Commander shell (`ui/static/`); `ui/run_view.py` read-only, display only; `POST answer|approve` → `cli.resume_runner` + `DesignRunner.resume` (400/409/404/501); non-loopback warning.
+- Runner J (#32): `LLMEngine.choose` floors the usage limit at `call_token_ceiling` (`CHARS_PER_TOKEN` 3, `REQUEST_OVERHEAD_TOKENS` 1024); a DR past the phase budget records `TOKEN_BUDGET_OVERRUN` instead of escalating; P5 `max_tokens` 90 k; harness `token_budget_overruns` metric.
+- Post-sub C (#31): `--speak` (`speech.Speaker`, macOS `say`, no-op elsewhere; questions, P10 summary, DR-11, what-if verdicts); CHP-EL-FRAC 0.50 in UQ-CASES; interim `token_summary.json` before `plot_figures` + run-end `fig_tokens.png` redraw; 11 committed `fig_tokens.png` regenerated.
+- Eval F (#29): P0 lists missing challenge inputs (`MISSING_INPUTS`); P1 opens with CFG-BASIS-CONFIRM (`keep`/`change`, change ⇒ escalate) then one CFG-INPUT-DEFAULTS question; `cross_run_sizing` check (S8); S2/S5/S8 pass on real tools.
+- Feature B (#28): `cli whatif --run-id --set LEVER=v` = `tools.whatif`; 9 levers (DB-31/32, DB-30, ECO-CO2-GAS, CHP-EL-FRAC, OPT-ROBUST-BACKUP, flow, doublets, concept) applied as TL-15 does; guard → TL-12 → verifier per side in `runs/<id>/whatif/<n>/`, the run's files never written; DR-W<n>.
 - WP-15: README/NOTICE/REPORT pack generated from run artefacts; `DecisionEngine.close()` chain; WP-15 defects recorded under README Limitations, not fixed.
 - WP-12 follow-up: coder uses `calls.model_builder` (thinking off, 8192 tok, 1200 s); a timeout ⇒ feedback + next draft.
 - WP-10 P0 follow-up: P0 = finalise/refuse only; step budget out ⇒ `INTAKE_CLOSED`, the deterministic intake decides.
@@ -77,8 +79,8 @@ One line per decision, grouped by WP; dated 11-01 (WP-00: 10-31). Why: the `conf
 - WP-00: ECO-04 USD in code; `StrictModel` schemas; day-average MW; cloud = policy / TestModel only.
 
 ## Assumptions added during build
-(Record id → `config/assumptions.yaml` entry; never only here.)
-- WP-00: DB-30…DB-38, DB-34a–d, DB-34-RH, DB-40 (no DB-39), ECO-CUR. WP-01/12/13/14/15, follow-ups, Feature B, Feature G: none. Eval F (WP-13 follow-up): CFG-BASIS-CONFIRM, CFG-INPUT-DEFAULTS (`added_by: WP-13 follow-up`; no design value depends on them).
+(Each id has a `config/assumptions.yaml` entry.)
+- WP-00: DB-30…DB-38, DB-34a–d, DB-34-RH, DB-40 (no DB-39), ECO-CUR. WP-01/12/13/14/15, follow-ups, Feature B, Feature E, Feature G: none. Eval F (WP-13 follow-up): CFG-BASIS-CONFIRM, CFG-INPUT-DEFAULTS (`added_by: WP-13 follow-up`; no design value depends on them).
 - WP-04: SUB-RHOC, SUB-II, DEM-COP-HD. WP-02: COOL-ABS-B/CAL/CAP/LB/AUX/PL/DRV, COOL-ELC, COOL-ELC-APPROACH, COOL-HR, COOL-FC.
 - WP-09: VER-ESP-PB, VER-ESP-MARGIN, VER-HP-ETA, VER-HP-LIFT. WP-05: SUB-WELL, SUB-PWH, SUB-PBUB, SUB-NPSH, SUB-ESP, SUB-PSUC, SUB-SPACING.
 - WP-03: HP-ETA-L, HP-APPROACH, EB-ETA, STO-REC-HT, STO-REC-COLD, CHP-EL-FRAC. WP-08: ECO-CO2-GAS/AG/SCOPE, ECO-ELEC-NET, ECO-REAL, ECO-ALLOC, ECO-OM, ECO-PUMP-CAPEX, ECO-CHILLER, ECO-SENS-MULT, EXG-FUEL, EXG-KPI, NET-LOSS-FRAC, NET-TRUNK-M, SCL-RULES.
@@ -86,39 +88,37 @@ One line per decision, grouped by WP; dated 11-01 (WP-00: 10-31). Why: the `conf
 
 ## Open follow-ups (after submission; grouped by owner)
 **Defects found in WP-15 (recorded, not fixed; README Limitations)**
-- ~~`plots.plot_tokens` runs in P10 before `token_summary.json` exists~~ fixed in Post-sub C (interim summary + run-end redraw; committed figures regenerated).
 - `run_eval.py` rewrites `eval_results.json` per call (S11-only line lost); `--compare` sums every scenario. Fix: per-scenario results, compare S11 only.
-- ~~P5 DR-08 on gemma4:26b-a4b escalated on `UsageLimitExceeded` instead of falling back~~ fixed by Runner J (#32); the submitted runs predate it; L3 (qwen3.6:27b) rerun after the merge. Final run DR-10 and P7 were policy fallbacks (criterion not offered; `call_tool` without a tool): add to the few-shot examples. Eval harness: add an `intake_closed` metric.
-**WP-07** — DSP-FLOW alternatives unpriced; DSP-HP-MIN `min_part_load_frac` 0 cheaper on C2 (register undecided); fast year 7–25 s at ≥ 3 km; C6 `storage` fails PH-20/PH-22; treat `simulate_day._flag_text/_heat_pump_*`, `Mixer._MIN_TOTAL_FLOW` as API.
-**WP-11** — DR-06 cites TL-13, not the outage days; TL-13 `rejected` ↛ `guard_failed`; no HT-ATES capex (C6 unpriced); WACC view (ECO-06) missing; saturation data > 100 °C re-opens ≥ 3 km (`depth_check`); treat `FastPlant._model/.carries/.run` as API.
-**WP-12** — LLM P4 calls tools directly (no `check_draft`), `register_model` mutates the live registry; promotion = copy folders + registry + `.rst` via PR (S7 draft needs the card's partial free-cooling rule and tests first, `docs/results/s7_demo/README.md`).
-**WP-13** — CI ruff skips `scripts/`. Eval F closed S2/S5/S8 in code; the full S1–S11 eval rerun (L2, laptop) is pending (expected S2, S5, S8 → pass; `cross_run_sizing` needs S1 in the same `run_eval` call). Missing-input detection is keyword-based, so every non-brief prompt records one extra assumed `CFG-INPUT-DEFAULTS` answer in assume mode; the `change` answer escalates rather than re-basing the run.
-**WP-14** — No `AbsorptionPoint` ⇒ C3/C4 UNVERIFIED; `HeatPumpPoint` lacks max sink T; ESP intake +0.86 bar over 1.2·p_b; free cooling 87 % on smoothed normals; HEX rated at 300 m³/h; CLI `resume` hint omits `--runs-dir`; budget not stored in the run; DR-11 variant priced on the base year only, no own MC; `robust_backup` never escalates.
-**Feature G** — no live refresh (REFRESH button); resuming an LLM run from the browser needs the local Ollama model (or `--engine policy`); no authentication — keep the default 127.0.0.1 bind.
-**Feature D** — not tried on a Mac yet (laptop step: `uv pip install -r requirements-voice.txt`, CLOUD_SETUP §7.10); English only; the policy normaliser needs digits (no number words); no barge-in / voice "stop"; the normaliser's tokens count in the run's `token_summary.json` (agent `voice_normaliser`); §I dialogue loop pending.
+- Final run DR-10 and P7 were policy fallbacks (criterion not offered; `call_tool` without a tool): add to the few-shot examples. Eval harness: add an `intake_closed` metric. (P5 DR-08 starvation and the P10 `plot_tokens` placeholder were fixed by #32 / #31; the submitted runs predate them; L3 rerun after the merge.)
+**WP-07** — DSP-FLOW alternatives unpriced; DSP-HP-MIN `min_part_load_frac` 0 cheaper on C2 (register undecided); fast year 7–25 s at ≥ 3 km; C6 `storage` fails PH-20/PH-22; `simulate_day._flag_text/_heat_pump_*`, `Mixer._MIN_TOTAL_FLOW` are API.
+**WP-11** — DR-06 cites TL-13, not the outage days; TL-13 `rejected` ↛ `guard_failed`; no HT-ATES capex (C6 unpriced); WACC view (ECO-06) missing; saturation data > 100 °C re-opens ≥ 3 km (`depth_check`); `FastPlant._model/.carries/.run` are API.
+**WP-12** — LLM P4 calls tools directly (no `check_draft`), `register_model` mutates the live registry; promotion = copy folders + registry + `.rst` via PR (S7 draft first needs the card's partial free-cooling rule and tests; `docs/results/s7_demo/README.md`).
+**WP-13** — CI ruff skips `scripts/`. Eval F closed S2/S5/S8 in code; the full S1–S11 eval rerun (L2, laptop) is pending (`cross_run_sizing` needs S1 in the same `run_eval` call). Missing-input detection is keyword-based, so every non-brief prompt records one extra assumed `CFG-INPUT-DEFAULTS` answer in assume mode; the `change` answer escalates rather than re-basing the run.
+**WP-14** — No `AbsorptionPoint` ⇒ C3/C4 UNVERIFIED; `HeatPumpPoint` lacks max sink T; ESP intake +0.86 bar over 1.2·p_b; free cooling 87 % on smoothed normals; HEX rated at 300 m³/h; `resume` hint omits `--runs-dir`; budget not stored in the run; DR-11 variant priced on the base year only; `robust_backup` never escalates.
+**Feature E** — DR-12 is one record per run (last pass wins; history in rationale/events); after a verifier REJECT of the re-sized adopted design the pin is dropped but the adopted DB-31/32 answer and `review_levers` stay (the free TL-13 rerun uses each candidate's own return temperatures); `design_flow_m3h` needs a TL-13 pin (`fixed_sizes` request field, WP-11 file); keyword mapper English-only and literal; the web view shows review questions as pending questions without the table; voice (D/I) hooks in at `ask_fn`.
+**Feature G** — no live refresh (REFRESH button); resuming an LLM run from the browser needs the local Ollama model (or `--engine policy`); no authentication — keep the 127.0.0.1 bind.
+**Feature D** — not tried on a Mac yet (CLOUD_SETUP §7.10); English only; policy normaliser needs digits; no barge-in / voice "stop"; normaliser tokens count in `token_summary.json`; §I dialogue loop pending.
 **Spec/card nits** — GM-05 η ≈ 0.40 (code follows RC-06); DB-25 ≈ 22 bar (card 24.5); RC-09 "0.55 K/km" not reproducible; RC-10 lacks ESP/injection-pump capex; negative `gas_water_ratio` accepted; kpi defaults 1050 kg/m³ unsuffixed; dissolved-gas NPSH margin unquantified; `resume <unknown id>` creates `runs/<id>/`; `--run-id` unsanitised; `heat_pump_1987_usd_per_kw` unescalated.
 **All WPs** — GEMINI's `run_linter.sh` (black, isort, flake8 + docstrings, 100 cols): 42 pre-existing flake8 findings (WP-04 + tests); many GEMINI files are CRLF (keep line endings). Act/format split (spec §5.4.3) not implemented.
 
 ## Open questions for organisers (Discord)
 See spec §17. Answers: —
 
-## Hand-off: submission checklist (WP-15, 2026-11-03)
-Spec §18 with evidence:
-- [x] ACCEPTED design, 0 unmet days — `runs/final/final_llm/run_summary.json` (C2-opt-robust, ACCEPTED, approved), `report_draft.md`.
-- [x] DB-10…17 every day — `runs/final/final_llm/figures/verification.md` (46/46), SUB-08 pass.
-- [x] C0–C7 (+C8) compared, DR-01…DR-11 — `figures/candidates.md`, `decision_records/`, `docs/results/REPORT.md` §2, §7.
-- [x] Cooling models with cards, tests, registry, docs — `src/gemini_model/{absorption_chiller,electric_chiller,heat_rejection,free_cooling}`, SUB-18 pass.
+## Hand-off: submission checklist (WP-15)
+Spec §18, evidence:
+- [x] ACCEPTED design, 0 unmet days — `runs/final/final_llm/run_summary.json` (C2-opt-robust, approved), `report_draft.md`.
+- [x] DB-10…17 every day — `runs/final/final_llm/figures/verification.md` (46/46), SUB-08.
+- [x] C0–C7 (+C8) compared, DR-01…DR-11 — `figures/candidates.md`, `decision_records/`, `REPORT.md` §2, §7.
+- [x] Cooling models with cards, tests, registry, docs — `src/gemini_model/{absorption_chiller,electric_chiller,heat_rejection,free_cooling}`, SUB-18.
 - [x] Brine PVT configurable — SUB-19 pass.
-- [x] LCOH/LCOC, CO₂ vs C0, exergy, sensitivity, MC P10/P50/P90 — `REPORT.md` §1, §5 (SUB-10/11 pass).
-- [x] `llm_calls.jsonl` + `token_summary.json`; S10 (−45 %), S11 — `runs/final/final_llm/`, `runs/final/eval/` (SUB-12/15/16 pass).
-- [x] S1–S11 transcripts — `runs/final/eval/gemma4_12b-it-q4_K_M/` (SUB-17 pass; S7 "fail" predates #23, see `docs/results/s7_demo/`).
-- [x] Apache-2.0 notices — `NOTICE`, SUB-20/21 pass; LICENSE unchanged; no secrets; `.env.template` untouched.
-- [x] README with API placeholders (SUB-22 pass), `docs/results/REPORT.md`, `DECK_OUTLINE.md`.
+- [x] LCOH/LCOC, CO₂ vs C0, exergy, sensitivity, MC P10/P50/P90 — `REPORT.md` §1, §5 (SUB-10/11).
+- [x] `llm_calls.jsonl` + `token_summary.json`; S10 (−45 %), S11 — `runs/final/final_llm/`, `runs/final/eval/` (SUB-12/15/16).
+- [x] S1–S11 transcripts — `runs/final/eval/gemma4_12b-it-q4_K_M/` (SUB-17; S7 "fail" predates #23, `docs/results/s7_demo/`).
+- [x] Apache-2.0 notices — `NOTICE`, SUB-20/21; LICENSE unchanged; no secrets; `.env.template` untouched.
+- [x] README with API placeholders (SUB-22), `docs/results/REPORT.md`, `DECK_OUTLINE.md`.
 - [ ] 10 slides + appendix, ≤ 5-min video (SUB-23, user records from `DECK_OUTLINE.md`).
-- [ ] Code pushed: merge, then CLOUD_SETUP §8: fork the public GEMINI repo, `git push submission main:hackathon/<team-name>`, submit branch URL + deck + video.
+- [ ] Code pushed: merge, then CLOUD_SETUP §8 (fork the public GEMINI repo, `git push submission main:hackathon/<team-name>`, submit branch URL + deck + video).
 
-Runner J touched: `agents/engine.py` (`CHARS_PER_TOKEN`, `call_token_ceiling`, `_run(floor_tokens)`, `choose`), `runner/design_runner.py` (`TOKEN_BUDGET_OVERRUN`, `token_budget_overruns`, summary line), `runner/phases.py` (P5 budget), `eval/harness.py` (metric + column), tests (`agents/test_engine.py`, `runner/test_design_runner.py`, `runner/test_phases.py`, `eval/test_harness.py`), `README.md` (Limitations bullet), this file. Nothing in tools, models, `cli.py`, other config values or `runs/`.
+Feature E touched (new): `runner/review.py`, `agents/objections.py`, `unit_test/gemini_agent/runner/test_review.py`; edited: `schemas/decision.py`, `runner/state.py`, `runner/design_runner.py`, `agents/engine.py` (`map_objection`), `prompts/system.py`, `runner/toolbox.py` (`OptimiseArgs.candidate_id`), `runner/real_tools.py`, `runner/tool_stubs.py`, `runner/decision_records.py`, `cli.py` (`--review`), `README.md` (Review loop), `CLOUD_SETUP.md` §7.11, this file. No model/tool physics, no config value, nothing in `runs/`.
 
-Feature G touched (new): `src/gemini_agent/ui/`, `unit_test/gemini_agent/ui/`, `docs/results/web_commander.png`; edited: `cli.py` (`serve`, `resume_runner`), `README.md` (Web view, map), this file. Nothing in models, tools, runner, config or `runs/`.
-
-Feature D touched (new): `src/gemini_agent/ui/voice.py`, `unit_test/gemini_agent/ui/test_voice.py`, `requirements-voice.txt`; edited: `cli.py` (`talk`, `_talk`, `_runner(ask_fn=, model=)`, `_add_engine_args(speak=)`), `README.md` (Voice (experimental), map), `CLOUD_SETUP.md` §7.10, this file. Nothing in models, tools, runner, verifier, config, CI workflows or `runs/`.
+Feature D touched (new): `ui/voice.py`, `unit_test/gemini_agent/ui/test_voice.py`, `requirements-voice.txt`; edited: `cli.py` (`talk`, `_runner(ask_fn=, model=)`), `README.md` (Voice), `CLOUD_SETUP.md` §7.10, this file. Nothing in models, tools, runner, verifier, config, CI or `runs/`.

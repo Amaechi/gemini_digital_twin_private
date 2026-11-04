@@ -123,16 +123,33 @@ class SimulateArgs(StrictModel):
     mode: Literal["fast", "full"] = "fast"
 
 
+RUNNER_ONLY = "runner_only"
+"""``json_schema_extra`` flag of an argument the workflow runner sets itself: left out of the
+agent's tool brief, and any value an agent sends is replaced by the runner's."""
+
+
 class OptimiseArgs(StrictModel):
     """Arguments of ``optimise_design``."""
 
     top_n: int = Field(default=3, ge=1, le=3, description="Size the top 2–3 candidates.")
+    candidate_id: str | None = Field(
+        default=None,
+        description="Review loop (DR-12): size this adopted design only, at its doublets, depth "
+        "and return temperatures; None: the top-ranked concepts. Set by the runner only "
+        "(``DesignRunner._pin_args``), never offered to or taken from an agent.",
+        json_schema_extra={RUNNER_ONLY: True},
+    )
 
 
 class CardArgs(StrictModel):
     """Reference card id."""
 
     card_id: str = Field(pattern=r"^RC-\d{2}$")
+
+
+def _runner_only(info: Any) -> bool:
+    extra = info.json_schema_extra
+    return isinstance(extra, dict) and bool(extra.get(RUNNER_ONLY))
 
 
 def _arg_hint(info: Any) -> str:
@@ -174,7 +191,11 @@ class Toolbox:
     def brief(self, name: str) -> ToolBrief:
         """One-sentence description plus flat argument hints for the agent prompt."""
         spec = self._specs[name]
-        args = {key: _arg_hint(info) for key, info in spec.args_model.model_fields.items()}
+        args = {
+            key: _arg_hint(info)
+            for key, info in spec.args_model.model_fields.items()
+            if not _runner_only(info)
+        }
         return ToolBrief(name=name, description=spec.description, args=args)
 
     def validate_args(self, name: str, args: dict[str, Any]) -> BaseModel:
