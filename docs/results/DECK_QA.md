@@ -100,7 +100,7 @@ PYTHONPATH=src python -m gemini_agent.cli <command> [flags]
 
 | Command | What it does |
 |---|---|
-| `run` | Runs the design workflow P0 to P10. Flags: `--engine policy|llm`, `--model <ollama tag>`, `--budget full|quick|smoke`, `--input-mode ask|assume|pause`, `--review`, `--speak`, `--runs-dir`, `--run-id`, `--brief`, `--prompt`. |
+| `run` | Runs the design workflow P0 to P10. Flags: `--engine` (policy or llm), `--model <ollama tag>`, `--budget` (full, quick or smoke), `--input-mode` (ask, assume or pause), `--review`, `--speak`, `--runs-dir`, `--run-id`, `--brief`, `--prompt`. |
 | `resume --run-id X --answer "…"` | Answers a paused question (a missing input, or the final approval) and continues. |
 | `validate-config` | Loads every `config/*.yaml` into its schema and prints ok or FAIL. |
 | `whatif --run-id X --set LEVER=value` | Changes one or more levers on a finished run, reruns the year, economics and verifier, prints a before and after table, writes a DR-W record; never modifies the run's own files. |
