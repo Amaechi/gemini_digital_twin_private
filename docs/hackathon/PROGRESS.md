@@ -1,8 +1,8 @@
 # PROGRESS — read first, update last
 
-Keep it ≤ 20 KB; it is the hand-off between sessions. Old detail: merged PRs, `git log -p`.
+Keep it ≤ 20 KB (the hand-off between sessions; old detail: merged PRs, `git log -p`).
 
-## Status board (final, 2026-11-03)
+## Status board
 | WP | Title | Status | PR | Notes |
 |---|---|---|---|---|
 | WP-00 | Bootstrap, env, CI, skeleton | merged (529bc4b) | [#1](/Amaechi/gemini_digital_twin_private/pull/1) | doublet example 129.02 m³/h |
@@ -36,13 +36,13 @@ Keep it ≤ 20 KB; it is the hand-off between sessions. Old detail: merged PRs, 
 | Feature D | Push-to-talk voice front-end (`cli talk`) | merged (7a5dcac) | [#35](/Amaechi/gemini_digital_twin_private/pull/35) | `ui/voice.py`; faster-whisper STT, `say` TTS, one logged normaliser call per answer, keyboard confirmation; `requirements-voice.txt`; §I hook |
 | Feature E | Interactive design review loop (DR-12) | in review | [#36](/Amaechi/gemini_digital_twin_private/pull/36) | `cli run --review`; P9b objection → one what-if lever → `whatif` → adopt (P6–P9 rerun, TL-13 pinned) or keep; DR-12 |
 
-Latest full suite (Feature E after merging main with #34/#35, 11-04): `PYTHONPATH=src python -m pytest -q unit_test/gemini_model unit_test/gemini_simulator unit_test/gemini_agent -x` → **1467 passed, 8 warnings in 498 s** (42 review + 38 voice tests included). `validate_submission --pytest` → READY, 22 pass / 0 fail / WARN SUB-14 / MANUAL SUB-23; SUB-24 PASS.
+Latest full suite (Feature E after merging main with #34/#35, 11-04): `PYTHONPATH=src python -m pytest -q unit_test/gemini_model unit_test/gemini_simulator unit_test/gemini_agent -x` → **1467 passed, 8 warnings in 498 s** (incl. 42 review + 38 voice tests). `validate_submission --pytest` READY (22 pass, 0 fail, WARN SUB-14, MANUAL SUB-23, SUB-24 PASS).
 
 ## Decisions log (newest first)
 One line per decision; the why is in `config/assumptions.yaml` or the module docstring.
 
-**Feature E — interactive design review loop, DR-12** (11-03, FINAL_SPRINT §E, PR #36)
-- `cli run --review` (default off; `RunState.review_enabled`, kept by `resume`): after the P9 gate verdict the runner asks "Any objection to the recommended design? (Enter = none)" (ask / pause; assume = none); state machine `DesignRunner._review` + `ReviewState`, pause/resume via `REVIEW-<loop>-<round>` / `REVIEW-ADOPT-<loop>`.
+**Feature E — interactive design review loop, DR-12** (11-03, §E, PR #36)
+- `cli run --review` (default off; `RunState.review_enabled`, kept by `resume`): after the P9 gate verdict the runner asks "Any objection to the recommended design? (Enter = none)" (ask / pause; assume = none); state machine `DesignRunner._review` + `ReviewState`, pause/resume via `REVIEW-*` request ids.
 - Mapping = third engine call `DecisionEngine.map_objection(ReviewQuestion, context) -> LeverChoice` (NativeOutput: one `tools.whatif` lever + value or null; `check_lever_choice` shared by agent and runner; rationale without numbers). LLM = Lead Engineer kind `review` (DR-like floored limit, logged, retries → policy fallback); policy = `agents/objections.map_objection_by_keywords` (boiler/backup, return temperature, doublets, depth → nearest screened concept, flow, concept, DB-30). Unmatched / refused → reason prepended, 3 rounds → kept.
 - What-if = `tools.whatif.whatif(run_dir, {lever: value}, review_budget)` on the live run (`runs/<id>/whatif/<n>/`), recorded as a `ToolRecord` (`tool=whatif`, source user) so DR-12 cites real evidence keys; `review_budget` = the run's `--budget` else `quick`.
 - Adopt (`_adopt`): the what-if candidate joins `state.candidates`, `register_design` persists it, DB-30/31/32 become user answers, `state.review_pin` = its id, then `_restart_from_p6` (shared verifier loop-back path; counts against `MAX_VERIFICATION_LOOPS`, at the limit the change is kept). TL-13 pinned via runner-only `OptimiseArgs.candidate_id` (`_pin_args` overwrites it) → unpinned runs byte-identical. Adopted `OPT-ROBUST-BACKUP=off` makes the DR-11 robust option ineligible. Not adoptable: `design_flow_m3h`, `ECO-CO2-GAS`, `CHP-EL-FRAC`.
@@ -51,7 +51,7 @@ One line per decision; the why is in `config/assumptions.yaml` or the module doc
 
 
 **Merged WPs** (one line each; the full decisions are in the PR descriptions and `git log -p` of this file)
-- Feature D (#35): `cli talk` = `ui/voice.py` around the ask-mode run: push-to-talk `Microphone` (sounddevice) → faster-whisper `small` → `answer_spec` (mirrors `_coerce_answer`) + ONE logged NativeOutput `LLMNormaliser` call per transcript (`agent=voice_normaliser`; keyword `PolicyNormaliser` fallback / `--engine policy`) → canonical value echoed, keyboard-confirmed, validated by the runner as typed; P10 speaks the stored verifier summary; `requirements-voice.txt` only; `--typed`, `--mute`; §I `dialogue_hook`.
+- Feature D (#35): `cli talk` = `ui/voice.py` around the ask-mode run: push-to-talk `Microphone` (sounddevice) → faster-whisper `small` → `answer_spec` (mirrors `_coerce_answer`) + ONE logged NativeOutput `LLMNormaliser` call per transcript (`agent=voice_normaliser`; keyword `PolicyNormaliser` fallback / `--engine policy`) → canonical value echoed, keyboard-confirmed, validated by the runner as typed; P10 speaks the stored verifier summary; `requirements-voice.txt`; `--typed`, `--mute`; §I hook.
 - Feature G (#33): `cli serve` = `ui.server` on `http.server` + Plant Debugger Commander shell (`ui/static/`); `ui/run_view.py` read-only, display only; `POST answer|approve` → `cli.resume_runner` + `DesignRunner.resume` (400/409/404/501); non-loopback warning.
 - Runner J (#32): `LLMEngine.choose` floors the usage limit at `call_token_ceiling` (`CHARS_PER_TOKEN` 3, `REQUEST_OVERHEAD_TOKENS` 1024); a DR past the phase budget records `TOKEN_BUDGET_OVERRUN` instead of escalating; P5 `max_tokens` 90 k; harness `token_budget_overruns` metric.
 - Post-sub C (#31): `--speak` (`speech.Speaker`, macOS `say`, no-op elsewhere; questions, P10 summary, DR-11, what-if verdicts); CHP-EL-FRAC 0.50 in UQ-CASES; interim `token_summary.json` before `plot_figures` + run-end `fig_tokens.png` redraw; 11 committed `fig_tokens.png` regenerated.
@@ -79,7 +79,7 @@ One line per decision; the why is in `config/assumptions.yaml` or the module doc
 - WP-00: ECO-04 USD in code; `StrictModel` schemas; day-average MW; cloud = policy / TestModel only.
 
 ## Assumptions added during build
-(Record id → `config/assumptions.yaml` entry; never only here.)
+(Each id has a `config/assumptions.yaml` entry.)
 - WP-00: DB-30…DB-38, DB-34a–d, DB-34-RH, DB-40 (no DB-39), ECO-CUR. WP-01/12/13/14/15, follow-ups, Feature B, Feature E, Feature G: none. Eval F (WP-13 follow-up): CFG-BASIS-CONFIRM, CFG-INPUT-DEFAULTS (`added_by: WP-13 follow-up`; no design value depends on them).
 - WP-04: SUB-RHOC, SUB-II, DEM-COP-HD. WP-02: COOL-ABS-B/CAL/CAP/LB/AUX/PL/DRV, COOL-ELC, COOL-ELC-APPROACH, COOL-HR, COOL-FC.
 - WP-09: VER-ESP-PB, VER-ESP-MARGIN, VER-HP-ETA, VER-HP-LIFT. WP-05: SUB-WELL, SUB-PWH, SUB-PBUB, SUB-NPSH, SUB-ESP, SUB-PSUC, SUB-SPACING.
@@ -90,12 +90,12 @@ One line per decision; the why is in `config/assumptions.yaml` or the module doc
 **Defects found in WP-15 (recorded, not fixed; README Limitations)**
 - `run_eval.py` rewrites `eval_results.json` per call (S11-only line lost); `--compare` sums every scenario. Fix: per-scenario results, compare S11 only.
 - Final run DR-10 and P7 were policy fallbacks (criterion not offered; `call_tool` without a tool): add to the few-shot examples. Eval harness: add an `intake_closed` metric. (P5 DR-08 starvation and the P10 `plot_tokens` placeholder were fixed by #32 / #31; the submitted runs predate them; L3 rerun after the merge.)
-**WP-07** — DSP-FLOW alternatives unpriced; DSP-HP-MIN `min_part_load_frac` 0 cheaper on C2 (register undecided); fast year 7–25 s at ≥ 3 km; C6 `storage` fails PH-20/PH-22; treat `simulate_day._flag_text/_heat_pump_*`, `Mixer._MIN_TOTAL_FLOW` as API.
-**WP-11** — DR-06 cites TL-13, not the outage days; TL-13 `rejected` ↛ `guard_failed`; no HT-ATES capex (C6 unpriced); WACC view (ECO-06) missing; saturation data > 100 °C re-opens ≥ 3 km (`depth_check`); treat `FastPlant._model/.carries/.run` as API.
-**WP-12** — LLM P4 calls tools directly (no `check_draft`), `register_model` mutates the live registry; promotion = copy folders + registry + `.rst` via PR (S7 draft needs the card's partial free-cooling rule and tests first, `docs/results/s7_demo/README.md`).
+**WP-07** — DSP-FLOW alternatives unpriced; DSP-HP-MIN `min_part_load_frac` 0 cheaper on C2 (register undecided); fast year 7–25 s at ≥ 3 km; C6 `storage` fails PH-20/PH-22; `simulate_day._flag_text/_heat_pump_*`, `Mixer._MIN_TOTAL_FLOW` are API.
+**WP-11** — DR-06 cites TL-13, not the outage days; TL-13 `rejected` ↛ `guard_failed`; no HT-ATES capex (C6 unpriced); WACC view (ECO-06) missing; saturation data > 100 °C re-opens ≥ 3 km (`depth_check`); `FastPlant._model/.carries/.run` are API.
+**WP-12** — LLM P4 calls tools directly (no `check_draft`), `register_model` mutates the live registry; promotion = copy folders + registry + `.rst` via PR (S7 draft first needs the card's partial free-cooling rule and tests; `docs/results/s7_demo/README.md`).
 **WP-13** — CI ruff skips `scripts/`. Eval F closed S2/S5/S8 in code; the full S1–S11 eval rerun (L2, laptop) is pending (`cross_run_sizing` needs S1 in the same `run_eval` call). Missing-input detection is keyword-based, so every non-brief prompt records one extra assumed `CFG-INPUT-DEFAULTS` answer in assume mode; the `change` answer escalates rather than re-basing the run.
-**WP-14** — No `AbsorptionPoint` ⇒ C3/C4 UNVERIFIED; `HeatPumpPoint` lacks max sink T; ESP intake +0.86 bar over 1.2·p_b; free cooling 87 % on smoothed normals; HEX rated at 300 m³/h; CLI `resume` hint omits `--runs-dir`; budget not stored in the run; DR-11 variant priced on the base year only, no own MC; `robust_backup` never escalates.
-**Feature E** — DR-12 is one record per run (last pass wins; history in rationale/events); after a verifier REJECT of the re-sized adopted design the pin is dropped but the adopted DB-31/32 answer and `review_levers` stay (the free TL-13 rerun sizes the screened candidates at their own return temperatures); `design_flow_m3h` needs a TL-13 pin (`fixed_sizes` request field, WP-11 file); keyword mapper English-only and literal; the web view shows review questions as pending questions without the table; voice (D/I) hooks in at `ask_fn`.
+**WP-14** — No `AbsorptionPoint` ⇒ C3/C4 UNVERIFIED; `HeatPumpPoint` lacks max sink T; ESP intake +0.86 bar over 1.2·p_b; free cooling 87 % on smoothed normals; HEX rated at 300 m³/h; `resume` hint omits `--runs-dir`; budget not stored in the run; DR-11 variant priced on the base year only; `robust_backup` never escalates.
+**Feature E** — DR-12 is one record per run (last pass wins; history in rationale/events); after a verifier REJECT of the re-sized adopted design the pin is dropped but the adopted DB-31/32 answer and `review_levers` stay (the free TL-13 rerun uses each candidate's own return temperatures); `design_flow_m3h` needs a TL-13 pin (`fixed_sizes` request field, WP-11 file); keyword mapper English-only and literal; the web view shows review questions as pending questions without the table; voice (D/I) hooks in at `ask_fn`.
 **Feature G** — no live refresh (REFRESH button); resuming an LLM run from the browser needs the local Ollama model (or `--engine policy`); no authentication — keep the 127.0.0.1 bind.
 **Feature D** — not tried on a Mac yet (CLOUD_SETUP §7.10); English only; policy normaliser needs digits; no barge-in / voice "stop"; normaliser tokens count in `token_summary.json`; §I dialogue loop pending.
 **Spec/card nits** — GM-05 η ≈ 0.40 (code follows RC-06); DB-25 ≈ 22 bar (card 24.5); RC-09 "0.55 K/km" not reproducible; RC-10 lacks ESP/injection-pump capex; negative `gas_water_ratio` accepted; kpi defaults 1050 kg/m³ unsuffixed; dissolved-gas NPSH margin unquantified; `resume <unknown id>` creates `runs/<id>/`; `--run-id` unsanitised; `heat_pump_1987_usd_per_kw` unescalated.
@@ -104,8 +104,8 @@ One line per decision; the why is in `config/assumptions.yaml` or the module doc
 ## Open questions for organisers (Discord)
 See spec §17. Answers: —
 
-## Hand-off: submission checklist (WP-15, 2026-11-03)
-Spec §18 with evidence:
+## Hand-off: submission checklist (WP-15)
+Spec §18, evidence:
 - [x] ACCEPTED design, 0 unmet days — `runs/final/final_llm/run_summary.json` (C2-opt-robust, approved), `report_draft.md`.
 - [x] DB-10…17 every day — `runs/final/final_llm/figures/verification.md` (46/46), SUB-08.
 - [x] C0–C7 (+C8) compared, DR-01…DR-11 — `figures/candidates.md`, `decision_records/`, `REPORT.md` §2, §7.
@@ -113,7 +113,7 @@ Spec §18 with evidence:
 - [x] Brine PVT configurable — SUB-19 pass.
 - [x] LCOH/LCOC, CO₂ vs C0, exergy, sensitivity, MC P10/P50/P90 — `REPORT.md` §1, §5 (SUB-10/11).
 - [x] `llm_calls.jsonl` + `token_summary.json`; S10 (−45 %), S11 — `runs/final/final_llm/`, `runs/final/eval/` (SUB-12/15/16).
-- [x] S1–S11 transcripts — `runs/final/eval/gemma4_12b-it-q4_K_M/` (SUB-17; S7 "fail" predates #23, see `docs/results/s7_demo/`).
+- [x] S1–S11 transcripts — `runs/final/eval/gemma4_12b-it-q4_K_M/` (SUB-17; S7 "fail" predates #23, `docs/results/s7_demo/`).
 - [x] Apache-2.0 notices — `NOTICE`, SUB-20/21; LICENSE unchanged; no secrets; `.env.template` untouched.
 - [x] README with API placeholders (SUB-22), `docs/results/REPORT.md`, `DECK_OUTLINE.md`.
 - [ ] 10 slides + appendix, ≤ 5-min video (SUB-23, user records from `DECK_OUTLINE.md`).
