@@ -10,9 +10,9 @@
       "id": "C2-opt-robust",
       "label": "C2-opt-robust (C2-opt with the TL-15 P90 robust backups (OPT-ROBUST-BACKUP))",
       "evidence_ids": [
-        "TR-022",
-        "TR-023",
-        "TR-024"
+        "TR-020",
+        "TR-021",
+        "TR-022"
       ],
       "recommended": true,
       "eligible": true,
@@ -22,15 +22,12 @@
       "id": "C2-opt",
       "label": "C2-opt (TL-13 optimum of C2 (sized from C2-2d))",
       "evidence_ids": [
-        "TR-013",
         "TR-015",
         "TR-016",
         "TR-017",
         "TR-018",
         "TR-019",
-        "TR-020",
-        "TR-021",
-        "TR-022"
+        "TR-020"
       ],
       "recommended": false,
       "eligible": false,
@@ -40,10 +37,7 @@
       "id": "C6-opt",
       "label": "C6-opt (TL-13 optimum of C6 (sized from C6-2d))",
       "evidence_ids": [
-        "TR-013",
-        "TR-015",
-        "TR-016",
-        "TR-017"
+        "TR-015"
       ],
       "recommended": false,
       "eligible": false,
@@ -53,10 +47,7 @@
       "id": "C8-opt",
       "label": "C8-opt (TL-13 optimum of C8 (sized from C8-3d))",
       "evidence_ids": [
-        "TR-013",
-        "TR-015",
-        "TR-016",
-        "TR-017"
+        "TR-015"
       ],
       "recommended": false,
       "eligible": false,
@@ -64,7 +55,6 @@
     }
   ],
   "evidence_ids": [
-    "TR-013",
     "TR-015",
     "TR-016",
     "TR-017",
@@ -72,9 +62,7 @@
     "TR-019",
     "TR-020",
     "TR-021",
-    "TR-022",
-    "TR-023",
-    "TR-024"
+    "TR-022"
   ],
   "choice": "C2-opt-robust",
   "choice_label": "C2-opt-robust (C2-opt with the TL-15 P90 robust backups (OPT-ROBUST-BACKUP))",
@@ -87,22 +75,22 @@
       "C2-opt-robust"
     ],
     "evidence_ids": [
-      "TR-024"
+      "TR-022"
     ]
   },
-  "rationale": "The design is selected based on the verdict criterion because it is the only option with an ACCEPTED status in the verifier results.",
+  "rationale": "The design is recommended based on the verdict among guard-passed options in verify_design because it is the only candidate with an ACCEPTED status in TR-022. C2-opt, C6-opt, and C8-opt were rejected because they were not the verified design.",
   "rejected": [
     {
       "option_id": "C2-opt",
-      "reason": "Rejected because it is not the verified design."
+      "reason": "Not chosen."
     },
     {
       "option_id": "C6-opt",
-      "reason": "Rejected because it is not the verified design."
+      "reason": "Not chosen."
     },
     {
       "option_id": "C8-opt",
-      "reason": "Rejected because it is not the verified design."
+      "reason": "Not chosen."
     }
   ],
   "decision_source": "llm",

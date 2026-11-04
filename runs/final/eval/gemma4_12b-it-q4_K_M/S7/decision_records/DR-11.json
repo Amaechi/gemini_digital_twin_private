@@ -1,0 +1,68 @@
+{
+  "dr_id": "DR-11",
+  "title": "Backup capacity (robustness)",
+  "run_id": "S7",
+  "phase": "P8",
+  "role": "economics",
+  "question": "Which peak-backup capacity is installed: the base-year nameplates or the TL-15 robust nameplates?",
+  "options": [
+    {
+      "id": "installed-backup",
+      "label": "Keep the base-year backup nameplates of C2-opt (electric_chiller_mw 8.20, peak_boiler_mw 3.50 MW)",
+      "evidence_ids": [
+        "TR-022",
+        "TR-020",
+        "config:assumptions.yaml#OPT-ROBUST-BACKUP",
+        "config:assumptions.yaml#UQ-MC"
+      ],
+      "recommended": false,
+      "eligible": true,
+      "notes": "C2-opt: TL-15 P(demand met) 0.42 with the installed backups"
+    },
+    {
+      "id": "p90-robust-backup",
+      "label": "Install the TL-15 P90 robust backups (electric_chiller_mw 8.20, peak_boiler_mw 7.85 MW) as C2-opt-robust",
+      "evidence_ids": [
+        "TR-022",
+        "TR-020",
+        "config:assumptions.yaml#OPT-ROBUST-BACKUP",
+        "config:assumptions.yaml#UQ-MC"
+      ],
+      "recommended": true,
+      "eligible": true,
+      "notes": "C2-opt-robust: TL-15 P(demand met) 0.83; vs C2-opt \u0394LCOH +1.51, \u0394LCOC +0.00 USD/MWh, \u0394CAPEX +1.63 MUSD (full year); recommended (OPT-ROBUST-BACKUP)"
+    }
+  ],
+  "evidence_ids": [
+    "TR-020",
+    "TR-022",
+    "config:assumptions.yaml#OPT-ROBUST-BACKUP",
+    "config:assumptions.yaml#UQ-MC"
+  ],
+  "choice": "p90-robust-backup",
+  "choice_label": "Install the TL-15 P90 robust backups (electric_chiller_mw 8.20, peak_boiler_mw 7.85 MW) as C2-opt-robust",
+  "criterion": {
+    "id": "opt-robust-backup",
+    "key": "OPT-ROBUST-BACKUP",
+    "source": "assumptions register",
+    "text": "register rule OPT-ROBUST-BACKUP: install robust_backup_mw when it raises probability_demand_met",
+    "best_option_ids": [
+      "p90-robust-backup"
+    ],
+    "evidence_ids": [
+      "TR-020",
+      "TR-022",
+      "config:assumptions.yaml#OPT-ROBUST-BACKUP",
+      "config:assumptions.yaml#UQ-MC"
+    ]
+  },
+  "rationale": "Selected based on the OPT-ROBUST-BACKUP criterion which requires installing robust_backup_mw when it raises probability_demand_met. Option p90-robust-backup satisfies this by increasing the probability significantly as shown in TR-022. Option installed-backup was rejected because it does not meet the robust_backup requirement.",
+  "rejected": [
+    {
+      "option_id": "installed-backup",
+      "reason": "Not chosen."
+    }
+  ],
+  "decision_source": "llm",
+  "stub_evidence": false
+}

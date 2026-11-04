@@ -1,0 +1,164 @@
+{
+ "data": {
+  "checks": [
+   {
+    "candidate_id": "C0-0d",
+    "passed": true,
+    "violations": []
+   },
+   {
+    "candidate_id": "C1-3d",
+    "passed": true,
+    "violations": []
+   },
+   {
+    "candidate_id": "C2-2d",
+    "passed": true,
+    "violations": []
+   },
+   {
+    "candidate_id": "C3-2d",
+    "passed": true,
+    "violations": []
+   },
+   {
+    "candidate_id": "C4-2d",
+    "passed": false,
+    "violations": [
+     "verifier pre-check: depth 3200 m \u2014 ESP-intake NPSH not evaluable above 100 \u00b0C (SUB-NPSH, PH-19)"
+    ]
+   },
+   {
+    "candidate_id": "C5-3d",
+    "passed": true,
+    "violations": []
+   },
+   {
+    "candidate_id": "C6-2d",
+    "passed": true,
+    "violations": []
+   },
+   {
+    "candidate_id": "C7-2d",
+    "passed": true,
+    "violations": []
+   },
+   {
+    "candidate_id": "C8-3d",
+    "passed": true,
+    "violations": []
+   }
+  ],
+  "results": [
+   {
+    "candidate_id": "C0-0d",
+    "approved": true,
+    "status": "APPROVED",
+    "reason": "within all hard limits (limits.yaml DB-10\u202617, DB-36); signature ea752f161ae6 is new",
+    "violations": [],
+    "warnings": [],
+    "signature": "ea752f161ae6c6bc94e12c3caf43ed3bc20c716982bc927a5430e5109a7f0b9e",
+    "duplicate_of": null
+   },
+   {
+    "candidate_id": "C1-3d",
+    "approved": true,
+    "status": "APPROVED",
+    "reason": "within all hard limits (limits.yaml DB-10\u202617, DB-36); signature d08546f2a0c8 is new",
+    "violations": [],
+    "warnings": [],
+    "signature": "d08546f2a0c8870b2b6a5712bc8fafb48e1b75bd97fe3222b8252a6e47bd8c7b",
+    "duplicate_of": null
+   },
+   {
+    "candidate_id": "C2-2d",
+    "approved": true,
+    "status": "APPROVED",
+    "reason": "within all hard limits (limits.yaml DB-10\u202617, DB-36); signature 6e090817fbd0 is new",
+    "violations": [],
+    "warnings": [],
+    "signature": "6e090817fbd0217f6aab3844010a06ea16050b8628902db7d85e3c29882593b1",
+    "duplicate_of": null
+   },
+   {
+    "candidate_id": "C3-2d",
+    "approved": true,
+    "status": "APPROVED",
+    "reason": "within all hard limits (limits.yaml DB-10\u202617, DB-36); signature 25098a023754 is new",
+    "violations": [],
+    "warnings": [],
+    "signature": "25098a023754f476b0cc2264566081141557076c79a44ca5fae19696643fd497",
+    "duplicate_of": null
+   },
+   {
+    "candidate_id": "C4-2d",
+    "approved": true,
+    "status": "APPROVED",
+    "reason": "within all hard limits (limits.yaml DB-10\u202617, DB-36); signature d8306b55aefa is new",
+    "violations": [],
+    "warnings": [
+     "degassed brine at 105.1 \u00b0C is let down to 0 bar(g) (CFG-SURFACE): above 100 \u00b0C the saturation pressure exceeds 1 atm and flashing is not checked (no saturation data, RC-01); hold the degasser and HEX above saturation"
+    ],
+    "signature": "d8306b55aefa8565467a99fef666eaff300fc50839a94ac55194f7d2e2e17920",
+    "duplicate_of": null
+   },
+   {
+    "candidate_id": "C5-3d",
+    "approved": true,
+    "status": "APPROVED",
+    "reason": "within all hard limits (limits.yaml DB-10\u202617, DB-36); signature a20e2fa19a19 is new",
+    "violations": [],
+    "warnings": [],
+    "signature": "a20e2fa19a19e04a293c1703e1a08fd97a9d0051f2a26c00b9f56f4bc8457230",
+    "duplicate_of": null
+   },
+   {
+    "candidate_id": "C6-2d",
+    "approved": true,
+    "status": "APPROVED",
+    "reason": "within all hard limits (limits.yaml DB-10\u202617, DB-36); signature 058c670220bc is new",
+    "violations": [],
+    "warnings": [],
+    "signature": "058c670220bc68396809b821368ed7522b9f5c0d87d1a57699182ba66edc5be5",
+    "duplicate_of": null
+   },
+   {
+    "candidate_id": "C7-2d",
+    "approved": true,
+    "status": "APPROVED",
+    "reason": "within all hard limits (limits.yaml DB-10\u202617, DB-36); signature 744eb54d3668 is new",
+    "violations": [],
+    "warnings": [
+     "pressurised loop: brine plate HEX (and HP evaporator) at 54.2 bar(g) exceeds the gasketed plate-HEX rating 20.00 bar(g) (RC-03; GNS p.40, Guidebook p.218) and the loop must stay above p_b 45.0 bar(g): use shell-and-tube or plate-and-shell (no card cost) or degas with inhibitor (DR-07); the verifier fails PH-09 and PD-10 holds with zero margin"
+    ],
+    "signature": "744eb54d3668f397c2f476a99bd09fa267d148511f46e2f9ac4a5fb66b7ef3ee",
+    "duplicate_of": null
+   },
+   {
+    "candidate_id": "C8-3d",
+    "approved": true,
+    "status": "APPROVED",
+    "reason": "within all hard limits (limits.yaml DB-10\u202617, DB-36); signature 7c3fe47d052f is new",
+    "violations": [],
+    "warnings": [],
+    "signature": "7c3fe47d052fe7a091bb772a471948fce2097479085380d671ba8fa372d9c684",
+    "duplicate_of": null
+   }
+  ]
+ },
+ "summary": "TL-10: 8/9 approved; rejected C4-2d \u2014 C4-2d: verifier pre-check: depth 3200 m \u2014 ESP-intake NPSH not evaluable above 100 \u00b0C (SUB-NPSH, PH-19)",
+ "warnings": [
+  "degassed brine at 105.1 \u00b0C is let down to 0 bar(g) (CFG-SURFACE): above 100 \u00b0C the saturation pressure exceeds 1 atm and flashing is not checked (no saturation data, RC-01); hold the degasser and HEX above saturation",
+  "pressurised loop: brine plate HEX (and HP evaporator) at 54.2 bar(g) exceeds the gasketed plate-HEX rating 20.00 bar(g) (RC-03; GNS p.40, Guidebook p.218) and the loop must stay above p_b 45.0 bar(g): use shell-and-tube or plate-and-shell (no card cost) or degas with inhibitor (DR-07); the verifier fails PH-09 and PD-10 holds with zero margin"
+ ],
+ "assumption_ids": [
+  "DB-40"
+ ],
+ "sources": [
+  "config/limits.yaml",
+  "DB-10\u2026DB-17",
+  "DB-36",
+  "SUB-NPSH",
+  "SUB-PSUC"
+ ]
+}

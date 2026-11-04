@@ -12,18 +12,12 @@
       "evidence_ids": [
         "TR-009",
         "TR-010",
-        "TR-011",
         "TR-012",
-        "TR-013",
-        "TR-014",
-        "TR-015",
-        "TR-016",
-        "TR-018",
-        "TR-019"
+        "TR-013"
       ],
       "recommended": true,
       "eligible": true,
-      "notes": "candidates: C1-3d, C2-2d, C3-2d, C5-3d, C6-2d, C8-3d, C2-opt, C6-opt, C1-opt; excluded by DesignGuard/verifier: C4-2d; top-ranked (LCOH ranking)"
+      "notes": "candidates: C1-3d, C2-2d, C3-2d, C5-3d, C6-2d, C8-3d; excluded by DesignGuard/verifier: C4-2d; top-ranked (LCOH ranking)"
     },
     {
       "id": "pressurised-reinject",
@@ -31,13 +25,8 @@
       "evidence_ids": [
         "TR-009",
         "TR-010",
-        "TR-011",
         "TR-012",
-        "TR-013",
-        "TR-014",
-        "TR-015",
-        "TR-018",
-        "TR-019"
+        "TR-013"
       ],
       "recommended": false,
       "eligible": true,
@@ -47,14 +36,8 @@
   "evidence_ids": [
     "TR-009",
     "TR-010",
-    "TR-011",
     "TR-012",
-    "TR-013",
-    "TR-014",
-    "TR-015",
-    "TR-016",
-    "TR-018",
-    "TR-019"
+    "TR-013"
   ],
   "choice": "degas-use",
   "choice_label": "Gas handling: degas_use",
@@ -67,21 +50,17 @@
       "degas-use"
     ],
     "evidence_ids": [
-      "TR-013",
-      "TR-014",
-      "TR-015",
-      "TR-016",
-      "TR-018",
-      "TR-019"
+      "TR-012",
+      "TR-013"
     ]
   },
-  "rationale": "Decisive criterion: lowest lcoh_per_mwh + lcoc_per_mwh among guard-passed candidates without unmet demand in economics; it selects degas-use (TR-013, TR-014, TR-015).",
+  "rationale": "Selected based on the ranking-lowest-lcoh_per_mwh criterion among guard-passed options in economics. Option pressurised-reinject was rejected because it did not achieve the lowest lcoh_per_mwh as per the economics results in TR-013.",
   "rejected": [
     {
       "option_id": "pressurised-reinject",
-      "reason": "Not a best option under ranking-lowest-lcoh_per_mwh."
+      "reason": "Not chosen."
     }
   ],
-  "decision_source": "policy_fallback",
+  "decision_source": "llm",
   "stub_evidence": false
 }

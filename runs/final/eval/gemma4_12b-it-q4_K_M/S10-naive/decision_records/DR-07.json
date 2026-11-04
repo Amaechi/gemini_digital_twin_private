@@ -54,13 +54,13 @@
       "TR-013"
     ]
   },
-  "rationale": "Decisive criterion: lowest lcoh_per_mwh + lcoc_per_mwh among guard-passed candidates without unmet demand in economics; it selects degas-use (TR-012, TR-013).",
+  "rationale": "Selected based on the ranking-lowest-lcoh_per_mwh criterion as it contains the best-ranked options in economics. Option pressurised-reinject was rejected because it did not achieve the lowest lcoh_per_mwh among the eligible candidates.",
   "rejected": [
     {
       "option_id": "pressurised-reinject",
-      "reason": "Not a best option under ranking-lowest-lcoh_per_mwh."
+      "reason": "Not chosen."
     }
   ],
-  "decision_source": "policy_fallback",
+  "decision_source": "llm",
   "stub_evidence": false
 }

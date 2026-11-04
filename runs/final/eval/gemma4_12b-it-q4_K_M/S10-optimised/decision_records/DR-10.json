@@ -90,7 +90,7 @@
       "TR-027"
     ]
   },
-  "rationale": "Selected C2-opt-robust because it achieved the verdict in the selected-not-rejected criterion. Other options were rejected because they were not the verified design.",
+  "rationale": "The design is selected based on the verdict criterion because it is the only option with an ACCEPTED status from the verifier. Options C2-opt, C6-opt, and C1-opt were rejected because they are not the verified designs.",
   "rejected": [
     {
       "option_id": "C2-opt",

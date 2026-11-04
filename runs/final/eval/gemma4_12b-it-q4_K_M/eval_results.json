@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-11-02T23:50:27.490608+00:00",
+  "generated_at": "2026-11-04T03:44:53.381175+00:00",
   "engine": "llm",
   "model": "gemma4:12b-it-q4_K_M",
   "eval_dir": "runs/final/eval/gemma4_12b-it-q4_K_M",
@@ -18,17 +18,18 @@
       "selected_candidate": "C2-opt-robust",
       "conflicts": [],
       "metrics": {
-        "runtime_s": 379.417,
-        "tool_calls": 27,
+        "runtime_s": 387.622,
+        "tool_calls": 28,
         "stub_tool_calls": 0,
-        "llm_calls": 34,
-        "llm_valid_calls": 32,
-        "retries": 10,
+        "llm_calls": 33,
+        "llm_valid_calls": 31,
+        "retries": 8,
         "fallbacks": 2,
-        "step_rejections": 0,
-        "kind_coercions": 6,
-        "input_tokens": 97898,
-        "output_tokens": 5404
+        "step_rejections": 3,
+        "kind_coercions": 9,
+        "token_budget_overruns": 0,
+        "input_tokens": 88558,
+        "output_tokens": 5237
       },
       "checks": [
         {
@@ -83,7 +84,7 @@
           "type": "stub_tool_calls_max",
           "expect": "0 stub tool calls (promoted WP-14: real tools bound)",
           "passed": true,
-          "detail": "0/27 stub calls"
+          "detail": "0/28 stub calls"
         }
       ],
       "pending": [],
@@ -103,24 +104,25 @@
       "expected": "Lists missing inputs, asks, does not invent",
       "engine": "llm",
       "model": "gemma4:12b-it-q4_K_M",
-      "outcome": "pending",
+      "outcome": "pass",
       "status": "paused",
       "phase": "P1",
       "verdict": null,
       "selected_candidate": null,
       "conflicts": [],
       "metrics": {
-        "runtime_s": 26.524,
-        "tool_calls": 3,
+        "runtime_s": 4.643,
+        "tool_calls": 0,
         "stub_tool_calls": 0,
-        "llm_calls": 3,
-        "llm_valid_calls": 3,
-        "retries": 1,
+        "llm_calls": 1,
+        "llm_valid_calls": 1,
+        "retries": 0,
         "fallbacks": 0,
         "step_rejections": 0,
-        "kind_coercions": 3,
-        "input_tokens": 6139,
-        "output_tokens": 657
+        "kind_coercions": 0,
+        "token_budget_overruns": 0,
+        "input_tokens": 1062,
+        "output_tokens": 59
       },
       "checks": [
         {
@@ -137,28 +139,30 @@
         },
         {
           "type": "pending_question",
-          "expect": "a missing-input question is pending",
+          "expect": "ONE missing-input question is pending (CFG-INPUT-DEFAULTS; default = the repository defaults; promoted WP-13 follow-up)",
           "passed": true,
-          "detail": "asks [DB-30]: How should '330 daily steps' be read: A = each doublet available 330 of 365 days (35-day outage, dem"
+          "detail": "asks [CFG-INPUT-DEFAULTS]: The request does not provide: demand CSVs (daily heating and cooling demand, data/demand/); cooling "
+        },
+        {
+          "type": "question_mentions",
+          "expect": "the question lists the inputs the request lacks: demand CSVs, cooling demand, reservoir data (promoted WP-13 follow-up)",
+          "passed": true,
+          "detail": "question misses nothing"
         },
         {
           "type": "no_assumptions",
           "expect": "nothing is assumed before the answer (does not invent)",
           "passed": true,
           "detail": "0 assumption(s)/answer(s) recorded"
-        }
-      ],
-      "pending": [
+        },
         {
-          "expect": "the question lists the inputs the request lacks (demand CSVs, cooling, reservoir)",
-          "needs": [
-            "WP-14"
-          ],
-          "reason": "P1 gaps come from the assumptions register (DB-30/31/32); the runner always loads config/ and data/demand/, so inputs missing from the request itself are not detected yet",
-          "currently": "question misses ['cooling', 'reservoir']",
-          "now_passes": false
+          "type": "tool_calls_max",
+          "expect": "no tool runs before the answer (nothing is loaded from config/ or data/demand/ yet)",
+          "passed": true,
+          "detail": "0 tool call(s)"
         }
       ],
+      "pending": [],
       "run_dirs": [
         "S2"
       ],
@@ -179,7 +183,7 @@
       "selected_candidate": null,
       "conflicts": [],
       "metrics": {
-        "runtime_s": 4.337,
+        "runtime_s": 2.718,
         "tool_calls": 0,
         "stub_tool_calls": 0,
         "llm_calls": 1,
@@ -188,6 +192,7 @@
         "fallbacks": 0,
         "step_rejections": 0,
         "kind_coercions": 0,
+        "token_budget_overruns": 0,
         "input_tokens": 1067,
         "output_tokens": 61
       },
@@ -241,17 +246,18 @@
         "Requested 500 m3/h conflicts with the per-doublet flow limit 50–300 m3/h (DB-11); flows stay within the limit."
       ],
       "metrics": {
-        "runtime_s": 352.73,
-        "tool_calls": 25,
+        "runtime_s": 434.377,
+        "tool_calls": 29,
         "stub_tool_calls": 0,
-        "llm_calls": 32,
-        "llm_valid_calls": 29,
-        "retries": 12,
-        "fallbacks": 3,
+        "llm_calls": 36,
+        "llm_valid_calls": 35,
+        "retries": 11,
+        "fallbacks": 1,
         "step_rejections": 0,
-        "kind_coercions": 5,
-        "input_tokens": 93598,
-        "output_tokens": 5604
+        "kind_coercions": 7,
+        "token_budget_overruns": 0,
+        "input_tokens": 100280,
+        "output_tokens": 5787
       },
       "checks": [
         {
@@ -302,7 +308,7 @@
       "expected": "Notes conflict with DB-16, asks to confirm change of basis",
       "engine": "llm",
       "model": "gemma4:12b-it-q4_K_M",
-      "outcome": "pending",
+      "outcome": "pass",
       "status": "completed",
       "phase": "P10",
       "verdict": "ACCEPTED",
@@ -311,17 +317,18 @@
         "Requested heating supply 120 degC conflicts with the design basis 100 degC (DB-16); the design keeps 100 degC until a change of basis is confirmed."
       ],
       "metrics": {
-        "runtime_s": 372.148,
-        "tool_calls": 28,
+        "runtime_s": 419.144,
+        "tool_calls": 30,
         "stub_tool_calls": 0,
-        "llm_calls": 34,
-        "llm_valid_calls": 33,
-        "retries": 7,
-        "fallbacks": 1,
-        "step_rejections": 1,
-        "kind_coercions": 8,
-        "input_tokens": 87778,
-        "output_tokens": 5052
+        "llm_calls": 33,
+        "llm_valid_calls": 30,
+        "retries": 11,
+        "fallbacks": 3,
+        "step_rejections": 0,
+        "kind_coercions": 7,
+        "token_budget_overruns": 0,
+        "input_tokens": 98689,
+        "output_tokens": 5490
       },
       "checks": [
         {
@@ -335,19 +342,21 @@
           "expect": "keeps the basis until the change is confirmed",
           "passed": true,
           "detail": "1 conflict(s); matching: ['Requested heating supply 120 degC conflicts with the design basis 100 degC (DB-16); the design keeps 100 degC until a change of basis is confirmed.']"
-        }
-      ],
-      "pending": [
+        },
         {
-          "expect": "asks the user to confirm the change of basis",
-          "needs": [
-            "WP-14"
-          ],
-          "reason": "the runner records the conflict (CONFLICT event) but has no confirm-basis InputRequest yet; it needs an assumptions-register id for the question",
-          "currently": "no pending question",
-          "now_passes": false
+          "type": "assumption_or_question",
+          "expect": "asks the user to confirm the change of basis in P1 (CFG-BASIS-CONFIRM: keep | change; in --input-mode assume the register default 'keep' is recorded; promoted WP-13 follow-up)",
+          "passed": true,
+          "detail": "recorded: CFG-BASIS-CONFIRM = keep (assumed: register default)"
+        },
+        {
+          "type": "status",
+          "expect": "continues on the design basis (the assumed answer keeps DB-16)",
+          "passed": true,
+          "detail": "status completed"
         }
       ],
+      "pending": [],
       "run_dirs": [
         "S5"
       ],
@@ -371,17 +380,18 @@
       "selected_candidate": "C2-opt-robust",
       "conflicts": [],
       "metrics": {
-        "runtime_s": 350.877,
-        "tool_calls": 27,
+        "runtime_s": 380.558,
+        "tool_calls": 25,
         "stub_tool_calls": 0,
         "llm_calls": 33,
-        "llm_valid_calls": 30,
-        "retries": 12,
-        "fallbacks": 3,
+        "llm_valid_calls": 32,
+        "retries": 10,
+        "fallbacks": 1,
         "step_rejections": 0,
         "kind_coercions": 4,
-        "input_tokens": 99655,
-        "output_tokens": 5644
+        "token_budget_overruns": 0,
+        "input_tokens": 90279,
+        "output_tokens": 5339
       },
       "checks": [
         {
@@ -420,24 +430,25 @@
       "expected": "Gap detected; Model Builder writes model + passes reference-example test",
       "engine": "llm",
       "model": "gemma4:12b-it-q4_K_M",
-      "outcome": "fail",
-      "status": "escalated",
-      "phase": "P4",
-      "verdict": null,
-      "selected_candidate": null,
+      "outcome": "pending",
+      "status": "completed",
+      "phase": "P10",
+      "verdict": "ACCEPTED",
+      "selected_candidate": "C2-opt-robust",
       "conflicts": [],
       "metrics": {
-        "runtime_s": 143.091,
-        "tool_calls": 16,
+        "runtime_s": 448.024,
+        "tool_calls": 27,
         "stub_tool_calls": 0,
-        "llm_calls": 15,
-        "llm_valid_calls": 14,
-        "retries": 6,
-        "fallbacks": 1,
+        "llm_calls": 36,
+        "llm_valid_calls": 31,
+        "retries": 17,
+        "fallbacks": 5,
         "step_rejections": 1,
         "kind_coercions": 4,
-        "input_tokens": 43792,
-        "output_tokens": 2951
+        "token_budget_overruns": 0,
+        "input_tokens": 114475,
+        "output_tokens": 6510
       },
       "checks": [
         {
@@ -449,8 +460,8 @@
         {
           "type": "status",
           "expect": "the run completes",
-          "passed": false,
-          "detail": "status escalated"
+          "passed": true,
+          "detail": "status completed"
         },
         {
           "type": "gap_reported",
@@ -485,24 +496,25 @@
       "expected": "Re-sizes and explains",
       "engine": "llm",
       "model": "gemma4:12b-it-q4_K_M",
-      "outcome": "pending",
+      "outcome": "pass",
       "status": "completed",
       "phase": "P10",
       "verdict": "ACCEPTED",
       "selected_candidate": "C2-opt-robust",
       "conflicts": [],
       "metrics": {
-        "runtime_s": 395.935,
-        "tool_calls": 26,
+        "runtime_s": 379.328,
+        "tool_calls": 24,
         "stub_tool_calls": 0,
-        "llm_calls": 38,
-        "llm_valid_calls": 35,
-        "retries": 11,
-        "fallbacks": 3,
+        "llm_calls": 33,
+        "llm_valid_calls": 32,
+        "retries": 12,
+        "fallbacks": 1,
         "step_rejections": 0,
-        "kind_coercions": 4,
-        "input_tokens": 101185,
-        "output_tokens": 5635
+        "kind_coercions": 6,
+        "token_budget_overruns": 0,
+        "input_tokens": 93061,
+        "output_tokens": 5436
       },
       "checks": [
         {
@@ -522,19 +534,15 @@
           "expect": "explains the change in the Decision Records: DR-01 quotes the permeability and TL-04 (promoted WP-14)",
           "passed": true,
           "detail": "DR-01 misses nothing"
-        }
-      ],
-      "pending": [
+        },
         {
-          "expect": "re-sizes the doublets for the lower productivity",
-          "needs": [
-            "WP-15"
-          ],
-          "reason": "the real TL-05…TL-13 now size on the 50 mD basis (lower PI → ESP limits the flow), but no scenario check compares the S8 design with S1's yet (needs a cross-run check type)",
-          "currently": null,
-          "now_passes": null
+          "type": "cross_run_sizing",
+          "expect": "re-sizes the doublets for the lower productivity: against S1 of the same eval, the wells (doublets, depth, flow) or the ESP (stages, setting depth, peak electric power) are larger at the lower PI (promoted WP-13 follow-up; needs S1 in the same eval run)",
+          "passed": true,
+          "detail": "ESP re-sized: PI 3.06 vs S1 12.22 m3/h/bar; design 2 x 300.0 m3/h @ 2500.0 m, ESP 49 stages @ 1560 m, peak 1.43 MW (full year) vs 2 x 300.0 m3/h @ 2500.0 m, ESP 16 stages @ 840 m, peak 0.46 MW (full year)"
         }
       ],
+      "pending": [],
       "run_dirs": [
         "S8"
       ],
@@ -560,17 +568,18 @@
         "Stated 150 degC at 2500 m is inconsistent with the design basis: 12 degC surface temperature (DB-04) and 30 K/km gradient (DB-03) give 87.0 degC there (RC-01); the design uses the design basis until the data are confirmed."
       ],
       "metrics": {
-        "runtime_s": 354.197,
+        "runtime_s": 364.037,
         "tool_calls": 23,
         "stub_tool_calls": 0,
         "llm_calls": 32,
-        "llm_valid_calls": 27,
-        "retries": 16,
-        "fallbacks": 5,
-        "step_rejections": 2,
-        "kind_coercions": 5,
-        "input_tokens": 104535,
-        "output_tokens": 5847
+        "llm_valid_calls": 30,
+        "retries": 11,
+        "fallbacks": 2,
+        "step_rejections": 0,
+        "kind_coercions": 4,
+        "token_budget_overruns": 0,
+        "input_tokens": 91575,
+        "output_tokens": 5215
       },
       "checks": [
         {
@@ -616,17 +625,18 @@
       "selected_candidate": "C2-opt-robust",
       "conflicts": [],
       "metrics": {
-        "runtime_s": 948.3240000000001,
-        "tool_calls": 54,
+        "runtime_s": 973.707,
+        "tool_calls": 56,
         "stub_tool_calls": 0,
-        "llm_calls": 68,
-        "llm_valid_calls": 64,
+        "llm_calls": 67,
+        "llm_valid_calls": 63,
         "retries": 24,
         "fallbacks": 4,
-        "step_rejections": 4,
-        "kind_coercions": 12,
-        "input_tokens": 273102,
-        "output_tokens": 11814
+        "step_rejections": 3,
+        "kind_coercions": 13,
+        "token_budget_overruns": 0,
+        "input_tokens": 271013,
+        "output_tokens": 11833
       },
       "checks": [
         {
@@ -639,13 +649,13 @@
           "type": "token_saving",
           "expect": "the optimised settings use no more tokens than the naive ones",
           "passed": true,
-          "detail": "naive 183874 vs optimised 101042 tokens"
+          "detail": "naive 173909 vs optimised 108937 tokens"
         },
         {
           "type": "llm_metrics",
           "expect": "LLM calls and tokens are logged",
           "passed": true,
-          "detail": "33/34 LLM calls used without fallback"
+          "detail": "30/33 LLM calls used without fallback"
         }
       ],
       "pending": [
@@ -669,76 +679,76 @@
       ],
       "token_comparison": {
         "total": {
-          "naive_tokens": 183874.0,
-          "optimised_tokens": 101042.0,
-          "saved_tokens": 82832.0,
-          "saved_frac": 0.4505,
+          "naive_tokens": 173909.0,
+          "optimised_tokens": 108937.0,
+          "saved_tokens": 64972.0,
+          "saved_frac": 0.3736,
           "naive_calls": 34.0,
-          "optimised_calls": 34.0
+          "optimised_calls": 33.0
         },
         "by_agent": {
           "economics": {
-            "naive_tokens": 15669.0,
-            "optimised_tokens": 9439.0,
-            "saved_tokens": 6230.0,
-            "saved_frac": 0.3976,
+            "naive_tokens": 19177.0,
+            "optimised_tokens": 6460.0,
+            "saved_tokens": 12717.0,
+            "saved_frac": 0.6631,
             "naive_calls": 3.0,
             "optimised_calls": 3.0
           },
           "lead_engineer": {
-            "naive_tokens": 21979.0,
-            "optimised_tokens": 9726.0,
-            "saved_tokens": 12253.0,
-            "saved_frac": 0.5575,
-            "naive_calls": 4.0,
+            "naive_tokens": 10107.0,
+            "optimised_tokens": 12333.0,
+            "saved_tokens": -2226.0,
+            "saved_frac": -0.2202,
+            "naive_calls": 3.0,
             "optimised_calls": 4.0
           },
           "model_builder": {
-            "naive_tokens": 13351.0,
-            "optimised_tokens": 2349.0,
-            "saved_tokens": 11002.0,
-            "saved_frac": 0.8241,
-            "naive_calls": 2.0,
+            "naive_tokens": 27537.0,
+            "optimised_tokens": 2352.0,
+            "saved_tokens": 25185.0,
+            "saved_frac": 0.9146,
+            "naive_calls": 4.0,
             "optimised_calls": 1.0
           },
           "reporter": {
-            "naive_tokens": 15655.0,
-            "optimised_tokens": 3499.0,
-            "saved_tokens": 12156.0,
-            "saved_frac": 0.7765,
+            "naive_tokens": 16617.0,
+            "optimised_tokens": 1889.0,
+            "saved_tokens": 14728.0,
+            "saved_frac": 0.8863,
             "naive_calls": 2.0,
-            "optimised_calls": 2.0
+            "optimised_calls": 1.0
           },
           "requirements": {
             "naive_tokens": 9057.0,
-            "optimised_tokens": 7939.0,
-            "saved_tokens": 1118.0,
-            "saved_frac": 0.1234,
+            "optimised_tokens": 7895.0,
+            "saved_tokens": 1162.0,
+            "saved_frac": 0.1283,
             "naive_calls": 3.0,
             "optimised_calls": 3.0
           },
           "reviewer": {
-            "naive_tokens": 23579.0,
-            "optimised_tokens": 7471.0,
-            "saved_tokens": 16108.0,
-            "saved_frac": 0.6832,
+            "naive_tokens": 22961.0,
+            "optimised_tokens": 10160.0,
+            "saved_tokens": 12801.0,
+            "saved_frac": 0.5575,
             "naive_calls": 3.0,
             "optimised_calls": 2.0
           },
           "subsurface": {
-            "naive_tokens": 26640.0,
-            "optimised_tokens": 18041.0,
-            "saved_tokens": 8599.0,
-            "saved_frac": 0.3228,
+            "naive_tokens": 17966.0,
+            "optimised_tokens": 15273.0,
+            "saved_tokens": 2693.0,
+            "saved_frac": 0.1499,
             "naive_calls": 6.0,
             "optimised_calls": 6.0
           },
           "system_architect": {
-            "naive_tokens": 57944.0,
-            "optimised_tokens": 42578.0,
-            "saved_tokens": 15366.0,
-            "saved_frac": 0.2652,
-            "naive_calls": 11.0,
+            "naive_tokens": 50487.0,
+            "optimised_tokens": 52575.0,
+            "saved_tokens": -2088.0,
+            "saved_frac": -0.0414,
+            "naive_calls": 10.0,
             "optimised_calls": 13.0
           }
         },
@@ -753,81 +763,81 @@
           },
           "P1": {
             "naive_tokens": 9057.0,
-            "optimised_tokens": 7939.0,
-            "saved_tokens": 1118.0,
-            "saved_frac": 0.1234,
+            "optimised_tokens": 7895.0,
+            "saved_tokens": 1162.0,
+            "saved_frac": 0.1283,
             "naive_calls": 3.0,
             "optimised_calls": 3.0
           },
           "P10": {
-            "naive_tokens": 15655.0,
-            "optimised_tokens": 3499.0,
-            "saved_tokens": 12156.0,
-            "saved_frac": 0.7765,
+            "naive_tokens": 16617.0,
+            "optimised_tokens": 1889.0,
+            "saved_tokens": 14728.0,
+            "saved_frac": 0.8863,
             "naive_calls": 2.0,
-            "optimised_calls": 2.0
+            "optimised_calls": 1.0
           },
           "P2": {
-            "naive_tokens": 12775.0,
+            "naive_tokens": 12701.0,
             "optimised_tokens": 9762.0,
-            "saved_tokens": 3013.0,
-            "saved_frac": 0.2359,
+            "saved_tokens": 2939.0,
+            "saved_frac": 0.2314,
             "naive_calls": 4.0,
             "optimised_calls": 4.0
           },
           "P3": {
-            "naive_tokens": 21214.0,
-            "optimised_tokens": 16436.0,
-            "saved_tokens": 4778.0,
-            "saved_frac": 0.2252,
+            "naive_tokens": 16788.0,
+            "optimised_tokens": 16345.0,
+            "saved_tokens": 443.0,
+            "saved_frac": 0.0264,
             "naive_calls": 2.0,
             "optimised_calls": 5.0
           },
           "P4": {
-            "naive_tokens": 13351.0,
-            "optimised_tokens": 2349.0,
-            "saved_tokens": 11002.0,
-            "saved_frac": 0.8241,
-            "naive_calls": 2.0,
+            "naive_tokens": 27537.0,
+            "optimised_tokens": 2352.0,
+            "saved_tokens": 25185.0,
+            "saved_frac": 0.9146,
+            "naive_calls": 4.0,
             "optimised_calls": 1.0
           },
           "P5": {
-            "naive_tokens": 37469.0,
-            "optimised_tokens": 26202.0,
-            "saved_tokens": 11267.0,
-            "saved_frac": 0.3007,
+            "naive_tokens": 23218.0,
+            "optimised_tokens": 35831.0,
+            "saved_tokens": -12613.0,
+            "saved_frac": -0.5432,
             "naive_calls": 8.0,
             "optimised_calls": 8.0
           },
           "P6": {
-            "naive_tokens": 13126.0,
-            "optimised_tokens": 8219.0,
-            "saved_tokens": 4907.0,
-            "saved_frac": 0.3738,
-            "naive_calls": 3.0,
-            "optimised_calls": 2.0
-          },
-          "P7": {
-            "naive_tokens": 18049.0,
-            "optimised_tokens": 6150.0,
-            "saved_tokens": 11899.0,
-            "saved_frac": 0.6593,
+            "naive_tokens": 15746.0,
+            "optimised_tokens": 5910.0,
+            "saved_tokens": 9836.0,
+            "saved_frac": 0.6247,
             "naive_calls": 2.0,
             "optimised_calls": 2.0
           },
+          "P7": {
+            "naive_tokens": 6003.0,
+            "optimised_tokens": 8771.0,
+            "saved_tokens": -2768.0,
+            "saved_frac": -0.4611,
+            "naive_calls": 1.0,
+            "optimised_calls": 2.0
+          },
           "P8": {
-            "naive_tokens": 15669.0,
-            "optimised_tokens": 9439.0,
-            "saved_tokens": 6230.0,
-            "saved_frac": 0.3976,
+            "naive_tokens": 19177.0,
+            "optimised_tokens": 6460.0,
+            "saved_tokens": 12717.0,
+            "saved_frac": 0.6631,
             "naive_calls": 3.0,
             "optimised_calls": 3.0
           },
           "P9": {
-            "naive_tokens": 26351.0,
-            "optimised_tokens": 9888.0,
-            "saved_tokens": 16463.0,
-            "saved_frac": 0.6248,
+            "naive_tokens": 25907.0,
+            "optimised_tokens": 12563.0,
+            "saved_tokens": 13344.0,
+            "saved_frac": 0.5151,
             "naive_calls": 4.0,
             "optimised_calls": 3.0
           }
@@ -848,17 +858,18 @@
       "selected_candidate": "C2-opt-robust",
       "conflicts": [],
       "metrics": {
-        "runtime_s": 400.348,
-        "tool_calls": 29,
+        "runtime_s": 372.586,
+        "tool_calls": 25,
         "stub_tool_calls": 0,
-        "llm_calls": 35,
-        "llm_valid_calls": 31,
-        "retries": 15,
-        "fallbacks": 4,
-        "step_rejections": 2,
-        "kind_coercions": 8,
-        "input_tokens": 109805,
-        "output_tokens": 6123
+        "llm_calls": 33,
+        "llm_valid_calls": 32,
+        "retries": 7,
+        "fallbacks": 1,
+        "step_rejections": 1,
+        "kind_coercions": 6,
+        "token_budget_overruns": 0,
+        "input_tokens": 83558,
+        "output_tokens": 4966
       },
       "checks": [
         {
@@ -871,7 +882,7 @@
           "type": "llm_metrics",
           "expect": "tool-call validity, retries, fallbacks and tokens are recorded",
           "passed": true,
-          "detail": "31/35 LLM calls used without fallback"
+          "detail": "32/33 LLM calls used without fallback"
         }
       ],
       "pending": [

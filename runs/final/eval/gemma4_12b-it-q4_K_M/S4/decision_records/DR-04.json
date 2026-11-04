@@ -14,12 +14,16 @@
         "TR-010",
         "TR-011",
         "TR-012",
+        "TR-013",
         "TR-014",
-        "TR-015"
+        "TR-015",
+        "TR-016",
+        "TR-018",
+        "TR-019"
       ],
       "recommended": false,
       "eligible": true,
-      "notes": "candidates: C1-3d"
+      "notes": "candidates: C1-3d, C1-opt"
     },
     {
       "id": "free-cooling-electric",
@@ -29,12 +33,16 @@
         "TR-010",
         "TR-011",
         "TR-012",
+        "TR-013",
         "TR-014",
-        "TR-015"
+        "TR-015",
+        "TR-016",
+        "TR-018",
+        "TR-019"
       ],
       "recommended": true,
       "eligible": true,
-      "notes": "candidates: C2-2d, C5-3d, C6-2d, C7-2d, C8-3d; top-ranked (LCOH ranking)"
+      "notes": "candidates: C2-2d, C5-3d, C6-2d, C7-2d, C8-3d, C2-opt, C6-opt; top-ranked (LCOH ranking)"
     },
     {
       "id": "free-cooling-absorption",
@@ -44,8 +52,11 @@
         "TR-010",
         "TR-011",
         "TR-012",
+        "TR-013",
         "TR-014",
-        "TR-015"
+        "TR-015",
+        "TR-018",
+        "TR-019"
       ],
       "recommended": false,
       "eligible": true,
@@ -57,8 +68,12 @@
     "TR-010",
     "TR-011",
     "TR-012",
+    "TR-013",
     "TR-014",
-    "TR-015"
+    "TR-015",
+    "TR-016",
+    "TR-018",
+    "TR-019"
   ],
   "choice": "free-cooling-electric",
   "choice_label": "Free cooling + electric chillers (C2, C5)",
@@ -71,21 +86,23 @@
       "free-cooling-electric"
     ],
     "evidence_ids": [
-      "TR-011",
-      "TR-012",
+      "TR-013",
       "TR-014",
-      "TR-015"
+      "TR-015",
+      "TR-016",
+      "TR-018",
+      "TR-019"
     ]
   },
-  "rationale": "lowest lcoh_per_mwh among guard-passed options in economics as per TR-015.",
+  "rationale": "Selected based on ranking-lowest-lcoh_per_mwh among guard-passed options in economics. C1-3d and C1-opt were rejected for higher lcoh_per_mwh. C3-2d was rejected because it was excluded by the design guarder.",
   "rejected": [
     {
       "option_id": "electric-chillers",
-      "reason": "Higher lcoh_per_mwh than free-cooling-electric in TR-015."
+      "reason": "Not chosen."
     },
     {
       "option_id": "free-cooling-absorption",
-      "reason": "Higher lcoh_per_mwh than free-cooling-electric in TR-015."
+      "reason": "Not chosen."
     }
   ],
   "decision_source": "llm",

@@ -17,8 +17,9 @@
         "TR-013",
         "TR-014",
         "TR-015",
-        "TR-017",
-        "TR-018"
+        "TR-016",
+        "TR-018",
+        "TR-019"
       ],
       "recommended": true,
       "eligible": true,
@@ -35,8 +36,9 @@
         "TR-013",
         "TR-014",
         "TR-015",
-        "TR-017",
-        "TR-018"
+        "TR-016",
+        "TR-018",
+        "TR-019"
       ],
       "recommended": false,
       "eligible": true,
@@ -51,8 +53,9 @@
     "TR-013",
     "TR-014",
     "TR-015",
-    "TR-017",
-    "TR-018"
+    "TR-016",
+    "TR-018",
+    "TR-019"
   ],
   "choice": "no-storage",
   "choice_label": "No seasonal storage",
@@ -68,11 +71,12 @@
       "TR-013",
       "TR-014",
       "TR-015",
-      "TR-017",
-      "TR-018"
+      "TR-016",
+      "TR-018",
+      "TR-019"
     ]
   },
-  "rationale": "lowest lcoh_per_mwh among guard-passed options in economics based on TR-013, TR-014, TR-015, TR-017, TR-018. seasonal-ht-ates was rejected because it did not achieve the best ranking in the specified economic metric.",
+  "rationale": "Selected based on lowest lcoh_per_mwh among guard-passed options in economics. Option seasonal-ht-ates was rejected because it did not meet this criterion according to the economics results.",
   "rejected": [
     {
       "option_id": "seasonal-ht-ates",

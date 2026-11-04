@@ -1,6 +1,6 @@
 {
  "data": {
-  "spacing_m": 1000.0,
+  "spacing_m": 500.0,
   "flow_m3h": 200.0,
   "thickness_m": 100.0,
   "reservoir_temperature_degc": 87.0,
@@ -9,12 +9,12 @@
   "brine_cooling_k": 40.0,
   "rho_c_aquifer_j_per_m3_k": 2500000.0,
   "rho_c_water_j_per_m3_k": 4223000.0,
-  "breakthrough_time_yr": 35.3603115851983,
+  "breakthrough_time_yr": 8.840077896299576,
   "horizon_yr": 30.0,
-  "breakthrough_after_horizon": true,
+  "breakthrough_after_horizon": false,
   "min_spacing_for_horizon_m": 921.0910995038271,
-  "temperature_at_horizon_degc": 87.0,
-  "decline_at_horizon_k": 0.0,
+  "temperature_at_horizon_degc": 64.64769953929542,
+  "decline_at_horizon_k": 22.352300460704583,
   "heterogeneity_band_k": 6.0,
   "curve": [
    {
@@ -55,96 +55,98 @@
    },
    {
     "time_yr": 9.0,
-    "production_temperature_degc": 87.0
+    "production_temperature_degc": 84.12818694794959
    },
    {
     "time_yr": 10.0,
-    "production_temperature_degc": 87.0
+    "production_temperature_degc": 79.50699276136847
    },
    {
     "time_yr": 11.0,
-    "production_temperature_degc": 87.0
+    "production_temperature_degc": 77.06812925140427
    },
    {
     "time_yr": 12.0,
-    "production_temperature_degc": 87.0
+    "production_temperature_degc": 75.30582833245734
    },
    {
     "time_yr": 13.0,
-    "production_temperature_degc": 87.0
+    "production_temperature_degc": 73.91414823145456
    },
    {
     "time_yr": 14.0,
-    "production_temperature_degc": 87.0
+    "production_temperature_degc": 72.76336473549466
    },
    {
     "time_yr": 15.0,
-    "production_temperature_degc": 87.0
+    "production_temperature_degc": 71.78369674769353
    },
    {
     "time_yr": 16.0,
-    "production_temperature_degc": 87.0
+    "production_temperature_degc": 70.93250285673221
    },
    {
     "time_yr": 17.0,
-    "production_temperature_degc": 87.0
+    "production_temperature_degc": 70.18153633636214
    },
    {
     "time_yr": 18.0,
-    "production_temperature_degc": 87.0
+    "production_temperature_degc": 69.51100695471038
    },
    {
     "time_yr": 19.0,
-    "production_temperature_degc": 87.0
+    "production_temperature_degc": 68.906462845981
    },
    {
     "time_yr": 20.0,
-    "production_temperature_degc": 87.0
+    "production_temperature_degc": 68.35700742496239
    },
    {
     "time_yr": 21.0,
-    "production_temperature_degc": 87.0
+    "production_temperature_degc": 67.85421222250964
    },
    {
     "time_yr": 22.0,
-    "production_temperature_degc": 87.0
+    "production_temperature_degc": 67.39142000374994
    },
    {
     "time_yr": 23.0,
-    "production_temperature_degc": 87.0
+    "production_temperature_degc": 66.96327972241367
    },
    {
     "time_yr": 24.0,
-    "production_temperature_degc": 87.0
+    "production_temperature_degc": 66.5654257459865
    },
    {
     "time_yr": 25.0,
-    "production_temperature_degc": 87.0
+    "production_temperature_degc": 66.19425037550643
    },
    {
     "time_yr": 26.0,
-    "production_temperature_degc": 87.0
+    "production_temperature_degc": 65.84673867536092
    },
    {
     "time_yr": 27.0,
-    "production_temperature_degc": 87.0
+    "production_temperature_degc": 65.52034608118625
    },
    {
     "time_yr": 28.0,
-    "production_temperature_degc": 87.0
+    "production_temperature_degc": 65.21290608368305
    },
    {
     "time_yr": 29.0,
-    "production_temperature_degc": 87.0
+    "production_temperature_degc": 64.92255950173832
    },
    {
     "time_yr": 30.0,
-    "production_temperature_degc": 87.0
+    "production_temperature_degc": 64.64769953929542
    }
   ]
  },
- "summary": "t_b 35.4 yr (D 1000 m, Q 200 m\u00b3/h, h 100 m); T_prod 87.0\u00b0C at 30 yr (\u22120.0 K, \u00b16 K); D for t_b \u2265 30 yr: 921 m",
- "warnings": [],
+ "summary": "t_b 8.8 yr (D 500 m, Q 200 m\u00b3/h, h 100 m); T_prod 64.6\u00b0C at 30 yr (\u221222.4 K, \u00b16 K); D for t_b \u2265 30 yr: 921 m",
+ "warnings": [
+  "Breakthrough after 8.8 yr, before the 30-yr horizon: increase spacing to \u2265 921 m or reduce the average flow."
+ ],
  "assumption_ids": [
   "SUB-RHOC",
   "DB-33",

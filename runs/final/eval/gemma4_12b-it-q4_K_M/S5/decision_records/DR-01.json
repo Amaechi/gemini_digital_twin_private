@@ -17,8 +17,9 @@
         "TR-013",
         "TR-014",
         "TR-015",
-        "TR-017",
-        "TR-018"
+        "TR-016",
+        "TR-018",
+        "TR-019"
       ],
       "recommended": true,
       "eligible": true,
@@ -35,8 +36,9 @@
         "TR-013",
         "TR-014",
         "TR-015",
-        "TR-017",
-        "TR-018"
+        "TR-016",
+        "TR-018",
+        "TR-019"
       ],
       "recommended": false,
       "eligible": true,
@@ -51,8 +53,9 @@
     "TR-013",
     "TR-014",
     "TR-015",
-    "TR-017",
-    "TR-018"
+    "TR-016",
+    "TR-018",
+    "TR-019"
   ],
   "choice": "2-doublets",
   "choice_label": "2 doublet(s)",
@@ -68,15 +71,16 @@
       "TR-013",
       "TR-014",
       "TR-015",
-      "TR-017",
-      "TR-018"
+      "TR-016",
+      "TR-018",
+      "TR-019"
     ]
   },
-  "rationale": "Selected based on ranking-lowest-lcoh_per_mwh among guard-passed options in economics, as shown in TR-018.",
+  "rationale": "Selected based on lowest lcoh_per_mwh among guard-passed options in economics, as shown in TR-019.",
   "rejected": [
     {
       "option_id": "3-doublets",
-      "reason": "Rejected because it did not achieve the lowest lcoh_per_mwh among guard-passed options in economics according to TR-018."
+      "reason": "Higher lcoh_per_mwh compared to the selected option according to TR-019."
     }
   ],
   "decision_source": "llm",

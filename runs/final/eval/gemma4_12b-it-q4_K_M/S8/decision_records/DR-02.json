@@ -13,15 +13,13 @@
         "TR-009",
         "TR-010",
         "TR-011",
-        "TR-012",
         "TR-013",
-        "TR-015",
-        "TR-016",
+        "TR-014",
         "config:design_basis.yaml#DB-01"
       ],
       "recommended": true,
       "eligible": true,
-      "notes": "candidates: C1-3d, C2-2d, C3-2d, C6-2d, C7-2d, C8-3d, C2-opt, C6-opt, C8-opt; top-ranked (LCOH ranking)"
+      "notes": "candidates: C1-3d, C2-2d, C3-2d, C6-2d, C7-2d, C8-3d; top-ranked (LCOH ranking)"
     },
     {
       "id": "depth-3200m",
@@ -30,9 +28,8 @@
         "TR-009",
         "TR-010",
         "TR-011",
-        "TR-012",
-        "TR-015",
-        "TR-016"
+        "TR-013",
+        "TR-014"
       ],
       "recommended": false,
       "eligible": false,
@@ -45,9 +42,8 @@
         "TR-009",
         "TR-010",
         "TR-011",
-        "TR-012",
-        "TR-015",
-        "TR-016"
+        "TR-013",
+        "TR-014"
       ],
       "recommended": false,
       "eligible": true,
@@ -58,10 +54,8 @@
     "TR-009",
     "TR-010",
     "TR-011",
-    "TR-012",
     "TR-013",
-    "TR-015",
-    "TR-016",
+    "TR-014",
     "config:design_basis.yaml#DB-01"
   ],
   "choice": "depth-2500m",
@@ -75,22 +69,19 @@
       "depth-2500m"
     ],
     "evidence_ids": [
-      "TR-011",
-      "TR-012",
       "TR-013",
-      "TR-015",
-      "TR-016"
+      "TR-014"
     ]
   },
-  "rationale": "Selected based on lowest lcoh_per_mwh among guard-passed options in economics as identified in ranking-lowest-lcoh_per_mwh. depth-3200m was rejected because it was excluded by the design guard. depth-1500m was rejected because it did not meet the lowest lcoh_per_mwh ranking criterion.",
+  "rationale": "Selected based on lowest lcoh_per_mwh among guard-passed options in economics as indicated by TR-014 and the ranking criterion.",
   "rejected": [
     {
       "option_id": "depth-3200m",
-      "reason": "Not chosen."
+      "reason": "Excluded by DesignGuard/verifier as per TR-014 and notes."
     },
     {
       "option_id": "depth-1500m",
-      "reason": "Not chosen."
+      "reason": "Higher lcoh_per_mwh compared to the best-ranked candidates in TR-014."
     }
   ],
   "decision_source": "llm",

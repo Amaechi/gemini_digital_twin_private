@@ -50,10 +50,7 @@
      "C5-3d",
      "C6-2d",
      "C7-2d",
-     "C8-3d",
-     "C2-opt",
-     "C6-opt",
-     "C1-opt"
+     "C8-3d"
     ],
     "registered": true,
     "model_class": "gemini_model.adder.adder.Adder",
@@ -72,10 +69,7 @@
      "C5-3d",
      "C6-2d",
      "C7-2d",
-     "C8-3d",
-     "C2-opt",
-     "C6-opt",
-     "C1-opt"
+     "C8-3d"
     ],
     "registered": true,
     "model_class": "gemini_model.boiler.boiler.Boiler",
@@ -92,10 +86,7 @@
      "C4-2d",
      "C5-3d",
      "C6-2d",
-     "C8-3d",
-     "C2-opt",
-     "C6-opt",
-     "C1-opt"
+     "C8-3d"
     ],
     "registered": true,
     "model_class": "gemini_model.chp.chp.CHP",
@@ -114,10 +105,7 @@
      "C5-3d",
      "C6-2d",
      "C7-2d",
-     "C8-3d",
-     "C2-opt",
-     "C6-opt",
-     "C1-opt"
+     "C8-3d"
     ],
     "registered": true,
     "model_class": "gemini_model.electric_chiller.electric_chiller.ElectricChiller",
@@ -135,10 +123,7 @@
      "C5-3d",
      "C6-2d",
      "C7-2d",
-     "C8-3d",
-     "C2-opt",
-     "C6-opt",
-     "C1-opt"
+     "C8-3d"
     ],
     "registered": true,
     "model_class": "gemini_model.filter.filter.Filter",
@@ -155,9 +140,7 @@
      "C5-3d",
      "C6-2d",
      "C7-2d",
-     "C8-3d",
-     "C2-opt",
-     "C6-opt"
+     "C8-3d"
     ],
     "registered": true,
     "model_class": "gemini_model.free_cooling.free_cooling.FreeCooling",
@@ -174,10 +157,7 @@
      "C4-2d",
      "C6-2d",
      "C7-2d",
-     "C8-3d",
-     "C2-opt",
-     "C6-opt",
-     "C1-opt"
+     "C8-3d"
     ],
     "registered": true,
     "model_class": "gemini_model.heat_exchanger.heat_exchanger.HeatExchanger",
@@ -196,10 +176,7 @@
      "C5-3d",
      "C6-2d",
      "C7-2d",
-     "C8-3d",
-     "C2-opt",
-     "C6-opt",
-     "C1-opt"
+     "C8-3d"
     ],
     "registered": true,
     "model_class": "gemini_model.heat_rejection.heat_rejection.HeatRejection",
@@ -215,9 +192,7 @@
      "C5-3d",
      "C6-2d",
      "C7-2d",
-     "C8-3d",
-     "C2-opt",
-     "C6-opt"
+     "C8-3d"
     ],
     "registered": true,
     "model_class": "gemini_model.heatpump.heatpump_basic.HeatpumpBasic",
@@ -235,10 +210,7 @@
      "C5-3d",
      "C6-2d",
      "C7-2d",
-     "C8-3d",
-     "C2-opt",
-     "C6-opt",
-     "C1-opt"
+     "C8-3d"
     ],
     "registered": true,
     "model_class": "gemini_simulator.well_components.InjectorWell",
@@ -256,10 +228,7 @@
      "C5-3d",
      "C6-2d",
      "C7-2d",
-     "C8-3d",
-     "C2-opt",
-     "C6-opt",
-     "C1-opt"
+     "C8-3d"
     ],
     "registered": true,
     "model_class": "gemini_model.mixer.mixer.Mixer",
@@ -277,10 +246,7 @@
      "C5-3d",
      "C6-2d",
      "C7-2d",
-     "C8-3d",
-     "C2-opt",
-     "C6-opt",
-     "C1-opt"
+     "C8-3d"
     ],
     "registered": true,
     "model_class": "gemini_simulator.well_components.ProducerWell",
@@ -297,10 +263,7 @@
      "C4-2d",
      "C5-3d",
      "C6-2d",
-     "C8-3d",
-     "C2-opt",
-     "C6-opt",
-     "C1-opt"
+     "C8-3d"
     ],
     "registered": true,
     "model_class": "gemini_model.separator.separator.Separator",
@@ -318,10 +281,7 @@
      "C5-3d",
      "C6-2d",
      "C7-2d",
-     "C8-3d",
-     "C2-opt",
-     "C6-opt",
-     "C1-opt"
+     "C8-3d"
     ],
     "registered": true,
     "model_class": "gemini_model.splitter.splitter.Splitter",
@@ -332,8 +292,7 @@
    {
     "component_type": "thermal_storage",
     "needed_by": [
-     "C6-2d",
-     "C6-opt"
+     "C6-2d"
     ],
     "registered": true,
     "model_class": "gemini_model.thermal_storage.thermal_storage.ThermalStorage",
@@ -372,14 +331,11 @@
     "only_concepts": [],
     "affects": [
      "C1-3d",
-     "C1-opt",
      "C2-2d",
-     "C2-opt",
      "C3-2d",
      "C4-2d",
      "C5-3d",
      "C6-2d",
-     "C6-opt",
      "C7-2d",
      "C8-3d"
     ]
@@ -400,14 +356,11 @@
     "only_concepts": [],
     "affects": [
      "C1-3d",
-     "C1-opt",
      "C2-2d",
-     "C2-opt",
      "C3-2d",
      "C4-2d",
      "C5-3d",
      "C6-2d",
-     "C6-opt",
      "C7-2d",
      "C8-3d"
     ]
@@ -427,14 +380,11 @@
     "only_concepts": [],
     "affects": [
      "C1-3d",
-     "C1-opt",
      "C2-2d",
-     "C2-opt",
      "C3-2d",
      "C4-2d",
      "C5-3d",
      "C6-2d",
-     "C6-opt",
      "C7-2d",
      "C8-3d"
     ]
@@ -454,14 +404,11 @@
     "only_concepts": [],
     "affects": [
      "C1-3d",
-     "C1-opt",
      "C2-2d",
-     "C2-opt",
      "C3-2d",
      "C4-2d",
      "C5-3d",
      "C6-2d",
-     "C6-opt",
      "C7-2d",
      "C8-3d"
     ]
@@ -481,14 +428,11 @@
     "only_concepts": [],
     "affects": [
      "C1-3d",
-     "C1-opt",
      "C2-2d",
-     "C2-opt",
      "C3-2d",
      "C4-2d",
      "C5-3d",
      "C6-2d",
-     "C6-opt",
      "C7-2d",
      "C8-3d"
     ]
@@ -527,14 +471,11 @@
     "only_concepts": [],
     "affects": [
      "C1-3d",
-     "C1-opt",
      "C2-2d",
-     "C2-opt",
      "C3-2d",
      "C4-2d",
      "C5-3d",
      "C6-2d",
-     "C6-opt",
      "C7-2d",
      "C8-3d"
     ]
@@ -568,8 +509,7 @@
     "source": "WP-06 concept_layout, WP-03 GM-09",
     "only_concepts": [],
     "affects": [
-     "C6-2d",
-     "C6-opt"
+     "C6-2d"
     ]
    },
    {
@@ -587,11 +527,9 @@
     "only_concepts": [],
     "affects": [
      "C2-2d",
-     "C2-opt",
      "C3-2d",
      "C5-3d",
      "C6-2d",
-     "C6-opt",
      "C7-2d",
      "C8-3d"
     ]
@@ -611,13 +549,10 @@
     "only_concepts": [],
     "affects": [
      "C1-3d",
-     "C1-opt",
      "C2-2d",
-     "C2-opt",
      "C3-2d",
      "C4-2d",
      "C6-2d",
-     "C6-opt",
      "C7-2d",
      "C8-3d"
     ]
@@ -637,13 +572,10 @@
     "only_concepts": [],
     "affects": [
      "C1-3d",
-     "C1-opt",
      "C2-2d",
-     "C2-opt",
      "C3-2d",
      "C4-2d",
      "C6-2d",
-     "C6-opt",
      "C7-2d",
      "C8-3d"
     ]
@@ -697,14 +629,11 @@
     "only_concepts": [],
     "affects": [
      "C1-3d",
-     "C1-opt",
      "C2-2d",
-     "C2-opt",
      "C3-2d",
      "C4-2d",
      "C5-3d",
      "C6-2d",
-     "C6-opt",
      "C7-2d",
      "C8-3d"
     ]
@@ -722,7 +651,7 @@
   ],
   "note": "required types from the WP-06 concept layouts (CFG-LAYOUT); limitations from the WP-01\u2026WP-06 build (PROGRESS)"
  },
- "summary": "model_gap_analysis: 16 required types for 12 candidates; missing: none; 15 known limitations (13 affect candidates).",
+ "summary": "model_gap_analysis: 16 required types for 9 candidates; missing: none; 15 known limitations (13 affect candidates).",
  "warnings": [],
  "assumption_ids": [],
  "sources": [

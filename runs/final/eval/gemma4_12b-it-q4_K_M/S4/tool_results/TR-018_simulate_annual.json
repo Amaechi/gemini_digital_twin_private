@@ -1,0 +1,1061 @@
+{
+ "data": {
+  "mode": "fast",
+  "kpis": [
+   {
+    "candidate_id": "C0-0d",
+    "unmet_heating_days": 0,
+    "unmet_heating_mwh": 0.0,
+    "unmet_cooling_days": 0,
+    "unmet_cooling_mwh": 0.0,
+    "installed_heating_mw": 30.0,
+    "installed_cooling_mw": 10.0,
+    "heat_by_source_mwh": {
+     "peak_boiler": 111667.68000000014
+    },
+    "cool_by_source_mwh": {
+     "electric_chiller": 23742.528
+    },
+    "doublet_capacity_factors_frac": [],
+    "electricity_consumed_mwh": 3502.02288,
+    "electricity_generated_mwh": 0.0,
+    "gas_fuel_mwh": 124075.20000000001,
+    "co2_t_per_yr": 26332.169616,
+    "co2_reduction_vs_c0_frac": null,
+    "currency": null,
+    "capex_million": null,
+    "opex_million_per_yr": null,
+    "lcoh_per_mwh": null,
+    "lcoc_per_mwh": null,
+    "lcoh_20yr_per_mwh": null,
+    "lcoc_20yr_per_mwh": null,
+    "electricity_purchased_mwh": null,
+    "grid_gas_fuel_mwh": null,
+    "exergy_efficiency_frac": null,
+    "exergy_dead_state": null,
+    "exergy_utilisation_frac": null,
+    "min_constraint_margins": {
+     "heating_supply_margin_k": 0.0,
+     "heat_surplus_margin_mw": -0.0,
+     "peak_boiler_capacity_margin_mw": -3.552713678800501e-15,
+     "cooling_supply_margin_k": 0.0
+    },
+    "thermal_breakthrough_yr": null,
+    "percentiles": {}
+   },
+   {
+    "candidate_id": "C1-3d",
+    "unmet_heating_days": 0,
+    "unmet_heating_mwh": 0.0,
+    "unmet_cooling_days": 0,
+    "unmet_cooling_mwh": 0.0,
+    "installed_heating_mw": 62.40269368797236,
+    "installed_cooling_mw": 10.0,
+    "heat_by_source_mwh": {
+     "hex_1": 25029.535462286847,
+     "hex_2": 24731.947309258423,
+     "hex_3": 24705.646604495065,
+     "chp": 24176.867700000097,
+     "peak_boiler": 13023.682923959579
+    },
+    "cool_by_source_mwh": {
+     "electric_chiller": 23742.528
+    },
+    "doublet_capacity_factors_frac": [
+     0.761243288919806,
+     0.7491510817993722,
+     0.7481789784888698
+    ],
+    "electricity_consumed_mwh": 17723.254506061276,
+    "electricity_generated_mwh": 12088.43385,
+    "gas_fuel_mwh": 52247.11458564954,
+    "co2_t_per_yr": 13962.563246753332,
+    "co2_reduction_vs_c0_frac": null,
+    "currency": null,
+    "capex_million": null,
+    "opex_million_per_yr": null,
+    "lcoh_per_mwh": null,
+    "lcoc_per_mwh": null,
+    "lcoh_20yr_per_mwh": null,
+    "lcoc_20yr_per_mwh": null,
+    "electricity_purchased_mwh": null,
+    "grid_gas_fuel_mwh": null,
+    "exergy_efficiency_frac": null,
+    "exergy_dead_state": null,
+    "exergy_utilisation_frac": null,
+    "min_constraint_margins": {
+     "esp_1_intake_margin_bar": 0.45871344169388095,
+     "doublet_1_brine_cooling_margin_k": 20.953024411509375,
+     "doublet_1_flow_margin_m3h": 0.0,
+     "doublet_1_injection_balance_margin_m3h": 0.0,
+     "esp_2_intake_margin_bar": 0.45871344169388095,
+     "doublet_2_brine_cooling_margin_k": 20.953024411509375,
+     "doublet_2_flow_margin_m3h": 0.0,
+     "doublet_2_injection_balance_margin_m3h": 0.0,
+     "esp_3_intake_margin_bar": 0.45871344169388095,
+     "doublet_3_brine_cooling_margin_k": 20.953024411509375,
+     "doublet_3_flow_margin_m3h": 0.0,
+     "doublet_3_injection_balance_margin_m3h": 0.0,
+     "heating_supply_margin_k": 0.0,
+     "heat_surplus_margin_mw": -0.0,
+     "peak_boiler_capacity_margin_mw": 23.774764477548974,
+     "cooling_supply_margin_k": 0.0
+    },
+    "thermal_breakthrough_yr": 44.592707240754976,
+    "percentiles": {}
+   },
+   {
+    "candidate_id": "C2-2d",
+    "unmet_heating_days": 0,
+    "unmet_heating_mwh": 0.0,
+    "unmet_cooling_days": 0,
+    "unmet_cooling_mwh": 0.0,
+    "installed_heating_mw": 61.65095494856175,
+    "installed_cooling_mw": 18.59078720356259,
+    "heat_by_source_mwh": {
+     "hex_1": 32862.6450422486,
+     "hex_2": 29956.409205233504,
+     "hthp_1": 21597.36459108472,
+     "hthp_2": 19227.78902809985,
+     "chp": 8023.472133333339,
+     "peak_boiler": 1.961393536475953e-12
+    },
+    "cool_by_source_mwh": {
+     "free_cooling": 20587.903541325963,
+     "electric_chiller": 3154.6244586740345
+    },
+    "doublet_capacity_factors_frac": [
+     0.393227494470605,
+     0.356315438605879
+    ],
+    "electricity_consumed_mwh": 15437.757723427907,
+    "electricity_generated_mwh": 4011.7360666666664,
+    "gas_fuel_mwh": 12536.675208333338,
+    "co2_t_per_yr": 6521.974300214995,
+    "co2_reduction_vs_c0_frac": null,
+    "currency": null,
+    "capex_million": null,
+    "opex_million_per_yr": null,
+    "lcoh_per_mwh": null,
+    "lcoc_per_mwh": null,
+    "lcoh_20yr_per_mwh": null,
+    "lcoc_20yr_per_mwh": null,
+    "electricity_purchased_mwh": null,
+    "grid_gas_fuel_mwh": null,
+    "exergy_efficiency_frac": null,
+    "exergy_dead_state": null,
+    "exergy_utilisation_frac": null,
+    "min_constraint_margins": {
+     "esp_1_intake_margin_bar": 3.8702646538511325,
+     "doublet_1_brine_cooling_margin_k": 7.957835137517577e-07,
+     "doublet_1_flow_margin_m3h": 0.0,
+     "doublet_1_injection_balance_margin_m3h": 0.0,
+     "esp_2_intake_margin_bar": 3.8702646538511325,
+     "doublet_2_brine_cooling_margin_k": 7.957835137517577e-07,
+     "doublet_2_flow_margin_m3h": 0.0,
+     "doublet_2_injection_balance_margin_m3h": 0.0,
+     "hthp_1_rc04_limits_margin_count": 0.0,
+     "hthp_1_lift_margin_k": 9.54670553525716e-05,
+     "hthp_2_rc04_limits_margin_count": 0.0,
+     "hthp_2_lift_margin_k": 9.54670553525716e-05,
+     "heating_supply_margin_k": 0.0,
+     "heat_surplus_margin_mw": -0.0,
+     "peak_boiler_capacity_margin_mw": 29.999999999999993,
+     "cooling_supply_margin_k": 0.0
+    },
+    "thermal_breakthrough_yr": 86.32636221811272,
+    "percentiles": {}
+   },
+   {
+    "candidate_id": "C3-2d",
+    "unmet_heating_days": 0,
+    "unmet_heating_mwh": 0.0,
+    "unmet_cooling_days": 0,
+    "unmet_cooling_mwh": 0.0,
+    "installed_heating_mw": 61.65095494856175,
+    "installed_cooling_mw": 28.59078720356259,
+    "heat_by_source_mwh": {
+     "hex_1": 31320.633207745967,
+     "hex_2": 29692.406776239935,
+     "hthp_1": 23466.5521058506,
+     "hthp_2": 18719.617337093412,
+     "chp": 8468.470573070097,
+     "peak_boiler": 1.961393536475953e-12
+    },
+    "cool_by_source_mwh": {
+     "free_cooling": 20587.903541325963,
+     "absorption_chiller": 2884.0195488804375,
+     "electric_chiller": 270.60490979359736
+    },
+    "doublet_capacity_factors_frac": [
+     0.4413490297305068,
+     0.34976511219320777
+    ],
+    "electricity_consumed_mwh": 15666.77611773186,
+    "electricity_generated_mwh": 4234.235286535037,
+    "gas_fuel_mwh": 13231.985270421992,
+    "co2_t_per_yr": 6695.5390295347515,
+    "co2_reduction_vs_c0_frac": null,
+    "currency": null,
+    "capex_million": null,
+    "opex_million_per_yr": null,
+    "lcoh_per_mwh": null,
+    "lcoc_per_mwh": null,
+    "lcoh_20yr_per_mwh": null,
+    "lcoc_20yr_per_mwh": null,
+    "electricity_purchased_mwh": null,
+    "grid_gas_fuel_mwh": null,
+    "exergy_efficiency_frac": null,
+    "exergy_dead_state": null,
+    "exergy_utilisation_frac": null,
+    "min_constraint_margins": {
+     "esp_1_intake_margin_bar": 3.8702646538511325,
+     "doublet_1_brine_cooling_margin_k": 7.957835137517577e-07,
+     "doublet_1_flow_margin_m3h": 0.0,
+     "doublet_1_injection_balance_margin_m3h": 0.0,
+     "esp_2_intake_margin_bar": 3.8702646538511325,
+     "doublet_2_brine_cooling_margin_k": 7.957835137517577e-07,
+     "doublet_2_flow_margin_m3h": 0.0,
+     "doublet_2_injection_balance_margin_m3h": 0.0,
+     "hthp_1_rc04_limits_margin_count": 0.0,
+     "hthp_1_lift_margin_k": 0.001424868871687579,
+     "hthp_2_rc04_limits_margin_count": 0.0,
+     "hthp_2_lift_margin_k": 0.0006326263618561256,
+     "heating_supply_margin_k": 0.0,
+     "heat_surplus_margin_mw": -0.0,
+     "peak_boiler_capacity_margin_mw": 29.999999999999993,
+     "cooling_supply_margin_k": 0.0,
+     "absorption_drive_cooling_margin_k": 7.641232196545502,
+     "absorption_drive_flow_margin_m3h": 1.3848909983124047
+    },
+    "thermal_breakthrough_yr": 76.91395434248071,
+    "percentiles": {}
+   },
+   {
+    "candidate_id": "C4-2d",
+    "unmet_heating_days": 0,
+    "unmet_heating_mwh": 0.0,
+    "unmet_cooling_days": 0,
+    "unmet_cooling_mwh": 0.0,
+    "installed_heating_mw": 60.59728,
+    "installed_cooling_mw": 28.59078720356259,
+    "heat_by_source_mwh": {
+     "hex_1": 50486.97429947528,
+     "hex_2": 49724.79748490221,
+     "chp": 11445.25234352913,
+     "peak_boiler": 10.655875412807337
+    },
+    "cool_by_source_mwh": {
+     "free_cooling": 20587.903541325963,
+     "absorption_chiller": 2884.0195488804375,
+     "electric_chiller": 270.60490979359736
+    },
+    "doublet_capacity_factors_frac": [
+     0.5384531843051551,
+     0.5307482622517875
+    ],
+    "electricity_consumed_mwh": 5818.4803191790015,
+    "electricity_generated_mwh": 5722.626171764559,
+    "gas_fuel_mwh": 17895.046648334035,
+    "co2_t_per_yr": 4597.069154877597,
+    "co2_reduction_vs_c0_frac": null,
+    "currency": null,
+    "capex_million": null,
+    "opex_million_per_yr": null,
+    "lcoh_per_mwh": null,
+    "lcoc_per_mwh": null,
+    "lcoh_20yr_per_mwh": null,
+    "lcoc_20yr_per_mwh": null,
+    "electricity_purchased_mwh": null,
+    "grid_gas_fuel_mwh": null,
+    "exergy_efficiency_frac": null,
+    "exergy_dead_state": null,
+    "exergy_utilisation_frac": null,
+    "min_constraint_margins": {
+     "esp_1_intake_margin_bar": 0.5062060150148824,
+     "doublet_1_brine_cooling_margin_k": 0.04765200123939195,
+     "doublet_1_flow_margin_m3h": 0.0,
+     "doublet_1_injection_balance_margin_m3h": 0.0,
+     "esp_2_intake_margin_bar": 0.5062060150148824,
+     "doublet_2_brine_cooling_margin_k": 0.09330345658000994,
+     "doublet_2_flow_margin_m3h": 0.0,
+     "doublet_2_injection_balance_margin_m3h": 0.0,
+     "heating_supply_margin_k": 0.0,
+     "heat_surplus_margin_mw": -0.0,
+     "peak_boiler_capacity_margin_mw": 29.995140716853737,
+     "cooling_supply_margin_k": 0.0,
+     "absorption_drive_cooling_margin_k": 7.641232196545502,
+     "absorption_drive_flow_margin_m3h": 1.3848909983124047
+    },
+    "thermal_breakthrough_yr": 63.043362192380236,
+    "percentiles": {}
+   },
+   {
+    "candidate_id": "C5-3d",
+    "unmet_heating_days": 0,
+    "unmet_heating_mwh": 0.0,
+    "unmet_cooling_days": 0,
+    "unmet_cooling_mwh": 0.0,
+    "installed_heating_mw": 58.24917083333333,
+    "installed_cooling_mw": 18.59078720356259,
+    "heat_by_source_mwh": {
+     "hthp_1": 32518.539126830336,
+     "hthp_2": 32145.188826830345,
+     "hthp_3": 31993.757406830337,
+     "chp": 14900.457619999972,
+     "peak_boiler": 109.73701950906093
+    },
+    "cool_by_source_mwh": {
+     "free_cooling": 20587.903541325963,
+     "electric_chiller": 3154.6244586740345
+    },
+    "doublet_capacity_factors_frac": [
+     0.4681167950913242,
+     0.4630951903182078,
+     0.4607705033533105
+    ],
+    "electricity_consumed_mwh": 35970.18704403698,
+    "electricity_generated_mwh": 7450.228809999999,
+    "gas_fuel_mwh": 23403.895052926735,
+    "co2_t_per_yr": 14327.036997562673,
+    "co2_reduction_vs_c0_frac": null,
+    "currency": null,
+    "capex_million": null,
+    "opex_million_per_yr": null,
+    "lcoh_per_mwh": null,
+    "lcoc_per_mwh": null,
+    "lcoh_20yr_per_mwh": null,
+    "lcoc_20yr_per_mwh": null,
+    "electricity_purchased_mwh": null,
+    "grid_gas_fuel_mwh": null,
+    "exergy_efficiency_frac": null,
+    "exergy_dead_state": null,
+    "exergy_utilisation_frac": null,
+    "min_constraint_margins": {
+     "esp_1_intake_margin_bar": 0.08731566132123447,
+     "doublet_1_brine_cooling_margin_k": 23.645158255005526,
+     "doublet_1_flow_margin_m3h": 0.0,
+     "doublet_1_injection_balance_margin_m3h": 0.0,
+     "esp_2_intake_margin_bar": 0.08731566132123447,
+     "doublet_2_brine_cooling_margin_k": 23.645158255005526,
+     "doublet_2_flow_margin_m3h": 0.0,
+     "doublet_2_injection_balance_margin_m3h": 0.0,
+     "esp_3_intake_margin_bar": 0.08731566132123447,
+     "doublet_3_brine_cooling_margin_k": 23.645158255005526,
+     "doublet_3_flow_margin_m3h": 0.0,
+     "doublet_3_injection_balance_margin_m3h": 0.0,
+     "hthp_1_rc04_limits_margin_count": 0.0,
+     "hthp_1_lift_margin_k": 8.757067810449826e-06,
+     "hthp_2_rc04_limits_margin_count": 0.0,
+     "hthp_2_lift_margin_k": 8.757067810449826e-06,
+     "hthp_3_rc04_limits_margin_count": 0.0,
+     "hthp_3_lift_margin_k": 8.757067810449826e-06,
+     "heating_supply_margin_k": 0.0,
+     "heat_surplus_margin_mw": -0.0,
+     "peak_boiler_capacity_margin_mw": 27.962449724485275,
+     "cooling_supply_margin_k": 0.0
+    },
+    "thermal_breakthrough_yr": 72.51587526392404,
+    "percentiles": {}
+   },
+   {
+    "candidate_id": "C6-2d",
+    "unmet_heating_days": 0,
+    "unmet_heating_mwh": 0.0,
+    "unmet_cooling_days": 0,
+    "unmet_cooling_mwh": 0.0,
+    "installed_heating_mw": 61.65095494856175,
+    "installed_cooling_mw": 18.59078720356259,
+    "heat_by_source_mwh": {
+     "hex_1": 32862.6450422486,
+     "hex_2": 29956.409205233504,
+     "hthp_1": 21597.36459108472,
+     "hthp_2": 19227.78902809985,
+     "chp": 8023.472133333339,
+     "peak_boiler": 1.961393536475953e-12
+    },
+    "cool_by_source_mwh": {
+     "free_cooling": 20587.903541325963,
+     "electric_chiller": 3154.6244586740345
+    },
+    "doublet_capacity_factors_frac": [
+     0.393227494470605,
+     0.356315438605879
+    ],
+    "electricity_consumed_mwh": 15437.757723427907,
+    "electricity_generated_mwh": 4011.7360666666664,
+    "gas_fuel_mwh": 12536.675208333338,
+    "co2_t_per_yr": 6521.974300214995,
+    "co2_reduction_vs_c0_frac": null,
+    "currency": null,
+    "capex_million": null,
+    "opex_million_per_yr": null,
+    "lcoh_per_mwh": null,
+    "lcoc_per_mwh": null,
+    "lcoh_20yr_per_mwh": null,
+    "lcoc_20yr_per_mwh": null,
+    "electricity_purchased_mwh": null,
+    "grid_gas_fuel_mwh": null,
+    "exergy_efficiency_frac": null,
+    "exergy_dead_state": null,
+    "exergy_utilisation_frac": null,
+    "min_constraint_margins": {
+     "esp_1_intake_margin_bar": 3.8702646538511325,
+     "doublet_1_brine_cooling_margin_k": 7.957835137517577e-07,
+     "doublet_1_flow_margin_m3h": 0.0,
+     "doublet_1_injection_balance_margin_m3h": 0.0,
+     "esp_2_intake_margin_bar": 3.8702646538511325,
+     "doublet_2_brine_cooling_margin_k": 7.957835137517577e-07,
+     "doublet_2_flow_margin_m3h": 0.0,
+     "doublet_2_injection_balance_margin_m3h": 0.0,
+     "hthp_1_rc04_limits_margin_count": 0.0,
+     "hthp_1_lift_margin_k": 9.54670553525716e-05,
+     "hthp_2_rc04_limits_margin_count": 0.0,
+     "hthp_2_lift_margin_k": 9.54670553525716e-05,
+     "heating_supply_margin_k": 0.0,
+     "heat_surplus_margin_mw": -0.0,
+     "peak_boiler_capacity_margin_mw": 29.999999999999993,
+     "cooling_supply_margin_k": 0.0
+    },
+    "thermal_breakthrough_yr": 86.32636221811272,
+    "percentiles": {}
+   },
+   {
+    "candidate_id": "C7-2d",
+    "unmet_heating_days": 0,
+    "unmet_heating_mwh": 0.0,
+    "unmet_cooling_days": 0,
+    "unmet_cooling_mwh": 0.0,
+    "installed_heating_mw": 60.95424170652685,
+    "installed_cooling_mw": 18.59078720356259,
+    "heat_by_source_mwh": {
+     "hex_1": 34337.147976539505,
+     "hex_2": 31568.613258583388,
+     "hthp_1": 24012.852023460488,
+     "hthp_2": 21749.06674141662,
+     "peak_boiler": 1.961393536475953e-12
+    },
+    "cool_by_source_mwh": {
+     "free_cooling": 20587.903541325963,
+     "electric_chiller": 3154.6244586740345
+    },
+    "doublet_capacity_factors_frac": [
+     0.4189809860159817,
+     0.3837628647617009
+    ],
+    "electricity_consumed_mwh": 20726.22308488555,
+    "electricity_generated_mwh": 0.0,
+    "gas_fuel_mwh": 2.1793261516399477e-12,
+    "co2_t_per_yr": 6217.866925465664,
+    "co2_reduction_vs_c0_frac": null,
+    "currency": null,
+    "capex_million": null,
+    "opex_million_per_yr": null,
+    "lcoh_per_mwh": null,
+    "lcoc_per_mwh": null,
+    "lcoh_20yr_per_mwh": null,
+    "lcoc_20yr_per_mwh": null,
+    "electricity_purchased_mwh": null,
+    "grid_gas_fuel_mwh": null,
+    "exergy_efficiency_frac": null,
+    "exergy_dead_state": null,
+    "exergy_utilisation_frac": null,
+    "min_constraint_margins": {
+     "esp_1_intake_margin_bar": 1.9924228684827576,
+     "doublet_1_brine_cooling_margin_k": 1.286905785491399e-05,
+     "doublet_1_flow_margin_m3h": 0.67138671875,
+     "doublet_1_injection_balance_margin_m3h": 0.0,
+     "esp_2_intake_margin_bar": 1.9924228684827576,
+     "doublet_2_brine_cooling_margin_k": 1.286905785491399e-05,
+     "doublet_2_flow_margin_m3h": 0.67138671875,
+     "doublet_2_injection_balance_margin_m3h": 0.0,
+     "hthp_1_rc04_limits_margin_count": 0.0,
+     "hthp_1_lift_margin_k": 0.000667204237338126,
+     "hthp_2_rc04_limits_margin_count": 0.0,
+     "hthp_2_lift_margin_k": 0.000667204237338126,
+     "heating_supply_margin_k": 0.0,
+     "heat_surplus_margin_mw": -0.0,
+     "peak_boiler_capacity_margin_mw": 29.999999999999993,
+     "cooling_supply_margin_k": 0.0
+    },
+    "thermal_breakthrough_yr": 81.0201423328922,
+    "percentiles": {}
+   },
+   {
+    "candidate_id": "C8-3d",
+    "unmet_heating_days": 0,
+    "unmet_heating_mwh": 0.0,
+    "unmet_cooling_days": 0,
+    "unmet_cooling_mwh": 0.0,
+    "installed_heating_mw": 71.33362269218827,
+    "installed_cooling_mw": 18.59078720356259,
+    "heat_by_source_mwh": {
+     "hex_1": 22749.857886573413,
+     "hex_2": 19884.95364611368,
+     "hex_3": 17838.991671629494,
+     "hthp_1": 16604.485246759923,
+     "hthp_2": 14256.759820552987,
+     "hthp_3": 12354.696001703845,
+     "chp": 7977.9357266666775,
+     "peak_boiler": 1.00015616529466e-11
+    },
+    "cool_by_source_mwh": {
+     "free_cooling": 20587.903541325963,
+     "electric_chiller": 3154.6244586740345
+    },
+    "doublet_capacity_factors_frac": [
+     0.2825197542094749,
+     0.24603801013127855,
+     0.21673121343464613
+    ],
+    "electricity_consumed_mwh": 15443.590834519418,
+    "electricity_generated_mwh": 3988.9678633333333,
+    "gas_fuel_mwh": 12465.524572916678,
+    "co2_t_per_yr": 6512.994057322132,
+    "co2_reduction_vs_c0_frac": null,
+    "currency": null,
+    "capex_million": null,
+    "opex_million_per_yr": null,
+    "lcoh_per_mwh": null,
+    "lcoc_per_mwh": null,
+    "lcoh_20yr_per_mwh": null,
+    "lcoc_20yr_per_mwh": null,
+    "electricity_purchased_mwh": null,
+    "grid_gas_fuel_mwh": null,
+    "exergy_efficiency_frac": null,
+    "exergy_dead_state": null,
+    "exergy_utilisation_frac": null,
+    "min_constraint_margins": {
+     "esp_1_intake_margin_bar": 12.471801446439843,
+     "doublet_1_brine_cooling_margin_k": 9.727791052682733e-05,
+     "doublet_1_flow_margin_m3h": 0.0,
+     "doublet_1_injection_balance_margin_m3h": 0.0,
+     "esp_2_intake_margin_bar": 12.471801446439843,
+     "doublet_2_brine_cooling_margin_k": 9.727791052682733e-05,
+     "doublet_2_flow_margin_m3h": 0.0,
+     "doublet_2_injection_balance_margin_m3h": 0.0,
+     "esp_3_intake_margin_bar": 12.471801446439843,
+     "doublet_3_brine_cooling_margin_k": 9.727791052682733e-05,
+     "doublet_3_flow_margin_m3h": 0.30517578125,
+     "doublet_3_injection_balance_margin_m3h": 0.0,
+     "hthp_1_rc04_limits_margin_count": 0.0,
+     "hthp_1_lift_margin_k": 9.54670553525716e-05,
+     "hthp_2_rc04_limits_margin_count": 0.0,
+     "hthp_2_lift_margin_k": 9.54670553525716e-05,
+     "hthp_3_rc04_limits_margin_count": 0.0,
+     "hthp_3_lift_margin_k": 0.00048347188307928946,
+     "heating_supply_margin_k": 0.0,
+     "heat_surplus_margin_mw": -0.0,
+     "peak_boiler_capacity_margin_mw": 29.99999999999999,
+     "cooling_supply_margin_k": 0.0
+    },
+    "thermal_breakthrough_yr": 120.15407282501421,
+    "percentiles": {}
+   },
+   {
+    "candidate_id": "C2-opt",
+    "unmet_heating_days": 0,
+    "unmet_heating_mwh": 0.0,
+    "unmet_cooling_days": 0,
+    "unmet_cooling_mwh": 0.0,
+    "installed_heating_mw": 30.551795791981572,
+    "installed_cooling_mw": 16.79078720356259,
+    "heat_by_source_mwh": {
+     "hex_1": 34474.584798605654,
+     "hex_2": 33287.69276524924,
+     "hthp_1": 17373.67151091092,
+     "hthp_2": 15699.873777600667,
+     "chp": 9514.882233333354,
+     "peak_boiler": 1316.9749143001682
+    },
+    "cool_by_source_mwh": {
+     "free_cooling": 20587.903541325963,
+     "electric_chiller": 3154.6244586740345
+    },
+    "doublet_capacity_factors_frac": [
+     0.4552013101098744,
+     0.4336673266267123
+    ],
+    "electricity_consumed_mwh": 14205.837478546448,
+    "electricity_generated_mwh": 4757.441116666666,
+    "gas_fuel_mwh": 16330.308949916853,
+    "co2_t_per_yr": 6801.996481589387,
+    "co2_reduction_vs_c0_frac": null,
+    "currency": null,
+    "capex_million": null,
+    "opex_million_per_yr": null,
+    "lcoh_per_mwh": null,
+    "lcoc_per_mwh": null,
+    "lcoh_20yr_per_mwh": null,
+    "lcoc_20yr_per_mwh": null,
+    "electricity_purchased_mwh": null,
+    "grid_gas_fuel_mwh": null,
+    "exergy_efficiency_frac": null,
+    "exergy_dead_state": null,
+    "exergy_utilisation_frac": null,
+    "min_constraint_margins": {
+     "esp_1_intake_margin_bar": 0.45871344169388095,
+     "doublet_1_brine_cooling_margin_k": 0.0005301879720605029,
+     "doublet_1_flow_margin_m3h": 0.0,
+     "doublet_1_injection_balance_margin_m3h": 0.0,
+     "esp_2_intake_margin_bar": 0.45871344169388095,
+     "doublet_2_brine_cooling_margin_k": 0.00022892812280872477,
+     "doublet_2_flow_margin_m3h": 0.0,
+     "doublet_2_injection_balance_margin_m3h": 0.0,
+     "hthp_1_rc04_limits_margin_count": 0.0,
+     "hthp_1_lift_margin_k": 9.54670553525716e-05,
+     "hthp_2_rc04_limits_margin_count": 0.0,
+     "hthp_2_lift_margin_k": 9.54670553525716e-05,
+     "heating_supply_margin_k": 0.0,
+     "heat_surplus_margin_mw": -0.0,
+     "hthp_capacity_margin_mw": 7.942044759623457e-06,
+     "peak_boiler_capacity_margin_mw": 0.04292243432685927,
+     "cooling_supply_margin_k": 0.0
+    },
+    "thermal_breakthrough_yr": 74.57337746588789,
+    "percentiles": {}
+   },
+   {
+    "candidate_id": "C6-opt",
+    "unmet_heating_days": 0,
+    "unmet_heating_mwh": 0.0,
+    "unmet_cooling_days": 0,
+    "unmet_cooling_mwh": 0.0,
+    "installed_heating_mw": 30.551795791981572,
+    "installed_cooling_mw": 16.79078720356259,
+    "heat_by_source_mwh": {
+     "hex_1": 34474.584798605654,
+     "hex_2": 33287.69276524924,
+     "hthp_1": 17373.67151091092,
+     "hthp_2": 15699.873777600667,
+     "chp": 9514.882233333354,
+     "peak_boiler": 1316.9749143001682
+    },
+    "cool_by_source_mwh": {
+     "free_cooling": 20587.903541325963,
+     "electric_chiller": 3154.6244586740345
+    },
+    "doublet_capacity_factors_frac": [
+     0.4552013101098744,
+     0.4336673266267123
+    ],
+    "electricity_consumed_mwh": 14205.837478546448,
+    "electricity_generated_mwh": 4757.441116666666,
+    "gas_fuel_mwh": 16330.308949916853,
+    "co2_t_per_yr": 6801.996481589387,
+    "co2_reduction_vs_c0_frac": null,
+    "currency": null,
+    "capex_million": null,
+    "opex_million_per_yr": null,
+    "lcoh_per_mwh": null,
+    "lcoc_per_mwh": null,
+    "lcoh_20yr_per_mwh": null,
+    "lcoc_20yr_per_mwh": null,
+    "electricity_purchased_mwh": null,
+    "grid_gas_fuel_mwh": null,
+    "exergy_efficiency_frac": null,
+    "exergy_dead_state": null,
+    "exergy_utilisation_frac": null,
+    "min_constraint_margins": {
+     "esp_1_intake_margin_bar": 0.45871344169388095,
+     "doublet_1_brine_cooling_margin_k": 0.0005301879720605029,
+     "doublet_1_flow_margin_m3h": 0.0,
+     "doublet_1_injection_balance_margin_m3h": 0.0,
+     "esp_2_intake_margin_bar": 0.45871344169388095,
+     "doublet_2_brine_cooling_margin_k": 0.00022892812280872477,
+     "doublet_2_flow_margin_m3h": 0.0,
+     "doublet_2_injection_balance_margin_m3h": 0.0,
+     "hthp_1_rc04_limits_margin_count": 0.0,
+     "hthp_1_lift_margin_k": 9.54670553525716e-05,
+     "hthp_2_rc04_limits_margin_count": 0.0,
+     "hthp_2_lift_margin_k": 9.54670553525716e-05,
+     "heating_supply_margin_k": 0.0,
+     "heat_surplus_margin_mw": -0.0,
+     "hthp_capacity_margin_mw": 7.942044759623457e-06,
+     "peak_boiler_capacity_margin_mw": 0.04292243432685927,
+     "cooling_supply_margin_k": 0.0
+    },
+    "thermal_breakthrough_yr": 74.57337746588789,
+    "percentiles": {}
+   },
+   {
+    "candidate_id": "C1-opt",
+    "unmet_heating_days": 0,
+    "unmet_heating_mwh": 0.0,
+    "unmet_cooling_days": 0,
+    "unmet_cooling_mwh": 0.0,
+    "installed_heating_mw": 36.18420524968835,
+    "installed_cooling_mw": 10.0,
+    "heat_by_source_mwh": {
+     "hex_1": 24910.145126512405,
+     "hex_2": 24612.549724072956,
+     "hex_3": 24586.434241199728,
+     "chp": 22696.33469013322,
+     "peak_boiler": 14862.216218081612
+    },
+    "cool_by_source_mwh": {
+     "electric_chiller": 23742.528
+    },
+    "doublet_capacity_factors_frac": [
+     0.7829462366263373,
+     0.7697033421657834,
+     0.7688071036646336
+    ],
+    "electricity_consumed_mwh": 15784.62936889856,
+    "electricity_generated_mwh": 11348.167345066668,
+    "gas_fuel_mwh": 51976.59652897956,
+    "co2_t_per_yr": 13448.347581261964,
+    "co2_reduction_vs_c0_frac": null,
+    "currency": null,
+    "capex_million": null,
+    "opex_million_per_yr": null,
+    "lcoh_per_mwh": null,
+    "lcoc_per_mwh": null,
+    "lcoh_20yr_per_mwh": null,
+    "lcoc_20yr_per_mwh": null,
+    "electricity_purchased_mwh": null,
+    "grid_gas_fuel_mwh": null,
+    "exergy_efficiency_frac": null,
+    "exergy_dead_state": null,
+    "exergy_utilisation_frac": null,
+    "min_constraint_margins": {
+     "esp_1_intake_margin_bar": 3.07423004541497,
+     "doublet_1_brine_cooling_margin_k": 19.338171293358002,
+     "doublet_1_flow_margin_m3h": 26.0,
+     "doublet_1_injection_balance_margin_m3h": 0.0,
+     "esp_2_intake_margin_bar": 3.07423004541497,
+     "doublet_2_brine_cooling_margin_k": 19.338171293358002,
+     "doublet_2_flow_margin_m3h": 26.0,
+     "doublet_2_injection_balance_margin_m3h": 0.0,
+     "esp_3_intake_margin_bar": 3.07423004541497,
+     "doublet_3_brine_cooling_margin_k": 19.338171293358002,
+     "doublet_3_flow_margin_m3h": 26.0,
+     "doublet_3_injection_balance_margin_m3h": 0.0,
+     "heating_supply_margin_k": 0.0,
+     "heat_surplus_margin_mw": -0.0,
+     "peak_boiler_capacity_margin_mw": 0.021409700094067396,
+     "cooling_supply_margin_k": 0.0
+    },
+    "thermal_breakthrough_yr": 47.47074715401575,
+    "percentiles": {}
+   }
+  ],
+  "simulations": [
+   {
+    "candidate_id": "C0-0d",
+    "mode": "fast",
+    "status": "ok",
+    "reason": "",
+    "config_hash": "1f62a0a391a8223c1722c885ece3ec9c595b408af9b301e7de71ad62a95c798c",
+    "simulated_days": 365,
+    "outage_start_indices": [],
+    "max_fast_full_discrepancy_frac": null,
+    "invalid_full_days": 0,
+    "right_sized_mw": {
+     "peak_boiler_mw": 30.000000000000004,
+     "electric_chiller_mw": 10.0
+    },
+    "warnings": [
+     "2027-01-01: geothermal at maximum flow on the available doublets; peak boiler fills [\u00d7365]"
+    ],
+    "files": {}
+   },
+   {
+    "candidate_id": "C1-3d",
+    "mode": "fast",
+    "status": "ok",
+    "reason": "",
+    "config_hash": "6175a5dfb1534d731060256b002bbc0d3f7c462c7e3fec3b4fe05bf813bf23fe",
+    "simulated_days": 365,
+    "outage_start_indices": [
+     189,
+     145,
+     224
+    ],
+    "max_fast_full_discrepancy_frac": null,
+    "invalid_full_days": 0,
+    "right_sized_mw": {
+     "peak_boiler_mw": 6.25,
+     "electric_chiller_mw": 10.0
+    },
+    "warnings": [
+     "2027-01-01: geothermal at maximum flow on the available doublets; peak boiler fills [\u00d7188]"
+    ],
+    "files": {}
+   },
+   {
+    "candidate_id": "C2-2d",
+    "mode": "fast",
+    "status": "ok",
+    "reason": "",
+    "config_hash": "a33658899251000bf74ff3e23757c4fa9cbe8e42cc331c4f8f6db5065709aa4f",
+    "simulated_days": 365,
+    "outage_start_indices": [
+     189,
+     145
+    ],
+    "max_fast_full_discrepancy_frac": null,
+    "invalid_full_days": 0,
+    "right_sized_mw": {
+     "peak_boiler_mw": 0.0,
+     "electric_chiller_mw": 8.2
+    },
+    "warnings": [
+     "hthp_1: MISSING HTHP datasheet values ['max_lift_k', 'max_sink_temperature_degc', 'max_carnot_fraction']: RC-04 defaults VER-HP-ETA, VER-HP-LIFT; max sink temperature not checked [\u00d7610]",
+     "hthp_1: COP 4.37 capped at 0.6 x Carnot = 3.57 (RC-04) [\u00d7610]",
+     "hthp_1: sink water \u0394T 15.5 K > 11 K: needs a 4/8-pass evaporator/condenser (Guidebook p.250) [\u00d7610]",
+     "hthp_1: source water \u0394T 11.9 K > 11 K: needs a 4/8-pass evaporator/condenser (Guidebook p.250) [\u00d7610]",
+     "0 MWh associated gas flared (not used by burners)"
+    ],
+    "files": {}
+   },
+   {
+    "candidate_id": "C3-2d",
+    "mode": "fast",
+    "status": "ok",
+    "reason": "",
+    "config_hash": "27daac38bd18e9ad25ef7771f9eeee25cc1d2863a80cfc82fe61255bd13c7bee",
+    "simulated_days": 365,
+    "outage_start_indices": [
+     124,
+     238
+    ],
+    "max_fast_full_discrepancy_frac": null,
+    "invalid_full_days": 0,
+    "right_sized_mw": {
+     "peak_boiler_mw": 0.0,
+     "electric_chiller_mw": 1.2
+    },
+    "warnings": [
+     "hthp_1: MISSING HTHP datasheet values ['max_lift_k', 'max_sink_temperature_degc', 'max_carnot_fraction']: RC-04 defaults VER-HP-ETA, VER-HP-LIFT; max sink temperature not checked [\u00d7582]",
+     "hthp_1: COP 4.37 capped at 0.6 x Carnot = 3.57 (RC-04) [\u00d7582]",
+     "hthp_1: sink water \u0394T 15.5 K > 11 K: needs a 4/8-pass evaporator/condenser (Guidebook p.250) [\u00d7582]",
+     "hthp_1: source water \u0394T 11.9 K > 11 K: needs a 4/8-pass evaporator/condenser (Guidebook p.250) [\u00d7548]",
+     "2027-06-18: absorption off: residual 0.058 MW < DSP-ABS-MIN 1.000 MW; electric chiller [\u00d723]"
+    ],
+    "files": {}
+   },
+   {
+    "candidate_id": "C4-2d",
+    "mode": "fast",
+    "status": "ok",
+    "reason": "",
+    "config_hash": "c96eb48c276cfee25deab8ac400894074e4c97b77b03298efe08a76d44397af7",
+    "simulated_days": 365,
+    "outage_start_indices": [
+     124,
+     238
+    ],
+    "max_fast_full_discrepancy_frac": null,
+    "invalid_full_days": 0,
+    "right_sized_mw": {
+     "peak_boiler_mw": 0.05,
+     "electric_chiller_mw": 1.0
+    },
+    "warnings": [
+     "2027-06-18: absorption off: residual 0.058 MW < DSP-ABS-MIN 1.000 MW; electric chiller [\u00d723]",
+     "2027-01-26: geothermal at maximum flow on the available doublets; peak boiler fills [\u00d74]",
+     "507 MWh surplus electricity not credited (no export price)"
+    ],
+    "files": {}
+   },
+   {
+    "candidate_id": "C5-3d",
+    "mode": "fast",
+    "status": "ok",
+    "reason": "",
+    "config_hash": "d642ad770c641586cbcc42d317d5fb38b60f1dc6b428a9a79ad3ce2c616dbcc3",
+    "simulated_days": 365,
+    "outage_start_indices": [
+     189,
+     145,
+     224
+    ],
+    "max_fast_full_discrepancy_frac": null,
+    "invalid_full_days": 0,
+    "right_sized_mw": {
+     "peak_boiler_mw": 2.05,
+     "electric_chiller_mw": 8.2
+    },
+    "warnings": [
+     "hthp_1: MISSING HTHP datasheet values ['max_lift_k', 'max_sink_temperature_degc', 'max_carnot_fraction']: RC-04 defaults VER-HP-ETA, VER-HP-LIFT; max sink temperature not checked [\u00d7987]",
+     "hthp_1: COP 5.52 capped at 0.6 x Carnot = 3.33 (RC-04) [\u00d7987]",
+     "hthp_1: sink water \u0394T 39.1 K > 11 K: needs a 4/8-pass evaporator/condenser (Guidebook p.250) [\u00d7987]",
+     "hthp_1: source water \u0394T 16.2 K > 11 K: needs a 4/8-pass evaporator/condenser (Guidebook p.250) [\u00d7987]",
+     "2027-06-01: HTHP heat 2.261 MW below DSP-HP-MIN 2.430 MW: on/off cycling within the day (HEX + CHP alone need more brine or cannot carry the load) [\u00d744]"
+    ],
+    "files": {}
+   },
+   {
+    "candidate_id": "C6-2d",
+    "mode": "fast",
+    "status": "ok",
+    "reason": "",
+    "config_hash": "16ea63fee1e956962b72d232ec32a427cd79b8938e78f16030e5bf72b1461faa",
+    "simulated_days": 365,
+    "outage_start_indices": [
+     189,
+     145
+    ],
+    "max_fast_full_discrepancy_frac": null,
+    "invalid_full_days": 0,
+    "right_sized_mw": {
+     "peak_boiler_mw": 0.0,
+     "electric_chiller_mw": 8.2
+    },
+    "warnings": [
+     "hthp_1: MISSING HTHP datasheet values ['max_lift_k', 'max_sink_temperature_degc', 'max_carnot_fraction']: RC-04 defaults VER-HP-ETA, VER-HP-LIFT; max sink temperature not checked [\u00d7610]",
+     "hthp_1: COP 4.37 capped at 0.6 x Carnot = 3.57 (RC-04) [\u00d7610]",
+     "hthp_1: sink water \u0394T 15.5 K > 11 K: needs a 4/8-pass evaporator/condenser (Guidebook p.250) [\u00d7610]",
+     "hthp_1: source water \u0394T 11.9 K > 11 K: needs a 4/8-pass evaporator/condenser (Guidebook p.250) [\u00d7610]",
+     "C6 without equipment_sizes storage_capacity_mwh and storage_power_mw: parent plant only, no storage dispatched (DSP-STORAGE)"
+    ],
+    "files": {}
+   },
+   {
+    "candidate_id": "C7-2d",
+    "mode": "fast",
+    "status": "ok",
+    "reason": "",
+    "config_hash": "c4190b93aa8620d40d5ea1b41940cbe04348feedf5dc2a425354b56052f097c0",
+    "simulated_days": 365,
+    "outage_start_indices": [
+     189,
+     145
+    ],
+    "max_fast_full_discrepancy_frac": null,
+    "invalid_full_days": 0,
+    "right_sized_mw": {
+     "peak_boiler_mw": 0.0,
+     "electric_chiller_mw": 8.2
+    },
+    "warnings": [
+     "hthp_1: MISSING HTHP datasheet values ['max_lift_k', 'max_sink_temperature_degc', 'max_carnot_fraction']: RC-04 defaults VER-HP-ETA, VER-HP-LIFT; max sink temperature not checked [\u00d7615]",
+     "hthp_1: COP 4.54 capped at 0.6 x Carnot = 3.58 (RC-04) [\u00d7615]",
+     "hthp_1: sink water \u0394T 17.6 K > 11 K: needs a 4/8-pass evaporator/condenser (Guidebook p.250) [\u00d7615]",
+     "hthp_1: source water \u0394T 12.6 K > 11 K: needs a 4/8-pass evaporator/condenser (Guidebook p.250) [\u00d7615]"
+    ],
+    "files": {}
+   },
+   {
+    "candidate_id": "C8-3d",
+    "mode": "fast",
+    "status": "ok",
+    "reason": "",
+    "config_hash": "748368492d5e25f4d6a71a1276d591725f1f2975b6a73353376d7939757e9104",
+    "simulated_days": 365,
+    "outage_start_indices": [
+     189,
+     145,
+     224
+    ],
+    "max_fast_full_discrepancy_frac": null,
+    "invalid_full_days": 0,
+    "right_sized_mw": {
+     "peak_boiler_mw": 0.0,
+     "electric_chiller_mw": 8.2
+    },
+    "warnings": [
+     "hthp_1: MISSING HTHP datasheet values ['max_lift_k', 'max_sink_temperature_degc', 'max_carnot_fraction']: RC-04 defaults VER-HP-ETA, VER-HP-LIFT; max sink temperature not checked [\u00d7831]",
+     "hthp_1: COP 4.30 capped at 0.6 x Carnot = 3.50 (RC-04) [\u00d7831]",
+     "hthp_1: sink water \u0394T 16.1 K > 11 K: needs a 4/8-pass evaporator/condenser (Guidebook p.250) [\u00d7831]",
+     "hthp_1: source water \u0394T 12.4 K > 11 K: needs a 4/8-pass evaporator/condenser (Guidebook p.250) [\u00d7831]",
+     "0 MWh associated gas flared (not used by burners)"
+    ],
+    "files": {}
+   },
+   {
+    "candidate_id": "C2-opt",
+    "mode": "fast",
+    "status": "ok",
+    "reason": "",
+    "config_hash": "8ab269e1e3a75bfecb7bad9256d02c63c2aaa7619e34f288c91c564f62ed9128",
+    "simulated_days": 365,
+    "outage_start_indices": [
+     111,
+     184
+    ],
+    "max_fast_full_discrepancy_frac": null,
+    "invalid_full_days": 0,
+    "right_sized_mw": {},
+    "warnings": [
+     "hthp_1: MISSING HTHP datasheet values ['max_lift_k', 'max_sink_temperature_degc', 'max_carnot_fraction']: RC-04 defaults VER-HP-ETA, VER-HP-LIFT; max sink temperature not checked [\u00d7590]",
+     "hthp_1: COP 5.22 capped at 0.6 x Carnot = 4.39 (RC-04) [\u00d7590]",
+     "hthp_1: sink water \u0394T 11.5 K > 11 K: needs a 4/8-pass evaporator/condenser (Guidebook p.250) [\u00d7498]",
+     "hthp_1: source water \u0394T 12.1 K > 11 K: needs a 4/8-pass evaporator/condenser (Guidebook p.250) [\u00d7316]",
+     "2027-01-01: geothermal at maximum flow on the available doublets; peak boiler fills [\u00d758]"
+    ],
+    "files": {}
+   },
+   {
+    "candidate_id": "C6-opt",
+    "mode": "fast",
+    "status": "ok",
+    "reason": "",
+    "config_hash": "b38b1df5fdaed1576c36d1724535618c58d4c01ea3f10c80fa6d1e3c370ec74e",
+    "simulated_days": 365,
+    "outage_start_indices": [
+     111,
+     184
+    ],
+    "max_fast_full_discrepancy_frac": null,
+    "invalid_full_days": 0,
+    "right_sized_mw": {},
+    "warnings": [
+     "hthp_1: MISSING HTHP datasheet values ['max_lift_k', 'max_sink_temperature_degc', 'max_carnot_fraction']: RC-04 defaults VER-HP-ETA, VER-HP-LIFT; max sink temperature not checked [\u00d7590]",
+     "hthp_1: COP 5.22 capped at 0.6 x Carnot = 4.39 (RC-04) [\u00d7590]",
+     "hthp_1: sink water \u0394T 11.5 K > 11 K: needs a 4/8-pass evaporator/condenser (Guidebook p.250) [\u00d7498]",
+     "hthp_1: source water \u0394T 12.1 K > 11 K: needs a 4/8-pass evaporator/condenser (Guidebook p.250) [\u00d7316]",
+     "2027-01-01: geothermal at maximum flow on the available doublets; peak boiler fills [\u00d758]"
+    ],
+    "files": {}
+   },
+   {
+    "candidate_id": "C1-opt",
+    "mode": "fast",
+    "status": "ok",
+    "reason": "",
+    "config_hash": "c37be1b517de093c9d21504dceb934e2bce8809defdc78d488f4ed3bd5e6d1e7",
+    "simulated_days": 365,
+    "outage_start_indices": [
+     189,
+     145,
+     224
+    ],
+    "max_fast_full_discrepancy_frac": null,
+    "invalid_full_days": 0,
+    "right_sized_mw": {},
+    "warnings": [
+     "2027-01-01: geothermal at maximum flow on the available doublets; peak boiler fills [\u00d7200]"
+    ],
+    "files": {}
+   }
+  ],
+  "economics": [],
+  "cost_items": []
+ },
+ "summary": "TL-12 fast: 12 year(s) simulated (C0-0d unmet 0/0 d, C1-3d unmet 0/0 d, C2-2d unmet 0/0 d, C3-2d unmet 0/0 d, \u2026)",
+ "warnings": [
+  "2027-01-01: geothermal at maximum flow on the available doublets; peak boiler fills [\u00d7365]",
+  "2027-01-01: geothermal at maximum flow on the available doublets; peak boiler fills [\u00d7188]",
+  "hthp_1: MISSING HTHP datasheet values ['max_lift_k', 'max_sink_temperature_degc', 'max_carnot_fraction']: RC-04 defaults VER-HP-ETA, VER-HP-LIFT; max sink temperature not checked [\u00d7610]",
+  "hthp_1: COP 4.37 capped at 0.6 x Carnot = 3.57 (RC-04) [\u00d7610]",
+  "hthp_1: MISSING HTHP datasheet values ['max_lift_k', 'max_sink_temperature_degc', 'max_carnot_fraction']: RC-04 defaults VER-HP-ETA, VER-HP-LIFT; max sink temperature not checked [\u00d7582]",
+  "hthp_1: COP 4.37 capped at 0.6 x Carnot = 3.57 (RC-04) [\u00d7582]",
+  "2027-06-18: absorption off: residual 0.058 MW < DSP-ABS-MIN 1.000 MW; electric chiller [\u00d723]",
+  "2027-01-26: geothermal at maximum flow on the available doublets; peak boiler fills [\u00d74]",
+  "hthp_1: MISSING HTHP datasheet values ['max_lift_k', 'max_sink_temperature_degc', 'max_carnot_fraction']: RC-04 defaults VER-HP-ETA, VER-HP-LIFT; max sink temperature not checked [\u00d7987]",
+  "hthp_1: COP 5.52 capped at 0.6 x Carnot = 3.33 (RC-04) [\u00d7987]"
+ ],
+ "assumption_ids": [
+  "DB-30",
+  "SIM-FAST",
+  "SIM-OUTAGE",
+  "DSP-FLOW",
+  "CFG-SIZING"
+ ],
+ "sources": [
+  "spec \u00a78 SIM-01\u202607",
+  "TL-12 simulate_annual"
+ ]
+}

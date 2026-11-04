@@ -12,8 +12,7 @@
       "evidence_ids": [
         "config:assumptions.yaml#DB-31",
         "TR-011",
-        "TR-013",
-        "TR-016"
+        "TR-014"
       ],
       "recommended": true,
       "eligible": true,
@@ -25,8 +24,7 @@
       "evidence_ids": [
         "config:assumptions.yaml#DB-31",
         "TR-011",
-        "TR-013",
-        "TR-016"
+        "TR-014"
       ],
       "recommended": false,
       "eligible": true,
@@ -38,8 +36,7 @@
       "evidence_ids": [
         "config:assumptions.yaml#DB-31",
         "TR-011",
-        "TR-013",
-        "TR-016"
+        "TR-014"
       ],
       "recommended": false,
       "eligible": true,
@@ -51,8 +48,7 @@
       "evidence_ids": [
         "config:assumptions.yaml#DB-31",
         "TR-011",
-        "TR-013",
-        "TR-016"
+        "TR-014"
       ],
       "recommended": false,
       "eligible": true,
@@ -61,8 +57,7 @@
   ],
   "evidence_ids": [
     "TR-011",
-    "TR-013",
-    "TR-016",
+    "TR-014",
     "config:assumptions.yaml#DB-31"
   ],
   "choice": "dh-return-55",
@@ -77,8 +72,7 @@
     ],
     "evidence_ids": [
       "TR-011",
-      "TR-013",
-      "TR-016",
+      "TR-014",
       "config:assumptions.yaml#DB-31"
     ]
   },
@@ -86,15 +80,15 @@
   "rejected": [
     {
       "option_id": "dh-return-45",
-      "reason": "Does not match the register default for district-heating return temperature (DB-31)."
+      "reason": "Does not match the register default for the district-heating return temperature (DB-31)."
     },
     {
       "option_id": "dh-return-65",
-      "reason": "Does not match the register default for district-heating return temperature (DB-31)."
+      "reason": "Does not match the register default for the district-heating return temperature (DB-31)."
     },
     {
       "option_id": "dh-return-75",
-      "reason": "Does not match the register default for district-heating return temperature (DB-31)."
+      "reason": "Does not match the register default for the district-heating return temperature (DB-31)."
     }
   ],
   "decision_source": "llm",

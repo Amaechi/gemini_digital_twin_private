@@ -11,11 +11,15 @@
   "excluded_candidates": [
     "C4-2d"
   ],
-  "llm_fallbacks": 3,
+  "llm_fallbacks": 1,
   "conflicts": [],
+  "missing_inputs": [
+    "demand CSVs (daily heating and cooling demand, data/demand/)"
+  ],
   "assumptions_and_answers": [
-    "DB-30 = {\"interpretation\":\"A\",\"doublet_available_days_per_yr\":330,\"planned_outage_days_per_doublet\":35,\"outages_may_overlap\":false,\"outage_schedule\":\"chosen by the optimiser\",\"demand_met_days_per_yr\":365} (assumed: register default)",
+    "CFG-INPUT-DEFAULTS = repository defaults (assumed: register default)",
     "DB-31 = 55.0 degC (assumed: register default)",
+    "DB-30 = {\"interpretation\":\"A\",\"doublet_available_days_per_yr\":330,\"planned_outage_days_per_doublet\":35,\"outages_may_overlap\":false,\"outage_schedule\":\"chosen by the optimiser\",\"demand_met_days_per_yr\":365} (assumed: register default)",
     "DB-32 = 26.0 degC (assumed: register default)",
     "Human approval pending (non-interactive run)"
   ],
@@ -87,8 +91,8 @@
       "stub_evidence": false
     }
   ],
-  "tool_calls": 26,
+  "tool_calls": 24,
   "stub_tool_calls": 0,
-  "final_summary": "Completed P0\u2013P10: selected C2-opt-robust (verifier verdict ACCEPTED); 11 Decision Records; approval pending; 0/26 tool calls were stubs. LLM fallbacks to policy: 3.",
+  "final_summary": "Completed P0\u2013P10: selected C2-opt-robust (verifier verdict ACCEPTED); 11 Decision Records; approval pending; 0/24 tool calls were stubs. LLM fallbacks to policy: 1.",
   "escalation_reason": ""
 }

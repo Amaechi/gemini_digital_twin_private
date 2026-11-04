@@ -47,11 +47,11 @@
       "TR-001"
     ]
   },
-  "rationale": "Selected based on the brine materials check because it satisfies the requirement for saline brine as specified in the design basis.",
+  "rationale": "The choice is based on the brine material check among guard-passed options in economics, as specified in the design basis. titanium-plates-no-cu is the only option that satisfies the saline brine requirements of spec \u00a710.1. stainless-plates was rejected because it failed the same material check.",
   "rejected": [
     {
       "option_id": "stainless-plates",
-      "reason": "Rejected because it fails the materials check for saline brine as specified in the design basis."
+      "reason": "Not chosen."
     }
   ],
   "decision_source": "llm",

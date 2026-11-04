@@ -12,18 +12,12 @@
       "evidence_ids": [
         "TR-009",
         "TR-010",
-        "TR-011",
         "TR-012",
-        "TR-013",
-        "TR-014",
-        "TR-015",
-        "TR-016",
-        "TR-018",
-        "TR-019"
+        "TR-013"
       ],
       "recommended": true,
       "eligible": true,
-      "notes": "candidates: C1-3d, C2-2d, C3-2d, C5-3d, C7-2d, C8-3d, C2-opt, C1-opt; excluded by DesignGuard/verifier: C4-2d; top-ranked (LCOH ranking)"
+      "notes": "candidates: C1-3d, C2-2d, C3-2d, C5-3d, C7-2d, C8-3d; excluded by DesignGuard/verifier: C4-2d; top-ranked (LCOH ranking)"
     },
     {
       "id": "seasonal-ht-ates",
@@ -31,31 +25,19 @@
       "evidence_ids": [
         "TR-009",
         "TR-010",
-        "TR-011",
         "TR-012",
-        "TR-013",
-        "TR-014",
-        "TR-015",
-        "TR-016",
-        "TR-018",
-        "TR-019"
+        "TR-013"
       ],
       "recommended": false,
       "eligible": true,
-      "notes": "candidates: C6-2d, C6-opt"
+      "notes": "candidates: C6-2d"
     }
   ],
   "evidence_ids": [
     "TR-009",
     "TR-010",
-    "TR-011",
     "TR-012",
-    "TR-013",
-    "TR-014",
-    "TR-015",
-    "TR-016",
-    "TR-018",
-    "TR-019"
+    "TR-013"
   ],
   "choice": "no-storage",
   "choice_label": "No seasonal storage",
@@ -68,19 +50,15 @@
       "no-storage"
     ],
     "evidence_ids": [
-      "TR-013",
-      "TR-014",
-      "TR-015",
-      "TR-016",
-      "TR-018",
-      "TR-019"
+      "TR-012",
+      "TR-013"
     ]
   },
-  "rationale": "lowest lcoh_per_mwh among guard-passed options in economics",
+  "rationale": "lowest lcoh_per_mwh among guard-passed options in economics. Option seasonal-ht-ates was rejected because it had a higher lcoh_per_mwh than the best ranked options in the no-storage group as shown in TR-013.",
   "rejected": [
     {
       "option_id": "seasonal-ht-ates",
-      "reason": "higher lcoh_per_mwh compared to no-storage option"
+      "reason": "Not chosen."
     }
   ],
   "decision_source": "llm",

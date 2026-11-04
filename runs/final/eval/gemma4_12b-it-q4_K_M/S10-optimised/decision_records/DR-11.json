@@ -56,11 +56,11 @@
       "config:assumptions.yaml#UQ-MC"
     ]
   },
-  "rationale": "Selected based on the OPT-ROBUST-BACKUP criterion, which requires installing robust_backup_mw to increase probability_demand_met. Evidence TR-025 shows this configuration significantly improves demand fulfillment compared to the base-year backup.",
+  "rationale": "The selection follows the OPT-ROBUST-BACKUP criterion, which requires installing robust_backup_mw when it raises probability_demand_met as shown in TR-025. Option installed-backup was rejected because it does not meet this requirement.",
   "rejected": [
     {
       "option_id": "installed-backup",
-      "reason": "Rejected because it does not meet the OPT-ROBUST-BACKUP criterion, as it maintains the lower probability of demand fulfillment."
+      "reason": "Not chosen."
     }
   ],
   "decision_source": "llm",

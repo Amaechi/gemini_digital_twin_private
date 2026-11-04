@@ -47,11 +47,11 @@
       "TR-001"
     ]
   },
-  "rationale": "The choice is based on the brine materials check among guard-passed options in the design basis, which confirms titanium plates without copper alloys for saline brine contact.",
+  "rationale": "The choice is based on the brine criterion, which identifies titanium-plates-no-cu as the best option based on spec:\u00a710.1 and TR-001.",
   "rejected": [
     {
       "option_id": "stainless-plates",
-      "reason": "This option was rejected because it fails the materials check for saline brine as specified in the design basis."
+      "reason": "This option was rejected because it fails the materials check for saline brine as specified in spec:\u00a710.1."
     }
   ],
   "decision_source": "llm",

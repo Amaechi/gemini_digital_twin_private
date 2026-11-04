@@ -17,8 +17,9 @@
         "TR-013",
         "TR-014",
         "TR-015",
-        "TR-017",
+        "TR-016",
         "TR-018",
+        "TR-019",
         "config:design_basis.yaml#DB-01"
       ],
       "recommended": true,
@@ -35,8 +36,9 @@
         "TR-012",
         "TR-013",
         "TR-014",
-        "TR-017",
-        "TR-018"
+        "TR-015",
+        "TR-018",
+        "TR-019"
       ],
       "recommended": false,
       "eligible": false,
@@ -52,8 +54,9 @@
         "TR-012",
         "TR-013",
         "TR-014",
-        "TR-017",
-        "TR-018"
+        "TR-015",
+        "TR-018",
+        "TR-019"
       ],
       "recommended": false,
       "eligible": true,
@@ -68,8 +71,9 @@
     "TR-013",
     "TR-014",
     "TR-015",
-    "TR-017",
+    "TR-016",
     "TR-018",
+    "TR-019",
     "config:design_basis.yaml#DB-01"
   ],
   "choice": "depth-2500m",
@@ -86,11 +90,12 @@
       "TR-013",
       "TR-014",
       "TR-015",
-      "TR-017",
-      "TR-018"
+      "TR-016",
+      "TR-018",
+      "TR-019"
     ]
   },
-  "rationale": "The depth was selected because it provides the lowest lcoh_per_mwh among guard-passed options in economics according to TR-018. The option depth-3200m was rejected because it was excluded by the design guard. The option depth-1500m was rejected because it did not achieve the best ranking.",
+  "rationale": "Selected based on ranking-lowest-lcoh_per_mwh among guard-passed options in economics as per TR-019. Option depth-3200m was rejected because it was excluded by DesignGuard. Option depth-1500m was rejected because it did not achieve the best ranking in the specified economic criterion.",
   "rejected": [
     {
       "option_id": "depth-3200m",

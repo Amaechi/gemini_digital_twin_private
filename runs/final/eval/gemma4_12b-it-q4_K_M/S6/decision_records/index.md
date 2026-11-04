@@ -2,9 +2,9 @@
 
 | DR | Title | Choice | Source | Stub evidence |
 |---|---|---|---|---|
-| [DR-01](DR-01.md) | Number of doublets | 2-doublets | policy_fallback | no |
+| [DR-01](DR-01.md) | Number of doublets | 2-doublets | llm | no |
 | [DR-02](DR-02.md) | Well depth | depth-2500m | llm | no |
-| [DR-03](DR-03.md) | Heat top-up technology | hthp-series | policy_fallback | no |
+| [DR-03](DR-03.md) | Heat top-up technology | hthp-series | llm | no |
 | [DR-04](DR-04.md) | Cooling technology mix | free-cooling-electric | llm | no |
 | [DR-05](DR-05.md) | Storage yes/no | no-storage | llm | no |
 | [DR-06](DR-06.md) | Maintenance windows | optimiser-lowest-load | llm | no |

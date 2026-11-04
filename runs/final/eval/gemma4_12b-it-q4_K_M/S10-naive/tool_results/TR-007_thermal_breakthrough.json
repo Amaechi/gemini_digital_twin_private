@@ -1,20 +1,20 @@
 {
  "data": {
-  "spacing_m": 1000.0,
-  "flow_m3h": 200.0,
+  "spacing_m": 500.0,
+  "flow_m3h": 150.0,
   "thickness_m": 100.0,
   "reservoir_temperature_degc": 99.99,
-  "wellhead_temperature_degc": 96.35615077028177,
-  "injection_temperature_degc": 56.35615077028177,
+  "wellhead_temperature_degc": 95.18748307624594,
+  "injection_temperature_degc": 55.18748307624594,
   "brine_cooling_k": 40.0,
   "rho_c_aquifer_j_per_m3_k": 2500000.0,
   "rho_c_water_j_per_m3_k": 4223000.0,
-  "breakthrough_time_yr": 35.3603115851983,
+  "breakthrough_time_yr": 11.786770528399432,
   "horizon_yr": 30.0,
-  "breakthrough_after_horizon": true,
-  "min_spacing_for_horizon_m": 921.0910995038271,
-  "temperature_at_horizon_degc": 99.99,
-  "decline_at_horizon_k": 0.0,
+  "breakthrough_after_horizon": false,
+  "min_spacing_for_horizon_m": 797.6882913700545,
+  "temperature_at_horizon_degc": 79.16321107085756,
+  "decline_at_horizon_k": 20.826788929142438,
   "heterogeneity_band_k": 6.0,
   "curve": [
    {
@@ -67,84 +67,86 @@
    },
    {
     "time_yr": 12.0,
-    "production_temperature_degc": 99.99
+    "production_temperature_degc": 96.97332660843743
    },
    {
     "time_yr": 13.0,
-    "production_temperature_degc": 99.99
+    "production_temperature_degc": 92.96507298019276
    },
    {
     "time_yr": 14.0,
-    "production_temperature_degc": 99.99
+    "production_temperature_degc": 90.71286155711711
    },
    {
     "time_yr": 15.0,
-    "production_temperature_degc": 99.99
+    "production_temperature_degc": 89.04583670511515
    },
    {
     "time_yr": 16.0,
-    "production_temperature_degc": 99.99
+    "production_temperature_degc": 87.705949518144
    },
    {
     "time_yr": 17.0,
-    "production_temperature_degc": 99.99
+    "production_temperature_degc": 86.58199431954714
    },
    {
     "time_yr": 18.0,
-    "production_temperature_degc": 99.99
+    "production_temperature_degc": 85.61351364875543
    },
    {
     "time_yr": 19.0,
-    "production_temperature_degc": 99.99
+    "production_temperature_degc": 84.7632116413218
    },
    {
     "time_yr": 20.0,
-    "production_temperature_degc": 99.99
+    "production_temperature_degc": 84.00615414819374
    },
    {
     "time_yr": 21.0,
-    "production_temperature_degc": 99.99
+    "production_temperature_degc": 83.32471291756217
    },
    {
     "time_yr": 22.0,
-    "production_temperature_degc": 99.99
+    "production_temperature_degc": 82.7059002665464
    },
    {
     "time_yr": 23.0,
-    "production_temperature_degc": 99.99
+    "production_temperature_degc": 82.13983890732464
    },
    {
     "time_yr": 24.0,
-    "production_temperature_degc": 99.99
+    "production_temperature_degc": 81.6188250632197
    },
    {
     "time_yr": 25.0,
-    "production_temperature_degc": 99.99
+    "production_temperature_degc": 81.13672520209741
    },
    {
     "time_yr": 26.0,
-    "production_temperature_degc": 99.99
+    "production_temperature_degc": 80.68857152295432
    },
    {
     "time_yr": 27.0,
-    "production_temperature_degc": 99.99
+    "production_temperature_degc": 80.27028152388716
    },
    {
     "time_yr": 28.0,
-    "production_temperature_degc": 99.99
+    "production_temperature_degc": 79.87845809178944
    },
    {
     "time_yr": 29.0,
-    "production_temperature_degc": 99.99
+    "production_temperature_degc": 79.51024357561339
    },
    {
     "time_yr": 30.0,
-    "production_temperature_degc": 99.99
+    "production_temperature_degc": 79.16321107085756
    }
   ]
  },
- "summary": "t_b 35.4 yr (D 1000 m, Q 200 m\u00b3/h, h 100 m); T_prod 100.0\u00b0C at 30 yr (\u22120.0 K, \u00b16 K); D for t_b \u2265 30 yr: 921 m",
- "warnings": [],
+ "summary": "t_b 11.8 yr (D 500 m, Q 150 m\u00b3/h, h 100 m); T_prod 79.2\u00b0C at 30 yr (\u221220.8 K, \u00b16 K); D for t_b \u2265 30 yr: 798 m",
+ "warnings": [
+  "Breakthrough after 11.8 yr, before the 30-yr horizon: increase spacing to \u2265 798 m or reduce the average flow."
+ ],
  "assumption_ids": [
   "SUB-RHOC",
   "DB-33",

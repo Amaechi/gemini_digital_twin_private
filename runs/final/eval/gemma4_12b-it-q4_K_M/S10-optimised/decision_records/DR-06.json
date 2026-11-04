@@ -52,11 +52,11 @@
       "config:assumptions.yaml#DB-30"
     ]
   },
-  "rationale": "only option meeting DB-30: non-overlapping outages in the lowest-load windows",
+  "rationale": "lowest lcoh_per_mwh among guard-passed options in economics because it satisfies DB-30 by ensuring non-overlapping outages in low-load windows.",
   "rejected": [
     {
       "option_id": "common-summer-block",
-      "reason": "outages would overlap; DB-30 requires non-overlapping outages"
+      "reason": "rejected because it violates DB-30 by allowing overlapping outages."
     }
   ],
   "decision_source": "llm",

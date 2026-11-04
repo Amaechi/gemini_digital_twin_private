@@ -21,7 +21,7 @@
       ],
       "recommended": false,
       "eligible": true,
-      "notes": "candidates: C1-3d, C1-opt"
+      "notes": "candidates: C1-3d"
     },
     {
       "id": "free-cooling-electric",
@@ -38,7 +38,7 @@
       ],
       "recommended": true,
       "eligible": true,
-      "notes": "candidates: C2-2d, C5-3d, C6-2d, C7-2d, C8-3d, C2-opt, C6-opt; top-ranked (LCOH ranking)"
+      "notes": "candidates: C2-2d, C5-3d, C6-2d, C7-2d, C8-3d; top-ranked (LCOH ranking)"
     },
     {
       "id": "free-cooling-absorption",
@@ -49,6 +49,7 @@
         "TR-011",
         "TR-012",
         "TR-013",
+        "TR-014",
         "TR-016",
         "TR-017"
       ],
@@ -78,24 +79,23 @@
       "free-cooling-electric"
     ],
     "evidence_ids": [
-      "TR-012",
       "TR-013",
       "TR-014",
       "TR-016",
       "TR-017"
     ]
   },
-  "rationale": "lowest lcoh_per_mwh among guard-passed options in economics based on TR-017.",
+  "rationale": "Decisive criterion: lowest lcoh_per_mwh + lcoc_per_mwh among guard-passed candidates without unmet demand in economics; it selects free-cooling-electric (TR-013, TR-014, TR-016).",
   "rejected": [
     {
       "option_id": "electric-chillers",
-      "reason": "Higher lcoh_per_mwh than the selected option in TR-017."
+      "reason": "Not a best option under ranking-lowest-lcoh_per_mwh."
     },
     {
       "option_id": "free-cooling-absorption",
-      "reason": "Excluded by DesignGuard/verifier as noted in the option description."
+      "reason": "Not a best option under ranking-lowest-lcoh_per_mwh."
     }
   ],
-  "decision_source": "llm",
+  "decision_source": "policy_fallback",
   "stub_evidence": false
 }

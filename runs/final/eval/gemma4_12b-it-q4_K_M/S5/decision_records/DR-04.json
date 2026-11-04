@@ -17,8 +17,9 @@
         "TR-013",
         "TR-014",
         "TR-015",
-        "TR-017",
-        "TR-018"
+        "TR-016",
+        "TR-018",
+        "TR-019"
       ],
       "recommended": false,
       "eligible": true,
@@ -35,8 +36,9 @@
         "TR-013",
         "TR-014",
         "TR-015",
-        "TR-017",
-        "TR-018"
+        "TR-016",
+        "TR-018",
+        "TR-019"
       ],
       "recommended": true,
       "eligible": true,
@@ -52,8 +54,9 @@
         "TR-012",
         "TR-013",
         "TR-014",
-        "TR-017",
-        "TR-018"
+        "TR-015",
+        "TR-018",
+        "TR-019"
       ],
       "recommended": false,
       "eligible": true,
@@ -68,8 +71,9 @@
     "TR-013",
     "TR-014",
     "TR-015",
-    "TR-017",
-    "TR-018"
+    "TR-016",
+    "TR-018",
+    "TR-019"
   ],
   "choice": "free-cooling-electric",
   "choice_label": "Free cooling + electric chillers (C2, C5)",
@@ -85,19 +89,20 @@
       "TR-013",
       "TR-014",
       "TR-015",
-      "TR-017",
-      "TR-018"
+      "TR-016",
+      "TR-018",
+      "TR-019"
     ]
   },
-  "rationale": "lowest lcoh_per_mwh among guard-passed options in economics",
+  "rationale": "Selected based on ranking-lowest-lcoh_per_mwh among guard-passed options in economics. Option free-cooling-absorption was rejected because it was excluded by DesignGuard/verifier. Option electric-chillers was rejected because it did not achieve the lowest lcoh_per_mwh according to the economics results.",
   "rejected": [
     {
       "option_id": "electric-chillers",
-      "reason": "higher lcoh_per_mwh than the selected option"
+      "reason": "Not chosen."
     },
     {
       "option_id": "free-cooling-absorption",
-      "reason": "higher lcoh_per_mwh than the selected option"
+      "reason": "Not chosen."
     }
   ],
   "decision_source": "llm",

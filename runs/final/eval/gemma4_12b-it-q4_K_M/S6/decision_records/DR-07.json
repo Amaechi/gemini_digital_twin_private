@@ -14,10 +14,8 @@
         "TR-010",
         "TR-011",
         "TR-012",
-        "TR-013",
         "TR-014",
-        "TR-016",
-        "TR-017"
+        "TR-015"
       ],
       "recommended": true,
       "eligible": true,
@@ -31,10 +29,8 @@
         "TR-010",
         "TR-011",
         "TR-012",
-        "TR-013",
         "TR-014",
-        "TR-016",
-        "TR-017"
+        "TR-015"
       ],
       "recommended": false,
       "eligible": true,
@@ -46,10 +42,8 @@
     "TR-010",
     "TR-011",
     "TR-012",
-    "TR-013",
     "TR-014",
-    "TR-016",
-    "TR-017"
+    "TR-015"
   ],
   "choice": "degas-use",
   "choice_label": "Gas handling: degas_use",
@@ -64,17 +58,15 @@
     "evidence_ids": [
       "TR-011",
       "TR-012",
-      "TR-013",
       "TR-014",
-      "TR-016",
-      "TR-017"
+      "TR-015"
     ]
   },
-  "rationale": "lowest lcoh_per_mwh among guard-passed options in economics",
+  "rationale": "lowest lcoh_per_mwh among guard-passed options in economics. Option pressurised-reinject was rejected because it did not achieve the lowest lcoh_per_mwh as indicated by the ranking-lowest-lcoh_per_mwh criterion.",
   "rejected": [
     {
       "option_id": "pressurised-reinject",
-      "reason": "higher lcoh_per_mwh compared to degas-use"
+      "reason": "Not chosen."
     }
   ],
   "decision_source": "llm",

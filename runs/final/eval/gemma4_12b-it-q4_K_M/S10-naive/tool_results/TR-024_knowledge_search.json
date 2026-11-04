@@ -1,0 +1,43 @@
+{
+ "data": {
+  "query": "KPI targets LCOH LCOC district heating",
+  "terms": [
+   "kpi",
+   "targets",
+   "lcoh",
+   "lcoc",
+   "district",
+   "heating"
+  ],
+  "snippets": [
+   {
+    "source": "data/knowledge/reference_cards/RC-10_economics.md",
+    "section": "Sourced values for the former ECO-04 placeholders (primary sources read 31 Oct 2026)",
+    "citation": "RC-10_economics.md \u00a7 Sourced values for the former ECO-04 placeholders (primary sources read 31 Oct 2026)",
+    "text": "## Sourced values for the former ECO-04 placeholders (primary sources read 31 Oct 2026)\nCurrency: native values first; USD at the **ECB 2025 annual average 1.1300 USD/EUR** (ECB Data Portal series EXR.A.USD.EUR.SP00.A; 30 Oct 2026 reference rate 1.1172). DEA = Danish Energy Agency/Energinet technology catalogues (ens.dk/en/analyses-and-statistics/technology-data-generation-electricity-and-district-heating): *Technology Data \u2013 Generation of Electricity and District Heating* v0019 Aug 2026 (PDF ens.dk/media/8614, Excel datasheet ens.dk/media/8615; cost years: 2020 \u20ac, except chapters 40/41 in 2025 \u20ac) and *Technology Data \u2013 Industrial Process Heat* v0006 Jan 2026 (PDF ens.dk/media/7757, Excel ens.dk/media/7758; 2025 \u20ac). DEA's own 2020 \u20ac \u2192 2025 \u20ac inflation factor = 1.168 (Technology Brief June 2026, ens.dk/media/8616). All DEA \"nominal investment\" = equipment + installation, per MW of output; no 2026 column \u2014 2025 column used.\n| Item (config key) | Value (native) | USD value | Sensitivity range (USD) | Source \u2014 exact | Tag |\n|---|---|---|---|---|---|\n| HTHP capex (`hthp_capex_usd_per_kw_th`) | **1.20 M\u20ac2025/MW_th** (low\u2013high 0.9\u20131.5); 2030: 1.15. Fixed O&M 2,494 \u20ac/MW/yr, var. O&M 3.6 \u20ac\u2026",
+    "score": 8.0
+   },
+   {
+    "source": "data/knowledge/reference_cards/RC-09_district_network_storage.md",
+    "section": "RC-09 District network and thermal storage",
+    "citation": "RC-09_district_network_storage.md \u00a7 RC-09 District network and thermal storage",
+    "text": "# RC-09 District network and thermal storage\n**Feeds:** DB-31/32 return temperatures, TL-23 pipe_heat_loss, GM-09 ThermalStorage, dispatch rules.\n**Verification status:** values from Guidebook Ch10/12, Danfoss/Thisted, Shallow DHC review, WEC, TU Delft/RTES papers.",
+    "score": 7.0
+   },
+   {
+    "source": "data/knowledge/reference_cards/RC-10_economics.md",
+    "section": "Benchmarks (sanity)",
+    "citation": "RC-10_economics.md \u00a7 Benchmarks (sanity)",
+    "text": "## Benchmarks (sanity)\n- NL consumer heat price cap 2026 (ACM maximum variable tariff): 40.97 \u20ac/GJ incl. VAT = **33.86 \u20ac/GJ excl. VAT = 121.9 \u20ac/MWh_th \u2248 138 $/MWh_th**; a competitive LCOH must sit below this (ACM, \"ACM stelt maximale warmtetarieven 2026 vast\", 5 Dec 2025).\n- Chiller plant installed costs: water-cooled centrifugal 740\u2013760 $2022/ton (\u2248 210\u2013216 $/kW_c) for 400\u2013600 ton units (US EIA, *Updated Buildings Sector Appliance and Equipment Costs*, Mar 2023, p. 125); single-stage LiBr absorption 1,800\u20132,300 $/ton installed for 1,320\u2013440 ton (\u2248 512\u2013654 $/kW_c), equipment only 820\u20132,010 $/ton (US DOE AMO, *Absorption Chillers for CHP Systems*, DOE/EE-1608, May 2017, Table 3 p. 4). Use to sanity-check the RC-05 1986 functions \u00d7 CEPCI 2.5.\n- Gippsland GRAC LCOH 19.16 AUD/GJ (gas 31); SGIL 16.81; capacity factor drives LCOH; shared networks \u221212 %.\n- WVU heating + absorption cooling: $40\u201343/MWh_th full retrofit (2012 $), $18\u201322 hot-water case.\n- NREL desalination: new wells LCOH US$0.010\u20130.014/kWh_th (2014 $).\n- World Energy Council: district-energy cost structure \u2248 75 % capital, 15 % O&M, 10 % ancillary energy.",
+    "score": 6.0
+   }
+  ]
+ },
+ "summary": "3 snippet(s) for 'KPI targets LCOH LCOC district heating': RC-10_economics.md \u00a7 Sourced values for the former ECO-04 placeholders (primary sources read 31 Oct 2026); RC-09_district_network_storage.md \u00a7 RC-09 District network and thermal storage; RC-10_economics.md \u00a7 Benchmarks (sanity)",
+ "warnings": [],
+ "assumption_ids": [],
+ "sources": [
+  "RC-09_district_network_storage.md",
+  "RC-10_economics.md"
+ ]
+}

@@ -76,13 +76,13 @@
       "TR-019"
     ]
   },
-  "rationale": "lowest lcoh_per_mwh among guard-passed options in economics",
+  "rationale": "Decisive criterion: lowest lcoh_per_mwh + lcoc_per_mwh among guard-passed candidates without unmet demand in economics; it selects no-storage (TR-013, TR-014, TR-015).",
   "rejected": [
     {
       "option_id": "seasonal-ht-ates",
-      "reason": "higher lcoh_per_mwh compared to no-storage option"
+      "reason": "Not a best option under ranking-lowest-lcoh_per_mwh."
     }
   ],
-  "decision_source": "llm",
+  "decision_source": "policy_fallback",
   "stub_evidence": false
 }

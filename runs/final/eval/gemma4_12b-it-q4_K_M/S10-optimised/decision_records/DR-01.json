@@ -76,11 +76,11 @@
       "TR-019"
     ]
   },
-  "rationale": "Selected based on lowest lcoh_per_mwh among guard-passed options in economics, as shown in TR-019. 3-doublets was rejected because it did not achieve the lowest lcoh_per_mwh per the specified criterion.",
+  "rationale": "lowest lcoh_per_mwh among guard-passed options in economics based on TR-019.",
   "rejected": [
     {
       "option_id": "3-doublets",
-      "reason": "Not chosen."
+      "reason": "higher lcoh_per_mwh than 2-doublets according to TR-019."
     }
   ],
   "decision_source": "llm",

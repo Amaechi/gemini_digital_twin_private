@@ -13,14 +13,12 @@
         "TR-009",
         "TR-010",
         "TR-011",
-        "TR-012",
         "TR-013",
-        "TR-015",
-        "TR-016"
+        "TR-014"
       ],
       "recommended": true,
       "eligible": true,
-      "notes": "candidates: C1-3d, C2-2d, C3-2d, C5-3d, C6-2d, C8-3d, C2-opt, C6-opt, C8-opt; excluded by DesignGuard/verifier: C4-2d; top-ranked (LCOH ranking)"
+      "notes": "candidates: C1-3d, C2-2d, C3-2d, C5-3d, C6-2d, C8-3d; excluded by DesignGuard/verifier: C4-2d; top-ranked (LCOH ranking)"
     },
     {
       "id": "pressurised-reinject",
@@ -29,9 +27,8 @@
         "TR-009",
         "TR-010",
         "TR-011",
-        "TR-012",
-        "TR-015",
-        "TR-016"
+        "TR-013",
+        "TR-014"
       ],
       "recommended": false,
       "eligible": true,
@@ -42,10 +39,8 @@
     "TR-009",
     "TR-010",
     "TR-011",
-    "TR-012",
     "TR-013",
-    "TR-015",
-    "TR-016"
+    "TR-014"
   ],
   "choice": "degas-use",
   "choice_label": "Gas handling: degas_use",
@@ -58,18 +53,15 @@
       "degas-use"
     ],
     "evidence_ids": [
-      "TR-011",
-      "TR-012",
       "TR-013",
-      "TR-015",
-      "TR-016"
+      "TR-014"
     ]
   },
-  "rationale": "Selected based on lowest lcoh_per_mwh among guard-passed options in economics as identified in the ranking-lowest-lcoh_per_mwh criterion. Option pressurised-reinject was rejected because it did not achieve the best ranking for this specific economic metric.",
+  "rationale": "lowest lcoh_per_mwh among guard-passed options in economics based on TR-013 and TR-014.",
   "rejected": [
     {
       "option_id": "pressurised-reinject",
-      "reason": "Not chosen."
+      "reason": "higher lcoh_per_mwh than the selected option."
     }
   ],
   "decision_source": "llm",

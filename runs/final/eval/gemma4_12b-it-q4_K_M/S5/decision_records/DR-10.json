@@ -10,9 +10,9 @@
       "id": "C2-opt-robust",
       "label": "C2-opt-robust (C2-opt with the TL-15 P90 robust backups (OPT-ROBUST-BACKUP))",
       "evidence_ids": [
-        "TR-024",
-        "TR-025",
-        "TR-026"
+        "TR-026",
+        "TR-027",
+        "TR-028"
       ],
       "recommended": true,
       "eligible": true,
@@ -22,15 +22,16 @@
       "id": "C2-opt",
       "label": "C2-opt (TL-13 optimum of C2 (sized from C2-2d))",
       "evidence_ids": [
-        "TR-015",
-        "TR-017",
+        "TR-016",
         "TR-018",
         "TR-019",
         "TR-020",
         "TR-021",
         "TR-022",
         "TR-023",
-        "TR-024"
+        "TR-024",
+        "TR-025",
+        "TR-026"
       ],
       "recommended": false,
       "eligible": false,
@@ -40,10 +41,11 @@
       "id": "C6-opt",
       "label": "C6-opt (TL-13 optimum of C6 (sized from C6-2d))",
       "evidence_ids": [
-        "TR-015",
-        "TR-017",
+        "TR-016",
         "TR-018",
-        "TR-019"
+        "TR-019",
+        "TR-020",
+        "TR-021"
       ],
       "recommended": false,
       "eligible": false,
@@ -53,10 +55,11 @@
       "id": "C1-opt",
       "label": "C1-opt (TL-13 optimum of C1 (sized from C1-3d))",
       "evidence_ids": [
-        "TR-015",
-        "TR-017",
+        "TR-016",
         "TR-018",
-        "TR-019"
+        "TR-019",
+        "TR-020",
+        "TR-021"
       ],
       "recommended": false,
       "eligible": false,
@@ -64,8 +67,7 @@
     }
   ],
   "evidence_ids": [
-    "TR-015",
-    "TR-017",
+    "TR-016",
     "TR-018",
     "TR-019",
     "TR-020",
@@ -74,7 +76,9 @@
     "TR-023",
     "TR-024",
     "TR-025",
-    "TR-026"
+    "TR-026",
+    "TR-027",
+    "TR-028"
   ],
   "choice": "C2-opt-robust",
   "choice_label": "C2-opt-robust (C2-opt with the TL-15 P90 robust backups (OPT-ROBUST-BACKUP))",
@@ -87,22 +91,22 @@
       "C2-opt-robust"
     ],
     "evidence_ids": [
-      "TR-026"
+      "TR-028"
     ]
   },
-  "rationale": "The design is selected based on the verdict criterion as it is the only option with an ACCEPTED status in the verifier results.",
+  "rationale": "The design is selected based on the verdict criterion because it is the only option with an ACCEPTED status in the verifier results as shown in TR-028. C2-opt, C6-opt, and C1-opt were rejected because they were not the verified design.",
   "rejected": [
     {
       "option_id": "C2-opt",
-      "reason": "not the verified design"
+      "reason": "Not chosen."
     },
     {
       "option_id": "C6-opt",
-      "reason": "not the verified design"
+      "reason": "Not chosen."
     },
     {
       "option_id": "C1-opt",
-      "reason": "not the verified design"
+      "reason": "Not chosen."
     }
   ],
   "decision_source": "llm",

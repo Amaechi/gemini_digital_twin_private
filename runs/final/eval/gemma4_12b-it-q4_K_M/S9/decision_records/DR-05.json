@@ -54,7 +54,7 @@
       "TR-013"
     ]
   },
-  "rationale": "The choice is based on the ranking-lowest-lcoh_per_mwh among guard-passed options in economics, as indicated by TR-013 and TR-012. Option seasonal-ht-ates was rejected because it did not achieve the best ranking in the specified economic criterion.",
+  "rationale": "The selection is based on the lowest lcoh_per_mwh among guard-passed options in economics, as indicated by TR-012 and TR-013. Option seasonal-ht-ates was rejected because it did not achieve the best ranking in the specified economic criterion.",
   "rejected": [
     {
       "option_id": "seasonal-ht-ates",

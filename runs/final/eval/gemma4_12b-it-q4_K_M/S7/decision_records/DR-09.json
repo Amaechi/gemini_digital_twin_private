@@ -47,11 +47,11 @@
       "TR-001"
     ]
   },
-  "rationale": "Selected based on the brine materials check in spec \u00a710.1, as confirmed by TR-001.",
+  "rationale": "selected based on brine materials check among guard-passed options in spec-materials-check using TR-001",
   "rejected": [
     {
       "option_id": "stainless-plates",
-      "reason": "Fails the brine materials check in spec \u00a710.1."
+      "reason": "fails the brine materials check in spec-materials-check"
     }
   ],
   "decision_source": "llm",
