@@ -149,6 +149,26 @@ model choice: completed, 100 % validity, 0 fallbacks, 79 k tokens, 328 s, record
 `eval_results.json` on every call; `runs/final/eval/model_comparison.json` was generated after
 that and therefore sums all 12 gemma4 runs. See Limitations.
 
+**Second full pipeline run with a 36 GB-class model** (`runs/final_qwen27b/final_llm/`, qwen3.6:27b,
+`--budget full`, ask mode, L-3): same selected design and the same verdict as the submitted gemma4
+run (C2-opt-robust, ACCEPTED, 11 Decision Records with identical choices); approval **pending**
+(the operator pressed Enter at the P10 approval prompt, so the run is complete but no approval
+was recorded). Numbers from `token_summary.json` and `run_summary.json` of each run:
+
+| Run | Class | Outcome | LLM calls | Tokens | Requests / retries | Policy fallbacks | Stub tool calls | Model latency |
+|---|---|---|---|---|---|---|---|---|
+| gemma4:12b-it-q4_K_M (`runs/final/`, submitted) | 16 GB | C2-opt-robust ACCEPTED, approval approved | 34 | 99 301 (93 699 in / 5 602 out) | 44 / 10 | 2 | 0/23 | 299 s |
+| qwen3.6:27b (`runs/final_qwen27b/`) | 36 GB | C2-opt-robust ACCEPTED, approval pending | 37 | 136 882 (127 820 in / 9 062 out) | 59 / 22 | 7 | 0/26 | 621 s |
+
+The larger model used +38% tokens and +108% model latency (≈ 16 min wall time,
+`events.jsonl` 23:09:13 → 23:25:13) and fell back to the policy on 7 Decision Records
+(DR-01, DR-02, DR-03, DR-05, DR-08, DR-09, DR-10; in all seven `llm_calls.jsonl` records the
+validator rejected the answer twice because the named criterion was not one of the offered
+criterion ids) against one (DR-10) for gemma4. Every fallback choice equals the choice gemma4 made
+itself in the submitted run, so the design, the verifier verdict and the report tables agree. The
+run is evidence that the pipeline is model-independent, not a replacement for the submitted run:
+`validate_submission.py` reads `runs/final/` only.
+
 ## Reproduce
 
 Python 3.12, no GPU, no network and no LLM are needed for the policy engine. Install:
@@ -423,6 +443,7 @@ fake STT/TTS/LLM, real what-if tool): two `whatif/<n>/` records, the run's files
 |---|---|
 | `runs/final/final_llm/` | the submitted LLM run: `llm_calls.jsonl` (every prompt, answer, tokens, latency), `token_summary.json`, `events.jsonl`/`events.sqlite`, `tool_results/TR-001…023.json`, `decision_records/DR-01…11.{json,md}`, `report_draft.md`, figures, annual CSVs, optimisation/uncertainty/sensitivity JSON |
 | `runs/final/eval/` | S1–S11 transcripts of the chosen model, S11 of four other models, `model_comparison.{json,md}`, `S10-token_comparison.json` |
+| `runs/final_qwen27b/final_llm/` | second full LLM run (qwen3.6:27b, L-3): same file set as the submitted run (`llm_calls.jsonl`, `token_summary.json`, `events.jsonl`, `tool_results/TR-001…026.json`, `decision_records/`, `report_draft.md`, figures, annual CSVs); approval pending; not read by `validate_submission.py` |
 | `runs/final_policy/` | the same workflow on the deterministic policy engine (reference run, built by `scripts/build_results.py`) |
 | `docs/results/` | `REPORT.md` (report pack, generated), `DECK_OUTLINE.md` (slides + video script), figures (`final_llm/`), `s7_demo/` (Model Builder evidence), `submission_check.md`, `eval_policy_quick/`, WP-14 policy-run tables |
 | `docs/hackathon/` | `GEOAGENT_DESIGN_SPEC.md` (requirements), `WORK_PACKAGES.md`, `PROGRESS.md` (decisions, follow-ups, submission checklist), `CLOUD_SETUP.md` (laptop steps, submission) |

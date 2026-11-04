@@ -14,8 +14,9 @@ build
 runs/*
 !runs/final/
 !runs/final_policy/
+!runs/final_qwen27b/
 # tool memo caches (design_cache.sqlite) are not evidence; keep them out of the final run
-runs/final/**/cache/
+runs/**/cache/
 runs/final/**/whatif/
 runs/final_policy/whatif/
 .venv/
