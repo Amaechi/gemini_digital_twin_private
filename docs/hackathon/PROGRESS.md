@@ -37,7 +37,7 @@ Keep it ≤ 20 KB (the hand-off between sessions; old detail: merged PRs, `git l
 | Feature E | Interactive design review loop (DR-12) | merged (fbf763f) | [#36](/Amaechi/gemini_digital_twin_private/pull/36) | `cli run --review`; P9b objection → one what-if lever → `whatif` → adopt (P6–P9 rerun, TL-13 pinned) or keep; DR-12 |
 | Feature I | Voice dialogue loop (what-if by voice) | in review | PR pending | `ui/dialogue.py`; after the approval or `talk --run-id <completed>`: change → Lead Engineer lever → `whatif` → 3-sentence summary → adopt (`DesignRunner.adopt_whatif`, DR-12) / another / stop; max 5 rounds |
 
-Latest full suite (Feature I, 11-04): `PYTHONPATH=src python -m pytest -q unit_test/gemini_model unit_test/gemini_simulator unit_test/gemini_agent -x` → **FULL_SUITE_PLACEHOLDER** (incl. 34 dialogue tests). Previous (Feature E, 11-04): 1467 passed, 8 warnings in 498 s. `validate_submission --pytest` READY (22 pass, 0 fail, WARN SUB-14, MANUAL SUB-23, SUB-24 PASS).
+Latest full suite (Feature I, 11-04): `PYTHONPATH=src python -m pytest -q unit_test/gemini_model unit_test/gemini_simulator unit_test/gemini_agent -x` → **1501 passed, 8 warnings in 601 s** (incl. 34 dialogue tests; PROGRESS.md text edited after the run, no code change). Previous (Feature E, 11-04): 1467 passed, 8 warnings in 498 s. `validate_submission --pytest` READY (22 pass, 0 fail, WARN SUB-14, MANUAL SUB-23, SUB-24 PASS).
 
 ## Decisions log (newest first)
 One line per decision; the why is in `config/assumptions.yaml` or the module docstring.
