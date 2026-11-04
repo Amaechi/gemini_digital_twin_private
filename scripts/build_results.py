@@ -11,7 +11,7 @@ Examples::
 Steps: (1) ``python -m gemini_agent.cli run --engine policy`` into ``runs/<run_id>/`` (the
 previous run folder is replaced; input mode ``assume``: register defaults, labelled); (2) every
 TL-21 figure and table from that run's tool outputs into ``--out-dir`` (``tools/plots.py``)
-plus ``report.md``; (3) ``validate_submission`` on the run (``submission_check.{md,json}``).
+plus ``policy_report.md``; (3) ``validate_submission`` on the run (``submission_check.{md,json}``).
 Exit 0 when the run completed and the only failed submission checks are the LLM-only ones
 (SUB-12, SUB-15, SUB-16, SUB-17: local Ollama run, L-1/L-2).
 """
@@ -102,7 +102,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     out = args.out_dir
     figures, tables = plots.render_all(view, out)
     report, _ = plots.report_markdown(view, figure_dir="")
-    (out / "report.md").write_text(report, encoding="utf-8")
+    (out / "policy_report.md").write_text(report, encoding="utf-8")
     check = validate_submission(
         run_dir=run_dir,
         eval_root=args.eval_root,
@@ -113,7 +113,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     (out / "submission_check.json").write_text(check.model_dump_json(indent=2), encoding="utf-8")
     failed = [c.id for c in check.checks if c.status == CheckStatus.FAIL]
     blocking = [c for c in failed if c not in LLM_ONLY_CHECKS]
-    print(f"results pack: {len(figures)} figures, {len(tables)} tables + report.md in {out}")
+    print(f"results pack: {len(figures)} figures, {len(tables)} tables + policy_report.md in {out}")
     print(f"submission check: failed {failed or 'none'}; blocking (non-LLM) {blocking or 'none'}")
     return 0 if view.status == "completed" and not blocking else 1
 

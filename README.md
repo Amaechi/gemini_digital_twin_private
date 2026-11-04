@@ -324,6 +324,55 @@ Ollama model the run was started with (or `--engine policy`).
 
 ![Web Design Commander view of runs/final/final_llm](docs/results/web_commander.png)
 
+### Voice (experimental)
+
+`cli talk` (post-submission) is a push-to-talk front-end around the same run as `cli run
+--input-mode ask`: you speak the design request and every answer, the assistant speaks the
+questions and the verdict. Nothing else changes — the runner, DesignGuard, DesignVerifier and the
+P10 approval are the ones `run` uses, and no number is computed by voice or by the LLM
+(`src/gemini_agent/ui/voice.py`).
+
+How a session goes:
+
+1. **Request.** "Describe the design request" — press Enter, speak, press Enter again. The clip is
+   transcribed offline by [faster-whisper](https://github.com/SYSTRAN/faster-whisper) (model
+   `small`, CPU int8) and echoed: `I heard: "…"` then `use it? [Y/n]`. The confirmed text is the
+   run's `--prompt`.
+2. **Questions.** Every `InputRequest` of the run (DB-30 interpretation, return temperatures, the
+   S2/S5 intake questions) is spoken with its default, then recorded. One LLM call with the
+   `NativeOutput` schema `NormalisedAnswer` turns the transcript into the expected form —
+   `sixty-five degrees` → `65`, `option B` → `B`, `yes please` → `yes`, "the default" → the
+   register default — and is validated against what the runner accepts, logged in
+   `llm_calls.jsonl` (`agent` = `voice_normaliser`) and, on failure, replaced by a keyword
+   normaliser (`--engine policy` uses only the keywords, so numbers must be spoken as digits).
+   The result is echoed, `I understood 65 degC - apply? [Y/n]`, and only a confirmed value reaches
+   the runner, which validates it exactly like a typed answer (three unusable attempts → the
+   register default is recorded as an assumption, as when Enter is pressed in ask mode).
+3. **Approval.** In P10 the verifier's stored summary and the recommended design are spoken, and
+   the approval is your spoken yes/no, confirmed on the keyboard. Then the run summary, the
+   verdict and the DR-11 rationale are read as with `--speak`.
+
+Install on a Mac (optional packages, pinned in `requirements-voice.txt`; the main CI never
+installs them — `talk` imports them lazily and prints the install hint when they are missing):
+
+```bash
+uv pip install -r requirements-voice.txt
+```
+
+The first run downloads the `small` model (≈ 0.5 GB) into the Hugging Face cache; each utterance
+then takes a few seconds on the CPU (CTranslate2 has no Metal backend). Speech output uses the
+macOS `say` command (printed only elsewhere; `--mute` prints only).
+
+```bash
+PYTHONPATH=src python -m gemini_agent.cli talk --engine llm --model <tag> --budget quick
+```
+
+`--typed` replaces the microphone by the keyboard (no optional package needed; also how the tests
+drive the loop), `--stt-model` picks another faster-whisper size, `--engine policy` runs without
+Ollama. Limits: English transcription, no barge-in while the assistant speaks, no voice "stop" —
+Ctrl-C ends the run like `run`. The post-run voice dialogue (what-if by voice) is a reserved hook
+(`VoiceSession.dialogue_hook`), not yet implemented.
+
 ## Where the evidence is
 
 | Path | Content |
@@ -343,7 +392,8 @@ Ollama model the run was started with (or `--engine policy`).
   `tools/` (TL-01…23),
   `verify/` (DesignGuard, DesignVerifier), `memory/` (event store, project knowledge, design
   cache), `logging/` (LLM call log), `eval/` (S1–S11 harness, submission checks), `schemas/`,
-  `prompts/`, `ui/` (web Design Commander: `run_view.py`, `server.py`, `static/`), `cli.py`.
+  `prompts/`, `ui/` (web Design Commander: `run_view.py`, `server.py`, `static/`; voice
+  front-end `voice.py`), `cli.py`. `requirements-voice.txt` pins the optional voice packages.
 - `src/gemini_model/` — new GEMINI models with reference cards, tests and `.rst` pages:
   `absorption_chiller`, `electric_chiller`, `heat_rejection`, `free_cooling`, `electric_boiler`,
   `thermal_storage`, `fluid` (configurable brine PVT), plus extensions of `heatpump`

@@ -271,7 +271,22 @@ PYTHONPATH=src python -m gemini_agent.cli whatif --run-id final_llm --runs-dir r
 ```
 Levers (`--set`, repeatable; `whatif --help` lists them with their bounds): `DB-31`, `DB-32` (return temperatures, register range), `DB-30=A|B`, `ECO-CO2-GAS`, `CHP-EL-FRAC` (register range), `OPT-ROBUST-BACKUP=on|off` (the run's TL-15 robust nameplates), `design_flow_m3h`, `doublets` (DesignGuard DB-10/11), `concept=<id>` (re-pick a screened candidate of the run). `--budget quick` (default) simulates the full year on both sides (≈ 1–3 min on a laptop); `--budget full` also reruns the TL-15 Monte Carlo on the changed design for P(demand met) (≈ the P8 time of the run). An out-of-limit lever is refused with the guard's reason (exit 5); an unknown lever lists the valid ones (exit 2). Outputs: `whatif.json`, `whatif.md`, `DR-W<n>.json/.md` (Decision-Record layout, evidence keys), `tool_results/`.
 
-### 7.10 Review loop on a run (post-submission, optional)
+### 7.10 Voice front-end on the Mac (post-submission, experimental, optional)
+`cli talk` runs the design workflow by voice: push-to-talk recording (Enter starts, Enter stops), offline transcription with faster-whisper, spoken questions through `say`, and the same runner, guard, verifier and approval as `cli run` (README "Voice (experimental)"). It needs two extra packages that the main requirements and the CI do not install. Inside the venv of 7.1:
+```bash
+uv pip install -r requirements-voice.txt
+```
+This installs `faster-whisper==1.2.1` (with CTranslate2, tokenizers, Hugging Face Hub) and `sounddevice==0.5.6` (PortAudio comes with its wheel). The first `talk` downloads the `small` Whisper model, about 0.5 GB, into `~/.cache/huggingface/hub/` (a one-time download; after that everything is offline). macOS asks once for microphone access for the terminal application; allow it in System Settings → Privacy & Security → Microphone if the recording stays silent.
+
+Start the Ollama server as in 7.2, then (quick budget ≈ 1–3 min of tools plus your answers; use `--budget smoke` for a 30-second rehearsal):
+```bash
+PYTHONPATH=src python -m gemini_agent.cli talk --engine llm --model <model> --budget quick --runs-dir runs/voice
+```
+What you will do: press Enter, say the request ("Design the deep-geothermal heating and cooling system for the campus in the brief"), press Enter, confirm `I heard: "…"` / `use it? [Y/n]` with Enter; for each spoken question press Enter, answer ("use the defaults", "interpretation A", "sixty-five degrees", "twenty-six"), press Enter, confirm `I understood 65 degC - apply? [Y/n]`; at the end say "yes" or "no" to the approval. Every answer is validated by the runner as a typed one would be; a value it rejects is asked again. The normaliser's LLM calls are in `runs/voice/<run-id>/llm_calls.jsonl` with `agent` = `voice_normaliser`.
+
+Checks: `talk --typed` runs the same loop from the keyboard without the two packages (what the tests use); `--mute` keeps `say` quiet; `--engine policy` needs no Ollama but understands only digits, option letters, yes/no and "default". Keep `--runs-dir runs/voice` (or any directory other than `runs/final`) so the submitted run folder is untouched.
+
+### 7.11 Review loop on a run (post-submission, optional)
 `cli run --review` asks, after the P9 verifier verdict, "Any objection to the recommended design? (Enter = none)". Your free text goes to the Lead Engineer (the LLM with `--engine llm`, keyword patterns with `--engine policy`), which maps it to exactly one bounded what-if lever (see 7.9) or says that no lever matches and asks again (max 3 rounds). The runner then runs the what-if on the live run (`runs/<dir>/<id>/whatif/<n>/`), prints the before → after table with the DesignGuard/verifier verdicts and asks "adopt the change? yes/no". *yes* reruns P6–P9 on the changed design (TL-13 sizes from it; counted against the ≤ 3 verification loops), then asks again; *no* keeps the design. Either way DR-12 "User review: <objection> → <lever>" is written with the what-if as evidence. Default off: the submitted runs and evals never use it.
 ```bash
 PYTHONPATH=src python -m gemini_agent.cli run --engine llm --model gemma4:12b-it-q4_K_M --budget quick --runs-dir runs/review_demo --run-id demo --input-mode ask --review

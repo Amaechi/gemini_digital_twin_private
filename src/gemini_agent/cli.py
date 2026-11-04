@@ -10,6 +10,7 @@ Usage::
     PYTHONPATH=src python -m gemini_agent.cli whatif --run-id final_llm --runs-dir runs/final \
         --set DB-31=65 --budget quick
     PYTHONPATH=src python -m gemini_agent.cli serve --runs-dir runs/final --port 8765
+    PYTHONPATH=src python -m gemini_agent.cli talk --engine llm --model <tag> --budget quick
 
 ``--engine policy`` is the deterministic engine used in cloud sessions, tests and CI; it never
 calls an LLM. ``--engine llm`` uses a local Ollama model (spec §4.3) and only runs on a laptop;
@@ -38,6 +39,15 @@ before → after table, and the user adopts the change (P6–P9 rerun) or keeps 
 summary with the verifier verdict, the DR-11 rationale and the what-if verdicts aloud with the
 macOS ``say`` command (``gemini_agent.speech``); elsewhere it prints one note and is a no-op.
 Everything is printed exactly as without the flag.
+
+``talk`` (post-submission, experimental) is the push-to-talk voice front-end
+(``gemini_agent.ui.voice``): the request is recorded (Enter starts and stops the recording),
+transcribed offline with faster-whisper and confirmed; every question of the run is spoken, the
+spoken answer is normalised into the expected form (one logged LLM call with ``--engine llm``,
+keywords with ``--engine policy``), echoed and confirmed on the keyboard before the runner
+validates it as usual; the P10 approval is spoken with the verifier's summary. The optional
+packages live in ``requirements-voice.txt``; ``--typed`` uses the keyboard instead of a
+microphone. The runner, DesignGuard, verifier and approval are the same as for ``run``.
 """
 
 from __future__ import annotations
@@ -50,17 +60,20 @@ import threading
 from collections.abc import Sequence
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
 
 import yaml
 from pydantic import ValidationError
 
 from gemini_agent import __version__
+from gemini_agent.agents import engine as agent_engine
 from gemini_agent.agents.engine import create_decision_engine
 from gemini_agent.logging.llm_logger import LLMLogger
 from gemini_agent.memory.event_store import SQLiteEventStore
 from gemini_agent.runner.design_runner import (
     RUNS_ROOT,
     STORE_FILE,
+    AskFn,
     DesignRunner,
     InvalidAnswer,
     RunResult,
@@ -71,6 +84,7 @@ from gemini_agent.schemas.decision import InputRequest, RunStatus
 from gemini_agent.speech import Speaker, request_text, speaking_ask
 from gemini_agent.tools import whatif as whatif_tool
 from gemini_agent.ui import server as ui_server
+from gemini_agent.ui import voice as voice_ui
 
 EXIT_OK = 0
 EXIT_CONFIG_ERROR = 1
@@ -99,8 +113,9 @@ def _add_speak_arg(parser: argparse.ArgumentParser) -> None:
     )
 
 
-def _add_engine_args(parser: argparse.ArgumentParser) -> None:
-    _add_speak_arg(parser)
+def _add_engine_args(parser: argparse.ArgumentParser, *, speak: bool = True) -> None:
+    if speak:
+        _add_speak_arg(parser)
     parser.add_argument(
         "--engine",
         choices=["policy", "llm"],
@@ -215,6 +230,34 @@ def build_parser() -> argparse.ArgumentParser:
     serve.add_argument(
         "--read-only", action="store_true", help="disable the answer/approve routes (501)"
     )
+
+    talk = sub.add_parser(
+        "talk",
+        help="push-to-talk voice front-end: speak the request and the answers (experimental)",
+        description=(
+            "Run the design workflow by voice: record the request (Enter starts and stops the "
+            "recording; faster-whisper transcribes it offline), confirm the transcript, then "
+            "answer every question of the run by voice (spoken with its default, normalised into "
+            "the expected form, echoed and confirmed with [Y/n]) up to the P10 approval. Speech "
+            "output uses the macOS `say` command (printed only elsewhere). Needs the optional "
+            f"packages of {voice_ui.VOICE_REQUIREMENTS} unless --typed is given."
+        ),
+    )
+    _add_engine_args(talk, speak=False)
+    talk.add_argument("--run-id", default=None, help="run identifier (outputs in runs/<run_id>/)")
+    talk.add_argument(
+        "--stt-model",
+        default=voice_ui.STT_MODEL,
+        help=f"faster-whisper model size (default {voice_ui.STT_MODEL}; tiny/base/small/medium)",
+    )
+    talk.add_argument(
+        "--typed",
+        action="store_true",
+        help="type instead of speaking (no microphone, no faster-whisper/sounddevice needed)",
+    )
+    talk.add_argument(
+        "--mute", action="store_true", help="do not call `say`; print the spoken texts only"
+    )
     return parser
 
 
@@ -271,8 +314,20 @@ def _speaker(args: argparse.Namespace) -> Speaker:
 
 
 def _runner(
-    args: argparse.Namespace, run_id: str, *, resuming: bool = False, speaker: Speaker | None = None
+    args: argparse.Namespace,
+    run_id: str,
+    *,
+    resuming: bool = False,
+    speaker: Speaker | None = None,
+    ask_fn: AskFn | None = None,
+    model: Any = None,
 ) -> DesignRunner:
+    """Build the runner of ``run``/``resume``/``serve``/``talk``.
+
+    ``ask_fn`` replaces the terminal prompt (``talk`` passes the voice session's ``ask``);
+    ``model`` is a prebuilt Pydantic AI model shared with another caller (``talk`` shares the
+    Ollama model with its normaliser so the HTTP client is closed exactly once, by the engine).
+    """
     llm_config = load_config("llm", args.config_dir)
     runs_root = args.runs_dir or RUNS_ROOT
     stored_engine, stored_tag = _stored_engine(runs_root, run_id) if resuming else (None, "")
@@ -285,12 +340,14 @@ def _runner(
         llm_config,
         logger=LLMLogger(runs_root / run_id),
         run_id=run_id,
+        model=model,
         model_tag=args.model or stored_tag,
         validate_args=toolbox.validate_args,
     )
-    ask_fn = ask_terminal if sys.stdin.isatty() else None
-    if ask_fn is not None and speaker is not None and speaker.enabled:
-        ask_fn = speaking_ask(speaker, ask_fn)
+    if ask_fn is None:
+        ask_fn = ask_terminal if sys.stdin.isatty() else None
+        if ask_fn is not None and speaker is not None and speaker.enabled:
+            ask_fn = speaking_ask(speaker, ask_fn)
     budget = getattr(args, "budget", None)
     return DesignRunner(
         engine,
@@ -508,6 +565,70 @@ def _serve(args: argparse.Namespace) -> int:
     return EXIT_OK
 
 
+def _talk(args: argparse.Namespace) -> int:
+    """``talk``: the push-to-talk loop around the ordinary ``run`` (``gemini_agent.ui.voice``)."""
+    try:
+        llm_config = load_config("llm", args.config_dir)
+    except (OSError, yaml.YAMLError, ValidationError) as exc:
+        print(f"config error: {exc}", file=sys.stderr)
+        return EXIT_CONFIG_ERROR
+    engine_name = args.engine or llm_config.engine
+    run_id = args.run_id or f"{datetime.now(UTC):%Y%m%dT%H%M%SZ}-{engine_name}-talk"
+    runs_root = args.runs_dir or RUNS_ROOT
+    speaker = Speaker(not args.mute)
+    try:
+        listen = (
+            voice_ui.typed_listener() if args.typed else voice_ui.whisper_listener(args.stt_model)
+        )
+        if not args.typed:
+            # Fail before the first question if the optional packages are missing.
+            voice_ui.import_voice_module("sounddevice")
+            voice_ui.import_voice_module("faster_whisper")
+    except voice_ui.VoiceDependencyError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return EXIT_USAGE
+    session = voice_ui.VoiceSession(
+        speaker=speaker,
+        listen=listen,
+        normaliser=voice_ui.PolicyNormaliser(),
+        run_dir=runs_root / run_id,
+    )
+    prompt = session.request_prompt()
+    if prompt is None:
+        if not session.confirm("No request was confirmed. Use the default challenge brief?"):
+            print("talk: no request; nothing started", file=sys.stderr)
+            return EXIT_USAGE
+        prompt = ""
+    # Only now is anything written under runs/<run_id>/ (the normaliser's logger creates it).
+    model: Any = None
+    normaliser: voice_ui.Normaliser = session.normaliser
+    if engine_name == "llm":
+        # Looked up on the module so tests (and the test-wide real-LLM block) can replace it.
+        model = agent_engine.build_ollama_model(llm_config, "orchestrator", args.model or "")
+        normaliser = voice_ui.LLMNormaliser(
+            llm_config, model, LLMLogger(runs_root / run_id), run_id=run_id
+        )
+        session.normaliser = normaliser
+    runner = _runner(args, run_id, ask_fn=session.ask, model=model)
+    try:
+        result = runner.start(prompt, run_id=run_id, input_mode="ask", model_tag=args.model or "")
+        code = _report(result, speaker)
+        if isinstance(normaliser, voice_ui.LLMNormaliser):
+            print(
+                f"voice: {normaliser.calls} normaliser LLM calls, {normaliser.fallbacks} policy "
+                f"fallbacks ({len(session.transcripts)} transcripts)"
+            )
+        # FINAL_SPRINT §I: the post-run voice dialogue loop (what-if by voice) starts here,
+        # before the runner closes the shared model, so the loop can still make LLM calls.
+        session.after_run(result)
+    except ValueError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return EXIT_USAGE
+    finally:
+        runner.close()
+    return code
+
+
 def _exit_on_sigterm(signum: int, frame: object) -> None:
     """SIGTERM (CI time limit, kill) → SystemExit, so context managers stop worker pools."""
     raise SystemExit(128 + signum)
@@ -530,6 +651,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             return _whatif(args)
         if args.command == "serve":
             return _serve(args)
+        if args.command == "talk":
+            return _talk(args)
         parser.print_help()
         return EXIT_OK
     finally:
