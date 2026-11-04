@@ -296,6 +296,7 @@ class DesignRunner:
             input_mode=input_mode,
             model_tag=model_tag,
             review_enabled=self.review,
+            review_budget=self.review_budget if self.review else "",
         )
         store.create_run(run_id, state.status.value, state.model_dump(mode="json"))
         payload: dict[str, Any] = {"engine": self.engine.name, "input_mode": input_mode}
@@ -641,8 +642,13 @@ class DesignRunner:
 
     @staticmethod
     def _pin_args(state: RunState, tool: str, args: dict[str, ArgValue]) -> dict[str, ArgValue]:
-        """Review loop: after an adoption TL-13 sizes from the adopted design (runner-enforced)."""
-        if tool == "optimise_design" and state.review_pin:
+        """Runner-only arguments: TL-13's ``candidate_id`` is the adopted what-if design or None.
+
+        Review loop: after an adoption TL-13 sizes from the adopted design; without one the
+        argument is forced to None, so an agent can never choose what TL-13 sizes (the brief
+        does not show the argument; ``toolbox.RUNNER_ONLY``).
+        """
+        if tool == "optimise_design":
             return {**args, "candidate_id": state.review_pin}
         return args
 
@@ -1291,7 +1297,7 @@ class DesignRunner:
                 {
                     "candidate_id": state.selected_id,
                     "verdict": state.verdict_value(),
-                    "budget": self.review_budget,
+                    "budget": state.review_budget or self.review_budget,
                     "message": f"user review of {state.selected_id} "
                     f"(verdict {state.verdict_value() or 'none'})",
                 },
@@ -1331,8 +1337,8 @@ class DesignRunner:
                     result = review_mod.run_whatif(
                         self.run_dir(state.run_id),
                         choice.lever,
-                        choice.value,
-                        self.review_budget,
+                        review_mod.resolve_value(state, choice.lever, choice.value),
+                        state.review_budget or self.review_budget,
                         self.config_dir,
                     )
                 except whatif_tool.WhatIfRefused as exc:

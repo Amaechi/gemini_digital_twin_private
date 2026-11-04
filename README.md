@@ -249,7 +249,8 @@ The runner then runs the same `whatif(...)` as `cli whatif` on the live run (`ru
 prints the before → after KPI table with the DesignGuard / verifier verdicts and asks "adopt the
 change? yes/no". *Yes* reruns P6–P9 on the changed design through the verifier loop-back path
 (counted against the ≤ 3 loops): TL-13 sizes from the adopted design (its doublets, depth and
-return temperatures fixed; `optimise_design --candidate_id`), P7–P9 verify it, and the review is
+return temperatures fixed; the runner-only `optimise_design` argument `candidate_id`), P7–P9
+verify it, and the review is
 asked again. DR-12 "User review: \<objection\> → \<lever\>" records adopted or kept with the
 what-if evidence (`TR-…` id, the `DR-W<n>` record). Golden rule 1 holds: the LLM only picks a
 lever, every number is a tool result; the policy engine maps a few keyword patterns

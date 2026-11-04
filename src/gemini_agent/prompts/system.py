@@ -160,8 +160,9 @@ REVIEW_RULES = (
     "Map the user's objection to exactly one lever of DATA.levers and a value, or set lever to "
     "null when no offered lever expresses it (the user is then asked again). The value is text "
     "the tools parse: copy the user's own number or choice (degC, count, on/off, A/B), or the id "
-    "of one of DATA.candidates for the concept lever; never work out a number yourself. 'more' "
-    "or 'fewer' doublets means the selected count plus or minus one. A too-large boiler or "
+    "of one of DATA.candidates for the concept lever; never work out a number yourself: for "
+    "'more' or 'fewer' doublets return the value more or fewer (the runner steps the count). A "
+    "too-large boiler or "
     "backup means OPT-ROBUST-BACKUP off; a depth means the candidate nearest it. The rationale "
     "names the lever id and states no number."
 )

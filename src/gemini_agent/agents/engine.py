@@ -8,6 +8,8 @@
 # their HTTP clients and event loop (``close``) so the CLI exits without a shutdown traceback.
 # 2026-11-03 (runner J): Decision Record choice calls get a usage-limit floor (the call's own
 # token ceiling) so a DR the workflow requires is never starved by the phase token budget.
+# 2026-11-03 (review loop): third engine call ``map_objection`` (Lead Engineer agent kind
+# ``review``, ``LeverChoice`` output; keyword policy and resilient fallback).
 """Decision engines: deterministic policy, Pydantic AI role agents and a resilient fallback.
 
 ``PolicyEngine``, ``LLMEngine`` and ``ResilientEngine`` (which falls back to the policy) follow

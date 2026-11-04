@@ -36,6 +36,7 @@ from pydantic import JsonValue
 from gemini_agent.runner.state import ReviewState, RunState, ToolRecord
 from gemini_agent.schemas.candidate import Candidate
 from gemini_agent.schemas.decision import (
+    INT_STEPS,
     REVIEW_DR_ID,
     REVIEW_DR_TITLE,
     CandidateBrief,
@@ -215,6 +216,24 @@ def adopt_request(state: RunState, review: ReviewState, result: WhatIfResult) ->
 
 
 # --------------------------------------------------------------------------- what-if
+def resolve_value(state: RunState, lever: str, value: str | None) -> str | None:
+    """Turn an engine's ``more`` / ``fewer`` for an integer lever into the stepped count.
+
+    The engine never works out the number: the selected design's count ± 1 is computed here
+    (``schemas.decision.INT_STEPS``); the DesignGuard bounds it in the what-if.
+    """
+    spec = whatif_tool.LEVERS.get(lever)
+    if value is None or spec is None or spec.kind != "int":
+        return value
+    step = INT_STEPS.get(value.strip().lower())
+    if step is None:
+        return value
+    selected = selected_candidate(state)
+    if selected is None:
+        return value
+    return str(getattr(selected, spec.id, 0) + step)
+
+
 def run_whatif(
     run_dir: Path, lever: str, value: Any, budget: str, config_dir: Path | None
 ) -> WhatIfResult:
@@ -434,6 +453,7 @@ __all__ = [
     "lever_briefs",
     "load_whatif",
     "objection_request",
+    "resolve_value",
     "review_record",
     "run_whatif",
     "selected_candidate",

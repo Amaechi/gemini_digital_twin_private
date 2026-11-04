@@ -401,6 +401,9 @@ class LeverChoice(StrictModel):
 
 
 _FLAG_WORDS = {"on", "off", "true", "false", "yes", "no", "1", "0"}
+INT_STEPS: dict[str, int] = {"more": 1, "fewer": -1, "less": -1}
+"""Integer-lever values an engine may return instead of a count (golden rule 1: the runner steps
+the selected design's count deterministically, ``runner.review.resolve_value``)."""
 
 
 def check_lever_choice(question: ReviewQuestion, choice: LeverChoice) -> str | None:
@@ -422,8 +425,8 @@ def check_lever_choice(question: ReviewQuestion, choice: LeverChoice) -> str | N
         except ValueError:
             return f"{lever.id} needs a number ({lever.unit or 'unitless'}), got '{value}'"
     elif lever.kind == "int":
-        if not re.fullmatch(r"[+-]?\d+", value):
-            return f"{lever.id} needs an integer, got '{value}'"
+        if value.lower() not in INT_STEPS and not re.fullmatch(r"[+-]?\d+", value):
+            return f"{lever.id} needs an integer (or more / fewer), got '{value}'"
     elif lever.kind == "choice":
         if value.lower() not in {c.lower() for c in lever.choices}:
             return f"{lever.id} must be one of {lever.choices}, got '{value}'"

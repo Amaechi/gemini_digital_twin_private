@@ -165,6 +165,9 @@ class RunState(StrictModel):
     review_enabled: bool = Field(
         default=False, description="cli run --review: ask for objections after the P9 verdict."
     )
+    review_budget: str = Field(
+        default="", description="What-if budget of the review (stored at start, used by resume)."
+    )
     review: ReviewState | None = Field(
         default=None, description="Review loop in progress (None outside the P9 review)."
     )
@@ -236,7 +239,12 @@ class RunState(StrictModel):
         return records
 
     def summary_dict(self) -> dict[str, Any]:
-        """Compact run summary written to ``run_summary.json``."""
+        """Compact run summary written to ``run_summary.json``.
+
+        ``review_levers`` appears only when the user adopted a what-if (review loop), so the
+        summary of every other run is unchanged.
+        """
+        review = {"review_levers": dict(self.review_levers)} if self.review_levers else {}
         return {
             "run_id": self.run_id,
             "status": self.status.value,
@@ -265,6 +273,7 @@ class RunState(StrictModel):
             "stub_tool_calls": sum(1 for r in self.tool_results if r.stub),
             "final_summary": self.final_summary,
             "escalation_reason": self.escalation_reason,
+            **review,
         }
 
     def verdict_value(self) -> str | None:

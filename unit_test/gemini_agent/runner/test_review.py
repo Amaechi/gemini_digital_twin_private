@@ -266,6 +266,87 @@ def test_lever_briefs_mirror_the_whatif_catalogue():
 
 
 # --------------------------------------------------------------------------- runner, review off
+def test_optimise_candidate_id_is_runner_only(tmp_path, monkeypatch):
+    """The TL-13 pin is hidden from the agent's tool brief and an agent value is never used."""
+    assert "candidate_id" not in stub_toolbox().brief("optimise_design").args
+    assert "top_n" in stub_toolbox().brief("optimise_design").args
+    assert "candidate_id" in stub_toolbox().brief("verify_design").args  # ordinary arguments stay
+
+    rewritten = []
+
+    def pins_c3(messages, info):
+        if output_name(info) == "Decision":
+            prompt = user_prompt(messages)
+            if (
+                '"phase":"P6"' in prompt
+                and '"optimise_design"' in prompt.split("completed_tools")[0]
+            ):
+                decision = json.loads(policy_like(messages, info).parts[0].content)
+                step = decision["steps"][0]
+                if step.get("tool") == "optimise_design":
+                    step["args"] = {"top_n": 3, "candidate_id": "C3-2d"}
+                    rewritten.append(step)
+                    return ModelResponse(parts=[TextPart(json.dumps(decision))])
+        return policy_like(messages, info)
+
+    engine, _ = _llm_engine(tmp_path, "pin", pins_c3)
+    runner = DesignRunner(engine, runs_root=tmp_path)  # no --review
+    result = runner.start("", run_id="pin")
+    assert result.status == RunStatus.COMPLETED
+    state = runner.load_state("pin")
+    p6 = [r for r in state.tool_results if r.tool == "optimise_design"]
+    assert rewritten and p6 and all(r.args.get("candidate_id") is None for r in p6)
+    assert all(r.source == "llm" for r in p6)  # the agent's step ran, with the pin removed
+    assert result.selected_id == "C1-3d"  # the ranking, not the agent, chose
+
+
+def test_more_or_fewer_doublets_from_the_engine_are_stepped_by_the_runner(tmp_path, monkeypatch):
+    """Rule 1: the LLM returns 'more'; the runner adds one to the selected design's count."""
+    calls: list = []
+    monkeypatch.setattr(review_mod, "whatif", fake_whatif(calls))
+    question = _question("x")
+    assert (
+        check_lever_choice(question, LeverChoice(lever="doublets", value="more", rationale="r"))
+        is None
+    )
+    engine, _ = _llm_engine(
+        tmp_path, "mo", _review_answer("doublets", "fewer", "One doublet less.")
+    )
+    script = Script({"REVIEW-0-1": "fewer doublets", "REVIEW-ADOPT-0": "no"})
+    runner = DesignRunner(engine, runs_root=tmp_path, review=True, ask_fn=script)
+    result = runner.start("", run_id="mo", input_mode="ask")
+    assert result.status == RunStatus.COMPLETED and calls == [{"doublets": 2}]  # C1-3d has 3
+    mapped = next(e for e in _events(runner, "mo") if e.type == "REVIEW_MAPPED")
+    assert mapped.payload["value"] == "fewer" and mapped.payload["source"] == "llm"
+    assert _dr12(runner, "mo").title == "User review: fewer doublets → doublets=2"
+
+
+def test_review_budget_is_stored_with_the_run(tmp_path, monkeypatch):
+    """A paused review resumes with the budget the run started with, and the summary lists adopted levers."""
+    calls: list = []
+    seen = []
+
+    def spy(run_dir, levers, budget="quick", *, config_dir=None):
+        seen.append(budget)
+        return fake_whatif(calls)(run_dir, levers, budget, config_dir=config_dir)
+
+    monkeypatch.setattr(review_mod, "whatif", spy)
+    first = DesignRunner(PolicyEngine(), runs_root=tmp_path, review=True, review_budget="smoke")
+    first.start("", run_id="b", input_mode="pause")
+    for answer in ("A", "55", "25"):
+        first.resume("b", answer)
+    assert first.load_state("b").review_budget == "smoke"
+    second = DesignRunner(PolicyEngine(), runs_root=tmp_path, review=True)  # default quick
+    second.resume("b", "return temperature 65")
+    assert seen == ["smoke"]
+    result = second.resume("b", "yes")
+    assert result.pending.request_id == "REVIEW-1-1"
+    second.resume("b", "")
+    second.resume("b", "yes")
+    summary = json.loads((tmp_path / "b" / "run_summary.json").read_text("utf-8"))
+    assert summary["review_levers"] == {"DB-31": 65.0}
+
+
 def test_review_off_leaves_the_run_and_its_events_unchanged(tmp_path, monkeypatch):
     """Default: the review code path never runs; no new event or record appears."""
 
@@ -284,6 +365,8 @@ def test_review_off_leaves_the_run_and_its_events_unchanged(tmp_path, monkeypatc
     state = runner.load_state("off")
     assert not state.review_enabled and state.review is None and state.review_pin is None
     assert "review" not in json.dumps(state.summary_dict())
+    brief = runner.toolbox.brief("optimise_design")
+    assert list(brief.args) == ["top_n"]
     assert not (tmp_path / "off" / "decision_records" / "DR-12.json").exists()
 
 
