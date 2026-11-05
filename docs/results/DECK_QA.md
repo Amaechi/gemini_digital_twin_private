@@ -493,7 +493,7 @@ Yes in the wells, which is where it matters for the pumps; no explicit hydraulic
 
 **Plate heat exchanger.** The pressure drop is 24 kPa per NTU (RC-03), checked by PH-10, but it is not fed into a pump-power line.
 
-**Surface and district pipes.** There is no surface-pipe pressure-drop or distribution-pumping model; `tools/network.py` (TL-23, RC-09) handles heat loss only, and the economics has no trunk-pipe line because the brief gives no route length. The README lists this, and the one card figure that could not be reproduced (the 0.55 K/km loss) is replaced by the 10 % network-loss fraction from the register. The screening-level wellhead pressures in the design-basis tool also neglect friction, by design, because the doublet tool computes it properly.
+**Surface and district pipes.** Pipe internal friction losses beyond the plant are not explicitly modelled, because the brief gives no data on the piping infrastructure (route length, diameters, elevation, insulation) outside the plant boundary. There is no surface-pipe pressure-drop or distribution-pumping model; `tools/network.py` (TL-23, RC-09) handles heat loss only, and the economics has no trunk-pipe line because the brief gives no route length. The README lists this, and the one card figure that could not be reproduced (the 0.55 K/km loss) is replaced by the 10 % network-loss fraction from the register. The screening-level wellhead pressures in the design-basis tool also neglect friction, by design, because the doublet tool computes it properly.
 
 So the honest answer to a judge: well friction yes, with the standard correlation and conservative roughness; district-network hydraulics no, flagged as a limitation with the register value that stands in for it.
 
