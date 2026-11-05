@@ -1,14 +1,14 @@
 {
-  "generated_at": "2026-11-03T15:27:16.751407+00:00",
-  "repo_root": "/home/user/gemini_digital_twin_private",
-  "run_dir": "/home/user/gemini_digital_twin_private/runs/final/final_llm",
-  "eval_root": "/home/user/gemini_digital_twin_private/runs/final/eval",
+  "generated_at": "2026-11-05T21:50:33.850392+00:00",
+  "repo_root": ".",
+  "run_dir": "./runs/final/final_llm",
+  "eval_root": "./runs/final/eval",
   "checks": [
     {
       "id": "SUB-01",
       "item": "DL-04: final run artefacts (run_summary.json, events.sqlite, events.jsonl)",
       "status": "pass",
-      "detail": "/home/user/gemini_digital_twin_private/runs/final/final_llm; missing none"
+      "detail": "./runs/final/final_llm; missing none"
     },
     {
       "id": "SUB-02",
@@ -145,8 +145,8 @@
     {
       "id": "SUB-24",
       "item": "EV-02: unit tests green (GEMINI + gemini_agent)",
-      "status": "pass",
-      "detail": "1334 passed, 7 warnings in 472.38s (0:07:52)"
+      "status": "manual",
+      "detail": "run with --pytest to include the suite"
     }
   ]
 }

@@ -84,8 +84,8 @@ Contents
 | ECO-CUR, ECO-05, OPT-ROBUST-BACKUP, UQ-MC, CFG-LAYOUT, COOL-FC, VER-HP-ETA, SUB-WELL, … (named) | Entries in the assumptions register: every value the brief did not give, with justification, source and sensitivity. | `config/assumptions.yaml` |
 | SUB-01 … SUB-24 | Submission checks run by `scripts/validate_submission.py`. | `src/gemini_agent/eval/submission.py` |
 | S1 … S11 | Evaluation scenarios (section 2). | `evals/scenarios.yaml` |
-| WP-00 … WP-15 | Work packages of the build. | `docs/hackathon/WORK_PACKAGES.md` |
-| L-1, L-2, L-3 | The laptop LLM runs: model selection, the final run, the second-model run. | `docs/hackathon/PROGRESS.md` |
+| WP-00 … WP-15 | Work packages of the build (internal planning notes, not in the public repository). | commit history |
+| L-1, L-2, L-3 | The laptop LLM runs: model selection, the final run, the second-model run. | README, `runs/final*` |
 | [P] [D] [L] [W] [A] | Provenance tags: provided, derived, literature, web, assumption. | spec §0 |
 
 ---
