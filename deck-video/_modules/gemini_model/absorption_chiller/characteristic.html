@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>gemini_model.absorption_chiller.characteristic &mdash; GEMINI Geothermal Digital Twin (deck-video)</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=19f00094" />
+
+  
+  <!--[if lt IE 9]>
+    <script src="../../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+        <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+        <script src="../../../_static/documentation_options.js?v=3a0b4cda"></script>
+        <script src="../../../_static/doctools.js?v=9a2dae69"></script>
+        <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            GEMINI Geothermal Digital Twin
+          </a>
+              <div class="version">
+                deck-video
+              </div>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Table of Contents</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../index_about_gemini.html">1. About GEMINI</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../index_getting_started.html">2. Getting started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../index_setup.html">3. Set-up</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../index_applications.html">4. Applications</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../index_models.html">5. Models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../index_sourcecode.html">6. Source code documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../glossary.html">7. Glossary</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">GEMINI Geothermal Digital Twin</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">gemini_model.absorption_chiller.characteristic</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for gemini_model.absorption_chiller.characteristic</h1><div class="highlight"><pre>
+<span></span><span class="sd">"""Method B: characteristic equation (ΔΔt method) of a single-effect LiBr absorption chiller.</span>
+
+<span class="sd">Source: RC-05 Method B (standard Ziegler/Hellmann characteristic-equation form; the card</span>
+<span class="sd">gives the form, the coefficients are ``MISSING`` and must be calibrated).</span>
+
+<span class="sd">- ``ΔΔt = (t̄_G - t̄_AC) - B (t̄_AC - t̄_E)`` with t̄ the arithmetic mean of inlet and outlet</span>
+<span class="sd">  of the external circuits: G generator (hot water), AC absorber + condenser (cooling water</span>
+<span class="sd">  in series), E evaporator (chilled water). B ≈ 1.1-1.2 (Dühring slope, LiBr) [A].</span>
+<span class="sd">- Capacity ``Q_E = s_E (ΔΔt - ΔΔt_min)``; drive heat ``Q_G = s_G (ΔΔt - ΔΔt_min,G)``;</span>
+<span class="sd">  ``COP = Q_E / Q_G``.</span>
+
+<span class="sd">Calibration (RC-05 option ii, no datasheet found): fit s_E, ΔΔt_min, s_G, ΔΔt_min,G to</span>
+<span class="sd">Method A at its rating points (T_chw 44 °F, T_cw 85 °F, T_hw 180-240 °F). Method A gives</span>
+<span class="sd">inlet/outlet temperatures, so the mean temperatures need the external-circuit temperature</span>
+<span class="sd">changes at rating: generator ΔT 7.2 K on hot water [L Guidebook p.267], cooling-water range</span>
+<span class="sd">5 K [A RC-07], chilled-water ΔT 6 K [A, the DB-32 design ΔT 20/26 °C; the card gives no</span>
+<span class="sd">rating value]. The fit is a weighted least-squares line through (ΔΔt, F) and (ΔΔt, F/COP)</span>
+<span class="sd">with weights 1/y, i.e. it minimises the relative error. s_E and s_G are fractions of the</span>
+<span class="sd">nominal capacity per kelvin; multiply by the nominal capacity for W/K.</span>
+
+<span class="sd">Coefficients for the default B = 1.15 (``DOCUMENTED_COEFFICIENTS``, reproduced by</span>
+<span class="sd">``calibrate_to_ghc1989()`` and checked in the unit tests): s_E = 0.022260 1/K,</span>
+<span class="sd">ΔΔt_min = 9.503 K, s_G = 0.032491 1/K, ΔΔt_min,G = 7.453 K (calibrated ΔΔt range 21.06-54.39 K).</span>
+<span class="sd">On the rating line the fit reproduces Method A within 1.0 % (capacity) and 2.1 % (COP).</span>
+<span class="sd">"""</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">functools</span><span class="w"> </span><span class="kn">import</span> <span class="n">lru_cache</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">gemini_model.absorption_chiller</span><span class="w"> </span><span class="kn">import</span> <span class="n">ghc1989</span>
+
+<span class="n">DEFAULT_DUHRING_SLOPE</span> <span class="o">=</span> <span class="mf">1.15</span>  <span class="c1"># B, RC-05 [A] 1.1-1.2 (mid-point)</span>
+<span class="n">DEFAULT_GENERATOR_DELTA_T_K</span> <span class="o">=</span> <span class="mf">7.2</span>  <span class="c1"># hot-water ΔT at rating, RC-05 (Guidebook p.267) [L]</span>
+<span class="n">DEFAULT_COOLING_WATER_RANGE_K</span> <span class="o">=</span> <span class="mf">5.0</span>  <span class="c1"># RC-07 [A] (Guidebook rating ΔT 9 °F)</span>
+<span class="n">DEFAULT_CHILLED_WATER_DELTA_T_K</span> <span class="o">=</span> <span class="mf">6.0</span>  <span class="c1"># [A] DB-32 design ΔT (20/26 °C), rating ΔT not on card</span>
+<span class="n">DEFAULT_RATING_HOT_WATER_DEGF</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="nb">float</span><span class="p">(</span><span class="n">t</span><span class="p">)</span> <span class="k">for</span> <span class="n">t</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">180</span><span class="p">,</span> <span class="mi">241</span><span class="p">,</span> <span class="mi">5</span><span class="p">))</span>
+
+<span class="c1"># Output of calibrate_to_ghc1989() with the defaults above (rounded; see module docstring).</span>
+<span class="n">DOCUMENTED_COEFFICIENTS</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s2">"s_e_per_k"</span><span class="p">:</span> <span class="mf">0.022260</span><span class="p">,</span>
+    <span class="s2">"ddt_min_k"</span><span class="p">:</span> <span class="mf">9.503</span><span class="p">,</span>
+    <span class="s2">"s_g_per_k"</span><span class="p">:</span> <span class="mf">0.032491</span><span class="p">,</span>
+    <span class="s2">"ddt_min_g_k"</span><span class="p">:</span> <span class="mf">7.453</span><span class="p">,</span>
+<span class="p">}</span>
+
+<span class="n">COEFFICIENT_KEYS</span> <span class="o">=</span> <span class="p">(</span><span class="s2">"s_e_per_k"</span><span class="p">,</span> <span class="s2">"ddt_min_k"</span><span class="p">,</span> <span class="s2">"s_g_per_k"</span><span class="p">,</span> <span class="s2">"ddt_min_g_k"</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="delta_delta_t_k">
+<a class="viewcode-back" href="../../../codedocumentation/gemini_model.absorption_chiller.characteristic.html#gemini_model.absorption_chiller.characteristic.delta_delta_t_k">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">delta_delta_t_k</span><span class="p">(</span><span class="n">generator_mean_degc</span><span class="p">,</span> <span class="n">absorber_condenser_mean_degc</span><span class="p">,</span> <span class="n">evaporator_mean_degc</span><span class="p">,</span> <span class="n">b</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Return the characteristic temperature difference ΔΔt (K) (RC-05 Method B)."""</span>
+    <span class="k">return</span> <span class="p">(</span><span class="n">generator_mean_degc</span> <span class="o">-</span> <span class="n">absorber_condenser_mean_degc</span><span class="p">)</span> <span class="o">-</span> <span class="n">b</span> <span class="o">*</span> <span class="p">(</span>
+        <span class="n">absorber_condenser_mean_degc</span> <span class="o">-</span> <span class="n">evaporator_mean_degc</span>
+    <span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="validate_coefficients">
+<a class="viewcode-back" href="../../../codedocumentation/gemini_model.absorption_chiller.characteristic.html#gemini_model.absorption_chiller.characteristic.validate_coefficients">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">validate_coefficients</span><span class="p">(</span><span class="n">coefficients</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Check a characteristic-coefficient dict and return it with float values.</span>
+
+<span class="sd">    Requires the keys in :data:`COEFFICIENT_KEYS`, s_E &gt; 0, s_G &gt; 0 and</span>
+<span class="sd">    ΔΔt_min,G ≤ ΔΔt_min (drive heat must not vanish while the machine still cools).</span>
+<span class="sd">    """</span>
+    <span class="n">missing</span> <span class="o">=</span> <span class="p">[</span><span class="n">key</span> <span class="k">for</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">COEFFICIENT_KEYS</span> <span class="k">if</span> <span class="n">key</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">coefficients</span><span class="p">]</span>
+    <span class="k">if</span> <span class="n">missing</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"characteristic_coefficients is missing </span><span class="si">{</span><span class="n">missing</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+    <span class="n">values</span> <span class="o">=</span> <span class="p">{</span><span class="n">key</span><span class="p">:</span> <span class="nb">float</span><span class="p">(</span><span class="n">coefficients</span><span class="p">[</span><span class="n">key</span><span class="p">])</span> <span class="k">for</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">COEFFICIENT_KEYS</span><span class="p">}</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="nb">all</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">isfinite</span><span class="p">(</span><span class="nb">list</span><span class="p">(</span><span class="n">values</span><span class="o">.</span><span class="n">values</span><span class="p">()))):</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"characteristic_coefficients must be finite: </span><span class="si">{</span><span class="n">values</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">values</span><span class="p">[</span><span class="s2">"s_e_per_k"</span><span class="p">]</span> <span class="o">&lt;=</span> <span class="mf">0.0</span> <span class="ow">or</span> <span class="n">values</span><span class="p">[</span><span class="s2">"s_g_per_k"</span><span class="p">]</span> <span class="o">&lt;=</span> <span class="mf">0.0</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"characteristic_coefficients s_e_per_k and s_g_per_k must be &gt; 0"</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">values</span><span class="p">[</span><span class="s2">"ddt_min_g_k"</span><span class="p">]</span> <span class="o">&gt;</span> <span class="n">values</span><span class="p">[</span><span class="s2">"ddt_min_k"</span><span class="p">]:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="s2">"characteristic_coefficients need ddt_min_g_k &lt;= ddt_min_k "</span>
+            <span class="s2">"(otherwise the COP is unbounded near zero load)"</span>
+        <span class="p">)</span>
+    <span class="k">return</span> <span class="n">values</span></div>
+
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_weighted_line</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Fit y = s (x - x0) by least squares on the relative error (weights 1/y)."""</span>
+    <span class="n">x</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">float</span><span class="p">)</span>
+    <span class="n">y</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">y</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">float</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">x</span><span class="o">.</span><span class="n">size</span> <span class="o">&lt;</span> <span class="mi">2</span> <span class="ow">or</span> <span class="n">np</span><span class="o">.</span><span class="n">any</span><span class="p">(</span><span class="n">y</span> <span class="o">&lt;=</span> <span class="mf">0.0</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"calibration needs at least two points with positive values"</span><span class="p">)</span>
+    <span class="n">slope</span><span class="p">,</span> <span class="n">intercept</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">polyfit</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="n">w</span><span class="o">=</span><span class="mf">1.0</span> <span class="o">/</span> <span class="n">y</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">slope</span> <span class="o">&lt;=</span> <span class="mf">0.0</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"calibration gave a non-positive slope"</span><span class="p">)</span>
+    <span class="k">return</span> <span class="nb">float</span><span class="p">(</span><span class="n">slope</span><span class="p">),</span> <span class="nb">float</span><span class="p">(</span><span class="o">-</span><span class="n">intercept</span> <span class="o">/</span> <span class="n">slope</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="fit_coefficients">
+<a class="viewcode-back" href="../../../codedocumentation/gemini_model.absorption_chiller.characteristic.html#gemini_model.absorption_chiller.characteristic.fit_coefficients">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">fit_coefficients</span><span class="p">(</span><span class="n">delta_delta_t</span><span class="p">,</span> <span class="n">capacity_fraction</span><span class="p">,</span> <span class="n">cop</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Fit the characteristic-equation coefficients to operating points.</span>
+
+<span class="sd">    Use it for a manufacturer datasheet (RC-05 option i) or for Method A (option ii).</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    delta_delta_t: sequence of float</span>
+<span class="sd">        ΔΔt of each point (K), from :func:`delta_delta_t_k`.</span>
+<span class="sd">    capacity_fraction: sequence of float</span>
+<span class="sd">        Cooling capacity of each point as a fraction of the nominal capacity (-).</span>
+<span class="sd">    cop: sequence of float</span>
+<span class="sd">        Thermal COP of each point (-); the drive heat fraction is capacity / COP.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    dict</span>
+<span class="sd">        ``s_e_per_k``, ``ddt_min_k``, ``s_g_per_k``, ``ddt_min_g_k`` (validated).</span>
+<span class="sd">    """</span>
+    <span class="n">capacity_fraction</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">capacity_fraction</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">float</span><span class="p">)</span>
+    <span class="n">drive_fraction</span> <span class="o">=</span> <span class="n">capacity_fraction</span> <span class="o">/</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">cop</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">float</span><span class="p">)</span>
+    <span class="n">s_e</span><span class="p">,</span> <span class="n">ddt_min</span> <span class="o">=</span> <span class="n">_weighted_line</span><span class="p">(</span><span class="n">delta_delta_t</span><span class="p">,</span> <span class="n">capacity_fraction</span><span class="p">)</span>
+    <span class="n">s_g</span><span class="p">,</span> <span class="n">ddt_min_g</span> <span class="o">=</span> <span class="n">_weighted_line</span><span class="p">(</span><span class="n">delta_delta_t</span><span class="p">,</span> <span class="n">drive_fraction</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">validate_coefficients</span><span class="p">(</span>
+        <span class="p">{</span><span class="s2">"s_e_per_k"</span><span class="p">:</span> <span class="n">s_e</span><span class="p">,</span> <span class="s2">"ddt_min_k"</span><span class="p">:</span> <span class="n">ddt_min</span><span class="p">,</span> <span class="s2">"s_g_per_k"</span><span class="p">:</span> <span class="n">s_g</span><span class="p">,</span> <span class="s2">"ddt_min_g_k"</span><span class="p">:</span> <span class="n">ddt_min_g</span><span class="p">}</span>
+    <span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="rating_delta_delta_t_k">
+<a class="viewcode-back" href="../../../codedocumentation/gemini_model.absorption_chiller.characteristic.html#gemini_model.absorption_chiller.characteristic.rating_delta_delta_t_k">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">rating_delta_delta_t_k</span><span class="p">(</span>
+    <span class="n">hot_water_degf</span><span class="p">,</span>
+    <span class="n">duhring_slope</span><span class="o">=</span><span class="n">DEFAULT_DUHRING_SLOPE</span><span class="p">,</span>
+    <span class="n">generator_delta_t_k</span><span class="o">=</span><span class="n">DEFAULT_GENERATOR_DELTA_T_K</span><span class="p">,</span>
+    <span class="n">chilled_water_delta_t_k</span><span class="o">=</span><span class="n">DEFAULT_CHILLED_WATER_DELTA_T_K</span><span class="p">,</span>
+    <span class="n">cooling_water_range_k</span><span class="o">=</span><span class="n">DEFAULT_COOLING_WATER_RANGE_K</span><span class="p">,</span>
+    <span class="n">chilled_water_degf</span><span class="o">=</span><span class="n">ghc1989</span><span class="o">.</span><span class="n">RATING_CHILLED_WATER_DEGF</span><span class="p">,</span>
+    <span class="n">cooling_water_degf</span><span class="o">=</span><span class="n">ghc1989</span><span class="o">.</span><span class="n">RATING_COOLING_WATER_DEGF</span><span class="p">,</span>
+<span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Return ΔΔt (K) of a Method A operating point (inlet/leaving °F → circuit means).</span>
+
+<span class="sd">    Hot water enters at T_hw (mean T_hw - ΔT_G/2); chilled water leaves at T_chw</span>
+<span class="sd">    (mean T_chw + ΔT_E/2); cooling water enters at T_cw (mean T_cw + range/2).</span>
+<span class="sd">    """</span>
+    <span class="n">generator_mean</span> <span class="o">=</span> <span class="n">ghc1989</span><span class="o">.</span><span class="n">degf_to_degc</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">hot_water_degf</span><span class="p">,</span> <span class="nb">float</span><span class="p">))</span> <span class="o">-</span> <span class="p">(</span>
+        <span class="n">generator_delta_t_k</span> <span class="o">/</span> <span class="mf">2.0</span>
+    <span class="p">)</span>
+    <span class="n">absorber_condenser_mean</span> <span class="o">=</span> <span class="n">ghc1989</span><span class="o">.</span><span class="n">degf_to_degc</span><span class="p">(</span><span class="n">cooling_water_degf</span><span class="p">)</span> <span class="o">+</span> <span class="n">cooling_water_range_k</span> <span class="o">/</span> <span class="mi">2</span>
+    <span class="n">evaporator_mean</span> <span class="o">=</span> <span class="n">ghc1989</span><span class="o">.</span><span class="n">degf_to_degc</span><span class="p">(</span><span class="n">chilled_water_degf</span><span class="p">)</span> <span class="o">+</span> <span class="n">chilled_water_delta_t_k</span> <span class="o">/</span> <span class="mf">2.0</span>
+    <span class="k">return</span> <span class="n">delta_delta_t_k</span><span class="p">(</span><span class="n">generator_mean</span><span class="p">,</span> <span class="n">absorber_condenser_mean</span><span class="p">,</span> <span class="n">evaporator_mean</span><span class="p">,</span> <span class="n">duhring_slope</span><span class="p">)</span></div>
+
+
+
+<span class="nd">@lru_cache</span><span class="p">(</span><span class="n">maxsize</span><span class="o">=</span><span class="mi">32</span><span class="p">)</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">_calibrate_cached</span><span class="p">(</span>
+    <span class="n">duhring_slope</span><span class="p">,</span>
+    <span class="n">generator_delta_t_k</span><span class="p">,</span>
+    <span class="n">chilled_water_delta_t_k</span><span class="p">,</span>
+    <span class="n">cooling_water_range_k</span><span class="p">,</span>
+    <span class="n">hot_water_degf</span><span class="p">,</span>
+    <span class="n">chilled_water_degf</span><span class="p">,</span>
+    <span class="n">cooling_water_degf</span><span class="p">,</span>
+<span class="p">):</span>
+    <span class="n">ddt</span> <span class="o">=</span> <span class="n">rating_delta_delta_t_k</span><span class="p">(</span>
+        <span class="n">hot_water_degf</span><span class="p">,</span>
+        <span class="n">duhring_slope</span><span class="p">,</span>
+        <span class="n">generator_delta_t_k</span><span class="p">,</span>
+        <span class="n">chilled_water_delta_t_k</span><span class="p">,</span>
+        <span class="n">cooling_water_range_k</span><span class="p">,</span>
+        <span class="n">chilled_water_degf</span><span class="p">,</span>
+        <span class="n">cooling_water_degf</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">hot_water</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">hot_water_degf</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">float</span><span class="p">)</span>
+    <span class="n">fraction</span> <span class="o">=</span> <span class="n">ghc1989</span><span class="o">.</span><span class="n">capacity_fraction</span><span class="p">(</span><span class="n">hot_water</span><span class="p">,</span> <span class="n">chilled_water_degf</span><span class="p">,</span> <span class="n">cooling_water_degf</span><span class="p">)</span>
+    <span class="n">cop</span> <span class="o">=</span> <span class="n">ghc1989</span><span class="o">.</span><span class="n">cop</span><span class="p">(</span><span class="n">hot_water</span><span class="p">)</span>
+    <span class="n">coefficients</span> <span class="o">=</span> <span class="n">fit_coefficients</span><span class="p">(</span><span class="n">ddt</span><span class="p">,</span> <span class="n">fraction</span><span class="p">,</span> <span class="n">cop</span><span class="p">)</span>
+
+    <span class="n">fitted_fraction</span> <span class="o">=</span> <span class="n">coefficients</span><span class="p">[</span><span class="s2">"s_e_per_k"</span><span class="p">]</span> <span class="o">*</span> <span class="p">(</span><span class="n">ddt</span> <span class="o">-</span> <span class="n">coefficients</span><span class="p">[</span><span class="s2">"ddt_min_k"</span><span class="p">])</span>
+    <span class="n">fitted_drive</span> <span class="o">=</span> <span class="n">coefficients</span><span class="p">[</span><span class="s2">"s_g_per_k"</span><span class="p">]</span> <span class="o">*</span> <span class="p">(</span><span class="n">ddt</span> <span class="o">-</span> <span class="n">coefficients</span><span class="p">[</span><span class="s2">"ddt_min_g_k"</span><span class="p">])</span>
+    <span class="n">report</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="s2">"max_rel_error_capacity"</span><span class="p">:</span> <span class="nb">float</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">max</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">fitted_fraction</span> <span class="o">/</span> <span class="n">fraction</span> <span class="o">-</span> <span class="mf">1.0</span><span class="p">))),</span>
+        <span class="s2">"max_rel_error_cop"</span><span class="p">:</span> <span class="nb">float</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">max</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">((</span><span class="n">fitted_fraction</span> <span class="o">/</span> <span class="n">fitted_drive</span><span class="p">)</span> <span class="o">/</span> <span class="n">cop</span> <span class="o">-</span> <span class="mf">1.0</span><span class="p">))),</span>
+        <span class="s2">"ddt_range_k"</span><span class="p">:</span> <span class="p">(</span><span class="nb">float</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">min</span><span class="p">(</span><span class="n">ddt</span><span class="p">)),</span> <span class="nb">float</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">max</span><span class="p">(</span><span class="n">ddt</span><span class="p">))),</span>
+    <span class="p">}</span>
+    <span class="k">return</span> <span class="n">coefficients</span><span class="p">,</span> <span class="n">report</span>
+
+
+<div class="viewcode-block" id="calibrate_to_ghc1989">
+<a class="viewcode-back" href="../../../codedocumentation/gemini_model.absorption_chiller.characteristic.html#gemini_model.absorption_chiller.characteristic.calibrate_to_ghc1989">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">calibrate_to_ghc1989</span><span class="p">(</span>
+    <span class="n">duhring_slope</span><span class="o">=</span><span class="n">DEFAULT_DUHRING_SLOPE</span><span class="p">,</span>
+    <span class="n">generator_delta_t_k</span><span class="o">=</span><span class="n">DEFAULT_GENERATOR_DELTA_T_K</span><span class="p">,</span>
+    <span class="n">chilled_water_delta_t_k</span><span class="o">=</span><span class="n">DEFAULT_CHILLED_WATER_DELTA_T_K</span><span class="p">,</span>
+    <span class="n">cooling_water_range_k</span><span class="o">=</span><span class="n">DEFAULT_COOLING_WATER_RANGE_K</span><span class="p">,</span>
+    <span class="n">hot_water_degf</span><span class="o">=</span><span class="n">DEFAULT_RATING_HOT_WATER_DEGF</span><span class="p">,</span>
+    <span class="n">chilled_water_degf</span><span class="o">=</span><span class="n">ghc1989</span><span class="o">.</span><span class="n">RATING_CHILLED_WATER_DEGF</span><span class="p">,</span>
+    <span class="n">cooling_water_degf</span><span class="o">=</span><span class="n">ghc1989</span><span class="o">.</span><span class="n">RATING_COOLING_WATER_DEGF</span><span class="p">,</span>
+    <span class="n">with_report</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+<span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Calibrate Method B to Method A at its rating points (RC-05 option ii).</span>
+
+<span class="sd">    Rating points: T_chw 44 °F, T_cw 85 °F, T_hw 180-240 °F (every 5 °F by default).</span>
+<span class="sd">    Returns the coefficient dict (see :func:`fit_coefficients`); with ``with_report``</span>
+<span class="sd">    also a dict with the maximum relative capacity/COP error on the rating points and</span>
+<span class="sd">    the calibrated ΔΔt range (K). Results are cached per argument set.</span>
+<span class="sd">    """</span>
+    <span class="n">coefficients</span><span class="p">,</span> <span class="n">report</span> <span class="o">=</span> <span class="n">_calibrate_cached</span><span class="p">(</span>
+        <span class="nb">float</span><span class="p">(</span><span class="n">duhring_slope</span><span class="p">),</span>
+        <span class="nb">float</span><span class="p">(</span><span class="n">generator_delta_t_k</span><span class="p">),</span>
+        <span class="nb">float</span><span class="p">(</span><span class="n">chilled_water_delta_t_k</span><span class="p">),</span>
+        <span class="nb">float</span><span class="p">(</span><span class="n">cooling_water_range_k</span><span class="p">),</span>
+        <span class="nb">tuple</span><span class="p">(</span><span class="nb">float</span><span class="p">(</span><span class="n">t</span><span class="p">)</span> <span class="k">for</span> <span class="n">t</span> <span class="ow">in</span> <span class="n">hot_water_degf</span><span class="p">),</span>
+        <span class="nb">float</span><span class="p">(</span><span class="n">chilled_water_degf</span><span class="p">),</span>
+        <span class="nb">float</span><span class="p">(</span><span class="n">cooling_water_degf</span><span class="p">),</span>
+    <span class="p">)</span>
+    <span class="k">if</span> <span class="n">with_report</span><span class="p">:</span>
+        <span class="k">return</span> <span class="nb">dict</span><span class="p">(</span><span class="n">coefficients</span><span class="p">),</span> <span class="nb">dict</span><span class="p">(</span><span class="n">report</span><span class="p">)</span>
+    <span class="k">return</span> <span class="nb">dict</span><span class="p">(</span><span class="n">coefficients</span><span class="p">)</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, TNO.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
