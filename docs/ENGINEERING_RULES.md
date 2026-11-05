@@ -1,14 +1,7 @@
-# CLAUDE.md — GeoAgent (SPE GeoHackathon 2026) on the GEMINI repo
+# GeoAgent engineering rules (SPE GeoHackathon 2026, on the GEMINI repo)
 
 ## What we are building
 An agentic AI application that uses the GEMINI geothermal digital twin to select, size and validate a deep-geothermal district **heating (100 °C) and cooling (20 °C)** system, compares alternatives, explains every decision, and logs prompts/answers/tokens. Deadline ≈ 4–5 Nov 2026.
-
-## Sources of truth (read only what the current work package needs)
-- `docs/hackathon/WORK_PACKAGES.md` — your task. Read ONLY your WP section.
-- `docs/hackathon/PROGRESS.md` — status, decisions, hand-off notes. Read first, update last.
-- `docs/hackathon/GEOAGENT_DESIGN_SPEC.md` — full requirements (large). Read only the § numbers your WP lists (`grep -n "^## \|^### " <file>` to find them).
-- `data/knowledge/reference_cards/RC-*.md` — the ONLY engineering source for equations/values. Books are not in the repo.
-- `third_party/plantdebugger/` — Apache-2.0 reference code to adapt (never import it).
 
 ## Golden rules
 1. **The LLM never computes numbers.** All physics, sizing, costs, KPIs come from deterministic, unit-tested Python. Report numbers come from tool outputs.
@@ -28,7 +21,7 @@ An agentic AI application that uses the GEMINI geothermal digital twin to select
 - Ignore: `src/gemini_framework`, `src/gemini_interface`, `src/gemini_application`, `gemini-project/`, Docker, `third_party/` (reference only).
 
 ## Environment and commands
-- Python venv prepared by the cloud setup script at `/opt/geo-venv` (Python 3.12). Activate: `source /opt/geo-venv/bin/activate`. If missing locally: `uv venv -p 3.12 .venv && uv pip install -r requirements-hackathon.txt`.
+- Python 3.12 virtual environment: `uv venv -p 3.12 .venv && uv pip install -r requirements-hackathon.txt`.
 - Run tests (quiet, always): `PYTHONPATH=src python -m pytest -q unit_test/gemini_model unit_test/gemini_simulator unit_test/gemini_agent -x`
 - Single test file: `PYTHONPATH=src python -m pytest -q <path> -x`
 - Lint new code: `ruff check src/gemini_agent unit_test/gemini_agent` (and new model folders). GEMINI's upstream `Lint` workflow also runs **black + isort + flake8** on every push — run `black <new files> && isort <new files>` before committing so that check stays green.
@@ -37,23 +30,9 @@ An agentic AI application that uses the GEMINI geothermal digital twin to select
 - Do NOT install GEMINI's full Poetry stack (Flask, Celery, Chroma…). Only numpy/scipy/pandas + our deps.
 
 ## LLMs in this repo
-- Production engine: Pydantic AI agents on a local **Ollama** open-weight model (run by the user locally; cloud sessions have no GPU).
-- In cloud sessions and tests: **never call a real LLM or external API.** Use `--engine policy` (deterministic) or Pydantic AI `TestModel` / `FunctionModel`. Tests must pass offline.
+- Production engine: Pydantic AI agents on a local **Ollama** open-weight model.
+- In tests and CI: **never call a real LLM or external API.** Use `--engine policy` (deterministic) or Pydantic AI `TestModel` / `FunctionModel`. Tests must pass offline.
 - Every LLM call goes through `gemini_agent.logging.llm_logger` (prompt, response, tokens, latency, decision source).
-
-## Session workflow (every session)
-1. Read `docs/hackathon/PROGRESS.md`, then your WP section in `WORK_PACKAGES.md`, then only the listed spec sections and cards.
-2. Work on branch `wp-XX-<slug>` (the session's branch is fine). **Never commit to or push `main`** — all changes land via PR. Touch only files your WP owns; if you must touch another WP's file, keep the change minimal and note it in PROGRESS.md.
-3. Write tests with the code. Reproduce the card's validation tests. All tests green before finishing.
-4. Run the `wp-reviewer` subagent on your diff; for physics/model WPs also run `physics-checker`. Fix findings.
-5. Update `PROGRESS.md` (status, what changed, decisions, assumptions added, follow-ups, exact test command + result). Commit with clear messages. Open a PR titled `WP-XX: <title>`.
-
-## Context hygiene (keep the window small)
-- Never `cat` large files: spec (60 KB), CSVs (365 rows), `third_party/`, `runs/`, logs. Use `grep -n`, `sed -n 'a,bp'`, `head`.
-- Run pytest with `-q -x`; on failure re-run only the failing test with `-x -q --tb=short`.
-- Delegate wide searches/reading to a subagent and keep only its conclusion.
-- One WP per session. When a WP is done, stop; the next WP starts in a fresh session.
-- Before a likely compaction, make sure PROGRESS.md holds the state (it survives; chat does not).
 
 ## Code conventions
 - Python 3.12, type hints, Pydantic v2 models for all tool I/O, docstrings citing reference cards (e.g. `Source: RC-05 Method A (Guidebook p.268)`).
@@ -62,5 +41,3 @@ An agentic AI application that uses the GEMINI geothermal digital twin to select
 - Licensing: adapted Plant Debugger code starts with the header in `third_party/plantdebugger/README.md`; modified GEMINI files get `# Modified by <team> for SPE GeoHackathon 2026, <date>: <what>` near the top.
 - No secrets in the repo. No network calls in tests.
 
-## Definition of done (per WP)
-Tests green (command + count recorded in PROGRESS.md) · reviewer findings resolved · PROGRESS.md updated · PR opened · no unrelated changes.

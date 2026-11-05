@@ -1,14 +1,14 @@
 # GeoAgent submission check (spec §18)
 
-Generated: 2026-11-03T15:27:16.751407+00:00
-Final run: `/home/user/gemini_digital_twin_private/runs/final/final_llm`  
-Eval root: `/home/user/gemini_digital_twin_private/runs/final/eval`
+Generated: 2026-11-05T21:50:33.850392+00:00
+Final run: `./runs/final/final_llm`  
+Eval root: `./runs/final/eval`
 
-**READY** — pass 22, fail 0, warn 1, manual 1
+**READY** — pass 21, fail 0, warn 1, manual 2
 
 | ID | Item | Status | Detail |
 |---|---|---|---|
-| SUB-01 | DL-04: final run artefacts (run_summary.json, events.sqlite, events.jsonl) | PASS | /home/user/gemini_digital_twin_private/runs/final/final_llm; missing none |
+| SUB-01 | DL-04: final run artefacts (run_summary.json, events.sqlite, events.jsonl) | PASS | ./runs/final/final_llm; missing none |
 | SUB-02 | Run completed (P0–P10) and the recommended design was approved (P10) | PASS | completed, approved |
 | SUB-03 | §18: ACCEPTED design (final verifier verdict) | PASS | selected C2-opt-robust, verdict ACCEPTED |
 | SUB-04 | No stub tool calls (run_summary.json stub_tool_calls = 0) | PASS | 0/23 tool calls were stubs |
@@ -31,6 +31,6 @@ Eval root: `/home/user/gemini_digital_twin_private/runs/final/eval`
 | SUB-21 | §18: Apache-2.0 notices on modified GEMINI files | PASS | 11 GEMINI .py file(s) modified since d86e8bb; no notice: none; other modified files (check by hand): none |
 | SUB-22 | §18/DL-03: code pushed with README (API placeholders documented) | PASS | README.md present, placeholders documented |
 | SUB-23 | §18: 10 slides + appendix, ≤ 5-min video | MANUAL | check the deck and the video by hand |
-| SUB-24 | EV-02: unit tests green (GEMINI + gemini_agent) | PASS | 1334 passed, 7 warnings in 472.38s (0:07:52) |
+| SUB-24 | EV-02: unit tests green (GEMINI + gemini_agent) | MANUAL | run with --pytest to include the suite |
 
 Only FAIL blocks the submission. WARN items need a note in the report; MANUAL items are checked by hand.

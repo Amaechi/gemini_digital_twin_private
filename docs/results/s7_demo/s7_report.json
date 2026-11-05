@@ -3,7 +3,7 @@
  "gap_detected": true,
  "gap_closed": true,
  "registered_class": "FreeCoolingRc07",
- "sandbox": "/Users/amaechihalim/Documents/Coding/VScode/geothermalhack26/gemini_digital_twin_private/runs/s7_demo",
+ "sandbox": "runs/s7_demo",
  "run": {
   "before": {
    "registered_types": [

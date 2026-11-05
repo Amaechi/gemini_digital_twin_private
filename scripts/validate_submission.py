@@ -63,13 +63,15 @@ def main(argv: Sequence[str] | None = None) -> int:
         repo_root=args.repo_root,
         run_tests=args.pytest,
     )
-    markdown = render_markdown(report)
+    root_text = str(Path(args.repo_root).resolve())
+    markdown = render_markdown(report).replace(root_text, ".")
     print(markdown)
-    for path, text in ((args.output_md, markdown), (args.output_json, None)):
+    json_text = report.model_dump_json(indent=2).replace(root_text, ".")
+    for path, text in ((args.output_md, markdown), (args.output_json, json_text)):
         if path is None:
             continue
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(text or report.model_dump_json(indent=2), encoding="utf-8")
+        path.write_text(text, encoding="utf-8")
     return 0 if report.ok else 1
 
 

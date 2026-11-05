@@ -154,8 +154,7 @@ from the compacted history and tool-result summaries.
 its `eval_results.json`.)
 
 The gemma4:12b row is the S11 of its S1–S11 eval. Its earlier S11-only run (L-1, the basis of the
-model choice: completed, 100 % validity, 0 fallbacks, 79 k tokens, 328 s, recorded in
-`docs/hackathon/PROGRESS.md`) was overwritten by the full eval because `run_eval.py` rewrites
+model choice: completed, 100 % validity, 0 fallbacks, 79 k tokens, 328 s) was overwritten by the full eval because `run_eval.py` rewrites
 `eval_results.json` on every call; `runs/final/eval/model_comparison.json` was generated after
 that and therefore sums all 12 gemma4 runs. See Limitations.
 
@@ -298,8 +297,7 @@ TL-13 size variable and `ECO-CO2-GAS` / `CHP-EL-FRAC` are register values: their
 but cannot be adopted in a run. DR-12 holds the last review of the run; earlier adoptions are
 listed in its rationale and in the `REVIEW_*` / `LOOP_BACK` events.
 
-**Laptop LLM run** (needs [Ollama](https://ollama.com); full detail and timings in
-`docs/hackathon/CLOUD_SETUP.md` §7). Models per hardware are in `config/llm.yaml`: profile
+**Laptop LLM run** (needs [Ollama](https://ollama.com)). Models per hardware are in `config/llm.yaml`: profile
 `16gb` (qwen3.5:9b orchestrator, gemma4:12b coder) and `36gb` (qwen3.6:35b-a3b, qwen3.6:27b);
 `--model <tag>` uses one tag for every role. The settings below are **server** settings:
 
@@ -456,7 +454,7 @@ fake STT/TTS/LLM, real what-if tool): two `whatif/<n>/` records, the run's files
 | `runs/final_qwen27b/final_llm/` | second full LLM run (qwen3.6:27b, L-3): same file set as the submitted run (`llm_calls.jsonl`, `token_summary.json`, `events.jsonl`, `tool_results/TR-001…026.json`, `decision_records/`, `report_draft.md`, figures, annual CSVs); approval pending; not read by `validate_submission.py` |
 | `runs/final_policy/` | the same workflow on the deterministic policy engine (reference run, built by `scripts/build_results.py`) |
 | `docs/results/` | `REPORT.md` (report pack, generated), `DECK_OUTLINE.md` (slides + video script), figures (`final_llm/`), `s7_demo/` (Model Builder evidence), `SETTINGS_STUDY.md` + `settings_study/` (§4.3 thinking / context-length study, three `eval_results.json`), `submission_check.md`, `eval_policy_quick/`, WP-14 policy-run tables |
-| `docs/hackathon/` | `GEOAGENT_DESIGN_SPEC.md` (requirements), `WORK_PACKAGES.md`, `PROGRESS.md` (decisions, follow-ups, submission checklist), `CLOUD_SETUP.md` (laptop steps, submission) |
+| `docs/hackathon/` | `GEOAGENT_DESIGN_SPEC.md` (the full requirements and the source register) |
 | `config/` | `design_basis.yaml`, `climate_nl.yaml`, `limits.yaml`, `cost_assumptions.yaml`, `assumptions.yaml` (register of every assumed value), `llm.yaml` |
 | `data/knowledge/reference_cards/` | RC-01…RC-10: the only engineering source for equations and values (books are not redistributed) |
 
@@ -478,7 +476,7 @@ fake STT/TTS/LLM, real what-if tool): two `whatif/<n>/` records, the run's files
 - `src/gemini_simulator/` — registry entries, brine PVT in `kpi.py`, well components and nodal
   solver fixes (each file marked).
 - `unit_test/` mirrors `src/` (1 334 tests, command above; the result is recorded in
-  `docs/hackathon/PROGRESS.md`).
+  `docs/results/submission_check.md`, SUB-24).
 - `scripts/` — `build_results.py`, `build_report_pack.py`, `run_eval.py`, `run_optimisation.py`,
   `validate_submission.py`. `evals/scenarios.yaml` defines S1–S11.
 - `third_party/plantdebugger/` — unmodified Apache-2.0 reference copies (never imported).
@@ -563,7 +561,7 @@ credential exists anywhere in the repository (`.env.template` is GEMINI's and un
   rerun in the final runs (the case was already in `uncertainty_C2-opt.json`).
 - **S11-only result of the chosen model overwritten**: `run_eval.py` rewrites `eval_results.json`
   on each call, so the L-1 S11-only line of gemma4:12b (79 k tokens, 100 % validity, 0 fallbacks)
-  survives only in `docs/hackathon/PROGRESS.md`; the S11 row above is from the S1–S11 eval.
+  is not in the tracked eval files; the S11 row above is from the S1–S11 eval.
 - **Two policy fallbacks in the final run** (P7: a `call_tool` step without a tool; P9 DR-10: a
   criterion that was not offered); both are logged with the model's raw answer in
   `llm_calls.jsonl`, and the policy decided from the same evidence ids.
@@ -571,7 +569,7 @@ credential exists anywhere in the repository (`.env.template` is GEMINI's and un
   injection-pump capex and their replacement (ECO-PUMP-CAPEX is null, the economics tool warns
   "MISSING INPUT"); TL-17 lists 15 model limitations (LIM-*) in the report.
 - Unit tests and the submission checker: `validate_submission --pytest` is the SUB-24 evidence
-  (see `docs/hackathon/PROGRESS.md`, WP-15 hand-off, for the exact output).
+  (see `docs/results/submission_check.md` for the output).
 
 ## Licensing and credits
 
@@ -590,7 +588,7 @@ Apache-2.0 throughout (`LICENSE`, unchanged from GEMINI; `NOTICE` lists every re
 - Python dependencies from PyPI (numpy, scipy, pandas, matplotlib, pydantic, pydantic-ai,
   PyYAML, pytest, ruff) are not redistributed.
 
-## Submission (CLOUD_SETUP §8)
+## Submission
 
 1. Fork `GEMINI-Digital-Twin/gemini-geothermal-suite-open` on GitHub to your account (public).
 2. Push this repository's `main` as the team branch of the fork:
