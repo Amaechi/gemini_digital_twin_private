@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>gemini_model.heatpump.closed_form &mdash; GEMINI Geothermal Digital Twin (remove-ds-store)</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=19f00094" />
+
+  
+  <!--[if lt IE 9]>
+    <script src="../../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+        <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+        <script src="../../../_static/documentation_options.js?v=ed1c0021"></script>
+        <script src="../../../_static/doctools.js?v=9a2dae69"></script>
+        <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            GEMINI Geothermal Digital Twin
+          </a>
+              <div class="version">
+                remove-ds-store
+              </div>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Table of Contents</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../index_about_gemini.html">1. About GEMINI</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../index_getting_started.html">2. Getting started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../index_setup.html">3. Set-up</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../index_applications.html">4. Applications</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../index_models.html">5. Models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../index_sourcecode.html">6. Source code documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../glossary.html">7. Glossary</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">GEMINI Geothermal Digital Twin</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">gemini_model.heatpump.closed_form</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for gemini_model.heatpump.closed_form</h1><div class="highlight"><pre>
+<span></span><span class="sd">"""Closed-form heat-pump COP, robust operating point and HTHP limit screening (GM-03).</span>
+
+<span class="sd">Source: RC-04 (``data/knowledge/reference_cards/RC-04_heat_pump.md``, copied in</span>
+<span class="sd">``REFERENCE.md``); Geothermal Direct Use Engineering &amp; Design Guidebook (Geo-Heat Center 1989)</span>
+<span class="sd">Ch13 p.250, 258, Table 13.2; spec §7.2 GM-03. DEA COP-by-lift figures from RC-10 (plausibility</span>
+<span class="sd">only).</span>
+
+<span class="sd">- RC-04 eq. 1 (Carnot): ``COP_C = T_cond / (T_cond - T_evap)`` (K).</span>
+<span class="sd">- RC-04 eq. 2 (Lorenz): ``T̄ = (T_out - T_in) / ln(T_out / T_in)`` (log mean, K) for sink and</span>
+<span class="sd">  source; ``COP = η_L · T̄_sink / (T̄_sink - T̄_source)``.</span>
+<span class="sd">- RC-04 eq. 3: ``Q_h = Q_src · COP / (COP - 1)``; ``P_el = Q_h / COP``.</span>
+<span class="sd">- RC-04 eq. 4: refrigerant condensing / evaporating temperature = sink outlet + approach /</span>
+<span class="sd">  source outlet - approach, approach 3-5 K [A] (register HP-APPROACH: 4 K).</span>
+
+<span class="sd">HTHP limits at 100 °C are not covered by the 1989 book (Table 13.2: 82-104 °C, outdated): they</span>
+<span class="sd">come from a cited modern datasheet and stay ``MISSING`` until one is supplied. Without a datasheet</span>
+<span class="sd">the RC-04 default caps apply -- COP ≤ 0.6 × Carnot at the refrigerant temperatures and lift (sink</span>
+<span class="sd">outlet - source outlet) ≤ 60 K [A]; they are the DesignVerifier's register entries VER-HP-ETA and</span>
+<span class="sd">VER-HP-LIFT (check PH-14), reused here, not duplicated. The maximum sink temperature has no</span>
+<span class="sd">default: it is reported as missing and not checked.</span>
+
+<span class="sd">:func:`solve_operating_point` solves the same problem as GEMINI's Nelder-Mead path of</span>
+<span class="sd">:class:`~gemini_model.heatpump.heatpump_basic.HeatpumpBasic` (sink outlet at its target, source</span>
+<span class="sd">outlet unknown; if the source outlet would fall below its minimum, it is fixed there and the sink</span>
+<span class="sd">outlet drops instead) without a starting guess: the COP is the closed-form expression above and the</span>
+<span class="sd">one unknown temperature is a bracketed scalar root (``brentq``) of the energy balance.</span>
+<span class="sd">"""</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">itertools</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">math</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">scipy.optimize</span><span class="w"> </span><span class="kn">import</span> <span class="n">brentq</span>
+
+<span class="n">KELVIN</span> <span class="o">=</span> <span class="mf">273.15</span>
+
+<span class="c1"># Register defaults (config/assumptions.yaml); unit_test/gemini_model/heatpump checks equality.</span>
+<span class="n">DEFAULT_LORENZ_EFFICIENCY</span> <span class="o">=</span> <span class="mf">0.5</span>
+<span class="sd">"""η_L 0.50 [A] (RC-04; GEMINI default), register HP-ETA-L; sensitivity 0.40-0.55."""</span>
+<span class="n">DEFAULT_APPROACH_K</span> <span class="o">=</span> <span class="mf">4.0</span>
+<span class="sd">"""Evaporator and condenser approach 4 K [A] (RC-04 eq. 4: 3-5 K), register HP-APPROACH."""</span>
+<span class="n">RC04_DEFAULT_CARNOT_FRACTION</span> <span class="o">=</span> <span class="mf">0.6</span>
+<span class="sd">"""COP ≤ 0.6 × Carnot without a datasheet (RC-04 [A]), register VER-HP-ETA."""</span>
+<span class="n">RC04_DEFAULT_MAX_LIFT_K</span> <span class="o">=</span> <span class="mf">60.0</span>
+<span class="sd">"""Lift ≤ 60 K without a datasheet (RC-04 [A]), register VER-HP-LIFT."""</span>
+<span class="n">RC04_APPROACH_RANGE_K</span> <span class="o">=</span> <span class="p">(</span><span class="mf">3.0</span><span class="p">,</span> <span class="mf">5.0</span><span class="p">)</span>
+<span class="sd">"""RC-04 eq. 4 approach range [A]; outside it the model warns."""</span>
+<span class="n">CARNOT_FRACTION_ID</span> <span class="o">=</span> <span class="s2">"VER-HP-ETA"</span>
+<span class="n">MAX_LIFT_ID</span> <span class="o">=</span> <span class="s2">"VER-HP-LIFT"</span>
+<span class="n">LORENZ_EFFICIENCY_ID</span> <span class="o">=</span> <span class="s2">"HP-ETA-L"</span>
+<span class="n">APPROACH_ID</span> <span class="o">=</span> <span class="s2">"HP-APPROACH"</span>
+
+<span class="n">STANDARD_MAX_WATER_DELTA_T_K</span> <span class="o">=</span> <span class="mf">11.0</span>
+<span class="sd">"""Evaporator/condenser water ΔT: 5.6 K rating, up to 11 K standard, more needs 4/8-pass</span>
+<span class="sd">(Guidebook p.250, RC-04)."""</span>
+
+<span class="n">DEA_COP_BY_LIFT</span> <span class="o">=</span> <span class="p">((</span><span class="mf">40.0</span><span class="p">,</span> <span class="mf">4.45</span><span class="p">),</span> <span class="p">(</span><span class="mf">65.0</span><span class="p">,</span> <span class="mf">2.75</span><span class="p">),</span> <span class="p">(</span><span class="mf">80.0</span><span class="p">,</span> <span class="mf">2.4</span><span class="p">),</span> <span class="p">(</span><span class="mf">100.0</span><span class="p">,</span> <span class="mf">2.05</span><span class="p">))</span>
+<span class="sd">"""DEA nominal HTHP COP by lift (RC-10 'Sourced values', DEA Industrial Process Heat ch. 2). No</span>
+<span class="sd">entry below 40 K: plausibility band only, never the COP source (RC-10 conventions)."""</span>
+
+<span class="n">_COP_CLIP</span> <span class="o">=</span> <span class="mf">1.0e9</span>
+<span class="sd">"""Finite stand-in for an infinite COP inside root functions (no lift)."""</span>
+
+
+<div class="viewcode-block" id="log_mean_temperature_k">
+<a class="viewcode-back" href="../../../codedocumentation/gemini_model.heatpump.closed_form.html#gemini_model.heatpump.closed_form.log_mean_temperature_k">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">log_mean_temperature_k</span><span class="p">(</span><span class="n">t_in_k</span><span class="p">,</span> <span class="n">t_out_k</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Return the log-mean temperature (K) of a stream gliding from t_in_k to t_out_k (RC-04 eq. 2).</span>
+
+<span class="sd">    Equal temperatures (no glide) return that temperature.</span>
+<span class="sd">    """</span>
+    <span class="k">if</span> <span class="n">t_in_k</span> <span class="o">&lt;=</span> <span class="mf">0.0</span> <span class="ow">or</span> <span class="n">t_out_k</span> <span class="o">&lt;=</span> <span class="mf">0.0</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"absolute temperatures must be &gt; 0 K, got </span><span class="si">{</span><span class="n">t_in_k</span><span class="si">}</span><span class="s2">, </span><span class="si">{</span><span class="n">t_out_k</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">math</span><span class="o">.</span><span class="n">isclose</span><span class="p">(</span><span class="n">t_in_k</span><span class="p">,</span> <span class="n">t_out_k</span><span class="p">,</span> <span class="n">rel_tol</span><span class="o">=</span><span class="mf">1e-12</span><span class="p">,</span> <span class="n">abs_tol</span><span class="o">=</span><span class="mf">0.0</span><span class="p">):</span>
+        <span class="k">return</span> <span class="mf">0.5</span> <span class="o">*</span> <span class="p">(</span><span class="n">t_in_k</span> <span class="o">+</span> <span class="n">t_out_k</span><span class="p">)</span>
+    <span class="k">return</span> <span class="p">(</span><span class="n">t_out_k</span> <span class="o">-</span> <span class="n">t_in_k</span><span class="p">)</span> <span class="o">/</span> <span class="n">math</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">t_out_k</span> <span class="o">/</span> <span class="n">t_in_k</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="carnot_cop">
+<a class="viewcode-back" href="../../../codedocumentation/gemini_model.heatpump.closed_form.html#gemini_model.heatpump.closed_form.carnot_cop">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">carnot_cop</span><span class="p">(</span><span class="n">condensing_degc</span><span class="p">,</span> <span class="n">evaporating_degc</span><span class="p">,</span> <span class="n">efficiency</span><span class="o">=</span><span class="mf">1.0</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Return ``efficiency × T_cond / (T_cond - T_evap)`` (RC-04 eq. 1); inf if T_cond ≤ T_evap.</span>
+
+<span class="sd">    Same arithmetic as the DesignVerifier's PH-13/PH-14 (°C + 273.15), so a COP capped here at</span>
+<span class="sd">    ``fraction × carnot_cop(...)`` has a margin of exactly 0 there.</span>
+<span class="sd">    """</span>
+    <span class="n">cond_k</span> <span class="o">=</span> <span class="n">condensing_degc</span> <span class="o">+</span> <span class="n">KELVIN</span>
+    <span class="n">evap_k</span> <span class="o">=</span> <span class="n">evaporating_degc</span> <span class="o">+</span> <span class="n">KELVIN</span>
+    <span class="k">if</span> <span class="n">cond_k</span> <span class="o">&lt;=</span> <span class="n">evap_k</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">math</span><span class="o">.</span><span class="n">inf</span>
+    <span class="k">return</span> <span class="n">efficiency</span> <span class="o">*</span> <span class="p">(</span><span class="n">cond_k</span> <span class="o">/</span> <span class="p">(</span><span class="n">cond_k</span> <span class="o">-</span> <span class="n">evap_k</span><span class="p">))</span></div>
+
+
+
+<div class="viewcode-block" id="lorenz_cop">
+<a class="viewcode-back" href="../../../codedocumentation/gemini_model.heatpump.closed_form.html#gemini_model.heatpump.closed_form.lorenz_cop">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">lorenz_cop</span><span class="p">(</span><span class="n">sink_in_degc</span><span class="p">,</span> <span class="n">sink_out_degc</span><span class="p">,</span> <span class="n">source_in_degc</span><span class="p">,</span> <span class="n">source_out_degc</span><span class="p">,</span> <span class="n">efficiency</span><span class="o">=</span><span class="mf">1.0</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Return ``efficiency × T̄_sink / (T̄_sink - T̄_source)`` (RC-04 eq. 2), water temperatures °C.</span>
+
+<span class="sd">    Returns inf if the mean sink temperature does not exceed the mean source temperature (no lift).</span>
+<span class="sd">    """</span>
+    <span class="n">t_sink</span> <span class="o">=</span> <span class="n">log_mean_temperature_k</span><span class="p">(</span><span class="n">sink_in_degc</span> <span class="o">+</span> <span class="n">KELVIN</span><span class="p">,</span> <span class="n">sink_out_degc</span> <span class="o">+</span> <span class="n">KELVIN</span><span class="p">)</span>
+    <span class="n">t_source</span> <span class="o">=</span> <span class="n">log_mean_temperature_k</span><span class="p">(</span><span class="n">source_in_degc</span> <span class="o">+</span> <span class="n">KELVIN</span><span class="p">,</span> <span class="n">source_out_degc</span> <span class="o">+</span> <span class="n">KELVIN</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">t_sink</span> <span class="o">&lt;=</span> <span class="n">t_source</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">math</span><span class="o">.</span><span class="n">inf</span>
+    <span class="k">return</span> <span class="n">efficiency</span> <span class="o">*</span> <span class="n">t_sink</span> <span class="o">/</span> <span class="p">(</span><span class="n">t_sink</span> <span class="o">-</span> <span class="n">t_source</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="mean_lift_k">
+<a class="viewcode-back" href="../../../codedocumentation/gemini_model.heatpump.closed_form.html#gemini_model.heatpump.closed_form.mean_lift_k">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">mean_lift_k</span><span class="p">(</span><span class="n">sink_in_degc</span><span class="p">,</span> <span class="n">sink_out_degc</span><span class="p">,</span> <span class="n">source_in_degc</span><span class="p">,</span> <span class="n">source_out_degc</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Return the Lorenz mean lift T̄_sink - T̄_source (K, RC-04 eq. 2)."""</span>
+    <span class="n">t_sink</span> <span class="o">=</span> <span class="n">log_mean_temperature_k</span><span class="p">(</span><span class="n">sink_in_degc</span> <span class="o">+</span> <span class="n">KELVIN</span><span class="p">,</span> <span class="n">sink_out_degc</span> <span class="o">+</span> <span class="n">KELVIN</span><span class="p">)</span>
+    <span class="n">t_source</span> <span class="o">=</span> <span class="n">log_mean_temperature_k</span><span class="p">(</span><span class="n">source_in_degc</span> <span class="o">+</span> <span class="n">KELVIN</span><span class="p">,</span> <span class="n">source_out_degc</span> <span class="o">+</span> <span class="n">KELVIN</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">t_sink</span> <span class="o">-</span> <span class="n">t_source</span></div>
+
+
+
+<div class="viewcode-block" id="sink_heat_from_source">
+<a class="viewcode-back" href="../../../codedocumentation/gemini_model.heatpump.closed_form.html#gemini_model.heatpump.closed_form.sink_heat_from_source">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">sink_heat_from_source</span><span class="p">(</span><span class="n">source_heat_w</span><span class="p">,</span> <span class="n">cop</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Return ``Q_h = Q_src · COP / (COP - 1)`` (RC-04 eq. 3); COP must exceed 1."""</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">cop</span> <span class="o">&gt;</span> <span class="mf">1.0</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"COP must be &gt; 1 to draw heat from the source, got </span><span class="si">{</span><span class="n">cop</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">source_heat_w</span> <span class="o">*</span> <span class="n">cop</span> <span class="o">/</span> <span class="p">(</span><span class="n">cop</span> <span class="o">-</span> <span class="mf">1.0</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="dea_reference_cop">
+<a class="viewcode-back" href="../../../codedocumentation/gemini_model.heatpump.closed_form.html#gemini_model.heatpump.closed_form.dea_reference_cop">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">dea_reference_cop</span><span class="p">(</span><span class="n">lift_k</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Return the DEA nominal COP interpolated at ``lift_k`` (40-100 K), else None (RC-10).</span>
+
+<span class="sd">    Plausibility only: RC-10 does not state DEA's lift definition, and has no entry below 40 K.</span>
+<span class="sd">    """</span>
+    <span class="n">lifts</span> <span class="o">=</span> <span class="p">[</span><span class="n">item</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">DEA_COP_BY_LIFT</span><span class="p">]</span>
+    <span class="k">if</span> <span class="n">lift_k</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">lifts</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">&lt;=</span> <span class="n">lift_k</span> <span class="o">&lt;=</span> <span class="n">lifts</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]:</span>
+        <span class="k">return</span> <span class="kc">None</span>
+    <span class="k">for</span> <span class="p">(</span><span class="n">l0</span><span class="p">,</span> <span class="n">c0</span><span class="p">),</span> <span class="p">(</span><span class="n">l1</span><span class="p">,</span> <span class="n">c1</span><span class="p">)</span> <span class="ow">in</span> <span class="n">itertools</span><span class="o">.</span><span class="n">pairwise</span><span class="p">(</span><span class="n">DEA_COP_BY_LIFT</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">l0</span> <span class="o">&lt;=</span> <span class="n">lift_k</span> <span class="o">&lt;=</span> <span class="n">l1</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">c0</span> <span class="o">+</span> <span class="p">(</span><span class="n">c1</span> <span class="o">-</span> <span class="n">c0</span><span class="p">)</span> <span class="o">*</span> <span class="p">(</span><span class="n">lift_k</span> <span class="o">-</span> <span class="n">l0</span><span class="p">)</span> <span class="o">/</span> <span class="p">(</span><span class="n">l1</span> <span class="o">-</span> <span class="n">l0</span><span class="p">)</span>
+    <span class="k">return</span> <span class="kc">None</span>  <span class="c1"># pragma: no cover - the loop covers the closed range</span></div>
+
+
+
+<span class="k">class</span><span class="w"> </span><span class="nc">_CopModel</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""COP at given sink and source outlet temperatures (°C), with the optional Carnot cap."""</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">mode</span><span class="p">,</span>
+        <span class="n">efficiency</span><span class="p">,</span>
+        <span class="n">sink_in_degc</span><span class="p">,</span>
+        <span class="n">source_in_degc</span><span class="p">,</span>
+        <span class="n">carnot_cap_fraction</span><span class="p">,</span>
+        <span class="n">condenser_approach_k</span><span class="p">,</span>
+        <span class="n">evaporator_approach_k</span><span class="p">,</span>
+    <span class="p">):</span>
+        <span class="k">if</span> <span class="n">mode</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">"carnot"</span><span class="p">,</span> <span class="s2">"lorenz"</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"mode must be 'carnot' or 'lorenz', got </span><span class="si">{</span><span class="n">mode</span><span class="si">!r}</span><span class="s2">"</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">mode</span> <span class="o">=</span> <span class="n">mode</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">efficiency</span> <span class="o">=</span> <span class="n">efficiency</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">sink_in</span> <span class="o">=</span> <span class="n">sink_in_degc</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">source_in</span> <span class="o">=</span> <span class="n">source_in_degc</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">fraction</span> <span class="o">=</span> <span class="n">carnot_cap_fraction</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">condenser_approach</span> <span class="o">=</span> <span class="n">condenser_approach_k</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">evaporator_approach</span> <span class="o">=</span> <span class="n">evaporator_approach_k</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">uncapped</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">sink_out</span><span class="p">,</span> <span class="n">source_out</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">"""Return GEMINI's COP: Lorenz on water log means, or Carnot at (Th_out, Ts_in)."""</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">mode</span> <span class="o">==</span> <span class="s2">"lorenz"</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">lorenz_cop</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">sink_in</span><span class="p">,</span> <span class="n">sink_out</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">source_in</span><span class="p">,</span> <span class="n">source_out</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">efficiency</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">carnot_cop</span><span class="p">(</span><span class="n">sink_out</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">source_in</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">efficiency</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">cap</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">sink_out</span><span class="p">,</span> <span class="n">source_out</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">"""Return ``fraction × Carnot`` at the refrigerant temperatures (inf without a cap)."""</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">fraction</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">math</span><span class="o">.</span><span class="n">inf</span>
+        <span class="n">condensing</span> <span class="o">=</span> <span class="n">sink_out</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">condenser_approach</span>
+        <span class="n">evaporating</span> <span class="o">=</span> <span class="n">source_out</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">evaporator_approach</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">fraction</span> <span class="o">*</span> <span class="n">carnot_cop</span><span class="p">(</span><span class="n">condensing</span><span class="p">,</span> <span class="n">evaporating</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">sink_out</span><span class="p">,</span> <span class="n">source_out</span><span class="p">):</span>
+        <span class="k">return</span> <span class="nb">min</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">uncapped</span><span class="p">(</span><span class="n">sink_out</span><span class="p">,</span> <span class="n">source_out</span><span class="p">),</span> <span class="bp">self</span><span class="o">.</span><span class="n">cap</span><span class="p">(</span><span class="n">sink_out</span><span class="p">,</span> <span class="n">source_out</span><span class="p">))</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_finite</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">name</span><span class="p">):</span>
+    <span class="n">value</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">math</span><span class="o">.</span><span class="n">isfinite</span><span class="p">(</span><span class="n">value</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2"> must be finite, got </span><span class="si">{</span><span class="n">value</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">value</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_idle</span><span class="p">(</span><span class="n">sink_in_degc</span><span class="p">,</span> <span class="n">source_in_degc</span><span class="p">,</span> <span class="n">reason</span><span class="p">):</span>
+    <span class="k">return</span> <span class="p">{</span>
+        <span class="s2">"running"</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span>
+        <span class="s2">"cop"</span><span class="p">:</span> <span class="mf">0.0</span><span class="p">,</span>
+        <span class="s2">"cop_uncapped"</span><span class="p">:</span> <span class="mf">0.0</span><span class="p">,</span>
+        <span class="s2">"sink_out_degc"</span><span class="p">:</span> <span class="n">sink_in_degc</span><span class="p">,</span>
+        <span class="s2">"source_out_degc"</span><span class="p">:</span> <span class="n">source_in_degc</span><span class="p">,</span>
+        <span class="s2">"sink_heat_w"</span><span class="p">:</span> <span class="mf">0.0</span><span class="p">,</span>
+        <span class="s2">"source_heat_w"</span><span class="p">:</span> <span class="mf">0.0</span><span class="p">,</span>
+        <span class="s2">"power_el_w"</span><span class="p">:</span> <span class="mf">0.0</span><span class="p">,</span>
+        <span class="s2">"branch"</span><span class="p">:</span> <span class="s2">"idle"</span><span class="p">,</span>
+        <span class="s2">"warnings"</span><span class="p">:</span> <span class="p">[</span><span class="sa">f</span><span class="s2">"heat pump idle: </span><span class="si">{</span><span class="n">reason</span><span class="si">}</span><span class="s2">"</span><span class="p">],</span>
+    <span class="p">}</span>
+
+
+<div class="viewcode-block" id="solve_operating_point">
+<a class="viewcode-back" href="../../../codedocumentation/gemini_model.heatpump.closed_form.html#gemini_model.heatpump.closed_form.solve_operating_point">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">solve_operating_point</span><span class="p">(</span>
+    <span class="o">*</span><span class="p">,</span>
+    <span class="n">mode</span><span class="p">,</span>
+    <span class="n">efficiency</span><span class="p">,</span>
+    <span class="n">sink_in_degc</span><span class="p">,</span>
+    <span class="n">sink_out_target_degc</span><span class="p">,</span>
+    <span class="n">source_in_degc</span><span class="p">,</span>
+    <span class="n">sink_capacity_rate_w_k</span><span class="p">,</span>
+    <span class="n">source_capacity_rate_w_k</span><span class="p">,</span>
+    <span class="n">source_out_min_degc</span><span class="p">,</span>
+    <span class="n">carnot_cap_fraction</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+    <span class="n">condenser_approach_k</span><span class="o">=</span><span class="n">DEFAULT_APPROACH_K</span><span class="p">,</span>
+    <span class="n">evaporator_approach_k</span><span class="o">=</span><span class="n">DEFAULT_APPROACH_K</span><span class="p">,</span>
+<span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Solve the heat-pump operating point with closed-form COP and a bracketed root (RC-04).</span>
+
+<span class="sd">    Same problem as GEMINI's Nelder-Mead path: the sink leaves at ``sink_out_target_degc``; the</span>
+<span class="sd">    source outlet follows from ``Q_src = Q_h (1 - 1/COP)`` (RC-04 eq. 3). If it would fall below</span>
+<span class="sd">    ``source_out_min_degc`` it is fixed there and the sink outlet drops instead. Capacity rates are</span>
+<span class="sd">    ``ṁ c_p`` (W/K). ``carnot_cap_fraction`` (None = no cap) caps COP at that fraction of Carnot at</span>
+<span class="sd">    the refrigerant temperatures (sink outlet + condenser approach, source outlet - evaporator</span>
+<span class="sd">    approach).</span>
+
+<span class="sd">    Returns a dict: ``running``, ``cop``, ``cop_uncapped``, ``sink_out_degc``, ``source_out_degc``,</span>
+<span class="sd">    ``sink_heat_w``, ``source_heat_w``, ``power_el_w``, ``branch`` ("target", "source_floor" or</span>
+<span class="sd">    "idle") and ``warnings``. ``sink_heat_w = source_heat_w + power_el_w`` exactly. The heat pump</span>
+<span class="sd">    is idle (no exception) when a flow is zero, there is no heating need, the source is at or</span>
+<span class="sd">    below its minimum, COP ≤ 1, or there is no lift (a heat exchanger suffices). Negative flows</span>
+<span class="sd">    and non-finite inputs raise ValueError.</span>
+<span class="sd">    """</span>
+    <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="p">(</span>
+        <span class="p">(</span><span class="s2">"sink_in_degc"</span><span class="p">,</span> <span class="n">sink_in_degc</span><span class="p">),</span>
+        <span class="p">(</span><span class="s2">"sink_out_target_degc"</span><span class="p">,</span> <span class="n">sink_out_target_degc</span><span class="p">),</span>
+        <span class="p">(</span><span class="s2">"source_in_degc"</span><span class="p">,</span> <span class="n">source_in_degc</span><span class="p">),</span>
+        <span class="p">(</span><span class="s2">"source_out_min_degc"</span><span class="p">,</span> <span class="n">source_out_min_degc</span><span class="p">),</span>
+    <span class="p">):</span>
+        <span class="n">_finite</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">name</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="p">(</span>
+        <span class="p">(</span><span class="s2">"sink_capacity_rate_w_k"</span><span class="p">,</span> <span class="n">sink_capacity_rate_w_k</span><span class="p">),</span>
+        <span class="p">(</span><span class="s2">"source_capacity_rate_w_k"</span><span class="p">,</span> <span class="n">source_capacity_rate_w_k</span><span class="p">),</span>
+    <span class="p">):</span>
+        <span class="k">if</span> <span class="n">_finite</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">name</span><span class="p">)</span> <span class="o">&lt;</span> <span class="mf">0.0</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2"> must be &gt;= 0 (a negative flow is a wiring error), got </span><span class="si">{</span><span class="n">value</span><span class="si">}</span><span class="s2">"</span>
+            <span class="p">)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">_finite</span><span class="p">(</span><span class="n">efficiency</span><span class="p">,</span> <span class="s2">"efficiency"</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mf">0.0</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"efficiency must be &gt; 0, got </span><span class="si">{</span><span class="n">efficiency</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">carnot_cap_fraction</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="ow">not</span> <span class="mf">0.0</span> <span class="o">&lt;</span> <span class="n">_finite</span><span class="p">(</span><span class="n">carnot_cap_fraction</span><span class="p">,</span> <span class="s2">"fraction"</span><span class="p">)</span> <span class="o">&lt;=</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"carnot_cap_fraction must be in (0, 1], got </span><span class="si">{</span><span class="n">carnot_cap_fraction</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+    <span class="n">sink_in_degc</span><span class="p">,</span> <span class="n">source_in_degc</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">sink_in_degc</span><span class="p">),</span> <span class="nb">float</span><span class="p">(</span><span class="n">source_in_degc</span><span class="p">)</span>
+    <span class="n">model</span> <span class="o">=</span> <span class="n">_CopModel</span><span class="p">(</span>
+        <span class="n">mode</span><span class="p">,</span>
+        <span class="n">efficiency</span><span class="p">,</span>
+        <span class="n">sink_in_degc</span><span class="p">,</span>
+        <span class="n">source_in_degc</span><span class="p">,</span>
+        <span class="n">carnot_cap_fraction</span><span class="p">,</span>
+        <span class="n">condenser_approach_k</span><span class="p">,</span>
+        <span class="n">evaporator_approach_k</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">c_h</span><span class="p">,</span> <span class="n">c_s</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">sink_capacity_rate_w_k</span><span class="p">),</span> <span class="nb">float</span><span class="p">(</span><span class="n">source_capacity_rate_w_k</span><span class="p">)</span>
+    <span class="n">target</span><span class="p">,</span> <span class="n">t_min</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">sink_out_target_degc</span><span class="p">),</span> <span class="nb">float</span><span class="p">(</span><span class="n">source_out_min_degc</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">c_h</span> <span class="o">&lt;=</span> <span class="mf">0.0</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">_idle</span><span class="p">(</span><span class="n">sink_in_degc</span><span class="p">,</span> <span class="n">source_in_degc</span><span class="p">,</span> <span class="s2">"no sink flow"</span><span class="p">)</span>
+    <span class="n">q_h_target</span> <span class="o">=</span> <span class="n">c_h</span> <span class="o">*</span> <span class="p">(</span><span class="n">target</span> <span class="o">-</span> <span class="n">sink_in_degc</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">q_h_target</span> <span class="o">&lt;=</span> <span class="mf">0.0</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">_idle</span><span class="p">(</span><span class="n">sink_in_degc</span><span class="p">,</span> <span class="n">source_in_degc</span><span class="p">,</span> <span class="s2">"sink inlet at or above the outlet target"</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">c_s</span> <span class="o">&lt;=</span> <span class="mf">0.0</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">_idle</span><span class="p">(</span><span class="n">sink_in_degc</span><span class="p">,</span> <span class="n">source_in_degc</span><span class="p">,</span> <span class="s2">"no source flow"</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">source_in_degc</span> <span class="o">&lt;=</span> <span class="n">t_min</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">_idle</span><span class="p">(</span><span class="n">sink_in_degc</span><span class="p">,</span> <span class="n">source_in_degc</span><span class="p">,</span> <span class="s2">"source inlet at or below Ts_in_minimum"</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">clipped</span><span class="p">(</span><span class="n">sink_out</span><span class="p">,</span> <span class="n">source_out</span><span class="p">):</span>
+        <span class="k">return</span> <span class="nb">min</span><span class="p">(</span><span class="n">model</span><span class="p">(</span><span class="n">sink_out</span><span class="p">,</span> <span class="n">source_out</span><span class="p">),</span> <span class="n">_COP_CLIP</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">source_out_at</span><span class="p">(</span><span class="n">cop</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">source_in_degc</span> <span class="o">-</span> <span class="n">q_h_target</span> <span class="o">*</span> <span class="p">(</span><span class="mf">1.0</span> <span class="o">-</span> <span class="mf">1.0</span> <span class="o">/</span> <span class="n">cop</span><span class="p">)</span> <span class="o">/</span> <span class="n">c_s</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">residual</span><span class="p">(</span><span class="n">cop</span><span class="p">):</span>  <span class="c1"># strictly increasing in cop: a higher COP cools the source more</span>
+        <span class="k">return</span> <span class="n">cop</span> <span class="o">-</span> <span class="n">clipped</span><span class="p">(</span><span class="n">target</span><span class="p">,</span> <span class="n">source_out_at</span><span class="p">(</span><span class="n">cop</span><span class="p">))</span>
+
+    <span class="k">if</span> <span class="n">residual</span><span class="p">(</span><span class="mf">1.0</span><span class="p">)</span> <span class="o">&gt;=</span> <span class="mf">0.0</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">_idle</span><span class="p">(</span><span class="n">sink_in_degc</span><span class="p">,</span> <span class="n">source_in_degc</span><span class="p">,</span> <span class="s2">"COP ≤ 1 at these temperatures"</span><span class="p">)</span>
+
+    <span class="n">branch</span> <span class="o">=</span> <span class="s2">"target"</span>
+    <span class="n">available</span> <span class="o">=</span> <span class="p">(</span><span class="n">source_in_degc</span> <span class="o">-</span> <span class="n">t_min</span><span class="p">)</span> <span class="o">*</span> <span class="n">c_s</span> <span class="o">/</span> <span class="n">q_h_target</span>  <span class="c1"># = 1 - 1/COP at the source floor</span>
+    <span class="k">if</span> <span class="n">available</span> <span class="o">&gt;=</span> <span class="mf">1.0</span><span class="p">:</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">math</span><span class="o">.</span><span class="n">isfinite</span><span class="p">(</span><span class="n">model</span><span class="o">.</span><span class="n">uncapped</span><span class="p">(</span><span class="n">target</span><span class="p">,</span> <span class="n">source_in_degc</span> <span class="o">-</span> <span class="n">q_h_target</span> <span class="o">/</span> <span class="n">c_s</span><span class="p">)):</span>
+            <span class="k">return</span> <span class="n">_idle</span><span class="p">(</span><span class="n">sink_in_degc</span><span class="p">,</span> <span class="n">source_in_degc</span><span class="p">,</span> <span class="s2">"no lift: a heat exchanger suffices"</span><span class="p">)</span>
+        <span class="n">cop_hi</span> <span class="o">=</span> <span class="mf">2.0</span>
+        <span class="k">while</span> <span class="n">residual</span><span class="p">(</span><span class="n">cop_hi</span><span class="p">)</span> <span class="o">&lt;</span> <span class="mf">0.0</span><span class="p">:</span>
+            <span class="n">cop_hi</span> <span class="o">*=</span> <span class="mf">2.0</span>
+            <span class="k">if</span> <span class="n">cop_hi</span> <span class="o">&gt;</span> <span class="n">_COP_CLIP</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">_idle</span><span class="p">(</span><span class="n">sink_in_degc</span><span class="p">,</span> <span class="n">source_in_degc</span><span class="p">,</span> <span class="s2">"no operating point"</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">cop_hi</span> <span class="o">=</span> <span class="mf">1.0</span> <span class="o">/</span> <span class="p">(</span><span class="mf">1.0</span> <span class="o">-</span> <span class="n">available</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">residual</span><span class="p">(</span><span class="n">cop_hi</span><span class="p">)</span> <span class="o">&lt;</span> <span class="mf">0.0</span><span class="p">:</span>
+            <span class="n">branch</span> <span class="o">=</span> <span class="s2">"source_floor"</span>
+
+    <span class="k">if</span> <span class="n">branch</span> <span class="o">==</span> <span class="s2">"target"</span><span class="p">:</span>
+        <span class="n">cop</span> <span class="o">=</span> <span class="n">brentq</span><span class="p">(</span><span class="n">residual</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">,</span> <span class="n">cop_hi</span><span class="p">,</span> <span class="n">xtol</span><span class="o">=</span><span class="mf">1e-14</span><span class="p">,</span> <span class="n">rtol</span><span class="o">=</span><span class="mf">1e-15</span><span class="p">,</span> <span class="n">maxiter</span><span class="o">=</span><span class="mi">500</span><span class="p">)</span>
+        <span class="n">sink_out</span> <span class="o">=</span> <span class="n">target</span>
+        <span class="n">source_out</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="n">source_out_at</span><span class="p">(</span><span class="n">cop</span><span class="p">),</span> <span class="n">t_min</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">q_s</span> <span class="o">=</span> <span class="n">c_s</span> <span class="o">*</span> <span class="p">(</span><span class="n">source_in_degc</span> <span class="o">-</span> <span class="n">t_min</span><span class="p">)</span>
+        <span class="n">sink_low</span> <span class="o">=</span> <span class="n">sink_in_degc</span> <span class="o">+</span> <span class="n">q_s</span> <span class="o">/</span> <span class="n">c_h</span>  <span class="c1"># sink outlet at COP → ∞</span>
+
+        <span class="k">def</span><span class="w"> </span><span class="nf">floor_residual</span><span class="p">(</span><span class="n">sink_out</span><span class="p">):</span>
+            <span class="n">q_h</span> <span class="o">=</span> <span class="n">c_h</span> <span class="o">*</span> <span class="p">(</span><span class="n">sink_out</span> <span class="o">-</span> <span class="n">sink_in_degc</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">q_h</span> <span class="o">/</span> <span class="p">(</span><span class="n">q_h</span> <span class="o">-</span> <span class="n">q_s</span><span class="p">)</span> <span class="o">-</span> <span class="n">clipped</span><span class="p">(</span><span class="n">sink_out</span><span class="p">,</span> <span class="n">t_min</span><span class="p">)</span>
+
+        <span class="c1"># Scan down from the target (GEMINI starts there) for the first sign change.</span>
+        <span class="n">upper</span> <span class="o">=</span> <span class="n">target</span>
+        <span class="n">lower</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="n">steps</span> <span class="o">=</span> <span class="mi">400</span>
+        <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">steps</span> <span class="o">+</span> <span class="mi">1</span><span class="p">):</span>
+            <span class="n">fraction</span> <span class="o">=</span> <span class="mf">1.0</span> <span class="o">-</span> <span class="n">k</span> <span class="o">/</span> <span class="n">steps</span> <span class="k">if</span> <span class="n">k</span> <span class="o">&lt;</span> <span class="n">steps</span> <span class="k">else</span> <span class="mf">1e-9</span>
+            <span class="n">candidate</span> <span class="o">=</span> <span class="n">sink_low</span> <span class="o">+</span> <span class="p">(</span><span class="n">target</span> <span class="o">-</span> <span class="n">sink_low</span><span class="p">)</span> <span class="o">*</span> <span class="n">fraction</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">math</span><span class="o">.</span><span class="n">isfinite</span><span class="p">(</span><span class="n">model</span><span class="o">.</span><span class="n">uncapped</span><span class="p">(</span><span class="n">candidate</span><span class="p">,</span> <span class="n">t_min</span><span class="p">)):</span>
+                <span class="k">break</span>  <span class="c1"># no lift below this sink outlet</span>
+            <span class="k">if</span> <span class="n">floor_residual</span><span class="p">(</span><span class="n">candidate</span><span class="p">)</span> <span class="o">&gt;=</span> <span class="mf">0.0</span><span class="p">:</span>
+                <span class="n">lower</span> <span class="o">=</span> <span class="n">candidate</span>
+                <span class="k">break</span>
+            <span class="n">upper</span> <span class="o">=</span> <span class="n">candidate</span>
+        <span class="k">if</span> <span class="n">lower</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">_idle</span><span class="p">(</span><span class="n">sink_in_degc</span><span class="p">,</span> <span class="n">source_in_degc</span><span class="p">,</span> <span class="s2">"no operating point at the source floor"</span><span class="p">)</span>
+        <span class="n">sink_out</span> <span class="o">=</span> <span class="n">brentq</span><span class="p">(</span><span class="n">floor_residual</span><span class="p">,</span> <span class="n">lower</span><span class="p">,</span> <span class="n">upper</span><span class="p">,</span> <span class="n">xtol</span><span class="o">=</span><span class="mf">1e-12</span><span class="p">,</span> <span class="n">rtol</span><span class="o">=</span><span class="mf">1e-15</span><span class="p">,</span> <span class="n">maxiter</span><span class="o">=</span><span class="mi">500</span><span class="p">)</span>
+        <span class="n">source_out</span> <span class="o">=</span> <span class="n">t_min</span>
+
+    <span class="n">cop</span> <span class="o">=</span> <span class="n">model</span><span class="p">(</span><span class="n">sink_out</span><span class="p">,</span> <span class="n">source_out</span><span class="p">)</span>
+    <span class="c1"># No lift on the water side (uncapped COP infinite): the cap must not make the pump run.</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">cop</span> <span class="o">&lt;</span> <span class="n">_COP_CLIP</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">math</span><span class="o">.</span><span class="n">isfinite</span><span class="p">(</span><span class="n">model</span><span class="o">.</span><span class="n">uncapped</span><span class="p">(</span><span class="n">sink_out</span><span class="p">,</span> <span class="n">source_out</span><span class="p">)):</span>
+        <span class="k">return</span> <span class="n">_idle</span><span class="p">(</span><span class="n">sink_in_degc</span><span class="p">,</span> <span class="n">source_in_degc</span><span class="p">,</span> <span class="s2">"no lift: a heat exchanger suffices"</span><span class="p">)</span>
+    <span class="n">sink_heat</span> <span class="o">=</span> <span class="n">c_h</span> <span class="o">*</span> <span class="p">(</span><span class="n">sink_out</span> <span class="o">-</span> <span class="n">sink_in_degc</span><span class="p">)</span>
+    <span class="n">power_el</span> <span class="o">=</span> <span class="n">sink_heat</span> <span class="o">/</span> <span class="n">cop</span>
+    <span class="n">warnings</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">if</span> <span class="n">branch</span> <span class="o">==</span> <span class="s2">"source_floor"</span><span class="p">:</span>
+        <span class="n">warnings</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">"source outlet held at Ts_in_minimum </span><span class="si">{</span><span class="n">t_min</span><span class="si">:</span><span class="s2">g</span><span class="si">}</span><span class="s2"> °C: sink outlet "</span>
+            <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">sink_out</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2"> °C below the </span><span class="si">{</span><span class="n">target</span><span class="si">:</span><span class="s2">g</span><span class="si">}</span><span class="s2"> °C target"</span>
+        <span class="p">)</span>
+    <span class="k">return</span> <span class="p">{</span>
+        <span class="s2">"running"</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span>
+        <span class="s2">"cop"</span><span class="p">:</span> <span class="n">cop</span><span class="p">,</span>
+        <span class="s2">"cop_uncapped"</span><span class="p">:</span> <span class="n">model</span><span class="o">.</span><span class="n">uncapped</span><span class="p">(</span><span class="n">sink_out</span><span class="p">,</span> <span class="n">source_out</span><span class="p">),</span>
+        <span class="s2">"sink_out_degc"</span><span class="p">:</span> <span class="n">sink_out</span><span class="p">,</span>
+        <span class="s2">"source_out_degc"</span><span class="p">:</span> <span class="n">source_out</span><span class="p">,</span>
+        <span class="s2">"sink_heat_w"</span><span class="p">:</span> <span class="n">sink_heat</span><span class="p">,</span>
+        <span class="s2">"source_heat_w"</span><span class="p">:</span> <span class="n">sink_heat</span> <span class="o">-</span> <span class="n">power_el</span><span class="p">,</span>
+        <span class="s2">"power_el_w"</span><span class="p">:</span> <span class="n">power_el</span><span class="p">,</span>
+        <span class="s2">"branch"</span><span class="p">:</span> <span class="n">branch</span><span class="p">,</span>
+        <span class="s2">"warnings"</span><span class="p">:</span> <span class="n">warnings</span><span class="p">,</span>
+    <span class="p">}</span></div>
+
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_datasheet_value</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">low</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">high</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+    <span class="k">if</span> <span class="n">value</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">None</span>
+    <span class="n">value</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">math</span><span class="o">.</span><span class="n">isfinite</span><span class="p">(</span><span class="n">value</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2"> must be finite, got </span><span class="si">{</span><span class="n">value</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">low</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">value</span> <span class="o">&lt;=</span> <span class="n">low</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2"> must be &gt; </span><span class="si">{</span><span class="n">low</span><span class="si">}</span><span class="s2">, got </span><span class="si">{</span><span class="n">value</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">high</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">value</span> <span class="o">&gt;</span> <span class="n">high</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2"> must be ≤ </span><span class="si">{</span><span class="n">high</span><span class="si">}</span><span class="s2">, got </span><span class="si">{</span><span class="n">value</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">value</span>
+
+
+<div class="viewcode-block" id="hthp_limits">
+<a class="viewcode-back" href="../../../codedocumentation/gemini_model.heatpump.closed_form.html#gemini_model.heatpump.closed_form.hthp_limits">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">hthp_limits</span><span class="p">(</span>
+    <span class="n">datasheet</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">max_lift_k</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">max_sink_temperature_degc</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">max_carnot_fraction</span><span class="o">=</span><span class="kc">None</span>
+<span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Return the HTHP limits in force: cited datasheet values, else RC-04 defaults / MISSING.</span>
+
+<span class="sd">    Datasheet values need a ``datasheet`` citation (never invented). Returns a dict with</span>
+<span class="sd">    ``max_lift_k`` / ``max_carnot_fraction`` in force, the datasheet-only values (None when</span>
+<span class="sd">    missing) for the verifier's ``HeatPumpPoint``, ``max_sink_temperature_degc`` (None = MISSING,</span>
+<span class="sd">    not checked), ``missing_inputs``, ``assumption_ids`` (VER-HP-LIFT / VER-HP-ETA when their</span>
+<span class="sd">    defaults apply) and ``limits_source``.</span>
+<span class="sd">    """</span>
+    <span class="n">lift</span> <span class="o">=</span> <span class="n">_datasheet_value</span><span class="p">(</span><span class="n">max_lift_k</span><span class="p">,</span> <span class="s2">"max_lift_k"</span><span class="p">,</span> <span class="n">low</span><span class="o">=</span><span class="mf">0.0</span><span class="p">)</span>
+    <span class="n">sink</span> <span class="o">=</span> <span class="n">_datasheet_value</span><span class="p">(</span><span class="n">max_sink_temperature_degc</span><span class="p">,</span> <span class="s2">"max_sink_temperature_degc"</span><span class="p">)</span>
+    <span class="n">fraction</span> <span class="o">=</span> <span class="n">_datasheet_value</span><span class="p">(</span><span class="n">max_carnot_fraction</span><span class="p">,</span> <span class="s2">"max_carnot_fraction"</span><span class="p">,</span> <span class="n">low</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span> <span class="n">high</span><span class="o">=</span><span class="mf">1.0</span><span class="p">)</span>
+    <span class="n">given</span> <span class="o">=</span> <span class="p">[</span><span class="n">v</span> <span class="k">for</span> <span class="n">v</span> <span class="ow">in</span> <span class="p">(</span><span class="n">lift</span><span class="p">,</span> <span class="n">sink</span><span class="p">,</span> <span class="n">fraction</span><span class="p">)</span> <span class="k">if</span> <span class="n">v</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">]</span>
+    <span class="k">if</span> <span class="n">given</span> <span class="ow">and</span> <span class="ow">not</span> <span class="p">(</span><span class="nb">isinstance</span><span class="p">(</span><span class="n">datasheet</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span> <span class="ow">and</span> <span class="n">datasheet</span><span class="o">.</span><span class="n">strip</span><span class="p">()):</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="s2">"HTHP limits (max_lift_k, max_sink_temperature_degc, max_carnot_fraction) need a "</span>
+            <span class="s2">"cited 'datasheet' (RC-04: never invent them)"</span>
+        <span class="p">)</span>
+    <span class="n">missing</span> <span class="o">=</span> <span class="p">[</span>
+        <span class="n">name</span>
+        <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="p">(</span>
+            <span class="p">(</span><span class="s2">"max_lift_k"</span><span class="p">,</span> <span class="n">lift</span><span class="p">),</span>
+            <span class="p">(</span><span class="s2">"max_sink_temperature_degc"</span><span class="p">,</span> <span class="n">sink</span><span class="p">),</span>
+            <span class="p">(</span><span class="s2">"max_carnot_fraction"</span><span class="p">,</span> <span class="n">fraction</span><span class="p">),</span>
+        <span class="p">)</span>
+        <span class="k">if</span> <span class="n">value</span> <span class="ow">is</span> <span class="kc">None</span>
+    <span class="p">]</span>
+    <span class="n">assumption_ids</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">if</span> <span class="n">fraction</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">assumption_ids</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">CARNOT_FRACTION_ID</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">lift</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">assumption_ids</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">MAX_LIFT_ID</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">missing</span><span class="p">:</span>
+        <span class="n">source</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="sa">f</span><span class="s2">"MISSING HTHP datasheet values </span><span class="si">{</span><span class="n">missing</span><span class="si">}</span><span class="s2">: RC-04 defaults "</span>
+            <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="s1">', '</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">assumption_ids</span><span class="p">)</span><span class="w"> </span><span class="ow">or</span><span class="w"> </span><span class="s1">'none'</span><span class="si">}</span><span class="s2">; max sink temperature "</span>
+            <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="s1">'not checked'</span><span class="w"> </span><span class="k">if</span><span class="w"> </span><span class="n">sink</span><span class="w"> </span><span class="ow">is</span><span class="w"> </span><span class="kc">None</span><span class="w"> </span><span class="k">else</span><span class="w"> </span><span class="s1">'from the datasheet'</span><span class="si">}</span><span class="s2">"</span>
+        <span class="p">)</span>
+        <span class="k">if</span> <span class="n">datasheet</span><span class="p">:</span>
+            <span class="n">source</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">"datasheet: </span><span class="si">{</span><span class="n">datasheet</span><span class="si">}</span><span class="s2">; "</span> <span class="o">+</span> <span class="n">source</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">source</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">"datasheet: </span><span class="si">{</span><span class="n">datasheet</span><span class="si">}</span><span class="s2">"</span>
+    <span class="k">return</span> <span class="p">{</span>
+        <span class="s2">"max_lift_k"</span><span class="p">:</span> <span class="n">RC04_DEFAULT_MAX_LIFT_K</span> <span class="k">if</span> <span class="n">lift</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">lift</span><span class="p">,</span>
+        <span class="s2">"max_carnot_fraction"</span><span class="p">:</span> <span class="n">RC04_DEFAULT_CARNOT_FRACTION</span> <span class="k">if</span> <span class="n">fraction</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">fraction</span><span class="p">,</span>
+        <span class="s2">"datasheet_max_lift_k"</span><span class="p">:</span> <span class="n">lift</span><span class="p">,</span>
+        <span class="s2">"datasheet_max_carnot_fraction"</span><span class="p">:</span> <span class="n">fraction</span><span class="p">,</span>
+        <span class="s2">"max_sink_temperature_degc"</span><span class="p">:</span> <span class="n">sink</span><span class="p">,</span>
+        <span class="s2">"missing_inputs"</span><span class="p">:</span> <span class="n">missing</span><span class="p">,</span>
+        <span class="s2">"assumption_ids"</span><span class="p">:</span> <span class="n">assumption_ids</span><span class="p">,</span>
+        <span class="s2">"limits_source"</span><span class="p">:</span> <span class="n">source</span><span class="p">,</span>
+    <span class="p">}</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, TNO.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
